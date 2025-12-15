@@ -88,14 +88,6 @@ export function hasAnyRole(user: User | null, roles: Array<"patient" | "doctor" 
   
   // Fallback to deprecated role field
   return roles.includes(user.role as any);
-  userRoles?: {
-    patient?: boolean;
-    doctor?: boolean;
-    admin?: boolean;
-    brand?: boolean;
-    affiliate?: boolean;
-    superAdmin?: boolean;
-  };
 }
 
 // Check if user is authenticated by calling the backend
