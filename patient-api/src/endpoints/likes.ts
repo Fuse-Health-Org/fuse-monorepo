@@ -360,5 +360,149 @@ router.post('/likes/migrate', authenticateJWT, async (req: Request, res: Respons
   }
 });
 
+/**
+ * Admin: Get likes analytics for a product
+ * GET /likes/admin/analytics/:tenantProductId
+ * Requires authentication
+ */
+router.get('/likes/admin/analytics/:tenantProductId', authenticateJWT, async (req: Request, res: Response) => {
+  try {
+    const currentUser = getCurrentUser(req);
+    if (!currentUser) {
+      return res.status(401).json({
+        success: false,
+        error: 'Authentication required',
+      });
+    }
+
+    const { tenantProductId } = req.params;
+
+    // Get total likes count
+    const totalLikes = await Like.count({
+      where: {
+        tenantProductId,
+        liked: true,
+      },
+    });
+
+    // Get likes by logged-in users
+    const userLikes = await Like.count({
+      where: {
+        tenantProductId,
+        liked: true,
+        userId: { [Op.ne]: null },
+      },
+    });
+
+    // Get likes by anonymous users
+    const anonymousLikes = await Like.count({
+      where: {
+        tenantProductId,
+        liked: true,
+        anonymousId: { [Op.ne]: null },
+      },
+    });
+
+    // Get recent likes (last 30 days) with daily breakdown
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const recentLikes = await Like.findAll({
+      where: {
+        tenantProductId,
+        liked: true,
+        createdAt: { [Op.gte]: thirtyDaysAgo },
+      },
+      attributes: ['createdAt'],
+      order: [['createdAt', 'ASC']],
+    });
+
+    // Group by day
+    const dailyLikes: Record<string, number> = {};
+    recentLikes.forEach((like) => {
+      const date = new Date(like.createdAt).toISOString().split('T')[0];
+      dailyLikes[date] = (dailyLikes[date] || 0) + 1;
+    });
+
+    // Convert to array for charting
+    const dailyLikesArray = Object.entries(dailyLikes).map(([date, count]) => ({
+      date,
+      count,
+    }));
+
+    return res.json({
+      success: true,
+      data: {
+        totalLikes,
+        userLikes,
+        anonymousLikes,
+        dailyLikes: dailyLikesArray,
+      },
+    });
+  } catch (error) {
+    console.error('❌ Error getting likes analytics:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to get likes analytics',
+    });
+  }
+});
+
+/**
+ * Admin: Get likes count for multiple products (for product list page)
+ * POST /likes/admin/counts
+ * Body: { tenantProductIds: string[] }
+ * Requires authentication
+ */
+router.post('/likes/admin/counts', authenticateJWT, async (req: Request, res: Response) => {
+  try {
+    const currentUser = getCurrentUser(req);
+    if (!currentUser) {
+      return res.status(401).json({
+        success: false,
+        error: 'Authentication required',
+      });
+    }
+
+    const { tenantProductIds } = req.body;
+
+    if (!tenantProductIds || !Array.isArray(tenantProductIds)) {
+      return res.status(400).json({
+        success: false,
+        error: 'tenantProductIds array is required',
+      });
+    }
+
+    // Get like counts for all products
+    const likes = await Like.findAll({
+      where: {
+        tenantProductId: { [Op.in]: tenantProductIds },
+        liked: true,
+      },
+      attributes: ['tenantProductId'],
+    });
+
+    // Count likes per product
+    const likeCounts: Record<string, number> = {};
+    tenantProductIds.forEach((id: string) => {
+      likeCounts[id] = 0;
+    });
+    likes.forEach((like) => {
+      likeCounts[like.tenantProductId] = (likeCounts[like.tenantProductId] || 0) + 1;
+    });
+
+    return res.json({
+      success: true,
+      data: likeCounts,
+    });
+  } catch (error) {
+    console.error('❌ Error getting likes counts:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to get likes counts',
+    });
+  }
+});
+
 export default router;
 
