@@ -11,10 +11,10 @@ const WeightLossPage: React.FC = () => {
     setIsModalOpen(true);
   }, []);
 
-  // Handle modal close - redirect back to treatments
+  // Handle modal close - stay on current subdomain and go to home page
   const handleModalClose = () => {
     setIsModalOpen(false);
-    router.push('/treatments');
+    window.location.href = window.location.origin + '/';
   };
 
   return (

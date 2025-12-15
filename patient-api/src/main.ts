@@ -4,6 +4,7 @@ import helmet from "helmet";
 import cors from "cors";
 import multer from "multer";
 import dns from "dns/promises";
+import jwt from "jsonwebtoken";
 import { initializeDatabase } from "./config/database";
 import { MailsSender } from "./services/mailsSender";
 import Treatment from "./models/Treatment";
@@ -125,6 +126,8 @@ import { templateRoutes } from "./features/templates";
 import { contactRoutes } from "./features/contacts";
 import { tagRoutes } from "./features/tags";
 import { GlobalFees } from "./models/GlobalFees";
+import SupportTicket from "./models/SupportTicket";
+import TicketMessage from "./models/TicketMessage";
 
 // Helper function to fetch global fees from database
 async function getGlobalFees() {
@@ -240,22 +243,22 @@ app.use(
       const allowedOrigins =
         process.env.NODE_ENV === "production"
           ? [
-              process.env.FRONTEND_URL,
-              // Add additional production domains via environment variables only
-              process.env.ADDITIONAL_ALLOWED_ORIGINS?.split(",").map((o) =>
-                o.trim()
-              ),
-            ]
-              .flat()
-              .filter(Boolean)
+            process.env.FRONTEND_URL,
+            // Add additional production domains via environment variables only
+            process.env.ADDITIONAL_ALLOWED_ORIGINS?.split(",").map((o) =>
+              o.trim()
+            ),
+          ]
+            .flat()
+            .filter(Boolean)
           : [
-              "http://localhost:3000",
-              "http://localhost:3002",
-              "http://localhost:3003",
-              "http://localhost:3005",
-              "http://localhost:3030",
-              // Development only - no production domains
-            ];
+            "http://localhost:3000",
+            "http://localhost:3002",
+            "http://localhost:3003",
+            "http://localhost:3005",
+            "http://localhost:3030",
+            // Development only - no production domains
+          ];
 
       // SECURITY: Validate all origins are HTTPS in production
       if (process.env.NODE_ENV === "production") {
@@ -1091,59 +1094,28 @@ app.get("/auth/google/callback", async (req, res) => {
       return res.redirect(redirectUrl);
     }
 
-    // Non-superAdmin: Require MFA even for Google OAuth
-    const otpCode = MfaToken.generateCode();
-    const mfaSessionToken = MfaToken.generateMfaToken();
-    const expiresAt = MfaToken.getExpirationTime();
+    // Google OAuth: Skip MFA - Google already provides strong authentication
+    // Update last login time
+    await user.updateLastLogin();
 
-    // Delete any existing MFA tokens for this user (cleanup)
-    await MfaToken.destroy({ where: { userId: user.id } });
+    // Create JWT token
+    const token = createJWTToken(user);
 
-    // Create new MFA token record
-    await MfaToken.create({
-      userId: user.id,
-      code: otpCode,
-      mfaToken: mfaSessionToken,
-      expiresAt,
+    if (process.env.NODE_ENV === "development") {
+      console.log(`🔓 Google OAuth: MFA skipped for user ${user.id}`);
+    }
+
+    // HIPAA Audit: Log successful Google OAuth login
+    await AuditService.logLogin(req, {
+      id: user.id,
       email: user.email,
-      verified: false,
-      resendCount: 0,
-      failedAttempts: 0,
-    });
-
-    // Send OTP email
-    const emailSent = await MailsSender.sendMfaCode(
-      user.email,
-      otpCode,
-      user.firstName
-    );
-
-    if (!emailSent) {
-      console.error("❌ Failed to send MFA code email");
-      return res.redirect(
-        `${returnUrl}?googleAuth=error&reason=mfa_email_failed`
-      );
-    }
-
-    // HIPAA Audit: Log MFA code sent (Google OAuth callback)
-    await AuditService.log({
-      action: AuditAction.MFA_CODE_SENT,
-      resourceType: AuditResourceType.USER,
-      resourceId: user.id,
-      userId: user.id,
       clinicId: user.clinicId,
-      details: { email: user.email, method: "google_oauth_callback" },
-      ipAddress: req.ip || req.connection?.remoteAddress,
-      userAgent: req.headers["user-agent"],
     });
 
+    // Redirect back to frontend with token
+    const redirectUrl = `${returnUrl}?googleAuth=success&skipAccount=true&token=${token}&user=${encodeURIComponent(JSON.stringify(user.toSafeJSON()))}`;
     if (process.env.NODE_ENV === "development") {
-      console.log("🔐 MFA code sent to Google user (callback)");
-    }
-    // Redirect to frontend with MFA required flag
-    const redirectUrl = `${returnUrl}?googleAuth=mfa_required&mfaToken=${mfaSessionToken}&email=${encodeURIComponent(user.email)}`;
-    if (process.env.NODE_ENV === "development") {
-      console.log("🔗 Redirecting to MFA");
+      console.log("🔗 Redirecting with token");
     }
     res.redirect(redirectUrl);
   } catch (error) {
@@ -1155,7 +1127,7 @@ app.get("/auth/google/callback", async (req, res) => {
     }
     const returnUrl = req.query.state
       ? JSON.parse(Buffer.from(req.query.state as string, "base64").toString())
-          .returnUrl
+        .returnUrl
       : "http://localhost:3000";
     res.redirect(`${returnUrl}?googleAuth=error`);
   }
@@ -1239,63 +1211,31 @@ app.post("/auth/google", async (req, res) => {
       });
     }
 
-    // Non-superAdmin: Require MFA even for Google OAuth
-    const otpCode = MfaToken.generateCode();
-    const mfaSessionToken = MfaToken.generateMfaToken();
-    const expiresAt = MfaToken.getExpirationTime();
+    // Google OAuth: Skip MFA - Google already provides strong authentication
+    // Update last login time
+    await user.updateLastLogin();
 
-    // Delete any existing MFA tokens for this user (cleanup)
-    await MfaToken.destroy({ where: { userId: user.id } });
-
-    // Create new MFA token record
-    await MfaToken.create({
-      userId: user.id,
-      code: otpCode,
-      mfaToken: mfaSessionToken,
-      expiresAt,
-      email: user.email,
-      verified: false,
-      resendCount: 0,
-      failedAttempts: 0,
-    });
-
-    // Send OTP email
-    const emailSent = await MailsSender.sendMfaCode(
-      user.email,
-      otpCode,
-      user.firstName
-    );
-
-    if (!emailSent) {
-      console.error("❌ Failed to send MFA code email");
-      return res.status(500).json({
-        success: false,
-        message: "Failed to send verification code. Please try again.",
-      });
-    }
-
-    // HIPAA Audit: Log MFA code sent (Google OAuth)
-    await AuditService.log({
-      action: AuditAction.MFA_CODE_SENT,
-      resourceType: AuditResourceType.USER,
-      resourceId: user.id,
-      userId: user.id,
-      clinicId: user.clinicId,
-      details: { email: user.email, method: "google_oauth" },
-      ipAddress: req.ip || req.connection?.remoteAddress,
-      userAgent: req.headers["user-agent"],
-    });
+    // Create JWT token directly
+    const token = createJWTToken(user);
 
     if (process.env.NODE_ENV === "development") {
-      console.log("🔐 MFA code sent to Google user");
+      console.log(`🔓 Google OAuth: MFA skipped for user ${user.id}`);
     }
 
-    // Return MFA required response
+    // HIPAA Audit: Log successful Google OAuth login
+    await AuditService.logLogin(req, {
+      id: user.id,
+      email: user.email,
+      clinicId: user.clinicId,
+    });
+
+    // Return success with token
     res.status(200).json({
       success: true,
-      requiresMfa: true,
-      mfaToken: mfaSessionToken,
-      message: "Verification code sent to your email",
+      requiresMfa: false,
+      token: token,
+      user: user.toSafeJSON(),
+      message: "Authentication successful",
     });
   } catch (error) {
     // HIPAA: Do not log detailed errors in production
@@ -2034,22 +1974,29 @@ app.get("/auth/me", authenticateJWT, async (req, res) => {
     // Get user data from JWT
     const currentUser = getCurrentUser(req);
 
-      // Optionally fetch fresh user data from database
-      const user = await User.findByPk(currentUser?.id, {
-        include: [{ model: UserRoles, as: "userRoles", required: false }],
+    // Fetch fresh user data from database with UserRoles
+    const user = await User.findByPk(currentUser?.id, {
+      include: [{ model: UserRoles, as: 'userRoles', required: false }],
+    });
+    if (!user) {
+      // User was deleted from database but JWT token still exists
+      return res.status(401).json({
+        success: false,
+        message: "User not found",
       });
-      if (!user) {
-        // User was deleted from database but JWT token still exists
-        return res.status(401).json({
-          success: false,
-          message: "User not found",
-        });
-      }
+    }
 
-      res.status(200).json({
-        success: true,
-        user: user.toSafeJSON(),
-      });
+    // Include impersonation fields from JWT if present
+    const userData = user.toSafeJSON();
+    if (currentUser?.impersonating) {
+      userData.impersonating = true;
+      userData.impersonatedBy = currentUser.impersonatedBy;
+    }
+
+    res.status(200).json({
+      success: true,
+      user: userData,
+    });
   } catch (error) {
     if (process.env.NODE_ENV === "development") {
       console.error("❌ Auth check error occurred:", error);
@@ -2667,6 +2614,71 @@ app.post("/custom-website", authenticateJWT, async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to save portal settings"
+    });
+  }
+});
+
+// Toggle custom website active status
+app.post("/custom-website/toggle-active", authenticateJWT, async (req, res) => {
+  try {
+    const currentUser = getCurrentUser(req);
+    if (!currentUser) {
+      return res.status(401).json({
+        success: false,
+        message: "Not authenticated"
+      });
+    }
+
+    const user = await User.findByPk(currentUser.id);
+    if (!user || !user.clinicId) {
+      return res.status(404).json({
+        success: false,
+        message: "User or clinic not found"
+      });
+    }
+
+    // Only allow brand users to toggle portal status
+    if (!user.hasAnyRoleSync(['brand', 'doctor'])) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied"
+      });
+    }
+
+    const { isActive } = req.body;
+    if (typeof isActive !== 'boolean') {
+      return res.status(400).json({
+        success: false,
+        message: "isActive must be a boolean"
+      });
+    }
+
+    let customWebsite = await CustomWebsite.findOne({
+      where: { clinicId: user.clinicId }
+    });
+
+    if (customWebsite) {
+      await customWebsite.update({ isActive });
+    } else {
+      // Create a new custom website with default values and the specified isActive state
+      customWebsite = await CustomWebsite.create({
+        clinicId: user.clinicId,
+        isActive
+      });
+    }
+
+    console.log(`🌐 Custom website ${isActive ? 'activated' : 'deactivated'} for clinic:`, user.clinicId);
+
+    res.status(200).json({
+      success: true,
+      message: `Portal ${isActive ? 'activated' : 'deactivated'} successfully`,
+      data: customWebsite
+    });
+  } catch (error) {
+    console.error('Error toggling custom website status:', error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to toggle portal status"
     });
   }
 });
@@ -3366,7 +3378,7 @@ app.get("/products/:id", async (req, res) => {
         } catch (e: any) {
           const isUniqueViolation = Boolean(
             e?.name === "SequelizeUniqueConstraintError" ||
-              e?.parent?.code === "23505"
+            e?.parent?.code === "23505"
           );
           if (!isUniqueViolation) {
             if (process.env.NODE_ENV === "development") {
@@ -4531,11 +4543,11 @@ app.get(
 
       const brandTreatments = treatmentIds.length
         ? await BrandTreatment.findAll({
-            where: {
-              userId: currentUser.id,
-              treatmentId: treatmentIds,
-            },
-          })
+          where: {
+            userId: currentUser.id,
+            treatmentId: treatmentIds,
+          },
+        })
         : [];
 
       const brandTreatmentByTreatmentId = new Map(
@@ -5033,22 +5045,22 @@ app.get("/getTreatments", authenticateJWT, async (req, res) => {
           // Treatment Plan info
           treatmentPlan: treatmentPlan
             ? {
-                id: treatmentPlan.id,
-                name: treatmentPlan.name,
-                price: treatmentPlan.price,
-                billingInterval: treatmentPlan.billingInterval,
-              }
+              id: treatmentPlan.id,
+              name: treatmentPlan.name,
+              price: treatmentPlan.price,
+              billingInterval: treatmentPlan.billingInterval,
+            }
             : null,
           // Subscription info
           subscription: subscription
             ? {
-                id: subscription.id,
-                status: subscription.status,
-                stripeSubscriptionId: subscription.stripeSubscriptionId,
-                cancelledAt: subscription.cancelledAt,
-                paymentDue: subscription.paymentDue,
-                paidAt: subscription.paidAt,
-              }
+              id: subscription.id,
+              status: subscription.status,
+              stripeSubscriptionId: subscription.stripeSubscriptionId,
+              cancelledAt: subscription.cancelledAt,
+              paymentDue: subscription.paymentDue,
+              paidAt: subscription.paidAt,
+            }
             : null,
           // Order info
           orderId: order.id,
@@ -5729,10 +5741,10 @@ app.post("/orders/create-payment-intent", authenticateJWT, async (req, res) => {
       brandAmountUsd = Math.max(
         0,
         totalPaid -
-          platformFeeUsd -
-          stripeFeeUsd -
-          doctorUsd -
-          pharmacyWholesaleTotal
+        platformFeeUsd -
+        stripeFeeUsd -
+        doctorUsd -
+        pharmacyWholesaleTotal
       );
     } catch (e) {
       if (process.env.NODE_ENV === "development") {
@@ -6018,10 +6030,10 @@ app.post(
       const brandAmountUsd = Math.max(
         0,
         totalPaid -
-          platformFeeUsd -
-          stripeFeeUsd -
-          doctorUsd -
-          pharmacyWholesaleUsd
+        platformFeeUsd -
+        stripeFeeUsd -
+        doctorUsd -
+        pharmacyWholesaleUsd
       );
 
       if (process.env.NODE_ENV === "development") {
@@ -6272,7 +6284,7 @@ app.post("/payments/product/sub", async (req, res) => {
     if (authHeader) {
       try {
         currentUser = getCurrentUser(req);
-      } catch {}
+      } catch { }
     }
 
     if (!currentUser) {
@@ -6426,10 +6438,10 @@ app.post("/payments/product/sub", async (req, res) => {
     const brandAmountUsd = Math.max(
       0,
       totalPaid -
-        platformFeeUsd -
-        stripeFeeUsd -
-        doctorUsd -
-        pharmacyWholesaleUsd
+      platformFeeUsd -
+      stripeFeeUsd -
+      doctorUsd -
+      pharmacyWholesaleUsd
     );
 
     console.log("💰 Fee breakdown calculated:", {
@@ -8307,6 +8319,189 @@ app.get(
   }
 );
 
+// Admin: Get list of patients for impersonation
+app.get("/admin/patients/list", authenticateJWT, async (req, res) => {
+  try {
+    const currentUser = getCurrentUser(req);
+    if (!currentUser) {
+      return res.status(401).json({ success: false, message: "Not authenticated" });
+    }
+
+    // Only superAdmins can impersonate
+    const user = await User.findByPk(currentUser.id, {
+      include: [{ model: UserRoles, as: "userRoles", required: false }],
+    });
+    if (!user || !user.hasRoleSync("superAdmin")) {
+      return res.status(403).json({ success: false, message: "Forbidden: SuperAdmin access required" });
+    }
+
+    // Fetch all users with patient role (excluding current user)
+    const patients = await User.findAll({
+      where: {
+        id: { [Op.ne]: currentUser.id }, // Exclude current user
+      },
+      include: [
+        {
+          model: UserRoles,
+          as: "userRoles",
+          where: {
+            patient: true,
+          },
+          required: true,
+        },
+      ],
+      attributes: ["id", "email", "firstName", "lastName"],
+      order: [["email", "ASC"]],
+      limit: 500, // Reasonable limit
+    });
+
+    if (process.env.NODE_ENV === "development") {
+      console.log(`📋 Found ${patients.length} patients available for impersonation`);
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        patients: patients.map((p) => ({
+          id: p.id,
+          email: p.email,
+          firstName: p.firstName,
+          lastName: p.lastName,
+        })),
+      },
+    });
+  } catch (error) {
+    if (process.env.NODE_ENV === "development") {
+      console.error("❌ Error listing patients:", error);
+    }
+    res.status(500).json({ success: false, message: "Failed to list patients" });
+  }
+});
+
+// Admin: Start impersonating a user
+app.post("/admin/impersonate", authenticateJWT, async (req, res) => {
+  try {
+    const currentUser = getCurrentUser(req);
+    if (!currentUser) {
+      return res.status(401).json({ success: false, message: "Not authenticated" });
+    }
+
+    // Only superAdmins can impersonate
+    const admin = await User.findByPk(currentUser.id, {
+      include: [{ model: UserRoles, as: "userRoles", required: false }],
+    });
+    if (!admin || !admin.hasRoleSync("superAdmin")) {
+      return res.status(403).json({ success: false, message: "Forbidden: SuperAdmin access required" });
+    }
+
+    const { userId } = req.body;
+    if (!userId) {
+      return res.status(400).json({ success: false, message: "userId is required" });
+    }
+
+    // Fetch the user to impersonate
+    const targetUser = await User.findByPk(userId, {
+      include: [{ model: UserRoles, as: "userRoles", required: false }],
+    });
+    if (!targetUser) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    // Only allow impersonating patients
+    if (!targetUser.hasRoleSync("patient")) {
+      return res.status(400).json({ success: false, message: "Can only impersonate patients" });
+    }
+
+    // Create impersonation JWT token
+    const impersonationToken = jwt.sign(
+      {
+        userId: targetUser.id,
+        userRole: "patient", // Always patient for impersonation
+        clinicId: targetUser.clinicId,
+        loginTime: new Date().toISOString(),
+        impersonatedBy: admin.id, // Store original admin ID
+        impersonating: true,
+      },
+      process.env.JWT_SECRET!,
+      { expiresIn: "24h" }
+    );
+
+    res.status(200).json({
+      success: true,
+      data: {
+        token: impersonationToken,
+        impersonatedUser: {
+          id: targetUser.id,
+          email: targetUser.email,
+          firstName: targetUser.firstName,
+          lastName: targetUser.lastName,
+        },
+      },
+    });
+  } catch (error) {
+    if (process.env.NODE_ENV === "development") {
+      console.error("❌ Error starting impersonation:", error);
+    }
+    res.status(500).json({ success: false, message: "Failed to start impersonation" });
+  }
+});
+
+// Admin: Exit impersonation and return to original admin account
+app.post("/admin/exit-impersonation", authenticateJWT, async (req, res) => {
+  try {
+    const currentUser = getCurrentUser(req);
+    if (!currentUser) {
+      return res.status(401).json({ success: false, message: "Not authenticated" });
+    }
+
+    // Check if currently impersonating
+    const impersonatedBy = (req as any).user?.impersonatedBy;
+    if (!impersonatedBy) {
+      return res.status(400).json({ success: false, message: "Not currently impersonating" });
+    }
+
+    // Fetch the original admin user
+    const admin = await User.findByPk(impersonatedBy, {
+      include: [{ model: UserRoles, as: "userRoles", required: false }],
+    });
+    if (!admin) {
+      return res.status(404).json({ success: false, message: "Original admin user not found" });
+    }
+
+    // Determine admin role for JWT
+    let adminRole: string = "admin";
+    if (admin.hasRoleSync("superAdmin")) {
+      adminRole = "superAdmin";
+    } else if (admin.hasRoleSync("admin")) {
+      adminRole = "admin";
+    }
+
+    // Create new JWT token for original admin
+    const adminToken = jwt.sign(
+      {
+        userId: admin.id,
+        userRole: adminRole,
+        clinicId: admin.clinicId,
+        loginTime: new Date().toISOString(),
+      },
+      process.env.JWT_SECRET!,
+      { expiresIn: "24h" }
+    );
+
+    res.status(200).json({
+      success: true,
+      data: {
+        token: adminToken,
+      },
+    });
+  } catch (error) {
+    if (process.env.NODE_ENV === "development") {
+      console.error("❌ Error exiting impersonation:", error);
+    }
+    res.status(500).json({ success: false, message: "Failed to exit impersonation" });
+  }
+});
+
 app.get("/questionnaires/templates", authenticateJWT, async (req, res) => {
   try {
     const currentUser = getCurrentUser(req);
@@ -8483,10 +8678,10 @@ app.post("/questionnaires/templates", authenticateJWT, async (req, res) => {
       category,
       formTemplateType:
         formTemplateType === "normal" ||
-        formTemplateType === "user_profile" ||
-        formTemplateType === "doctor" ||
-        formTemplateType === "master_template" ||
-        formTemplateType === "standardized_template"
+          formTemplateType === "user_profile" ||
+          formTemplateType === "doctor" ||
+          formTemplateType === "master_template" ||
+          formTemplateType === "standardized_template"
           ? formTemplateType
           : null,
       createdById: currentUser.id,
@@ -12354,16 +12549,16 @@ app.put("/organization/update", authenticateJWT, async (req, res) => {
       data: {
         clinic: updatedClinic
           ? {
-              id: updatedClinic.id,
-              slug: updatedClinic.slug,
-              name: updatedClinic.name,
-              isCustomDomain: updatedClinic.isCustomDomain,
-              customDomain: updatedClinic.customDomain,
-              logo: updatedClinic.logo,
-              active: updatedClinic.isActive,
-              status: updatedClinic.status,
-              defaultFormColor: updatedClinic.defaultFormColor,
-            }
+            id: updatedClinic.id,
+            slug: updatedClinic.slug,
+            name: updatedClinic.name,
+            isCustomDomain: updatedClinic.isCustomDomain,
+            customDomain: updatedClinic.customDomain,
+            logo: updatedClinic.logo,
+            active: updatedClinic.isActive,
+            status: updatedClinic.status,
+            defaultFormColor: updatedClinic.defaultFormColor,
+          }
           : null,
       },
     });
@@ -13116,6 +13311,12 @@ async function startServer() {
   prescriptionWorker.start();
   console.log("💊 Prescription expiration worker initialized");
 
+  // Initialize Support Ticket Auto-Close Service
+  const SupportTicketAutoCloseService = (await import('./services/supportTicketAutoClose.service')).default;
+  const ticketAutoCloseService = new SupportTicketAutoCloseService();
+  ticketAutoCloseService.start();
+  console.log('🎫 Support ticket auto-close service initialized');
+
   // Start auto-approval service
   const AutoApprovalService = (await import("./services/autoApproval.service"))
     .default;
@@ -13396,6 +13597,10 @@ async function startServer() {
   // ============= CONFIG ENDPOINTS =============
   const configRouter = (await import("./endpoints/config")).default;
   app.use("/config", configRouter);
+
+  // ============= SUPPORT TICKETS ENDPOINTS =============
+  const { registerSupportEndpoints } = await import('./endpoints/support');
+  registerSupportEndpoints(app, authenticateJWT, getCurrentUser);
 
   // ============================================
   // DOCTOR-PATIENT CHAT ENDPOINTS
@@ -13751,11 +13956,11 @@ async function startServer() {
           ...chat.toJSON(),
           patient: patient
             ? {
-                id: patient.id,
-                firstName: patient.firstName,
-                lastName: patient.lastName,
-                email: patient.email,
-              }
+              id: patient.id,
+              firstName: patient.firstName,
+              lastName: patient.lastName,
+              email: patient.email,
+            }
             : null,
         };
 
@@ -15466,12 +15671,12 @@ app.get(
         `📦 [PUBLIC] Found customization:`,
         customization
           ? {
-              id: customization.id,
-              questionnaireId: customization.questionnaireId,
-              customColor: customization.customColor,
-              isActive: customization.isActive,
-              userId: customization.userId,
-            }
+            id: customization.id,
+            questionnaireId: customization.questionnaireId,
+            customColor: customization.customColor,
+            isActive: customization.isActive,
+            userId: customization.userId,
+          }
           : null
       );
 
@@ -15673,8 +15878,8 @@ app.get("/public/products/:productId/pharmacy-coverages", async (req, res) => {
         pharmacyProduct:
           c.assignments && c.assignments.length > 0
             ? {
-                pharmacyProductName: c.assignments[0].pharmacyProductName,
-              }
+              pharmacyProductName: c.assignments[0].pharmacyProductName,
+            }
             : null,
       })),
     });
@@ -15814,15 +16019,15 @@ app.post(
       const sanitized = {
         products: Array.isArray(req.body?.products)
           ? req.body.products.map((p: any) => {
-              const obj: any = { productId: p?.productId };
-              if (
-                typeof p?.questionnaireId === "string" &&
-                p.questionnaireId.length > 0
-              ) {
-                obj.questionnaireId = p.questionnaireId;
-              }
-              return obj;
-            })
+            const obj: any = { productId: p?.productId };
+            if (
+              typeof p?.questionnaireId === "string" &&
+              p.questionnaireId.length > 0
+            ) {
+              obj.questionnaireId = p.questionnaireId;
+            }
+            return obj;
+          })
           : [],
       };
 

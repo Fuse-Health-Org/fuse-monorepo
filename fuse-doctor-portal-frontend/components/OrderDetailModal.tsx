@@ -10,16 +10,18 @@ interface OrderDetailModalProps {
     isOpen: boolean;
     onClose: () => void;
     onApprove?: (orderId: string) => void;
+    onCancel?: (orderId: string) => void;
     onNotesAdded?: () => void;
 }
 
-export function OrderDetailModal({ order, isOpen, onClose, onApprove, onNotesAdded }: OrderDetailModalProps) {
+export function OrderDetailModal({ order, isOpen, onClose, onApprove, onCancel, onNotesAdded }: OrderDetailModalProps) {
     const { authenticatedFetch } = useAuth();
     const apiClient = new ApiClient(authenticatedFetch);
 
     const [notes, setNotes] = useState('');
     const [submittingNotes, setSubmittingNotes] = useState(false);
     const [approving, setApproving] = useState(false);
+    const [cancelling, setCancelling] = useState(false);
     const [pharmacyCoverages, setPharmacyCoverages] = useState<any[]>([]);
     const [loadingCoverage, setLoadingCoverage] = useState(false);
     const [coverageError, setCoverageError] = useState<string | null>(null);
@@ -93,6 +95,32 @@ export function OrderDetailModal({ order, isOpen, onClose, onApprove, onNotesAdd
             toast.error('Failed to approve order');
         } finally {
             setApproving(false);
+        }
+    };
+
+    const handleCancelOrder = async () => {
+        if (!confirm(`Are you sure you want to cancel order ${order.orderNumber}? This action cannot be undone.`)) {
+            return;
+        }
+
+        setCancelling(true);
+        try {
+            const response = await authenticatedFetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/doctor/orders/${order.id}/cancel`, {
+                method: 'POST',
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                toast.success(`Order ${order.orderNumber} cancelled successfully`);
+                onCancel?.(order.id);
+                onClose();
+            } else {
+                toast.error(data.message || 'Failed to cancel order');
+            }
+        } catch (error) {
+            toast.error('Failed to cancel order');
+        } finally {
+            setCancelling(false);
         }
     };
 
@@ -256,60 +284,60 @@ export function OrderDetailModal({ order, isOpen, onClose, onApprove, onNotesAdd
                             <div className="space-y-4">
                                 {pharmacyCoverages.map((pharmacyCoverage, index) => (
                                     <div key={index} className="bg-green-50 border border-green-200 p-4 rounded-lg">
-                                <div className="flex items-center mb-2">
-                                    <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                                        <div className="flex items-center mb-2">
+                                            <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
                                             <p className="text-green-800 font-semibold">
                                                 Coverage Available {pharmacyCoverages.length > 1 ? `(${index + 1}/${pharmacyCoverages.length})` : ''}
                                             </p>
-                                </div>
-                                <div className="space-y-2 text-sm">
+                                        </div>
+                                        <div className="space-y-2 text-sm">
                                             {pharmacyCoverage.coverage.customName && (
                                                 <div>
                                                     <span className="text-gray-600">Product Name:</span>{' '}
                                                     <span className="font-semibold text-gray-900">{pharmacyCoverage.coverage.customName}</span>
                                                 </div>
                                             )}
-                                    <div>
-                                        <span className="text-gray-600">Pharmacy:</span>{' '}
-                                        <span className="font-medium text-gray-900">{pharmacyCoverage.pharmacy.name}</span>
-                                    </div>
-                                    {pharmacyCoverage.coverage.pharmacyProductName && (
-                                        <div>
-                                            <span className="text-gray-600">Pharmacy Product:</span>{' '}
-                                            <span className="font-medium text-gray-900">{pharmacyCoverage.coverage.pharmacyProductName}</span>
+                                            <div>
+                                                <span className="text-gray-600">Pharmacy:</span>{' '}
+                                                <span className="font-medium text-gray-900">{pharmacyCoverage.pharmacy.name}</span>
+                                            </div>
+                                            {pharmacyCoverage.coverage.pharmacyProductName && (
+                                                <div>
+                                                    <span className="text-gray-600">Pharmacy Product:</span>{' '}
+                                                    <span className="font-medium text-gray-900">{pharmacyCoverage.coverage.pharmacyProductName}</span>
+                                                </div>
+                                            )}
+                                            {pharmacyCoverage.coverage.pharmacyProductId && (
+                                                <div>
+                                                    <span className="text-gray-600">SKU:</span>{' '}
+                                                    <span className="font-mono text-sm text-gray-900">{pharmacyCoverage.coverage.pharmacyProductId}</span>
+                                                </div>
+                                            )}
+                                            {pharmacyCoverage.coverage.sig && (
+                                                <div>
+                                                    <span className="text-gray-600">SIG:</span>{' '}
+                                                    <span className="font-medium text-gray-900 italic">{pharmacyCoverage.coverage.sig}</span>
+                                                </div>
+                                            )}
+                                            {pharmacyCoverage.coverage.form && (
+                                                <div>
+                                                    <span className="text-gray-600">Medication Form:</span>{' '}
+                                                    <span className="font-medium text-gray-900">{pharmacyCoverage.coverage.form}</span>
+                                                </div>
+                                            )}
+                                            {pharmacyCoverage.coverage.rxId && (
+                                                <div>
+                                                    <span className="text-gray-600">RX ID:</span>{' '}
+                                                    <span className="font-mono text-sm text-gray-900">{pharmacyCoverage.coverage.rxId}</span>
+                                                </div>
+                                            )}
+                                            {pharmacyCoverage.coverage.pharmacyWholesaleCost && (
+                                                <div>
+                                                    <span className="text-gray-600">Wholesale Cost:</span>{' '}
+                                                    <span className="font-medium text-gray-900">${pharmacyCoverage.coverage.pharmacyWholesaleCost}</span>
+                                                </div>
+                                            )}
                                         </div>
-                                    )}
-                                    {pharmacyCoverage.coverage.pharmacyProductId && (
-                                        <div>
-                                            <span className="text-gray-600">SKU:</span>{' '}
-                                            <span className="font-mono text-sm text-gray-900">{pharmacyCoverage.coverage.pharmacyProductId}</span>
-                                        </div>
-                                    )}
-                                    {pharmacyCoverage.coverage.sig && (
-                                        <div>
-                                            <span className="text-gray-600">SIG:</span>{' '}
-                                            <span className="font-medium text-gray-900 italic">{pharmacyCoverage.coverage.sig}</span>
-                                        </div>
-                                    )}
-                                    {pharmacyCoverage.coverage.form && (
-                                        <div>
-                                            <span className="text-gray-600">Medication Form:</span>{' '}
-                                            <span className="font-medium text-gray-900">{pharmacyCoverage.coverage.form}</span>
-                                        </div>
-                                    )}
-                                    {pharmacyCoverage.coverage.rxId && (
-                                        <div>
-                                            <span className="text-gray-600">RX ID:</span>{' '}
-                                            <span className="font-mono text-sm text-gray-900">{pharmacyCoverage.coverage.rxId}</span>
-                                        </div>
-                                    )}
-                                    {pharmacyCoverage.coverage.pharmacyWholesaleCost && (
-                                        <div>
-                                            <span className="text-gray-600">Wholesale Cost:</span>{' '}
-                                            <span className="font-medium text-gray-900">${pharmacyCoverage.coverage.pharmacyWholesaleCost}</span>
-                                        </div>
-                                    )}
-                                </div>
                                     </div>
                                 ))}
                             </div>
@@ -502,8 +530,15 @@ export function OrderDetailModal({ order, isOpen, onClose, onApprove, onNotesAdd
                                 Close
                             </button>
                             <button
+                                onClick={handleCancelOrder}
+                                disabled={cancelling || approving}
+                                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {cancelling ? 'Cancelling...' : 'Cancel Order'}
+                            </button>
+                            <button
                                 onClick={handleApprove}
-                                disabled={approving || loadingCoverage || !!coverageError || pharmacyCoverages.length === 0}
+                                disabled={approving || cancelling || loadingCoverage || !!coverageError || pharmacyCoverages.length === 0}
                                 className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
                                 title={coverageError ? 'Cannot approve: ' + coverageError : ''}
                             >

@@ -28,6 +28,9 @@ interface EmailVerificationState {
   setShowEmailModal: (show: boolean) => void;
   setEmailModalLoading: (loading: boolean) => void;
   setEmailModalError: (error: string) => void;
+  // Sign-in mode setters
+  setIsSignInOptionsMode?: (mode: boolean) => void;
+  setIsPasswordSignInMode?: (mode: boolean) => void;
 }
 
 export const createEmailVerificationHandlers = (
@@ -69,6 +72,8 @@ export const createEmailVerificationHandlers = (
     state.setVerificationError('');
     state.setIsVerifying(true);
 
+    console.log('🔐 Verifying code for:', state.verificationEmail);
+
     const result = await verifyCode(state.verificationEmail, state.verificationCode);
 
     if (result.success) {
@@ -88,24 +93,19 @@ export const createEmailVerificationHandlers = (
         state.setUserId(result.userData.id);
         state.setAccountCreated(true);
 
-        // Exit verification mode and advance
+        // Exit ALL sign-in modes
         state.setIsEmailVerificationMode(false);
+        state.setIsSignInOptionsMode?.(false);
+        state.setIsPasswordSignInMode?.(false);
         state.setVerificationCode('');
 
-        console.log('✅ Existing user verified, advancing');
-
-        setTimeout(() => {
-          if (state.questionnaire) {
-            const totalSteps = state.getTotalSteps();
-            if (state.currentStepIndex < totalSteps - 1) {
-              state.setCurrentStepIndex((prev: number) => prev + 1);
-            }
-          }
-        }, 150);
+        console.log('✅ Existing user verified, getCurrentQuestionnaireStep will skip user_profile steps');
       } else {
         // New user - email verified, stay on form to complete signup
         state.setAnswers((prev: any) => ({ ...prev, email: result.email || state.verificationEmail }));
         state.setIsEmailVerificationMode(false);
+        state.setIsSignInOptionsMode?.(false);
+        state.setIsPasswordSignInMode?.(false);
         state.setVerificationCode('');
         console.log('✅ New user email verified, continue with signup');
       }
@@ -143,11 +143,19 @@ export const createEmailVerificationHandlers = (
       return;
     }
 
-    // Email already filled, show modal with pre-filled email
-    console.log('📧 Email exists, pre-filling modal');
+    // Email already filled, send code directly
+    console.log('📧 Sending verification code to:', email);
     state.setVerificationEmail(email);
-    state.setShowEmailModal(true);
-    state.setEmailModalError('');
+    sendVerificationCode(email).then(result => {
+      if (result.success) {
+        state.setIsEmailVerificationMode(true);
+        console.log('✅ Verification code sent');
+      } else {
+        state.setShowEmailModal(true);
+        state.setVerificationEmail(email);
+        state.setEmailModalError(result.error || 'Failed to send code');
+      }
+    });
   };
 
   return {
@@ -157,4 +165,3 @@ export const createEmailVerificationHandlers = (
     handleResendCode
   };
 };
-

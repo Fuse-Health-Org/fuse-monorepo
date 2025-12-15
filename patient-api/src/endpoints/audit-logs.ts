@@ -128,7 +128,11 @@ export function registerAuditLogsEndpoints(
             superAdmin: true,
           },
         });
-        superAdminRoles.forEach((r) => superAdminUserIds.add(r.userId));
+        superAdminRoles.forEach((r) => {
+          if (r.superAdmin === true) {
+            superAdminUserIds.add(r.userId);
+          }
+        });
       }
 
       // Add isSuperAdmin flag to each log

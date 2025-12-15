@@ -83,6 +83,12 @@ export function Sidebar() {
     subscription?.customFeatures?.hasAccessToAnalytics ||
     subscription?.tierConfig?.hasAccessToAnalytics ||
     false;
+
+  // Check if user has access to Portal (Standard tier or higher)
+  // Plan types hierarchy: starter < standard < professional
+  const PORTAL_ALLOWED_PLAN_TYPES = ['standard', 'professional', 'enterprise'];
+  const hasAccessToPortal =
+    subscription?.plan?.type && PORTAL_ALLOWED_PLAN_TYPES.includes(subscription.plan.type);
   const fetchSubscriptionBasicInfo = async () => {
     try {
       const response = await authenticatedFetch(`${API_URL}/brand-subscriptions/basic-info`, {
@@ -130,6 +136,11 @@ export function Sidebar() {
       return !hasAccessToAnalytics
     }
 
+    // Portal requires Standard tier or higher
+    if (itemName === 'Portal') {
+      return !hasAccessToPortal
+    }
+
     // If no active subscription, disable everything except Plans and Settings
     if (!hasActiveSubscription) {
       return itemName !== 'Settings'
@@ -145,6 +156,12 @@ export function Sidebar() {
     // Analytics requires upgrade - redirect to plans page
     if (itemName === 'Analytics' && !hasAccessToAnalytics) {
       router.push('/plans?message=Upgrade your plan to access Analytics.')
+      return
+    }
+
+    // Portal requires Standard tier or higher - redirect to plans page
+    if (itemName === 'Portal' && !hasAccessToPortal) {
+      router.push('/plans?message=Upgrade to Standard or higher to access Portal customization.')
       return
     }
 
@@ -180,7 +197,7 @@ export function Sidebar() {
           <div
             className={cn(
               "group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-all cursor-pointer",
-              item.name === 'Analytics' && !hasAccessToAnalytics
+              (item.name === 'Analytics' && !hasAccessToAnalytics) || (item.name === 'Portal' && !hasAccessToPortal)
                 ? "opacity-70 text-muted-foreground/70 hover:bg-sidebar-accent/20 hover:opacity-80"
                 : "opacity-60 grayscale text-muted-foreground/60 hover:bg-sidebar-accent/30 hover:opacity-70",
               isActive
@@ -194,13 +211,13 @@ export function Sidebar() {
             <div className="flex items-center">
               <item.icon className={cn(
                 "mr-3 h-4 w-4",
-                item.name === 'Analytics' && !hasAccessToAnalytics ? "opacity-70" : "opacity-50"
+                (item.name === 'Analytics' && !hasAccessToAnalytics) || (item.name === 'Portal' && !hasAccessToPortal) ? "opacity-70" : "opacity-50"
               )} />
               <span className={cn(
-                item.name === 'Analytics' && !hasAccessToAnalytics ? "opacity-90" : "opacity-75"
+                (item.name === 'Analytics' && !hasAccessToAnalytics) || (item.name === 'Portal' && !hasAccessToPortal) ? "opacity-90" : "opacity-75"
               )}>{item.name}</span>
             </div>
-            {item.name === 'Analytics' && !hasAccessToAnalytics ? (
+            {(item.name === 'Analytics' && !hasAccessToAnalytics) || (item.name === 'Portal' && !hasAccessToPortal) ? (
               <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-100 to-orange-100 text-orange-700 border border-orange-200 font-medium">
                 Upgrade
               </span>
@@ -232,6 +249,8 @@ export function Sidebar() {
           <div className="absolute left-full ml-2 top-1/2 transform -translate-y-1/2 bg-gray-900 text-white text-xs px-2 py-1 rounded shadow-lg z-50 whitespace-nowrap">
             {item.name === 'Analytics' && !hasAccessToAnalytics
               ? '✨ Upgrade to access Analytics'
+              : item.name === 'Portal' && !hasAccessToPortal
+              ? '✨ Upgrade to Standard to customize your Portal'
               : 'Subscription Required'}
           </div>
         )}

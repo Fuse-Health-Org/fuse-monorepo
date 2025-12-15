@@ -562,7 +562,9 @@ export function registerClientManagementEndpoints(
       }
 
       // Get or create UserRoles
-      let userRoles = await UserRoles.findOne({ where: { userId } });
+      let userRoles = await UserRoles.findOne({ 
+        where: { userId }
+      });
 
       if (!userRoles) {
         // Create new UserRoles record
@@ -664,7 +666,9 @@ export function registerClientManagementEndpoints(
       }
 
       // Update UserRoles table - set only the specified role to true, others to false
-      let userRoles = await UserRoles.findOne({ where: { userId } });
+      let userRoles = await UserRoles.findOne({ 
+        where: { userId }
+      });
 
       if (!userRoles) {
         userRoles = await UserRoles.create({

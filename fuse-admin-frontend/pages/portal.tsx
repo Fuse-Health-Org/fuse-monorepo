@@ -1,12 +1,17 @@
 import { useState, useEffect } from "react"
+import { useRouter } from "next/router"
 import { useAuth } from "@/contexts/AuthContext"
 import Layout from "@/components/Layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Monitor, Smartphone, Upload, Link as LinkIcon } from "lucide-react"
+import { Monitor, Smartphone, Upload, Link as LinkIcon, Globe, Crown } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
+
+// Plan types that have access to Portal customization
+const PORTAL_ALLOWED_PLAN_TYPES = ['standard', 'professional', 'enterprise']
 
 const FONT_OPTIONS = [
   { value: "Playfair Display", label: "Playfair Display", description: "Elegant serif font with a classic feel" },
@@ -28,10 +33,12 @@ interface PortalSettings {
   heroImageUrl: string
   heroTitle: string
   heroSubtitle: string
+  isActive: boolean
 }
 
 export default function PortalPage() {
-  const { authenticatedFetch } = useAuth()
+  const router = useRouter()
+  const { authenticatedFetch, subscription } = useAuth()
   const [previewMode, setPreviewMode] = useState<"desktop" | "mobile">("desktop")
   const [isSaving, setIsSaving] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
@@ -48,11 +55,26 @@ export default function PortalPage() {
     heroImageUrl: "https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=1920&q=80",
     heroTitle: "Your Daily Health, Simplified",
     heroSubtitle: "All-in-one nutritional support in one simple drink",
+    isActive: true,
   })
+  const [isTogglingActive, setIsTogglingActive] = useState(false)
+
+  // Check if user has access to Portal based on their subscription plan
+  const hasPortalAccess = subscription?.plan?.type && PORTAL_ALLOWED_PLAN_TYPES.includes(subscription.plan.type)
+
+  // Redirect if user doesn't have portal access
+  useEffect(() => {
+    // Wait for subscription to be loaded before checking access
+    if (subscription !== null && !hasPortalAccess) {
+      router.replace('/plans?message=Upgrade to Standard or higher to access Portal customization.')
+    }
+  }, [subscription, hasPortalAccess, router])
 
   useEffect(() => {
-    loadSettings()
-  }, [])
+    if (hasPortalAccess) {
+      loadSettings()
+    }
+  }, [hasPortalAccess])
 
   const loadSettings = async () => {
     try {
@@ -69,6 +91,7 @@ export default function PortalPage() {
             heroImageUrl: data.data.heroImageUrl || settings.heroImageUrl,
             heroTitle: data.data.heroTitle || settings.heroTitle,
             heroSubtitle: data.data.heroSubtitle || settings.heroSubtitle,
+            isActive: data.data.isActive ?? true,
           })
         }
       }
@@ -98,6 +121,28 @@ export default function PortalPage() {
       alert("Error saving settings")
     } finally {
       setIsSaving(false)
+    }
+  }
+
+  const handleToggleActive = async (checked: boolean) => {
+    setIsTogglingActive(true)
+    try {
+      const response = await authenticatedFetch(`${API_URL}/custom-website/toggle-active`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isActive: checked }),
+      })
+      
+      if (response.ok) {
+        setSettings({ ...settings, isActive: checked })
+      } else {
+        alert("Failed to toggle portal status")
+      }
+    } catch (error) {
+      console.error("Error toggling portal status:", error)
+      alert("Error toggling portal status")
+    } finally {
+      setIsTogglingActive(false)
     }
   }
 
@@ -161,6 +206,28 @@ export default function PortalPage() {
     }
   }
 
+  // Show upgrade required message if user doesn't have access
+  if (subscription !== null && !hasPortalAccess) {
+    return (
+      <Layout>
+        <div className="flex flex-col items-center justify-center h-96 gap-6">
+          <div className="p-4 rounded-full bg-amber-100">
+            <Crown className="h-12 w-12 text-amber-600" />
+          </div>
+          <div className="text-center">
+            <h2 className="text-2xl font-bold mb-2">Upgrade Required</h2>
+            <p className="text-muted-foreground mb-4">
+              Portal customization is available on Standard plan and above.
+            </p>
+            <Button onClick={() => router.push('/plans')}>
+              View Plans
+            </Button>
+          </div>
+        </div>
+      </Layout>
+    )
+  }
+
   if (isLoading) {
     return (
       <Layout>
@@ -178,6 +245,38 @@ export default function PortalPage() {
           <h1 className="text-2xl font-bold">Portal Customization</h1>
           <p className="text-muted-foreground">Customize your patient-facing landing page</p>
         </div>
+
+        {/* Custom Website Activation Toggle */}
+        <Card className={`mb-6 ${settings.isActive ? 'border-green-200 bg-green-50/30' : 'border-gray-200'}`}>
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className={`p-3 rounded-full ${settings.isActive ? 'bg-green-100' : 'bg-gray-100'}`}>
+                  <Globe className={`h-6 w-6 ${settings.isActive ? 'text-green-600' : 'text-gray-400'}`} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold">Custom Website</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {settings.isActive 
+                      ? "Your custom landing page is live and visible to visitors"
+                      : "Enable to show your custom landing page to visitors"}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className={`text-sm font-medium ${settings.isActive ? 'text-green-600' : 'text-gray-500'}`}>
+                  {settings.isActive ? "Activated" : "Deactivated"}
+                </span>
+                <Switch
+                  checked={settings.isActive}
+                  onCheckedChange={handleToggleActive}
+                  disabled={isTogglingActive}
+                  className="data-[state=checked]:bg-green-600"
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Settings Panel */}

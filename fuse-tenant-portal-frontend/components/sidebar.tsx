@@ -10,6 +10,7 @@ import {
   Users,
   Settings,
   DollarSign,
+  MessageSquare,
   Shield,
 } from "lucide-react"
 
@@ -21,6 +22,7 @@ const navigation = [
   { name: "Tier Management", icon: Settings, href: "/tier-management" },
   { name: "Global Fees", icon: DollarSign, href: "/global-fees" },
   { name: "Audit Logs", icon: Shield, href: "/audit-logs" },
+  { name: "Support", icon: MessageSquare, href: "/support" },
 ]
 
 export function Sidebar() {

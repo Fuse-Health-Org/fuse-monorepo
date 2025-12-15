@@ -82,7 +82,9 @@ export class AuditService {
         if (!userId) return false;
 
         try {
-            const userRoles = await UserRoles.findOne({ where: { userId } });
+            const userRoles = await UserRoles.findOne({ 
+                where: { userId }
+            });
             return userRoles?.superAdmin === true;
         } catch (error) {
             // If we can't check, assume not superAdmin and continue logging

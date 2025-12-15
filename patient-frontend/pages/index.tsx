@@ -14,6 +14,7 @@ interface CustomWebsite {
   heroImageUrl?: string;
   heroTitle?: string;
   heroSubtitle?: string;
+  isActive?: boolean;
 }
 
 interface Product {
@@ -33,6 +34,7 @@ export default function LandingPage() {
   const router = useRouter();
   const [customWebsite, setCustomWebsite] = useState<CustomWebsite | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRedirecting, setIsRedirecting] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [productsLoading, setProductsLoading] = useState(true);
   const [hoveredCardIndex, setHoveredCardIndex] = useState<number | null>(null);
@@ -43,6 +45,8 @@ export default function LandingPage() {
         const domainInfo = await extractClinicSlugFromDomain();
         console.log('🔍 Domain info:', domainInfo);
 
+        let websiteData: CustomWebsite | null = null;
+
         // Try to load custom website if we have a clinic slug
         if (domainInfo.hasClinicSubdomain && domainInfo.clinicSlug) {
           console.log('🌐 Fetching custom website for slug:', domainInfo.clinicSlug);
@@ -50,9 +54,9 @@ export default function LandingPage() {
           console.log('✅ Custom website data:', result);
           if (result.success && result.data?.data) {
             // API returns { success, data: { data: {...} } }
-            setCustomWebsite(result.data.data);
+            websiteData = result.data.data;
           } else if (result.success && result.data) {
-            setCustomWebsite(result.data);
+            websiteData = result.data;
           }
         } else {
           // For localhost testing: fetch the default/first available custom website
@@ -62,23 +66,33 @@ export default function LandingPage() {
             console.log('✅ Loaded default custom website:', result);
             if (result.success && result.data?.data) {
               // API returns { success, data: { data: {...} } }
-              setCustomWebsite(result.data.data);
+              websiteData = result.data.data;
             } else if (result.success && result.data) {
-              setCustomWebsite(result.data);
+              websiteData = result.data;
             }
           } catch (error) {
             console.log('ℹ️ No custom website found');
           }
         }
+
+        // Check if custom website is active - if not, redirect to dashboard
+        if (!websiteData || websiteData.isActive === false) {
+          console.log('🔀 Custom website is not active, redirecting to dashboard...');
+          setIsRedirecting(true);
+          router.replace('/dashboard');
+          return; // Don't set isLoading to false - keep showing nothing while redirecting
+        }
+
+        setCustomWebsite(websiteData);
+        setIsLoading(false);
       } catch (error) {
         console.error('❌ Error loading custom website:', error);
-      } finally {
         setIsLoading(false);
       }
     };
 
     loadCustomWebsite();
-  }, []);
+  }, [router]);
 
   // Fetch products
   useEffect(() => {
@@ -296,6 +310,11 @@ export default function LandingPage() {
     logo,
     customWebsite
   });
+
+  // Show nothing while redirecting (prevents flash of content)
+  if (isRedirecting) {
+    return null;
+  }
 
   // Show loading skeleton while fetching custom website
   if (isLoading) {

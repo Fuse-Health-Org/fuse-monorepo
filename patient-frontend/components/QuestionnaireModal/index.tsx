@@ -1,3238 +1,384 @@
-import React, { useMemo, useEffect } from "react";
+import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  Modal,
-  ModalContent,
-  ModalBody,
-  Button,
-  Progress,
-  Input,
-  Textarea,
-  Radio,
-  RadioGroup,
-  Checkbox,
-  CheckboxGroup,
-  Select,
-  SelectItem,
-  Card,
-  CardBody,
-  Chip,
-  Divider
-} from "@heroui/react";
+import { Modal, ModalContent, ModalBody } from "@heroui/react";
 import { Icon } from "@iconify/react";
-import { apiCall } from "../../lib/api";
-import { Elements } from "@stripe/react-stripe-js";
 import { stripePromise } from "../../lib/stripe";
-import { StripePaymentForm } from "../StripePaymentForm";
-import {
-  QuestionnaireModalProps,
-  QuestionnaireData,
-  QuestionnaireStep,
-  PlanOption,
-} from "./types";
-import { createTheme, buildThemeVars } from "./theme";
+import { QuestionnaireModalProps } from "./types";
+import { useClinicFromDomain } from "../../hooks/useClinicFromDomain";
+import { useQuestionnaireModal } from "./hooks/useQuestionnaireModal";
+import { LoadingState } from "./components/LoadingState";
+import { ModalHeader } from "./components/ModalHeader";
+import { CheckoutStepView } from "./components/CheckoutStepView";
+import { ProductSelectionStepView } from "./components/ProductSelectionStepView";
 import { ProgressBar } from "./components/ProgressBar";
 import { StepHeader } from "./components/StepHeader";
-import { QuestionRenderer } from "./components/QuestionRenderer";
-import { CheckoutView } from "./components/CheckoutView";
-import { ProductSelection } from "./components/ProductSelection";
+import { RecommendedTreatmentView } from "./components/RecommendedTreatmentView";
 import { BMICalculator } from "./components/BMICalculator";
-import { replaceVariables, getVariablesFromClinic } from "../../lib/templateVariables";
-import { useClinicFromDomain } from "../../hooks/useClinicFromDomain";
-import { trackFormView, trackFormConversion, trackFormDropOff } from "../../lib/analytics";
-import { signInUser, createUserAccount as createUserAccountAPI, signInWithGoogle } from "./auth";
-import { AccountCreationStep, EmailVerificationStep, EmailInputModal } from "./AccountCreationStep";
-import { createEmailVerificationHandlers } from "./emailVerification";
+import { SuccessStoriesView } from "./components/SuccessStoriesView";
+import {
+  AccountCreationStep,
+  EmailVerificationStep,
+  EmailInputModal,
+  SignInOptionsStep,
+  GoogleMfaStep,
+  PasswordSignInStep
+} from "./AccountCreationStep";
+import { RegularQuestionsView } from "./components/RegularQuestionsView";
+import { InformationalStepView } from "./components/InformationalStepView";
+import { StepNavigationButtons } from "./components/StepNavigationButtons";
 
-export const QuestionnaireModal: React.FC<QuestionnaireModalProps> = ({
-  isOpen,
-  onClose,
-  treatmentId,
-  treatmentName,
-  questionnaireId,
-  productName,
-  productCategory,
-  productFormVariant,
-  globalFormStructure,
-  productPrice,
-  productStripePriceId,
-  productStripeProductId,
-  tenantProductId,
-  tenantProductFormId
-}) => {
-  console.log('🔍 QuestionnaireModal received globalFormStructure:', globalFormStructure)
+export const QuestionnaireModal: React.FC<QuestionnaireModalProps> = (props) => {
+  const { isOpen, onClose } = props;
   const { clinic: domainClinic, isLoading: isLoadingClinic } = useClinicFromDomain();
-  const [questionnaire, setQuestionnaire] = React.useState<QuestionnaireData | null>(null);
-  const [customColor, setCustomColor] = React.useState<string | null>(null);
-  const [loading, setLoading] = React.useState(false);
-  const [currentStepIndex, setCurrentStepIndex] = React.useState(0);
-  const [answers, setAnswers] = React.useState<Record<string, any>>({});
-  const [errors, setErrors] = React.useState<Record<string, string>>({});
-  const [selectedProducts, setSelectedProducts] = React.useState<Record<string, number>>({});
-  const [clientSecret, setClientSecret] = React.useState<string | null>(null);
-  const [paymentIntentId, setPaymentIntentId] = React.useState<string | null>(null);
-  const [orderId, setOrderId] = React.useState<string | null>(null);
-  const [paymentStatus, setPaymentStatus] = React.useState<'idle' | 'processing' | 'succeeded' | 'failed'>('idle');
-  const [userId, setUserId] = React.useState<string | null>(null);
-  const [accountCreated, setAccountCreated] = React.useState(false);
-  const [patientName, setPatientName] = React.useState<string>('');
-  const [patientFirstName, setPatientFirstName] = React.useState<string>('');
-  const [pharmacyCoverages, setPharmacyCoverages] = React.useState<any[]>([]);
 
-  // Sign-in/Sign-up toggle
-  const [isSignInMode, setIsSignInMode] = React.useState(false);
-  const [signInEmail, setSignInEmail] = React.useState('');
-  const [signInPassword, setSignInPassword] = React.useState('');
-  const [signInError, setSignInError] = React.useState('');
-  const [isSigningIn, setIsSigningIn] = React.useState(false);
+  const modal = useQuestionnaireModal(props, domainClinic, isLoadingClinic);
 
-  // Email verification state
-  const [isEmailVerificationMode, setIsEmailVerificationMode] = React.useState(false);
-  const [verificationEmail, setVerificationEmail] = React.useState('');
-  const [verificationCode, setVerificationCode] = React.useState('');
-  const [verificationError, setVerificationError] = React.useState('');
-  const [isVerifying, setIsVerifying] = React.useState(false);
-
-  // Email modal state
-  const [showEmailModal, setShowEmailModal] = React.useState(false);
-  const [emailModalLoading, setEmailModalLoading] = React.useState(false);
-  const [emailModalError, setEmailModalError] = React.useState('');
-
-  // Checkout form state
-  const [selectedPlan, setSelectedPlan] = React.useState("monthly");
-
-  // Medication modal state
-  const [showMedicationModal, setShowMedicationModal] = React.useState(false);
-  const [selectedMedication, setSelectedMedication] = React.useState("semaglutide-orals");
-
-  // Track if we've handled Google OAuth to prevent step reset on modal reopen
-  const hasHandledGoogleAuthRef = React.useRef(false);
-
-  // Reset Google OAuth flag when component unmounts (user navigates away)
-  React.useEffect(() => {
-    return () => {
-      console.log('🧹 [CLEANUP] Resetting hasHandledGoogleAuthRef on component unmount');
-      hasHandledGoogleAuthRef.current = false;
-    };
-  }, []);
-
-  // Handle Google OAuth callback - set user data from URL params
-  React.useEffect(() => {
-    console.log('🔍 [GOOGLE OAUTH] Effect triggered, current URL:', window.location.href);
-    const urlParams = new URLSearchParams(window.location.search);
-    const googleAuth = urlParams.get('googleAuth');
-    const token = urlParams.get('token');
-    const userStr = urlParams.get('user');
-    const skipAccount = urlParams.get('skipAccount');
-
-    console.log('🔍 [GOOGLE OAUTH] URL params:', { googleAuth, hasToken: !!token, hasUser: !!userStr, skipAccount });
-    console.log('🔍 [GOOGLE OAUTH] Full URL params object:', Object.fromEntries(urlParams.entries()));
-
-    if (googleAuth === 'success' && token && userStr) {
-      try {
-        const userData = JSON.parse(decodeURIComponent(userStr));
-        console.log('👤 [GOOGLE OAUTH] Parsed user data:', userData);
-
-        // Pre-fill the form with user's data
-        const newAnswers = {
-          ...answers,
-          firstName: userData.firstName || '',
-          lastName: userData.lastName || '',
-          email: userData.email || '',
-          mobile: userData.phoneNumber || ''
-        };
-
-        setAnswers(newAnswers);
-        setPatientFirstName(userData.firstName);
-        setPatientName(`${userData.firstName} ${userData.lastName}`.trim());
-        setUserId(userData.id);
-        setAccountCreated(true);
-
-        // Mark that we've handled Google OAuth - this prevents step reset
-        hasHandledGoogleAuthRef.current = true;
-
-        console.log('✅ [GOOGLE OAUTH] User data loaded, accountCreated set to true, marked as handled');
-
-        // Clean URL but KEEP skipAccount flag for step initialization
-        if (skipAccount === 'true') {
-          const cleanUrl = `${window.location.pathname}?skipAccount=true`;
-          console.log('🧹 [GOOGLE OAUTH] Cleaning URL but keeping skipAccount flag');
-          console.log('🧹 [GOOGLE OAUTH] Before:', window.location.href);
-          console.log('🧹 [GOOGLE OAUTH] After:', cleanUrl);
-          window.history.replaceState({}, document.title, cleanUrl);
-        }
-
-      } catch (error) {
-        console.error('❌ [GOOGLE OAUTH] Failed to parse user data:', error);
-      }
-    } else if (googleAuth === 'error') {
-      alert('Google sign-in failed. Please try again.');
-      window.history.replaceState({}, document.title, window.location.pathname);
-    } else {
-      console.log('ℹ️ [GOOGLE OAUTH] No Google OAuth params detected in URL');
-    }
-  }, []); // Run once on mount
-  const [shippingInfo, setShippingInfo] = React.useState({
-    address: "",
-    apartment: "",
-    city: "",
-    state: "",
-    zipCode: "",
-    country: "us"
-  });
-  const [checkoutPaymentInfo, setCheckoutPaymentInfo] = React.useState({
-    cardNumber: "",
-    expiryDate: "",
-    securityCode: "",
-    country: "brazil"
-  });
-
-  // Track if we've already sent analytics for this modal session
-  const hasTrackedViewRef = React.useRef(false);
-  const hasConvertedRef = React.useRef(false);
-  const hasTrackedDropOffRef = React.useRef(false);
-  const lastStageRef = React.useRef<'product' | 'payment' | 'account'>('product');
-
-  // Calculate BMI width for animation
-  const bmiWidth = React.useMemo(() => {
-    const weight = parseFloat(answers['weight'] || '0');
-    const feet = parseFloat(answers['heightFeet'] || '0');
-    const inches = parseFloat(answers['heightInches'] || '0');
-    if (weight && feet >= 0 && inches >= 0) {
-      const totalInches = feet * 12 + inches;
-      const heightInMeters = totalInches * 0.0254;
-      const weightInKg = weight * 0.453592;
-      const bmi = weightInKg / (heightInMeters * heightInMeters);
-      return Math.min((bmi / 40) * 100, 100);
-    }
-    return 0;
-  }, [answers['weight'], answers['heightFeet'], answers['heightInches']]);
-
-  // Add CSS animation dynamically
-  React.useEffect(() => {
-    const style = document.createElement('style');
-    style.textContent = `
-      @keyframes bmi-expand {
-        from { width: 0%; }
-        to { width: ${bmiWidth}%; }
-      }
-    `;
-    document.head.appendChild(style);
-    return () => {
-      document.head.removeChild(style);
-    };
-  }, [bmiWidth]);
-
-  // Build plans: prefer treatmentPlans; fallback to product (tenantProduct) pricing
-  const plans = useMemo(() => {
-    console.log('🎯 [PLANS] Building plans with:', {
-      hasTreatmentPlans: !!(questionnaire as any)?.treatment?.treatmentPlans,
-      treatmentPlansCount: (questionnaire as any)?.treatment?.treatmentPlans?.length || 0,
-      productPrice,
-      productStripePriceId,
-      productName,
-      tenantProductId
-    });
-
-    const fromTreatmentPlans = (questionnaire as any)?.treatment?.treatmentPlans as any[] | undefined;
-    if (Array.isArray(fromTreatmentPlans) && fromTreatmentPlans.length > 0) {
-      console.log('🎯 [PLANS] Using treatment plans');
-      return fromTreatmentPlans
-        .filter((plan: any) => plan.active)
-        .sort((a: any, b: any) => a.sortOrder - b.sortOrder)
-        .map((plan: any) => ({
-          id: plan.billingInterval,
-          uuid: plan.id,
-          name: plan.name,
-          description: plan.description || `Billed ${plan.billingInterval}`,
-          price: plan.price,
-          badge: plan.popular ? "Most Popular" : undefined,
-          badgeColor: plan.popular ? "success" as const : "primary" as const,
-          stripePriceId: plan.stripePriceId,
-          billingInterval: plan.billingInterval,
-          features: [
-            "Prescription medications included",
-            "Free expedited shipping",
-            "HSA + FSA eligible",
-            "Home delivery included"
-          ]
-        }));
-    }
-
-    // Fallback to single monthly plan using product price (stripePriceId is optional, backend will create if needed)
-    if (typeof productPrice === 'number' && productPrice > 0) {
-      console.log('🎯 [PLANS] Creating fallback product plan:', {
-        price: productPrice,
-        stripePriceId: productStripePriceId || 'will be created by backend',
-        productName
-      });
-      return [{
-        id: 'monthly',
-        name: productName ? `${productName} Plan` : 'Monthly Plan',
-        description: 'Billed monthly',
-        price: productPrice,
-        stripePriceId: productStripePriceId || undefined, // undefined is ok, backend will create
-        billingInterval: 'monthly',
-        features: [
-          "Prescription medications included",
-          "Free expedited shipping",
-          "HSA + FSA eligible",
-          "Home delivery included"
-        ]
-      } as PlanOption];
-    }
-
-    console.log('⚠️ [PLANS] No plans available - no treatment plans and no valid product price');
-    return [] as PlanOption[];
-  }, [questionnaire?.treatment?.treatmentPlans, productPrice, productStripePriceId, productName, tenantProductId]);
-
-  // Set default selected plan to first available plan
-  React.useEffect(() => {
-    console.log('🎯 Plan selection useEffect:', {
-      plansLength: plans.length,
-      selectedPlan,
-      firstPlanId: plans[0]?.id,
-      allPlans: plans.map(p => ({ id: p.id, name: p.name }))
-    });
-
-    if (plans.length > 0 && !selectedPlan) {
-      console.log('🎯 Setting selectedPlan to first plan:', plans[0].id);
-      setSelectedPlan(plans[0].id);
-    }
-  }, [plans, selectedPlan]);
-
-  // US States list
-  const usStates = [
-    { key: "AL", name: "Alabama" },
-    { key: "AK", name: "Alaska" },
-    { key: "AZ", name: "Arizona" },
-    { key: "AR", name: "Arkansas" },
-    { key: "CA", name: "California" },
-    { key: "CO", name: "Colorado" },
-    { key: "CT", name: "Connecticut" },
-    { key: "DE", name: "Delaware" },
-    { key: "FL", name: "Florida" },
-    { key: "GA", name: "Georgia" },
-    { key: "HI", name: "Hawaii" },
-    { key: "ID", name: "Idaho" },
-    { key: "IL", name: "Illinois" },
-    { key: "IN", name: "Indiana" },
-    { key: "IA", name: "Iowa" },
-    { key: "KS", name: "Kansas" },
-    { key: "KY", name: "Kentucky" },
-    { key: "LA", name: "Louisiana" },
-    { key: "ME", name: "Maine" },
-    { key: "MD", name: "Maryland" },
-    { key: "MA", name: "Massachusetts" },
-    { key: "MI", name: "Michigan" },
-    { key: "MN", name: "Minnesota" },
-    { key: "MS", name: "Mississippi" },
-    { key: "MO", name: "Missouri" },
-    { key: "MT", name: "Montana" },
-    { key: "NE", name: "Nebraska" },
-    { key: "NV", name: "Nevada" },
-    { key: "NH", name: "New Hampshire" },
-    { key: "NJ", name: "New Jersey" },
-    { key: "NM", name: "New Mexico" },
-    { key: "NY", name: "New York" },
-    { key: "NC", name: "North Carolina" },
-    { key: "ND", name: "North Dakota" },
-    { key: "OH", name: "Ohio" },
-    { key: "OK", name: "Oklahoma" },
-    { key: "OR", name: "Oregon" },
-    { key: "PA", name: "Pennsylvania" },
-    { key: "RI", name: "Rhode Island" },
-    { key: "SC", name: "South Carolina" },
-    { key: "SD", name: "South Dakota" },
-    { key: "TN", name: "Tennessee" },
-    { key: "TX", name: "Texas" },
-    { key: "UT", name: "Utah" },
-    { key: "VT", name: "Vermont" },
-    { key: "VA", name: "Virginia" },
-    { key: "WA", name: "Washington" },
-    { key: "WV", name: "West Virginia" },
-    { key: "WI", name: "Wisconsin" },
-    { key: "WY", name: "Wyoming" },
-    { key: "DC", name: "District of Columbia" }
-  ];
-
-  // Load questionnaire data (supports treatment-based or direct questionnaireId)
-  React.useEffect(() => {
-    const loadQuestionnaire = async () => {
-      if (!isOpen) return;
-
-      setLoading(true);
-      try {
-        // If questionnaireId is provided (product-based), fetch questionnaire directly via public proxy
-        if (questionnaireId) {
-          const qRes = await fetch(`/api/public/questionnaires/${encodeURIComponent(questionnaireId)}`)
-          const qData = await qRes.json().catch(() => null)
-
-          if (!qRes.ok || !qData?.success || !qData?.data) {
-            throw new Error(qData?.message || 'Failed to load questionnaire')
-          }
-
-          const questionnaireData = qData.data
-
-          // Debug: Log questionnaire data structure
-          console.log('📋 Questionnaire data loaded:', {
-            id: questionnaireData.id,
-            title: questionnaireData.title,
-            stepsCount: questionnaireData.steps?.length,
-            steps: questionnaireData.steps?.map((s: any) => ({
-              id: s.id,
-              title: s.title,
-              category: s.category,
-              questionsCount: s.questions?.length,
-              questions: s.questions?.map((q: any) => ({
-                id: q.id,
-                questionText: q.questionText,
-                answerType: q.answerType,
-                questionSubtype: q.questionSubtype,
-              }))
-            }))
-          });
-
-          // Ensure steps
-          if (!Array.isArray(questionnaireData.steps)) {
-            questionnaireData.steps = []
-          }
-
-          // If no user_profile steps exist, append them from the global first user_profile questionnaire
-          const hasUserProfile = (questionnaireData.steps || []).some((s: any) => s.category === 'user_profile')
-          if (!hasUserProfile) {
-            try {
-              const upRes = await fetch('/api/public/questionnaires/first-user-profile')
-              const upData = await upRes.json().catch(() => null)
-              if (upRes.ok && upData?.success && upData?.data) {
-                const userProfileSteps = (upData.data.steps || []).filter((s: any) => s.category === 'user_profile')
-                if (userProfileSteps.length > 0) {
-                  const normal = (questionnaireData.steps || [])
-                    .filter((s: any) => s.category === 'normal' || !s.category)
-                    .sort((a: any, b: any) => (a.stepOrder ?? 0) - (b.stepOrder ?? 0))
-                  const userProfileSorted = userProfileSteps.sort((a: any, b: any) => (a.stepOrder ?? 0) - (b.stepOrder ?? 0))
-                  const others = (questionnaireData.steps || [])
-                    .filter((s: any) => s.category && s.category !== 'normal' && s.category !== 'user_profile')
-                    .sort((a: any, b: any) => (a.stepOrder ?? 0) - (b.stepOrder ?? 0))
-                  const merged = [...normal, ...userProfileSorted, ...others]
-                  questionnaireData.steps = merged
-                }
-              }
-            } catch (e) {
-              console.warn('Failed to append user_profile steps:', e)
-            }
-          }
-
-          // Load standardized category questions for Global Form Structure usage
-          let categoryQuestionSteps: any[] = []
-          try {
-            if (productCategory) {
-              const stdRes = await fetch(`/api/public/questionnaires/standardized?category=${encodeURIComponent(productCategory)}`)
-              const stdData = await stdRes.json().catch(() => null)
-              if (stdRes.ok && stdData?.success && Array.isArray(stdData?.data) && stdData.data.length > 0) {
-                categoryQuestionSteps = stdData.data.flatMap((q: any) => q.steps || []).sort((a: any, b: any) => (a.stepOrder ?? 0) - (b.stepOrder ?? 0))
-                console.log(`✅ Loaded ${categoryQuestionSteps.length} category question steps for ${productCategory}`)
-              }
-            }
-          } catch (e) {
-            console.warn('Failed to load standardized steps:', e)
-          }
-
-          // Apply Global Form Structure section ordering if provided
-          if (globalFormStructure && globalFormStructure.sections && Array.isArray(globalFormStructure.sections)) {
-            console.log('🎯 Applying Global Form Structure ordering:', globalFormStructure.name)
-            const currentSteps = Array.isArray(questionnaireData.steps) ? questionnaireData.steps : []
-
-            // Categorize current steps by their actual category field
-            const normalSteps = currentSteps.filter((s: any) => s.category === 'normal' || !s.category).sort((a: any, b: any) => (a.stepOrder ?? 0) - (b.stepOrder ?? 0))
-            const userProfileSteps = currentSteps.filter((s: any) => s.category === 'user_profile').sort((a: any, b: any) => (a.stepOrder ?? 0) - (b.stepOrder ?? 0))
-            const otherSteps = currentSteps.filter((s: any) => s.category && s.category !== 'normal' && s.category !== 'user_profile').sort((a: any, b: any) => (a.stepOrder ?? 0) - (b.stepOrder ?? 0))
-
-            // Get enabled sections in order
-            const enabledSections = globalFormStructure.sections
-              .filter((s: any) => s.enabled)
-              .sort((a: any, b: any) => a.order - b.order)
-
-            console.log('  Enabled sections:', enabledSections.map((s: any) => `${s.order}. ${s.label} (${s.type})`))
-            console.log('  Available steps - normal:', normalSteps.length, 'userProfile:', userProfileSteps.length, 'category:', categoryQuestionSteps.length)
-
-            const orderedSteps: any[] = []
-
-            for (const section of enabledSections) {
-              switch (section.type) {
-                case 'product_questions':
-                  console.log(`  → Adding ${normalSteps.length} product question steps`)
-                  orderedSteps.push(...normalSteps)
-                  break
-                case 'category_questions':
-                  console.log(`  → Adding ${categoryQuestionSteps.length} category question steps`)
-                  orderedSteps.push(...categoryQuestionSteps)
-                  break
-                case 'account_creation':
-                  console.log(`  → Adding ${userProfileSteps.length} account creation steps`)
-                  orderedSteps.push(...userProfileSteps)
-                  break
-                case 'checkout':
-                  // Checkout is handled separately via checkoutStepPosition
-                  console.log('  → Checkout section (handled separately)')
-                  break
-                default:
-                  console.log(`  → Unknown section type: ${section.type}`)
-              }
-            }
-
-            // Add any other steps that weren't categorized
-            if (otherSteps.length > 0) {
-              console.log(`  → Adding ${otherSteps.length} other steps`)
-              orderedSteps.push(...otherSteps)
-            }
-
-            questionnaireData.steps = orderedSteps
-            console.log(`✅ Global Form Structure applied: ${orderedSteps.length} total steps`)
-
-            // Update checkout step position based on Global Form Structure
-            const checkoutSection = enabledSections.find((s: any) => s.type === 'checkout')
-            if (checkoutSection) {
-              // Calculate position: count how many section types come before checkout
-              const sectionsBeforeCheckout = enabledSections.filter((s: any) => s.order < checkoutSection.order && s.enabled && s.type !== 'checkout')
-              let checkoutPosition = 0
-
-              for (const section of sectionsBeforeCheckout) {
-                switch (section.type) {
-                  case 'product_questions':
-                    checkoutPosition += normalSteps.length
-                    break
-                  case 'category_questions':
-                    checkoutPosition += categoryQuestionSteps.length
-                    break
-                  case 'account_creation':
-                    checkoutPosition += userProfileSteps.length
-                    break
-                }
-              }
-
-              questionnaireData.checkoutStepPosition = checkoutPosition
-              console.log(`✅ Checkout position set to: ${checkoutPosition} (based on Global Form Structure)`)
-            }
-          } else if (categoryQuestionSteps.length > 0) {
-            // Fallback: No Global Form Structure - use default ordering
-            console.log('ℹ️ No Global Form Structure - using default section ordering')
-            const currentSteps = Array.isArray(questionnaireData.steps) ? questionnaireData.steps : []
-
-            if (productFormVariant === '2') {
-              // Prepend standardized
-              questionnaireData.steps = [...categoryQuestionSteps, ...currentSteps]
-            } else {
-              // Default behavior: append after user_profile
-              const normal = currentSteps
-                .filter((s: any) => s.category === 'normal' || !s.category)
-                .sort((a: any, b: any) => (a.stepOrder ?? 0) - (b.stepOrder ?? 0))
-              const userProfile = currentSteps
-                .filter((s: any) => s.category === 'user_profile')
-                .sort((a: any, b: any) => (a.stepOrder ?? 0) - (b.stepOrder ?? 0))
-              const others = currentSteps
-                .filter((s: any) => s.category && s.category !== 'normal' && s.category !== 'user_profile')
-                .sort((a: any, b: any) => (a.stepOrder ?? 0) - (b.stepOrder ?? 0))
-
-              // Order: normal, user_profile, category questions, others
-              questionnaireData.steps = [...normal, ...userProfile, ...categoryQuestionSteps, ...others]
-            }
-          }
-
-          // Fetch clinic data for variable replacement
-          try {
-            // Get clinic slug from hostname
-            const hostname = window.location.hostname;
-            let clinicSlug: string | null = null;
-
-            if (process.env.NODE_ENV === 'production') {
-              // Production: clinicSlug.fuse.health or clinicSlug.fusehealthstaging.xyz
-              if (hostname.endsWith('.fusehealth.com')) {
-                const parts = hostname.split('.fuse.health');
-                clinicSlug = parts.length > 1 ? parts[0] : null;
-              } else if (hostname.endsWith('.fusehealthstaging.xyz')) {
-                const parts = hostname.split('.fusehealthstaging.xyz');
-                clinicSlug = parts.length > 1 ? parts[0] : null;
-              }
-            } else {
-              // Development: clinicSlug.localhost
-              const parts = hostname.split('.localhost');
-              clinicSlug = parts.length > 1 ? parts[0] : null;
-            }
-
-            if (clinicSlug) {
-              // Fetch clinic data
-              const clinicRes = await fetch(`/api/public/clinic/${encodeURIComponent(clinicSlug)}`);
-              const clinicData = await clinicRes.json().catch(() => null);
-
-              if (clinicRes.ok && clinicData?.success && clinicData?.data) {
-                const clinic = clinicData.data;
-                const variables = {
-                  ...getVariablesFromClinic(clinic),
-                  productName: productName || ''
-                  // Don't include patientName/patientFirstName yet - they'll be set after account creation
-                };
-
-                // Replace variables in all step titles, descriptions, and questions
-                if (questionnaireData.steps && questionnaireData.steps.length > 0) {
-                  questionnaireData.steps = questionnaireData.steps.map((step: any) => ({
-                    ...step,
-                    title: replaceVariables(step.title || '', variables),
-                    description: replaceVariables(step.description || '', variables),
-                    questions: step.questions?.map((question: any) => ({
-                      ...question,
-                      questionText: replaceVariables(question.questionText || '', variables),
-                      placeholder: replaceVariables(question.placeholder || '', variables),
-                      options: question.options?.map((opt: any) => {
-                        if (typeof opt === 'string') {
-                          return replaceVariables(opt, variables);
-                        }
-                        if (opt && typeof opt === 'object') {
-                          return {
-                            ...opt,
-                            optionText: replaceVariables(opt.optionText || '', variables),
-                          };
-                        }
-                        return opt;
-                      }),
-                    })),
-                  }));
-                }
-              }
-            }
-          } catch (e) {
-            console.warn('Failed to load clinic data for variable replacement:', e);
-          }
-
-          setQuestionnaire(questionnaireData)
-          setLoading(false)
-          return
-        }
-
-        // Else fallback to treatment-based flow
-        if (!treatmentId) return;
-
-        // Fetch both questionnaire and treatment products
-        const [questionnaireResult, treatmentResult] = await Promise.all([
-          apiCall(`/questionnaires/treatment/${treatmentId}`),
-          apiCall(`/treatments/${treatmentId}`)
-        ]);
-        console.log('📋 Questionnaire API result:', questionnaireResult);
-        console.log('📋 Treatment API result:', treatmentResult);
-
-        if (questionnaireResult.success && questionnaireResult.data && treatmentResult.success && treatmentResult.data) {
-          // The actual questionnaire data is nested in result.data.data
-          const questionnaireData = questionnaireResult.data.data || questionnaireResult.data;
-          const treatmentData = treatmentResult.data.data || treatmentResult.data;
-          console.log('📋 Questionnaire data:', questionnaireData);
-          console.log('📋 Treatment data:', treatmentData);
-          console.log('📋 Steps:', questionnaireData.steps);
-
-          // Ensure steps array exists (allow empty arrays for checkout-only questionnaires)
-          if (!Array.isArray(questionnaireData.steps)) {
-            console.log('⚠️ No steps array found, initializing empty array for checkout-only questionnaire');
-            questionnaireData.steps = [];
-          }
-
-          // Get template variables from clinic/treatment data
-          const variables = {
-            ...getVariablesFromClinic(treatmentData.clinic || {}),
-            productName: productName || ''
-          };
-
-          // Replace variables in all step titles, descriptions, and questions
-          if (questionnaireData.steps && questionnaireData.steps.length > 0) {
-            questionnaireData.steps = questionnaireData.steps.map((step: any) => ({
-              ...step,
-              title: replaceVariables(step.title || '', variables),
-              description: replaceVariables(step.description || '', variables),
-              questions: step.questions?.map((question: any) => ({
-                ...question,
-                questionText: replaceVariables(question.questionText || '', variables),
-                placeholder: replaceVariables(question.placeholder || '', variables),
-                options: question.options?.map((opt: any) => {
-                  if (typeof opt === 'string') {
-                    return replaceVariables(opt, variables);
-                  }
-                  if (opt && typeof opt === 'object') {
-                    return {
-                      ...opt,
-                      optionText: replaceVariables(opt.optionText || '', variables),
-                    };
-                  }
-                  return opt;
-                }),
-              })),
-            }));
-          }
-
-          // Combine questionnaire with treatment products
-          const combinedData = {
-            ...questionnaireData,
-            treatment: treatmentData
-          };
-
-          setQuestionnaire(combinedData);
-        } else {
-          throw new Error('Failed to load questionnaire');
-        }
-      } catch (error) {
-        console.error('Error loading questionnaire:', error);
-        alert('Failed to load questionnaire: ' + (error as Error).message);
-        onClose();
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadQuestionnaire();
-  }, [isOpen, treatmentId, questionnaireId, onClose]);
-
-  // Fetch custom color for this questionnaire
-  React.useEffect(() => {
-    const fetchCustomColor = async () => {
-      console.log('🎨 [CUSTOM COLOR] Starting fetch...');
-      console.log('🎨 [CUSTOM COLOR] questionnaireId:', questionnaireId);
-      console.log('🎨 [CUSTOM COLOR] domainClinic:', domainClinic);
-      console.log('🎨 [CUSTOM COLOR] domainClinic?.id:', domainClinic?.id);
-
-      if (!questionnaireId) {
-        console.log('⚠️ [CUSTOM COLOR] No questionnaireId, skipping');
-        return;
-      }
-
-      if (!domainClinic?.id) {
-        console.log('⚠️ [CUSTOM COLOR] No domainClinic.id, skipping');
-        return;
-      }
-
-      try {
-        const url = `/public/questionnaire-customization/${questionnaireId}?clinicId=${domainClinic.id}`;
-        console.log('📡 [CUSTOM COLOR] Fetching from:', url);
-
-        const result = await apiCall(url);
-
-        console.log('📦 [CUSTOM COLOR] API result:', result);
-        console.log('📦 [CUSTOM COLOR] result.success:', result.success);
-        console.log('📦 [CUSTOM COLOR] result.data:', result.data);
-        console.log('📦 [CUSTOM COLOR] result.data?.data:', result.data?.data);
-
-        // The apiCall wraps the response, so we need result.data.data
-        const customizationData = result.data?.data || result.data;
-        console.log('📦 [CUSTOM COLOR] customizationData:', customizationData);
-
-        if (result.success && customizationData?.customColor) {
-          setCustomColor(customizationData.customColor);
-          console.log('✅ [CUSTOM COLOR] Set custom color to:', customizationData.customColor);
-        } else {
-          setCustomColor(null);
-          console.log('⚠️ [CUSTOM COLOR] No custom color found, set to null');
-        }
-      } catch (error) {
-        console.error('❌ [CUSTOM COLOR] Error fetching:', error);
-        setCustomColor(null);
-      }
-    };
-
-    if (isOpen) {
-      fetchCustomColor();
-    }
-  }, [questionnaireId, domainClinic?.id, isOpen]);
-
-  // Fetch pharmacy coverages for the product
-  React.useEffect(() => {
-    const fetchPharmacyCoverages = async () => {
-      if (!isOpen || !tenantProductId) {
-        return;
-      }
-
-      try {
-        console.log('💊 [PHARMACY COVERAGE] Fetching coverages for tenantProductId:', tenantProductId);
-
-        // Fetch the tenant product to get the base productId
-        const productRes = await fetch(`/api/public/tenant-products/${tenantProductId}`);
-        const productData = await productRes.json();
-
-        if (!productRes.ok || !productData?.success || !productData?.data?.productId) {
-          console.log('⚠️ [PHARMACY COVERAGE] Could not get base productId');
-          return;
-        }
-
-        const baseProductId = productData.data.productId;
-        console.log('💊 [PHARMACY COVERAGE] Base productId:', baseProductId);
-
-        // Fetch pharmacy coverages directly
-        const coverageRes = await fetch(`/api/public/products/${baseProductId}/pharmacy-coverages`);
-        const coverageData = await coverageRes.json();
-
-        if (coverageRes.ok && coverageData?.success && Array.isArray(coverageData?.data)) {
-          console.log('💊 [PHARMACY COVERAGE] Found coverages:', coverageData.data);
-          setPharmacyCoverages(coverageData.data);
-        } else {
-          console.log('⚠️ [PHARMACY COVERAGE] No coverages found');
-          setPharmacyCoverages([]);
-        }
-      } catch (error) {
-        console.error('❌ [PHARMACY COVERAGE] Error fetching:', error);
-        setPharmacyCoverages([]);
-      }
-    };
-
-    fetchPharmacyCoverages();
-  }, [isOpen, tenantProductId]);
-
-  // Track form view when modal opens
-  React.useEffect(() => {
-    const handleTrackFormView = async () => {
-      // Use tenantProductFormId - this should always be available from the URL
-      const formIdForTracking = tenantProductFormId;
-
-      console.log('🔍 [Analytics] Checking tracking conditions:', {
-        isOpen,
-        questionnaireId,
-        tenantProductFormId,
-        formIdForTracking,
-        tenantProductId,
-        hasTrackedView: hasTrackedViewRef.current,
-        domainClinic: domainClinic ? { id: domainClinic.id, name: domainClinic.name, userId: (domainClinic as any).userId } : null
-      });
-
-      // Only track if modal is open and we have the required data
-      if (!isOpen || !formIdForTracking || !tenantProductId || !domainClinic) {
-        console.log('⚠️ [Analytics] Skipping tracking - missing required data');
-        return;
-      }
-
-      // Skip if we've already tracked this modal session
-      if (hasTrackedViewRef.current) {
-        console.log('⚠️ [Analytics] Skipping tracking - already tracked for this modal session');
-        return;
-      }
-
-      // Get the user ID from the clinic (the brand owner)
-      const userId = (domainClinic as any).userId || (domainClinic as any).ownerId;
-
-      if (!userId) {
-        console.warn('⚠️ [Analytics] Cannot track view: no userId found on clinic. Clinic data:', domainClinic);
-        return;
-      }
-
-      console.log('✅ [Analytics] All conditions met, calling trackFormView...');
-
-      // Mark as tracked IMMEDIATELY to prevent duplicate calls
-      hasTrackedViewRef.current = true;
-
-      await trackFormView({
-        userId,
-        productId: tenantProductId,
-        formId: formIdForTracking,
-        clinicId: domainClinic.id,
-        clinicName: domainClinic.name,
-        productName: productName || undefined
-      });
-    };
-
-    handleTrackFormView();
-  }, [isOpen, questionnaireId, tenantProductFormId, tenantProductId, domainClinic, productName]);
-
-  // Track drop-off when user leaves page or closes modal
-  const prevIsOpenRef = React.useRef(isOpen);
-
-  React.useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
-    // Reset drop-off flag when opening
-    hasTrackedDropOffRef.current = false;
-
-    // Function to track drop-off
-    const trackDropOff = (useBeacon = false) => {
-      if (hasTrackedViewRef.current && !hasConvertedRef.current && !hasTrackedDropOffRef.current && tenantProductFormId && tenantProductId && domainClinic) {
-        const userId = (domainClinic as any).userId || (domainClinic as any).ownerId;
-
-        if (userId) {
-          const stage = lastStageRef.current;
-
-          console.log('📊 [Analytics] Tracking drop-off:', {
-            userId,
-            productId: tenantProductId,
-            formId: tenantProductFormId,
-            stage,
-            useBeacon,
-          });
-
-          hasTrackedDropOffRef.current = true;
-
-          trackFormDropOff({
-            userId,
-            productId: tenantProductId,
-            formId: tenantProductFormId,
-            dropOffStage: stage,
-            clinicId: domainClinic.id,
-            clinicName: domainClinic.name,
-            productName: productName || undefined,
-            useBeacon,
-          });
-        }
-      }
-    };
-
-    // Handle page unload (tab close, window close, navigation away)
-    const handleBeforeUnload = () => {
-      trackDropOff(true); // Use sendBeacon for reliability
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, [isOpen, tenantProductFormId, tenantProductId, domainClinic, productName]);
-
-  // Track drop-off when modal closes explicitly (user clicks X or back button)
-  React.useEffect(() => {
-    const wasOpen = prevIsOpenRef.current;
-    const isNowClosed = !isOpen;
-
-    // Track drop-off only when modal was open and is now closed
-    if (wasOpen && isNowClosed && hasTrackedViewRef.current && !hasConvertedRef.current && !hasTrackedDropOffRef.current && tenantProductFormId && tenantProductId && domainClinic) {
-      const userId = (domainClinic as any).userId || (domainClinic as any).ownerId;
-
-      if (userId) {
-        const stage = lastStageRef.current;
-
-        console.log('📊 [Analytics] Tracking drop-off on modal close:', {
-          userId,
-          productId: tenantProductId,
-          formId: tenantProductFormId,
-          stage,
-        });
-
-        hasTrackedDropOffRef.current = true;
-
-        trackFormDropOff({
-          userId,
-          productId: tenantProductId,
-          formId: tenantProductFormId,
-          dropOffStage: stage,
-          clinicId: domainClinic.id,
-          clinicName: domainClinic.name,
-          productName: productName || undefined,
-          useBeacon: false, // Use regular fetch for explicit closes
-        });
-      }
-    }
-
-    // Update the previous value
-    prevIsOpenRef.current = isOpen;
-  }, [isOpen, tenantProductFormId, tenantProductId, domainClinic, productName]);
-
-  // Reset state when modal closes
-  React.useEffect(() => {
-    if (!isOpen) {
-      setCurrentStepIndex(0);
-      setAnswers({});
-      setErrors({});
-      setQuestionnaire(null);
-      setCustomColor(null);
-      setSelectedProducts({});
-      setClientSecret(null);
-      setPaymentIntentId(null);
-      setPaymentStatus('idle');
-      setSelectedPlan("monthly");
-      // Reset analytics tracking flags
-      hasTrackedViewRef.current = false;
-      hasConvertedRef.current = false;
-      hasTrackedDropOffRef.current = false;
-      // DON'T reset hasHandledGoogleAuthRef - we want to keep it across modal reopens
-      // Reset sign-in state
-      setIsSignInMode(false);
-      setSignInEmail('');
-      setSignInPassword('');
-      setSignInError('');
-      setIsSigningIn(false);
-      setShippingInfo({
-        address: "",
-        apartment: "",
-        city: "",
-        state: "",
-        zipCode: "",
-        country: "us"
-      });
-      setCheckoutPaymentInfo({
-        cardNumber: "",
-        expiryDate: "",
-        securityCode: "",
-        country: "brazil"
-      });
-    }
-  }, [isOpen]);
-
-  // Set initial step when questionnaire loads
-  React.useEffect(() => {
-    if (questionnaire && isOpen) {
-      console.log('🔍 [STEP INIT] Current URL:', window.location.href);
-      console.log('🔍 [STEP INIT] hasHandledGoogleAuthRef:', hasHandledGoogleAuthRef.current);
-
-      const urlParams = new URLSearchParams(window.location.search);
-      const skipAccount = urlParams.get('skipAccount');
-      console.log('🔍 [STEP INIT] skipAccount flag:', skipAccount);
-
-      // If coming from Google OAuth, skip to the step AFTER account creation
-      if (skipAccount === 'true' && questionnaire.steps) {
-        const accountStepIndex = questionnaire.steps.findIndex(
-          (step: any) => step.title === 'Create Your Account'
-        );
-
-        console.log('🔍 [STEP INIT] Account step index:', accountStepIndex);
-
-        if (accountStepIndex >= 0) {
-          const targetStep = accountStepIndex + 1;
-          console.log('⏭️ [STEP INIT] Skipping account step - starting at step:', targetStep);
-          setCurrentStepIndex(targetStep);
-
-          // DON'T clean URL - keep the skipAccount flag so it works on modal reopen
-          console.log('✅ [STEP INIT] Keeping skipAccount flag in URL for persistence');
-          return;
-        }
-      }
-
-      // Otherwise, start at step 0 (but not if we've already handled Google OAuth)
-      if (!hasHandledGoogleAuthRef.current) {
-        console.log('📍 [STEP INIT] Starting at step 0');
-        setCurrentStepIndex(0);
-      } else {
-        console.log('⏭️ [STEP INIT] Skipping reset - Google OAuth handled, keeping current step');
-      }
-    }
-  }, [questionnaire, isOpen]);
-
-  // Create subscription when entering checkout step (DISABLED - now done on payment submit)
-  React.useEffect(() => {
-    const createSubscription = async () => {
-      return; // Disabled auto-creation - subscription created on payment submit
-      console.log('🔄 useEffect triggered - checking conditions:', {
-        isCheckoutStep: isCheckoutStep(),
-        hasQuestionnaire: !!questionnaire,
-        hasClientSecret: !!clientSecret,
-        hasTreatmentId: !!treatmentId,
-        currentStepIndex,
-        selectedPlan
-      });
-
-      if (!isCheckoutStep() || !questionnaire) {
-        console.log('⏭️ Skipping: not checkout step or no questionnaire');
-        return;
-      }
-
-      if (clientSecret) {
-        console.log('⏭️ Skipping: clientSecret already exists');
-        return;
-      }
-
-      if (!treatmentId) {
-        console.log('⏭️ Skipping: no treatmentId');
-        setPaymentStatus('idle');
-        return;
-      }
-
-      if (!selectedPlan) {
-        console.log('⏭️ Skipping: no plan selected yet, waiting...');
-        setPaymentStatus('idle');
-        return;
-      }
-
-      try {
-        console.log('💳 Auto-creating treatment subscription...');
-        console.log('🔍 Debug subscription creation:', {
-          selectedPlan,
-          plansAvailable: plans.map(p => ({ id: p.id, name: p.name })),
-          planLookupResult: plans.find(plan => plan.id === selectedPlan)
-        });
-
-        const selectedPlanData = plans.find(plan => plan.id === selectedPlan);
-        const stripePriceId = selectedPlanData?.stripePriceId;
-
-        if (!stripePriceId) {
-          console.error('❌ No stripePriceId found for selected plan:', selectedPlan);
-          setPaymentStatus('idle');
-          return;
-        }
-
-
-        // Prepare user details for subscription
-        const userDetails = {
-          firstName: answers['firstName'],
-          lastName: answers['lastName'],
-          email: answers['email'],
-          phoneNumber: answers['mobile']
-        };
-
-        console.log('💳 Request payload:', {
-          treatmentId: treatmentId,
-          stripePriceId: stripePriceId,
-          userDetails: userDetails
-        });
-        setPaymentStatus('processing');
-
-        const result = await apiCall('/payments/treatment/sub', {
-          method: 'POST',
-          body: JSON.stringify({
-            treatmentId: treatmentId,
-            stripePriceId: stripePriceId,
-            userDetails: userDetails
-          })
-        });
-
-        console.log('💳 Subscription API response:', result);
-
-        if (result.success && result.data) {
-          // Handle nested response structure: result.data.data or result.data
-          let subscriptionData = result.data;
-          if (result.data.data) {
-            subscriptionData = result.data.data;
-          }
-
-          console.log('💳 Subscription data extracted:', subscriptionData);
-
-          if (subscriptionData.clientSecret) {
-            setClientSecret(subscriptionData.clientSecret);
-            setPaymentIntentId(subscriptionData.subscriptionId || subscriptionData.id);
-            setPaymentStatus('idle');
-            console.log('💳 Treatment subscription auto-created successfully');
-          } else {
-            console.error('❌ No clientSecret in subscription response:', subscriptionData);
-            setPaymentStatus('idle'); // Fall back to manual trigger
-          }
-        } else {
-          console.error('❌ Subscription creation failed:', result);
-          setPaymentStatus('idle'); // Fall back to manual trigger
-        }
-      } catch (error) {
-        console.error('❌ Subscription creation error:', error);
-        setPaymentStatus('idle'); // Fall back to manual trigger
-      }
-    };
-
-    createSubscription();
-  }, [currentStepIndex, treatmentId, clientSecret, selectedPlan]);
-
-
-  // Helper functions for checkout steps
-  const getTotalSteps = (): number => {
-    if (!questionnaire) return 0;
-    // Questionnaire steps + Checkout
-    return questionnaire.steps.length + 1;
-  };
-
-  const isProductSelectionStep = (): boolean => {
-    // Skip product selection for subscription treatments
-    return false;
-  };
-
-  const isCheckoutStep = (): boolean => {
-    if (!questionnaire) return false;
-    const checkoutPos = questionnaire.checkoutStepPosition;
-    // For subscription treatments, checkout comes right after questionnaire steps
-    const checkoutStepIndex = checkoutPos === -1 ? questionnaire.steps.length : checkoutPos;
-    return currentStepIndex === checkoutStepIndex;
-  };
-
-  // Determine the current stage for analytics drop-off tracking
-  const getCurrentStage = (): 'product' | 'payment' | 'account' => {
-    // If we're on the checkout step, it's the payment stage
-    if (isCheckoutStep()) {
-      return 'payment';
-    }
-
-    // Otherwise, check the current step's category or questionnaire type
-    const currentStep = getCurrentQuestionnaireStep();
-    if (currentStep) {
-      // If the step category is 'user_profile', it's the account stage
-      if (currentStep.category === 'user_profile') {
-        return 'account';
-      }
-    }
-
-    // Default to 'product' stage for normal questions
-    return 'product';
-  };
-
-  // Update the last stage ref whenever the user navigates
-  React.useEffect(() => {
-    if (isOpen && questionnaire) {
-      const currentStage = getCurrentStage();
-      lastStageRef.current = currentStage;
-    }
-  }, [currentStepIndex, isOpen, questionnaire]);
-
-  // Helper: Evaluate step-level conditional logic
-  const evaluateStepConditionalLogic = (step: any): boolean => {
-    const conditionalLogic = step.conditionalLogic;
-    if (!conditionalLogic) return true; // No condition = always show
-
-    console.log(`🔍 Evaluating step conditional logic for: ${step.title}`);
-    console.log('  conditionalLogic:', conditionalLogic);
-    console.log('  current answers:', answers);
-
-    try {
-      // Parse format: answer_equals:{questionId}:{optionValue}
-      const tokens = conditionalLogic.split(' ');
-      let result = false;
-      let currentOperator: 'OR' | 'AND' | null = null;
-
-      for (let i = 0; i < tokens.length; i++) {
-        const token = tokens[i];
-
-        if (token.startsWith('answer_equals:')) {
-          const parts = token.replace('answer_equals:', '').split(':');
-          if (parts.length === 2) {
-            const [questionId, requiredValue] = parts;
-            const answer = answers[questionId];
-            const conditionMet = Array.isArray(answer) ? answer.includes(requiredValue) : answer === requiredValue;
-
-            console.log(`  Checking: questionId=${questionId}, requiredValue=${requiredValue}`);
-            console.log(`  Answer found: ${answer}, Condition met: ${conditionMet}`);
-
-            if (currentOperator === 'AND') {
-              result = result && conditionMet;
-            } else if (currentOperator === 'OR') {
-              result = result || conditionMet;
-            } else {
-              result = conditionMet;
-            }
-          }
-        } else if (token === 'OR' || token === 'AND') {
-          currentOperator = token as 'OR' | 'AND';
-        }
-      }
-
-      console.log(`  Final result: ${result ? 'SHOW STEP' : 'HIDE STEP'}`);
-      return result;
-    } catch (error) {
-      console.error('Error evaluating step conditional logic:', error);
-      return true; // Show step if error
-    }
-  };
-
-  const getCurrentQuestionnaireStep = () => {
-    if (!questionnaire || isProductSelectionStep() || isCheckoutStep()) return null;
-
-    const checkoutPos = questionnaire.checkoutStepPosition;
-    let actualStepIndex = currentStepIndex;
-
-    if (checkoutPos !== -1 && currentStepIndex > checkoutPos + 1) {
-      actualStepIndex = currentStepIndex - 2;
-    }
-
-    // Find the next visible step starting from actualStepIndex
-    for (let i = actualStepIndex; i < questionnaire.steps.length; i++) {
-      const step = questionnaire.steps[i];
-      if (evaluateStepConditionalLogic(step)) {
-        // Update currentStepIndex to this visible step's index
-        if (i !== actualStepIndex) {
-          setCurrentStepIndex(currentStepIndex + (i - actualStepIndex));
-        }
-
-        // Debug: Log current step details
-        console.log('📍 Current step:', {
-          index: i,
-          id: step.id,
-          title: step.title,
-          category: step.category,
-          questionsCount: step.questions?.length,
-          hasBMIQuestions: step.questions?.some(q => q.questionSubtype === 'bmi'),
-          questions: step.questions?.map(q => ({
-            id: q.id,
-            questionText: q.questionText,
-            answerType: q.answerType,
-            questionSubtype: q.questionSubtype,
-          }))
-        });
-
-        return step;
-      }
-    }
-
-    // If no more visible steps, return null to trigger completion
-    return null;
-  };
-
-  // Function to build questionnaire answers object (enhanced structure with metadata)
-  const buildQuestionnaireAnswers = (currentAnswers: Record<string, any>) => {
-    const structuredAnswers: any[] = [];
-    const legacyAnswers: Record<string, string> = {};
-
-    // Process each questionnaire step and question
-    questionnaire?.steps?.forEach(step => {
-      step.questions?.forEach(question => {
-        const answerKey = question.id;
-        const answerValue = currentAnswers[answerKey];
-
-        if (answerValue !== undefined && answerValue !== '') {
-          // Build structured answer with metadata
-          const structuredAnswer: any = {
-            questionId: question.id,
-            stepId: step.id,
-            stepCategory: step.category, // Add the step category
-            questionText: question.questionText,
-            answerType: question.answerType,
-            answer: answerValue,
-            answeredAt: new Date().toISOString()
-          };
-
-          // Handle option-based questions
-          if (question.answerType === 'single_choice' || question.answerType === 'multiple_choice' || question.answerType === 'checkbox') {
-            const selectedOptions: any[] = [];
-
-            if (Array.isArray(answerValue)) {
-              // Multiple choice/checkbox
-              answerValue.forEach(value => {
-                const option = question.options?.find(opt => opt.optionValue === value);
-                if (option) {
-                  selectedOptions.push({
-                    optionId: option.id,
-                    optionText: option.optionText,
-                    optionValue: option.optionValue
-                  });
-                }
-              });
-            } else {
-              // Single choice
-              const option = question.options?.find(opt => opt.optionValue === answerValue);
-              if (option) {
-                selectedOptions.push({
-                  optionId: option.id,
-                  optionText: option.optionText,
-                  optionValue: option.optionValue
-                });
-              }
-            }
-
-            structuredAnswer.selectedOptions = selectedOptions;
-
-            // For legacy compatibility, also build the simple text version
-            if (Array.isArray(answerValue)) {
-              const selectedTexts = answerValue.map(value => {
-                const option = question.options?.find(opt => opt.optionValue === value);
-                return option?.optionText || value;
-              });
-              legacyAnswers[question.questionText] = selectedTexts.join(', ');
-            } else {
-              const option = question.options?.find(opt => opt.optionValue === answerValue);
-              legacyAnswers[question.questionText] = option?.optionText || answerValue;
-            }
-          } else {
-            // For text inputs, number inputs, etc.
-            legacyAnswers[question.questionText] = String(answerValue);
-          }
-
-          structuredAnswers.push(structuredAnswer);
-        }
-      });
-    });
-
-    // Add form fields from account creation step (these don't have question metadata)
-    const accountFields = [
-      { key: 'firstName', label: 'First Name' },
-      { key: 'lastName', label: 'Last Name' },
-      { key: 'email', label: 'Email Address' },
-      { key: 'mobile', label: 'Mobile Number' }
-    ];
-
-    accountFields.forEach(field => {
-      if (currentAnswers[field.key]) {
-        legacyAnswers[field.label] = currentAnswers[field.key];
-
-        // Add to structured answers as well
-        structuredAnswers.push({
-          questionId: field.key, // Use the key as questionId for account fields
-          stepId: 'account-creation', // Special step ID for account fields
-          stepCategory: 'user_profile', // Account creation is typically user_profile category
-          questionText: field.label,
-          answerType: 'text',
-          answer: currentAnswers[field.key],
-          answeredAt: new Date().toISOString()
-        });
-      }
-    });
-
-    // Add calculated BMI fields
-    const bmiFields = [
-      { key: 'weight', label: 'Weight (pounds)' },
-      { key: 'heightFeet', label: 'Height Feet' },
-      { key: 'heightInches', label: 'Height Inches' },
-      { key: 'heightAndWeight', label: 'What is your current height and weight?' }
-    ];
-
-    bmiFields.forEach(field => {
-      if (currentAnswers[field.key]) {
-        legacyAnswers[field.label] = currentAnswers[field.key];
-      }
-    });
-
-    if (currentAnswers['bmi'] && currentAnswers['bmiCategory']) {
-      legacyAnswers['BMI Result'] = `${currentAnswers['bmi']} - ${currentAnswers['bmiCategory']}`;
-    }
-
-    // Return both structured and legacy formats for backward compatibility
-    return {
-      structured: {
-        answers: structuredAnswers,
-        metadata: {
-          questionnaireId: questionnaire?.id,
-          completedAt: new Date().toISOString(),
-          version: "1.0"
-        }
-      },
-      legacy: legacyAnswers
-    };
-  };
-
-  // Handle answer changes
-  const handleAnswerChange = (questionId: string, value: any) => {
-    // Limit mobile number to 10 digits (numbers only)
-    if (questionId === 'mobile') {
-      const numericValue = String(value).replace(/\D/g, ''); // Remove non-numeric characters
-      if (numericValue.length <= 10) {
-        const newAnswers = {
-          ...answers,
-          [questionId]: numericValue
-        };
-        setAnswers(newAnswers);
-
-        // Clear error for this question
-        if (errors[questionId]) {
-          setErrors(prev => {
-            const newErrors = { ...prev };
-            delete newErrors[questionId];
-            return newErrors;
-          });
-        }
-        return;
-      }
-      return; // Don't update if exceeds 10 digits
-    }
-
-    const newAnswers = {
-      ...answers,
-      [questionId]: value
-    };
-
-    // Calculate BMI if weight or height fields are being updated
-    if (questionId === 'weight' || questionId === 'heightFeet' || questionId === 'heightInches') {
-      const weight = parseFloat(newAnswers['weight'] as string);
-      const feet = parseFloat(newAnswers['heightFeet'] as string);
-      const inches = parseFloat(newAnswers['heightInches'] as string);
-
-      if (weight && feet >= 0 && inches >= 0) {
-        const totalInches = feet * 12 + inches;
-        const heightInMeters = totalInches * 0.0254;
-        const weightInKg = weight * 0.453592;
-        const bmi = weightInKg / (heightInMeters * heightInMeters);
-
-        let category = '';
-        if (bmi < 18.5) {
-          category = 'Underweight';
-        } else if (bmi < 25) {
-          category = 'Normal';
-        } else if (bmi < 30) {
-          category = 'Overweight';
-        } else {
-          category = 'Obese';
-        }
-
-        // Add BMI data to answers
-        newAnswers['bmi'] = bmi.toFixed(1);
-        newAnswers['bmiCategory'] = category;
-        newAnswers['heightAndWeight'] = `${weight} lbs, ${feet}'${inches}"`;
-      }
-    }
-
-    setAnswers(newAnswers);
-
-    // Clear error for this question
-    if (errors[questionId]) {
-      setErrors(prev => {
-        const newErrors = { ...prev };
-        delete newErrors[questionId];
-        return newErrors;
-      });
-    }
-
-    // Log the updated questionnaire answers in real-time
-    const questionnaireAnswers = buildQuestionnaireAnswers(newAnswers);
-    console.log('📋 ⚡ Real-time questionnaire update:');
-    console.log(`📋 Changed: "${questionId}" = `, value);
-    console.log('📋 Current questionnaire answers (structured):', questionnaireAnswers.structured);
-    console.log('📋 Current questionnaire answers (legacy):', questionnaireAnswers.legacy);
-  };
-
-  const handleRadioChange = (questionId: string, value: any) => {
-    // Update state synchronously for immediate navigation
-    let newAnswers = { ...answers, [questionId]: value };
-
-    // Persist updated answer immediately
-    setAnswers(newAnswers);
-
-    // Proactively clear error for this question on selection
-    setErrors(prev => {
-      const next = { ...prev };
-      delete next[questionId];
-      return next;
-    });
-
-    // Deterministic auto-advance: if all required questions in this step are satisfied with newAnswers
-    const step = getCurrentQuestionnaireStep();
-    const otherInvalid = step?.questions?.some((q: any) => {
-      if (q.id === questionId) return false;
-      if (!q.isRequired) return false;
-      const a = (newAnswers as any)[q.id];
-      if (a === undefined || a === null) return true;
-      if (typeof a === 'string' && a.trim() === '') return true;
-      if (Array.isArray(a) && a.length === 0) return true;
-      return false;
-    });
-    const totalSteps = getTotalSteps();
-    if (!otherInvalid) {
-      if (currentStepIndex < totalSteps - 1) {
-        setCurrentStepIndex(prev => prev + 1);
-      } else {
-        handleSubmit();
-      }
-    }
-
-    // Log the updated questionnaire answers in real-time
-    const questionnaireAnswers = buildQuestionnaireAnswers(newAnswers);
-    console.log('📋 ⚡ Real-time questionnaire update (Radio):');
-    console.log(`📋 Changed: "${questionId}" = `, value);
-    console.log('📋 Current questionnaire answers (structured):', questionnaireAnswers.structured);
-    console.log('📋 Current questionnaire answers (legacy):', questionnaireAnswers.legacy);
-
-    // Generic logic: Clear dependent questions when ANY radio answer actually changes
-    const currentStep = getCurrentQuestionnaireStep();
-    const question = currentStep?.questions?.find(q => q.id === questionId);
-
-    if (question && question.answerType === 'radio') {
-      const previousValue = answers[questionId];
-
-      // Only clear dependent questions if the answer actually changed
-      if (previousValue !== value) {
-        // Helper function to recursively find all questions that depend on a given question
-        const findDependentQuestions = (targetQuestionOrder: number, visitedOrders = new Set()): number[] => {
-          if (visitedOrders.has(targetQuestionOrder)) return [];
-          visitedOrders.add(targetQuestionOrder);
-
-          const dependentOrders: number[] = [];
-
-          currentStep.questions.forEach(q => {
-            const logic = (q as any).conditionalLogic;
-            if (logic && logic.includes(`questionOrder:${targetQuestionOrder},answer:`)) {
-              dependentOrders.push(q.questionOrder);
-              // Recursively find questions that depend on this question
-              const subDependents = findDependentQuestions(q.questionOrder, visitedOrders);
-              dependentOrders.push(...subDependents);
-            }
-          });
-
-          return dependentOrders;
-        };
-
-        // Find all questions that depend on this radio question
-        const dependentOrders = findDependentQuestions(question.questionOrder);
-
-        // Clear answers for all dependent questions
-        currentStep.questions.forEach(q => {
-          if (dependentOrders.includes(q.questionOrder)) {
-            delete newAnswers[q.id];
-          }
-        });
-      }
-    }
-
-    setAnswers(newAnswers);
-
-    // Clear errors for this question
-    if (errors[questionId]) {
-      setErrors(prev => {
-        const newErrors = { ...prev };
-        delete newErrors[questionId];
-        return newErrors;
-      });
-    }
-
-    // Check if this specific answer will trigger any conditional questions
-    const willTriggerConditionals = currentStep?.questions?.some(q => {
-      const logic = (q as any).conditionalLogic;
-      if (!logic) return false;
-
-      // Check if this conditional matches the value we just selected
-      if (logic.startsWith('answer_equals:')) {
-        const requiredValue = logic.replace('answer_equals:', '').trim();
-        return value === requiredValue;
-      }
-      return false;
-    });
-
-    // Auto-advance if this answer doesn't trigger any conditionals
-    if (!willTriggerConditionals && questionnaire) {
-      setTimeout(() => {
-        if (validateCurrentStep()) {
-          const totalSteps = getTotalSteps();
-          if (currentStepIndex < totalSteps - 1) {
-            setCurrentStepIndex(prev => prev + 1);
-          } else {
-            handleSubmit();
-          }
-        }
-      }, 300); // Small delay for smooth UX
-    }
-  };
-
-  const handleCheckboxChange = (questionId: string, optionValue: string, isChecked: boolean) => {
-    const currentValues = answers[questionId] || [];
-    const newValues = isChecked
-      ? [...currentValues, optionValue]
-      : currentValues.filter((v: string) => v !== optionValue);
-
-    // Update state
-    setAnswers(prev => ({
-      ...prev,
-      [questionId]: newValues
-    }));
-
-    // Clear errors for this question
-    if (errors[questionId]) {
-      setErrors(prev => {
-        const newErrors = { ...prev };
-        delete newErrors[questionId];
-        return newErrors;
-      });
-    }
-
-    // Log the updated questionnaire answers in real-time
-    const questionnaireAnswers = buildQuestionnaireAnswers({
-      ...answers,
-      [questionId]: newValues
-    });
-    console.log('📋 ⚡ Real-time questionnaire update (checkbox):');
-    console.log(`📋 Changed: "${questionId}" = `, newValues);
-    console.log('📋 Current questionnaire answers (structured):', questionnaireAnswers.structured);
-    console.log('📋 Current questionnaire answers (legacy):', questionnaireAnswers.legacy);
-
-    // Auto-advance if "None of the above" is selected
-    if (isChecked && (optionValue.toLowerCase().includes('none of the above') ||
-      optionValue.toLowerCase().includes('none of these'))) {
-      // Check if current step has conditional questions
-      const currentStep = getCurrentQuestionnaireStep();
-      const hasConditionalQuestions = currentStep?.questions?.some(q =>
-        (q as any).conditionalLogic
-      );
-
-      // Only auto-advance if there are no conditional questions in this step
-      if (!hasConditionalQuestions && questionnaire) {
-        const totalSteps = getTotalSteps();
-        if (currentStepIndex < totalSteps - 1) {
-          setCurrentStepIndex(prev => prev + 1);
-        } else {
-          handleSubmit();
-        }
-      }
-    }
-  };
-
-  // Handle product quantity changes
-  const handleProductQuantityChange = (productId: string, quantity: number) => {
-    setSelectedProducts(prev => ({
-      ...prev,
-      [productId]: quantity
-    }));
-  };
-
-  // Validate current step
-  const validateCurrentStep = (): boolean => {
-    if (!questionnaire) return true;
-
-    // Validate product selection step
-    if (isProductSelectionStep()) {
-      const hasSelectedProducts = Object.values(selectedProducts).some(qty => qty > 0);
-      if (!hasSelectedProducts) {
-        alert('Please select at least one product to continue.');
-        return false;
-      }
-      return true;
-    }
-
-    // Validate checkout step
-    if (isCheckoutStep()) {
-      // For subscription treatments, no product validation needed
-
-      // Validate required shipping fields
-      const requiredShippingFields = ['address', 'city', 'state', 'zipCode'];
-      for (const field of requiredShippingFields) {
-        if (!shippingInfo[field as keyof typeof shippingInfo]?.trim()) {
-          alert(`Please fill in the ${field.replace(/([A-Z])/g, ' $1').toLowerCase()} field.`);
-          return false;
-        }
-      }
-
-      // Validate Stripe payment is completed
-      if (paymentStatus !== 'succeeded') {
-        alert('Please complete your payment information before proceeding.');
-        return false;
-      }
-
-      return true;
-    }
-
-    // Validate regular questionnaire step
-    const currentStep = getCurrentQuestionnaireStep();
-    if (!currentStep) return true;
-
-    // If step is marked as not required, skip validation
-    if (currentStep.required === false) {
-      return true;
-    }
-
-    // Special validation for Create Your Account step
-    if (currentStep.title === 'Create Your Account') {
-      const stepErrors: Record<string, string> = {};
-      const requiredFields = ['firstName', 'lastName', 'email', 'mobile'];
-
-      for (const field of requiredFields) {
-        const answer = answers[field];
-        if (!answer || (typeof answer === 'string' && answer.trim() === '')) {
-          stepErrors[field] = 'This field is required';
-        }
-      }
-
-      // Basic email validation
-      const email = answers['email'];
-      if (email && !email.includes('@')) {
-        stepErrors['email'] = 'Please enter a valid email address';
-      }
-
-      setErrors(stepErrors);
-      return Object.keys(stepErrors).length === 0;
-    }
-
-    // Special validation for Body Measurements step
-    if (currentStep.title === 'Body Measurements') {
-      const stepErrors: Record<string, string> = {};
-      const requiredFields = ['weight', 'heightFeet', 'heightInches'];
-
-      for (const field of requiredFields) {
-        const answer = answers[field];
-        if (!answer || (typeof answer === 'string' && answer.trim() === '')) {
-          stepErrors[field] = 'This field is required';
-        }
-      }
-
-      // Validate numeric values
-      const weight = parseFloat(answers['weight'] as string);
-      const feet = parseFloat(answers['heightFeet'] as string);
-      const inches = parseFloat(answers['heightInches'] as string);
-
-      if (weight && (weight < 50 || weight > 1000)) {
-        stepErrors['weight'] = 'Please enter a valid weight';
-      }
-
-      if (feet && (feet < 1 || feet > 10)) {
-        stepErrors['heightFeet'] = 'Please enter a valid height';
-      }
-
-      if (inches && (inches < 0 || inches >= 12)) {
-        stepErrors['heightInches'] = 'Inches must be between 0 and 11';
-      }
-
-      setErrors(stepErrors);
-      return Object.keys(stepErrors).length === 0;
-    }
-
-    const stepErrors: Record<string, string> = {};
-
-    if (currentStep.questions) {
-      for (const question of currentStep.questions) {
-        // Only validate if question is VISIBLE (check conditional logic)
-        const conditionalLogic = (question as any).conditionalLogic;
-        let isVisible = true;
-
-        if (conditionalLogic) {
-          try {
-            const parentQuestion = currentStep.questions?.find((q: any) =>
-              q.conditionalLevel === 0 || !q.conditionalLevel
-            );
-            if (parentQuestion) {
-              const parentAnswer = answers[parentQuestion.id];
-              if (parentAnswer && conditionalLogic.startsWith('answer_equals:')) {
-                const requiredValue = conditionalLogic.replace('answer_equals:', '').trim();
-                if (Array.isArray(parentAnswer)) {
-                  isVisible = parentAnswer.includes(requiredValue);
-                } else {
-                  isVisible = parentAnswer === requiredValue;
-                }
-              } else {
-                isVisible = false; // No parent answer = hidden
-              }
-            }
-          } catch (error) {
-            isVisible = true; // Default to visible if error
-          }
-        }
-
-        // Only validate visible questions
-        if (isVisible) {
-          const answer = answers[question.id];
-          // Required empty
-          if (question.isRequired && (!answer || (Array.isArray(answer) && answer.length === 0) || (typeof answer === 'string' && answer.trim() === ''))) {
-            stepErrors[question.id] = 'This field is required';
-          }
-
-          // Special: DOB validation
-          const isDobQuestion = (question.questionText || '').toLowerCase().includes('date of birth');
-          if (isDobQuestion && answer) {
-            let normalized = String(answer);
-            const mmddyyyy = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
-            const usMatch = mmddyyyy.exec(normalized);
-            if (usMatch) {
-              const mm = usMatch[1].padStart(2, '0');
-              const dd = usMatch[2].padStart(2, '0');
-              const yyyy = usMatch[3];
-              normalized = `${yyyy}-${mm}-${dd}`;
-            }
-            const iso = /^([0-9]{4})-([0-9]{2})-([0-9]{2})$/.exec(normalized);
-            let valid = false;
-            if (iso) {
-              const year = Number(iso[1]);
-              const month = Number(iso[2]);
-              const day = Number(iso[3]);
-              if (year >= 1900 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
-                const dob = new Date(`${iso[1]}-${iso[2]}-${iso[3]}T00:00:00Z`);
-                if (!isNaN(dob.getTime())) {
-                  const now = new Date();
-                  const ageYears = (now.getTime() - dob.getTime()) / (365.25 * 24 * 60 * 60 * 1000);
-                  valid = ageYears >= 18 && ageYears <= 120;
-                }
-              }
-            }
-            if (!valid) {
-              stepErrors[question.id] = 'Enter a valid date (YYYY-MM-DD), age 18-120.';
-            } else if (normalized !== answer) {
-              setAnswers(prev => ({ ...prev, [question.id]: normalized }));
-            }
-          }
-        }
-      }
-    }
-
-    setErrors(stepErrors);
-    return Object.keys(stepErrors).length === 0;
-  };
-
-  // Navigate to next step
-  // Helper function to replace variables dynamically based on current state
-  const replaceCurrentVariables = (text: string): string => {
-    if (!text) return text;
-
-    const variables = {
-      ...getVariablesFromClinic(domainClinic || {}),
-      productName: productName || '',
-      patientFirstName: patientFirstName || '', // Put patientFirstName BEFORE patientName to avoid partial matches
-      patientName: patientName || ''
-    };
-
-    const result = replaceVariables(text, variables);
-
-    // Debug logging
-    if (text.includes('{{patient')) {
-      console.log('🔄 Variable replacement:', {
-        original: text,
-        variables,
-        result
-      });
-    }
-
-    return result;
-  };
-
-  // Handle sign-in
-  const handleSignIn = async () => {
-    setSignInError('');
-    setIsSigningIn(true);
-
-    const result = await signInUser(signInEmail, signInPassword);
-
-    if (result.success && result.userData) {
-      // Pre-fill the form with user's existing data
-      const newAnswers = {
-        ...answers,
-        firstName: result.userData.firstName,
-        lastName: result.userData.lastName,
-        email: result.userData.email,
-        mobile: result.userData.phoneNumber
-      };
-
-      setAnswers(newAnswers);
-
-      // Set patient variables
-      const firstName = result.userData.firstName;
-      const lastName = result.userData.lastName;
-      const fullName = `${firstName} ${lastName}`.trim();
-      setPatientFirstName(firstName);
-      setPatientName(fullName);
-
-      // Mark as already having an account
-      setUserId(result.userData.id);
-      setAccountCreated(true);
-
-      // Exit sign-in mode - this will trigger the useEffect below to advance the step
-      setIsSignInMode(false);
-      setIsSigningIn(false);
-
-      console.log('✅ User signed in successfully, will auto-advance to next step:', newAnswers);
-    } else {
-      setSignInError(result.error || 'Sign-in failed');
-      setIsSigningIn(false);
-    }
-  };
-
-  // Handle Google sign-in
-  const handleGoogleSignIn = async (credential: string) => {
-    if (!credential) {
-      console.log('⚠️ No Google credential provided');
-      return;
-    }
-
-    setIsSigningIn(true);
-
-    const result = await signInWithGoogle(credential, domainClinic?.id);
-
-    if (result.success && result.userData) {
-      // Pre-fill the form with user's existing data
-      const newAnswers = {
-        ...answers,
-        firstName: result.userData.firstName,
-        lastName: result.userData.lastName,
-        email: result.userData.email,
-        mobile: result.userData.phoneNumber
-      };
-
-      setAnswers(newAnswers);
-
-      // Set patient variables
-      const firstName = result.userData.firstName;
-      const lastName = result.userData.lastName;
-      const fullName = `${firstName} ${lastName}`.trim();
-      setPatientFirstName(firstName);
-      setPatientName(fullName);
-
-      // Mark as already having an account
-      setUserId(result.userData.id);
-      setAccountCreated(true);
-
-      // Exit sign-in mode
-      setIsSignInMode(false);
-
-      console.log('✅ User signed in with Google successfully, advancing to next step');
-
-      // Advance to next step after successful sign-in
-      setIsSigningIn(false);
-
-      setTimeout(() => {
-        if (questionnaire) {
-          const totalSteps = getTotalSteps();
-          if (currentStepIndex < totalSteps - 1) {
-            setCurrentStepIndex(prev => prev + 1);
-          }
-        }
-      }, 150);
-    } else {
-      setSignInError(result.error || 'Google sign-in failed');
-      setIsSigningIn(false);
-    }
-  };
-
-  // Auto-advance to next step after successful sign-in
-  const shouldAdvanceAfterSignInRef = React.useRef(false);
-
-  React.useEffect(() => {
-    const currentStep = getCurrentQuestionnaireStep();
-    const isOnAccountStep = currentStep?.title === 'Create Your Account';
-
-    // Check if we just completed sign-in
-    if (isOnAccountStep && accountCreated && !isSignInMode && !isSigningIn && shouldAdvanceAfterSignInRef.current) {
-      console.log('🚀 Auto-advancing after sign-in');
-      shouldAdvanceAfterSignInRef.current = false; // Reset flag
-
-      // Small delay to ensure all state updates are processed
-      setTimeout(() => {
-        if (questionnaire) {
-          const totalSteps = getTotalSteps();
-          if (currentStepIndex < totalSteps - 1) {
-            setCurrentStepIndex(prev => prev + 1);
-            console.log('✅ Advanced to next step after sign-in');
-          }
-        }
-      }, 150);
-    }
-
-    // Set flag when starting sign-in
-    if (isSigningIn && isSignInMode) {
-      shouldAdvanceAfterSignInRef.current = true;
-    }
-  }, [accountCreated, isSignInMode, isSigningIn, currentStepIndex, questionnaire]);
-
-  // Create user account after "Create Your Account" step
-  const createUserAccount = async () => {
-    // Immediately set patient name from answers (don't modify questionnaire to avoid re-render)
-    const firstName = answers['firstName'] || '';
-    const lastName = answers['lastName'] || '';
-    const fullName = `${firstName} ${lastName}`.trim();
-
-    setPatientFirstName(firstName);
-    setPatientName(fullName);
-
-    console.log('👤 Set patient variables:', { firstName, fullName });
-
-    // Try to create user account in background (don't block if it fails)
-    const result = await createUserAccountAPI(
-      answers['firstName'],
-      answers['lastName'],
-      answers['email'],
-      answers['mobile'],
-      domainClinic?.id
-    );
-
-    if (result.success && result.userId) {
-      setUserId(result.userId);
-      setAccountCreated(true);
-    } else {
-      // Don't block progression - account will be created/linked at payment time
-      setAccountCreated(true);
-    }
-  };
-
-  // Email verification handlers
-  const emailVerificationHandlers = createEmailVerificationHandlers({
-    answers,
-    verificationEmail,
-    verificationCode,
-    questionnaire,
-    currentStepIndex,
-    setVerificationError,
-    setVerificationEmail,
-    setIsEmailVerificationMode,
-    setIsVerifying,
-    setVerificationCode,
-    setAnswers,
-    setPatientFirstName,
-    setPatientName,
-    setUserId,
-    setAccountCreated,
-    setCurrentStepIndex,
-    getTotalSteps,
-    setShowEmailModal,
-    setEmailModalLoading,
-    setEmailModalError
-  });
-
-  const handleNext = async () => {
-    if (validateCurrentStep() && questionnaire) {
-      const currentStep = getCurrentQuestionnaireStep();
-
-      // If we just completed "Create Your Account" step and haven't created account yet, do it now
-      if (currentStep?.title === 'Create Your Account' && !accountCreated) {
-        await createUserAccount();
-      }
-
-      const totalSteps = getTotalSteps();
-      if (currentStepIndex < totalSteps - 1) {
-        setCurrentStepIndex(prev => prev + 1);
-      } else {
-        handleSubmit();
-      }
-    }
-  };
-
-  // Navigate to previous step
-  const handlePrevious = () => {
-    if (currentStepIndex > 0) {
-      setCurrentStepIndex(prev => prev - 1);
-    }
-  };
-
-  // Handle plan selection and create subscription
-  const handlePlanSelection = async (planId: string) => {
-    setSelectedPlan(planId);
-
-    setClientSecret(null);
-
-    setTimeout(async () => {
-      await createSubscriptionForPlan(planId);
-    }, 100);
-  };
-
-  // Create subscription for a specific plan
-  const createSubscriptionForPlan = async (planId: string) => {
-    try {
-      setPaymentStatus('processing');
-
-      const selectedPlanData = plans.find(plan => plan.id === planId);
-      const stripePriceId = selectedPlanData?.stripePriceId;
-
-      if (!stripePriceId) {
-        console.warn('⚠️ No stripePriceId found for plan, backend will create one:', planId);
-      }
-
-      // Prepare user details for subscription
-      const userDetails = {
-        firstName: answers['firstName'],
-        lastName: answers['lastName'],
-        email: answers['email'],
-        phoneNumber: answers['mobile']
-      };
-
-      // Prepare questionnaire answers in the enhanced structured format
-      const questionnaireAnswersData = buildQuestionnaireAnswers(answers);
-      const questionnaireAnswers = questionnaireAnswersData.structured;
-
-      console.log('📋 Starting questionnaire answers collection...');
-      console.log('📋 Raw answers object:', answers);
-      console.log('📋 🎉 Final structured questionnaire answers:', questionnaireAnswers);
-
-      // Check if clinic is merchant of record to add OBO parameter
-      const clinicMerchantOfRecord = (domainClinic as any)?.merchantOfRecord;
-      const isClinicMOR = clinicMerchantOfRecord === 'myself';
-
-      console.log('💳 Creating product subscription for selected plan:', {
-        tenantProductId,
-        stripePriceId: stripePriceId || 'will be created by backend',
-        planId,
-        planName: selectedPlanData?.name,
-        merchantOfRecord: clinicMerchantOfRecord,
-        isClinicMOR,
-        willUseOBO: isClinicMOR
-      });
-
-      const requestBody: any = {
-          tenantProductId: tenantProductId,
-          stripePriceId: stripePriceId || undefined, // Let backend create if missing
-          userDetails: userDetails,
-          questionnaireAnswers: questionnaireAnswers, // This is now the structured format
-        shippingInfo: shippingInfo,
-        clinicName: domainClinic?.name // For dynamic statement descriptor
-      };
-
-      // Add OBO parameter if clinic is merchant of record
-      if (isClinicMOR) {
-        requestBody.useOnBehalfOf = true;
-        console.log('💳 Adding OBO parameter - clinic is merchant of record');
-      }
-
-      const result = await apiCall('/payments/product/sub', {
-        method: 'POST',
-        body: JSON.stringify(requestBody)
-      });
-
-      if (result.success && result.data) {
-        const subscriptionData = result.data.data || result.data;
-        if (subscriptionData.clientSecret) {
-          setClientSecret(subscriptionData.clientSecret);
-          setPaymentIntentId(subscriptionData.paymentIntentId || subscriptionData.subscriptionId || subscriptionData.id);
-          if (subscriptionData.orderId) {
-            setOrderId(subscriptionData.orderId);
-          }
-          setPaymentStatus('idle');
-          console.log('💳 Subscription created successfully for plan:', selectedPlanData?.name);
-          return subscriptionData.clientSecret;
-        }
-      }
-
-      console.error('❌ Subscription creation failed:', result);
-      setPaymentStatus('failed');
-      return null;
-    } catch (error) {
-      console.error('❌ Subscription creation error:', error);
-      setPaymentStatus('failed');
-      return null;
-    }
-  };
-
-  const triggerCheckoutSequenceRun = React.useCallback(async () => {
-    if (!domainClinic?.id) {
-      console.warn('⚠️ Clinic ID not available, skipping sequence trigger');
-      return;
-    }
-
-    try {
-      const payload = {
-        paymentIntentId,
-        orderId,
-        selectedPlan,
-        userDetails: {
-          firstName: answers['firstName'],
-          lastName: answers['lastName'],
-          email: answers['email'],
-          phoneNumber: answers['mobile']
-        },
-        shippingInfo,
-        selectedProducts
-      };
-
-      await apiCall('/sequence-triggers/checkout', {
-        method: 'POST',
-        body: JSON.stringify({
-          clinicId: domainClinic.id,
-          payload
-        })
-      });
-
-      console.log('✅ Checkout sequence trigger created', {
-        clinicId: domainClinic.id,
-        sequencePayload: payload
-      });
-    } catch (error) {
-      console.error('❌ Failed to trigger checkout sequence:', error);
-    }
-  }, [domainClinic?.id, paymentIntentId, orderId, selectedPlan, answers, shippingInfo, selectedProducts]);
-
-  // Handle payment success (for subscription payments)
-  const handlePaymentSuccess = async () => {
-    try {
-      if (!paymentIntentId) {
-        throw new Error('No payment intent ID');
-      }
-
-      // For manual capture flow, payment is authorized but not captured yet
-      // The subscription will be created when payment is manually captured later
-      setPaymentStatus('succeeded');
-      console.log('💳 Payment authorized successfully:', paymentIntentId);
-      console.log('💳 Subscription will be created after manual payment capture');
-
-      await triggerCheckoutSequenceRun();
-
-      // Track conversion in analytics - use tenantProductFormId which is always available from URL
-      if (tenantProductFormId && tenantProductId && domainClinic) {
-        const userId = (domainClinic as any).userId || (domainClinic as any).ownerId;
-
-        if (userId) {
-          await trackFormConversion({
-            userId,
-            productId: tenantProductId,
-            formId: tenantProductFormId,
-            clinicId: domainClinic.id,
-            clinicName: domainClinic.name,
-            productName: productName || undefined,
-            paymentIntentId: paymentIntentId,
-            orderId: orderId || undefined
-          });
-
-          // Mark as converted so we don't track a drop-off
-          hasConvertedRef.current = true;
-        }
-      }
-
-      // Don't close modal, allow user to continue with questionnaire steps
-    } catch (error) {
-      setPaymentStatus('failed');
-      alert('Payment authorization failed. Please contact support.');
-    }
-  };
-
-
-  // Handle payment error
-  const handlePaymentError = (error: string) => {
-    setPaymentStatus('failed');
-    alert(`Payment failed: ${error}`);
-  };
-
-  // Submit questionnaire
-  const handleSubmit = async () => {
-    if (isCheckoutStep()) {
-      // Handle checkout submission
-      try {
-        console.log('💳 Processing checkout with data:', {
-          selectedPlan,
-          shippingInfo,
-          paymentInfo: checkoutPaymentInfo,
-          selectedProducts,
-          answers
-        });
-
-        // Here you would integrate with your actual payment processing
-        // For now, we'll just show a success message
-        alert('Order submitted successfully!');
-        onClose();
-      } catch (error) {
-        console.error('Checkout error:', error);
-        alert('There was an error processing your order. Please try again.');
-      }
-    } else {
-      alert('Questionnaire submitted!');
-      onClose();
-    }
-  };
-
-  // Priority: custom color (from QuestionnaireCustomization) > questionnaire color > clinic default color > system default
-  const themeColor = customColor || questionnaire?.color || domainClinic?.defaultFormColor;
-
-  console.log('🎨 [THEME] Computing theme color...');
-  console.log('🎨 [THEME] customColor:', customColor);
-  console.log('🎨 [THEME] questionnaire?.color:', questionnaire?.color);
-  console.log('🎨 [THEME] domainClinic?.defaultFormColor:', domainClinic?.defaultFormColor);
-  console.log('🎨 [THEME] Final themeColor:', themeColor);
-
-  const theme = useMemo(() => {
-    const result = createTheme(themeColor);
-    console.log('🎨 [THEME] Created theme:', result);
-    return result;
-  }, [themeColor]);
-  const themeVars = useMemo(
-    () => ({
-      "--q-primary": theme.primary,
-      "--q-primary-dark": theme.primaryDark,
-      "--q-primary-darker": theme.primaryDarker,
-      "--q-primary-light": theme.primaryLight,
-      "--q-primary-lighter": theme.primaryLighter,
-      "--q-primary-text": theme.text,
-    } as React.CSSProperties),
-    [theme]
-  );
-
-  useEffect(() => {
-    console.log("[QuestionnaireModal] theme", {
-      questionnaireColor: questionnaire?.color,
-      theme,
-    });
-  }, [questionnaire?.color, theme]);
-
-  if (loading || !questionnaire || !questionnaire.steps) {
-    return (
-      <Modal
-        isOpen={isOpen}
-        onClose={onClose}
-        size="full"
-        classNames={{
-          base: "m-0 sm:m-0 max-w-full max-h-full",
-          wrapper: "w-full h-full",
-          backdrop: "bg-overlay/50"
-        }}
-        hideCloseButton
-      >
-        <ModalContent className="h-full bg-white">
-          <ModalBody className="flex items-center justify-center">
-            <div className="text-center">
-              <div className="flex justify-center mb-4">
-                <Icon icon="lucide:loader-2" className="text-4xl text-primary animate-spin" />
-              </div>
-              <p className="text-lg">
-                {loading ? 'Loading questionnaire...' : 'No questionnaire found for this treatment'}
-              </p>
-            </div>
-          </ModalBody>
-        </ModalContent>
-      </Modal>
-    );
+  if (modal.loading || !modal.questionnaire || !modal.questionnaire.steps) {
+    return <LoadingState isOpen={isOpen} onClose={onClose} loading={modal.loading} />;
   }
 
-  const totalSteps = getTotalSteps();
-  const progressPercent = ((currentStepIndex + 1) / totalSteps) * 100;
-  const isLastStep = currentStepIndex === totalSteps - 1;
+  const totalSteps = modal.getTotalSteps();
+  const currentVisibleStep = modal.getCurrentVisibleStepNumber();
+  const progressPercent = (currentVisibleStep / totalSteps) * 100;
+  const isLastStep = currentVisibleStep === totalSteps;
+  const currentStep = modal.getCurrentQuestionnaireStep();
 
-  const currentStep = getCurrentQuestionnaireStep();
+  console.log('🔵 [INDEX RENDER]', {
+    currentStepIndex: modal.currentStepIndex,
+    currentVisibleStep,
+    totalSteps,
+    currentStepTitle: currentStep?.title,
+    accountCreated: modal.accountCreated,
+    userId: modal.userId
+  });
 
   // Determine step title and description
   let stepTitle = '';
   let stepDescription = '';
-
-  if (isProductSelectionStep()) {
+  if (modal.isProductSelectionStep()) {
     stepTitle = 'Product Selection';
     stepDescription = 'Choose your NAD+ products';
-  } else if (isCheckoutStep()) {
+  } else if (modal.isCheckoutStep()) {
     stepTitle = 'Complete Your Order';
     stepDescription = 'Secure checkout for your weight management treatment';
   } else if (currentStep) {
-    // Apply dynamic variable replacement for patient variables
-    stepTitle = replaceCurrentVariables(currentStep.title);
-    stepDescription = replaceCurrentVariables(currentStep.description || '');
+    stepTitle = modal.replaceCurrentVariables(currentStep.title);
+    stepDescription = modal.replaceCurrentVariables(currentStep.description || '');
   }
 
-  if (!currentStep && !isProductSelectionStep() && !isCheckoutStep()) {
-    // No more questionnaire steps - advance to next phase (product selection or checkout)
-    handleNext();
-    return null; // Prevent rendering empty step
+  // Handle case when no visible steps remain
+  if (!currentStep && !modal.isProductSelectionStep() && !modal.isCheckoutStep()) {
+    if (modal.questionnaire) {
+      const checkoutPos = modal.questionnaire.checkoutStepPosition;
+      const checkoutStepIndex = checkoutPos === -1 ? modal.questionnaire.steps.length : checkoutPos;
+      console.log('⏭️ No more visible questionnaire steps, advancing to checkout at index:', checkoutStepIndex);
+      modal.setCurrentStepIndex(checkoutStepIndex);
+    }
+    return null;
   }
+
+  // Render regular step content
+  const renderStepContent = () => {
+    // Google MFA takes precedence
+    if (modal.isGoogleMfaMode) {
+      return (
+        <GoogleMfaStep
+          email={modal.googleMfaEmail}
+          code={modal.googleMfaCode}
+          error={modal.googleMfaError}
+          isVerifying={modal.isVerifyingGoogleMfa}
+          inputRefs={modal.googleMfaInputRefs}
+          onCodeInput={modal.handleGoogleMfaInput}
+          onKeyDown={modal.handleGoogleMfaKeyDown}
+          onPaste={modal.handleGoogleMfaPaste}
+          onVerify={modal.handleGoogleMfaVerify}
+          onCancel={modal.handleGoogleMfaCancel}
+        />
+      );
+    }
+
+    // Sign-in options mode
+    if (modal.isSignInOptionsMode) {
+      if (modal.isEmailVerificationMode) {
+        return (
+          <EmailVerificationStep
+            email={modal.verificationEmail}
+            code={modal.verificationCode}
+            onCodeChange={modal.setVerificationCode}
+            onVerify={modal.emailVerificationHandlers.handleVerifyCode}
+            onBack={() => {
+              modal.setIsEmailVerificationMode(false);
+              modal.setVerificationCode('');
+            }}
+            onResendCode={modal.emailVerificationHandlers.handleResendCode}
+            error={modal.verificationError}
+            isVerifying={modal.isVerifying}
+            clinicName={domainClinic?.name}
+          />
+        );
+      }
+
+      if (modal.isPasswordSignInMode) {
+        return (
+          <PasswordSignInStep
+            email={modal.signInEmail}
+            password={modal.signInPassword}
+            error={modal.signInError}
+            isSigningIn={modal.isSigningIn}
+            onEmailChange={(v) => { modal.setSignInEmail(v); modal.setSignInError(''); }}
+            onPasswordChange={(v) => { modal.setSignInPassword(v); modal.setSignInError(''); }}
+            onSignIn={modal.handleSignIn}
+            onBack={() => {
+              modal.setIsPasswordSignInMode(false);
+              modal.setSignInEmail('');
+              modal.setSignInPassword('');
+              modal.setSignInError('');
+            }}
+            clinicName={domainClinic?.name}
+          />
+        );
+      }
+
+      return (
+        <SignInOptionsStep
+          onBack={() => {
+            modal.setIsSignInOptionsMode(false);
+            modal.setIsPasswordSignInMode(false);
+          }}
+          onGoogleSignIn={modal.handleGoogleSignIn}
+          onEmailSignIn={modal.emailVerificationHandlers.handleEmailSignIn}
+          onPasswordSignIn={() => modal.setIsPasswordSignInMode(true)}
+          clinicId={domainClinic?.id}
+          clinicName={domainClinic?.name}
+        />
+      );
+    }
+
+    // Recommended Treatment
+    if (currentStep?.title === 'Recommended Treatment') {
+      return (
+        <RecommendedTreatmentView
+          onAnswerChange={modal.handleAnswerChange}
+          onNext={modal.handleNext}
+        />
+      );
+    }
+
+    // BMI Calculator
+    if (currentStep?.title === 'Body Measurements' || currentStep?.questions?.some(q => q.questionSubtype === 'bmi')) {
+      return (
+        <BMICalculator
+          currentStep={currentStep}
+          answers={modal.answers}
+          onAnswerChange={modal.handleAnswerChange}
+        />
+      );
+    }
+
+    // Success Stories
+    if (currentStep?.title === 'Success Stories') {
+      return <SuccessStoriesView />;
+    }
+
+    // Create Your Account
+    if (currentStep?.title === 'Create Your Account') {
+      return (
+        <AccountCreationStep
+          isSignInMode={false}
+          onToggleMode={() => { }}
+          firstName={modal.answers['firstName'] || ''}
+          lastName={modal.answers['lastName'] || ''}
+          email={modal.answers['email'] || ''}
+          mobile={modal.answers['mobile'] || ''}
+          onFieldChange={modal.handleAnswerChange}
+          signInEmail=""
+          signInPassword=""
+          signInError=""
+          isSigningIn={false}
+          onSignInEmailChange={() => { }}
+          onSignInPasswordChange={() => { }}
+          onSignIn={() => { }}
+          onEmailSignIn={() => { }}
+          onGoogleSignIn={() => { }}
+          clinicId={domainClinic?.id}
+          clinicName={domainClinic?.name}
+        />
+      );
+    }
+
+    // Regular Questions
+    if (currentStep?.questions && currentStep.questions.length > 0) {
+      return (
+        <RegularQuestionsView
+          currentStep={currentStep}
+          answers={modal.answers}
+          errors={modal.errors}
+          theme={modal.theme}
+          replaceCurrentVariables={modal.replaceCurrentVariables}
+          onAnswerChange={modal.handleAnswerChange}
+          onRadioChange={modal.handleRadioChange}
+          onCheckboxChange={modal.handleCheckboxChange}
+          setErrors={modal.setErrors}
+        />
+      );
+    }
+
+    // Informational Step
+    return (
+      <InformationalStepView
+        stepTitle={stepTitle}
+        stepDescription={stepDescription}
+      />
+    );
+  };
+
+  // Check if we should show "Need to sign in?" link
+  const showNeedToSignIn = !modal.accountCreated && !modal.userId && !modal.isSignInOptionsMode &&
+    !modal.isGoogleMfaMode && !modal.isCheckoutStep();
 
   return (
     <>
       <Modal
         isOpen={isOpen}
         onClose={onClose}
-        onOpenChange={(open) => {
-          // Prevent closing if email modal is open
-          if (!open && showEmailModal) {
-            return;
-          }
-        }}
-        isDismissable={!showEmailModal}
-        isKeyboardDismissDisabled={showEmailModal}
+        onOpenChange={(open) => { if (!open && modal.showEmailModal) return; }}
+        isDismissable={!modal.showEmailModal}
+        isKeyboardDismissDisabled={modal.showEmailModal}
         size="full"
         classNames={{
           base: "m-0 sm:m-0 max-w-full max-h-full",
           wrapper: "w-full h-full !z-40",
-          backdrop: showEmailModal ? "!hidden" : "bg-overlay/50 !z-40"
+          backdrop: modal.showEmailModal ? "!hidden" : "bg-overlay/50 !z-40"
         }}
         hideCloseButton
       >
         <ModalContent
           className="h-full bg-gray-50 questionnaire-theme"
-          style={themeVars}
+          style={modal.themeVars}
         >
           <ModalBody
             className="p-0 h-full flex flex-col"
-            {...(showEmailModal ? { inert: '' as any } : {})}
+            {...(modal.showEmailModal ? { inert: '' as any } : {})}
           >
-            {/* Header with close button */}
-            <div className="flex items-center justify-between p-4 bg-white border-b border-gray-200">
-              <Button
-                isIconOnly
-                variant="light"
-                onPress={onClose}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <Icon icon="lucide:x" className="text-xl" />
-              </Button>
+            <ModalHeader
+              onClose={onClose}
+              currentStep={currentVisibleStep}
+              totalSteps={totalSteps}
+            />
 
-              <div className="text-center">
-                <p className="text-sm text-gray-600">
-                  Step {currentStepIndex + 1} of {totalSteps}
-                </p>
-              </div>
-
-              <div className="w-10" /> {/* Spacer for centering */}
-            </div>
-
-            {/* Step Content */}
             <div className="flex-1 overflow-y-auto bg-gray-50 p-4">
-              <div className={`w-full ${isCheckoutStep() ? 'max-w-5xl' : 'max-w-md'} mx-auto min-h-full flex flex-col justify-center`}>
+              <div className={`w-full ${modal.isCheckoutStep() ? 'max-w-5xl' : 'max-w-md'} mx-auto min-h-full flex flex-col justify-center`}>
                 <AnimatePresence mode="wait">
                   <motion.div
-                    key={currentStepIndex}
+                    key={modal.currentStepIndex}
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -20 }}
                     transition={{ duration: 0.2 }}
                     className="space-y-8"
                   >
-                    {isCheckoutStep() ? (
-                      // Checkout step with custom layout
-                      <>
-                        {/* Progress Bar */}
-                        <ProgressBar progressPercent={progressPercent} color={theme.primary} />
-
-                        {/* Brand and Previous button for checkout */}
-                        <StepHeader
-                          onPrevious={handlePrevious}
-                          canGoBack={currentStepIndex > 0}
-                          clinic={domainClinic ? { name: domainClinic.name, logo: (domainClinic as any).logo } : null}
-                          isLoadingClinic={isLoadingClinic}
-                        />
-
-                        <div className="bg-white rounded-2xl p-6 space-y-6">
-                          <CheckoutView
-                            plans={plans}
-                            selectedPlan={selectedPlan}
-                            onPlanChange={handlePlanSelection}
-                            paymentStatus={paymentStatus}
-                            clientSecret={clientSecret}
-                            shippingInfo={shippingInfo}
-                            onShippingInfoChange={(field, value) =>
-                              setShippingInfo((prev) => ({ ...prev, [field]: value }))
-                            }
-                            onRetryPaymentSetup={() => {
-                              setPaymentStatus('idle');
-                              setClientSecret(null);
-                              setPaymentIntentId(null);
-                            }}
-                            onCreateSubscription={createSubscriptionForPlan}
-                            onPaymentSuccess={handlePaymentSuccess}
-                            onPaymentError={handlePaymentError}
-                            stripePromise={stripePromise}
-                            theme={theme}
-                            questionnaireProducts={questionnaire.treatment?.products}
-                            selectedProducts={selectedProducts}
-                            treatmentName={treatmentName ?? productName ?? ''}
-                            pharmacyCoverages={pharmacyCoverages}
-                          />
-
-                          {paymentStatus === 'succeeded' && (
-                            <div className="pt-2">
-                              <Button
-                                color="primary"
-                                className="w-full"
-                                onPress={handleNext}
-                              >
-                                Continue
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                      </>
-                    ) : isProductSelectionStep() ? (
-                      // Product selection step
-                      <>
-                        {/* Progress Bar */}
-                        <ProgressBar progressPercent={progressPercent} color={theme.primary} />
-
-                        <div className="bg-white rounded-2xl p-6 space-y-6">
-                          <ProductSelection
-                            products={questionnaire.treatment?.products}
-                            selectedProducts={selectedProducts}
-                            onChange={handleProductQuantityChange}
-                          />
-
-                          {/* Continue button for product selection */}
-                          {!(isCheckoutStep() && paymentStatus !== 'succeeded') && (
-                            <button
-                              onClick={handleNext}
-                              disabled={isCheckoutStep() && paymentStatus !== 'succeeded'}
-                              className="w-full text-white font-medium py-4 px-6 rounded-2xl text-base h-auto flex items-center justify-center transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
-                              style={{
-                                backgroundColor: theme.primary,
-                                ...(isCheckoutStep() && paymentStatus !== 'succeeded' ? {} : { boxShadow: `0 10px 20px -10px ${theme.primaryDark}` })
-                              }}
-                            >
-                              {isLastStep ? (isCheckoutStep() ? 'Complete Order' : 'Continue') :
-                                (isCheckoutStep() && paymentStatus === 'succeeded') ? 'Continue' :
-                                  isProductSelectionStep() ? 'Continue to Checkout' :
-                                    isCheckoutStep() ? 'Complete Order' : 'Continue'}
-                              <Icon icon="lucide:chevron-right" className="ml-2 h-4 w-4" />
-                            </button>
-                          )}
-                        </div>
-                      </>
+                    {modal.isCheckoutStep() ? (
+                      <CheckoutStepView
+                        progressPercent={progressPercent}
+                        theme={modal.theme}
+                        onPrevious={modal.handlePrevious}
+                        canGoBack={modal.currentStepIndex > 0}
+                        clinic={domainClinic ? { name: domainClinic.name, logo: (domainClinic as any).logo } : null}
+                        isLoadingClinic={isLoadingClinic}
+                        plans={modal.plans}
+                        selectedPlan={modal.selectedPlan}
+                        onPlanChange={modal.handlePlanSelection}
+                        paymentStatus={modal.paymentStatus}
+                        clientSecret={modal.clientSecret}
+                        shippingInfo={modal.shippingInfo}
+                        onShippingInfoChange={(field, value) =>
+                          modal.setShippingInfo((prev) => ({ ...prev, [field]: value }))
+                        }
+                        onRetryPaymentSetup={() => { }}
+                        onCreateSubscription={modal.createSubscriptionForPlan}
+                        onPaymentSuccess={modal.handlePaymentSuccess}
+                        onPaymentError={modal.handlePaymentError}
+                        stripePromise={stripePromise}
+                        questionnaireProducts={modal.questionnaire.treatment?.products}
+                        selectedProducts={modal.selectedProducts}
+                        treatmentName={props.treatmentName ?? props.productName ?? ''}
+                        pharmacyCoverages={modal.pharmacyCoverages}
+                        onNext={modal.handleNext}
+                      />
+                    ) : modal.isProductSelectionStep() ? (
+                      <ProductSelectionStepView
+                        progressPercent={progressPercent}
+                        theme={modal.theme}
+                        products={modal.questionnaire.treatment?.products}
+                        selectedProducts={modal.selectedProducts}
+                        onProductQuantityChange={modal.handleProductQuantityChange}
+                        onNext={modal.handleNext}
+                        isCheckoutStep={modal.isCheckoutStep}
+                        paymentStatus={modal.paymentStatus}
+                        isLastStep={isLastStep}
+                        isProductSelectionStep={modal.isProductSelectionStep}
+                      />
                     ) : (
-                      // Regular questionnaire steps with v0 styling
                       <>
-                        {/* Progress Bar */}
-                        <ProgressBar progressPercent={progressPercent} color={theme.primary} backgroundColor="#E5E7EB" />
-
-                        {/* Brand and Previous button */}
+                        <ProgressBar progressPercent={progressPercent} color={modal.theme.primary} backgroundColor="#E5E7EB" />
                         <StepHeader
-                          onPrevious={handlePrevious}
-                          canGoBack={currentStepIndex > 0}
+                          onPrevious={modal.handlePrevious}
+                          canGoBack={modal.currentStepIndex > 0}
                           clinic={domainClinic ? { name: domainClinic.name, logo: (domainClinic as any).logo } : null}
                           isLoadingClinic={isLoadingClinic}
                         />
 
-                        {/* Questions */}
-                        {currentStep?.title === 'Recommended Treatment' ? (
-                          // Custom treatment recommendation page
-                          (() => {
-                            const medications = [
-                              {
-                                id: "compounded-semaglutide",
-                                name: "Compounded Semaglutide",
-                                type: "Injectable",
-                                badge: "Most Popular",
-                                badgeColor: "bg-emerald-100 text-emerald-700",
-                                subtitle: "Weekly Injectable",
-                                description: "Most commonly prescribed for consistent weight management",
-                                benefits: ["16% average weight loss", "Once-weekly injection"],
-                                icon: "💉",
-                              },
-                              {
-                                id: "semaglutide-orals",
-                                name: "Semaglutide Orals",
-                                type: "Oral",
-                                badge: "Oral",
-                                badgeColor: "bg-gray-100 text-gray-700",
-                                subtitle: "Daily Oral Option",
-                                description: "Needle-free alternative with flexible dosing",
-                                benefits: ["Oral dissolvable tablet", "Same active ingredient as Rybelsus®"],
-                                icon: "heyfeels",
-                                isSelected: true,
-                              },
-                              {
-                                id: "compounded-tirzepatide",
-                                name: "Compounded Tirzepatide",
-                                type: "Injectable",
-                                badge: null,
-                                subtitle: "Dual-Action Injectable",
-                                description: "Works on two hormone pathways for enhanced results",
-                                benefits: ["22% average weight loss", "GLP-1 and GIP receptor activation"],
-                                icon: "💉",
-                              },
-                              {
-                                id: "tirzepatide-orals",
-                                name: "Tirzepatide Orals",
-                                type: "Oral",
-                                badge: "Oral",
-                                badgeColor: "bg-gray-100 text-gray-700",
-                                subtitle: "Dual-Action Oral",
-                                description: "Advanced two-pathway approach in oral form",
-                                benefits: ["Oral dissolvable tablet", "GLP-1 and GIP receptor activation"],
-                                icon: "heyfeels",
-                              },
-                            ];
+                        {/* DEBUG: Show step category */}
+                        {/* {currentStep && (
+                          <div className="bg-yellow-100 border border-yellow-400 rounded-lg p-2 mb-4">
+                            <p className="text-sm font-mono">
+                              <strong>DEBUG Category:</strong> {currentStep.category || 'undefined'}
+                            </p>
+                          </div>
+                        )} */}
 
-                            return (
-                              <>
-                                <div className="space-y-4">
-                                  <div>
-                                    <h3 className="text-2xl font-medium text-gray-900 mb-3">Recommended Treatment</h3>
-                                    <p className="text-gray-600 text-base">Based on your assessment, our providers recommend this treatment</p>
-                                  </div>
+                        {renderStepContent()}
 
-                                  <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-6">
-                                    <div className="flex items-center gap-2 text-emerald-600 mb-4">
-                                      <Icon icon="lucide:check" className="w-4 h-4" />
-                                      <span className="text-sm font-medium">Provider Recommended</span>
-                                    </div>
-                                    <div className="flex items-start gap-4 mb-4">
-                                      <div className="w-16 h-16 bg-gray-800 rounded-lg flex items-center justify-center">
-                                        <div className="text-white text-xs font-bold">
-                                          <div>hey</div>
-                                          <div>feels</div>
-                                        </div>
-                                      </div>
-                                      <div className="flex-1">
-                                        <div className="flex items-center gap-2 mb-2">
-                                          <h3 className="text-xl font-medium text-gray-900">Semaglutide Orals</h3>
-                                        </div>
-                                        <div className="flex items-center gap-2 mb-3">
-                                          <span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-sm font-medium">
-                                            Most Popular
-                                          </span>
-                                          <span className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm font-medium">Oral</span>
-                                        </div>
-                                        <p className="text-gray-900 font-medium mb-1">Daily Oral Option</p>
-                                        <p className="text-gray-600 text-sm mb-4">Needle-free alternative with flexible dosing</p>
+                        {/* Navigation buttons - only show when not in special modes */}
+                        {!(modal.isCheckoutStep() && modal.paymentStatus !== 'succeeded') &&
+                          !modal.isSignInOptionsMode &&
+                          !modal.isGoogleMfaMode && (
+                            <>
+                              <StepNavigationButtons
+                                isCheckoutStep={modal.isCheckoutStep}
+                                paymentStatus={modal.paymentStatus}
+                                currentStep={currentStep}
+                                isSignInMode={modal.isSignInMode}
+                                isEmailVerificationMode={modal.isEmailVerificationMode}
+                                currentStepIndex={modal.currentStepIndex}
+                                answers={modal.answers}
+                                isLastStep={isLastStep}
+                                isProductSelectionStep={modal.isProductSelectionStep}
+                                theme={modal.theme}
+                                onNext={modal.handleNext}
+                                onPrevious={modal.handlePrevious}
+                                onClose={onClose}
+                                setCurrentStepIndex={() => { }}
+                              />
 
-                                        <div className="space-y-2 mb-6">
-                                          <div className="flex items-center gap-2">
-                                            <Icon icon="lucide:check" className="w-4 h-4 text-emerald-600" />
-                                            <span className="text-gray-700 text-sm">Oral dissolvable tablet</span>
-                                          </div>
-                                          <div className="flex items-center gap-2">
-                                            <Icon icon="lucide:check" className="w-4 h-4 text-emerald-600" />
-                                            <span className="text-gray-700 text-sm">Same active ingredient as Rybelsus®</span>
-                                          </div>
-                                        </div>
-
-                                        <button
-                                          onClick={() => {
-                                            // Handle treatment selection
-                                            handleAnswerChange('selectedTreatment', 'Semaglutide Orals');
-                                            handleNext();
-                                          }}
-                                          className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-3 px-6 rounded-2xl text-base h-auto flex items-center justify-center gap-2 transition-colors"
-                                        >
-                                          Select This Treatment
-                                          <Icon icon="lucide:chevron-right" className="w-4 h-4" />
-                                        </button>
-                                      </div>
-                                    </div>
-                                  </div>
-
+                              {/* "Need to sign in?" link */}
+                              {showNeedToSignIn && (
+                                <div className="text-center pt-2">
                                   <button
-                                    onClick={() => setShowMedicationModal(true)}
-                                    className="w-full bg-white rounded-2xl border border-gray-200 p-4 mb-6 flex items-center justify-center gap-2 text-gray-700 hover:bg-gray-50 transition-colors"
+                                    type="button"
+                                    onClick={() => modal.setIsSignInOptionsMode(true)}
+                                    className="text-gray-500 text-sm hover:text-gray-700 hover:underline transition-colors"
                                   >
-                                    <Icon icon="lucide:plus" className="w-4 h-4" />
-                                    <span className="font-medium">View Other Treatment Options</span>
+                                    Need to sign in?
                                   </button>
-
-                                  <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-6">
-                                    <div className="flex items-center gap-2 mb-4">
-                                      <Icon icon="lucide:lock" className="w-4 h-4 text-gray-600" />
-                                      <h3 className="font-medium text-gray-900">About Compounded Medications</h3>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                      <div className="flex items-center gap-2">
-                                        <Icon icon="lucide:check" className="w-4 h-4 text-emerald-600" />
-                                        <span className="text-gray-700 text-sm">Same active ingredients as brand-name medications</span>
-                                      </div>
-                                      <div className="flex items-center gap-2">
-                                        <Icon icon="lucide:check" className="w-4 h-4 text-emerald-600" />
-                                        <span className="text-gray-700 text-sm">Custom formulated by licensed US pharmacies</span>
-                                      </div>
-                                      <div className="flex items-center gap-2">
-                                        <Icon icon="lucide:check" className="w-4 h-4 text-emerald-600" />
-                                        <span className="text-gray-700 text-sm">Physician oversight with personalized dosing</span>
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  <div className="flex items-center justify-center gap-2 text-gray-600 text-sm">
-                                    <Icon icon="lucide:dollar-sign" className="w-4 h-4" />
-                                    <span>Special pricing available • $0 due today • Only pay if prescribed</span>
-                                  </div>
                                 </div>
-
-                                {/* Medication Selection Modal */}
-                                {showMedicationModal && (
-                                  <div className="fixed inset-0 flex items-start justify-center p-4 z-50" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)', margin: 0 }}>
-                                    <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-                                      <div className="sticky top-0 bg-white border-b border-gray-200 p-6 rounded-t-2xl z-10">
-                                        <div className="flex items-center justify-between">
-                                          <h2 className="text-xl font-medium text-gray-900">Choose Preferred Medication</h2>
-                                          <button
-                                            onClick={() => setShowMedicationModal(false)}
-                                            className="text-gray-400 hover:text-gray-600 transition-colors"
-                                          >
-                                            <Icon icon="lucide:x" className="w-5 h-5" />
-                                          </button>
-                                        </div>
-                                        <p className="text-gray-600 text-sm mt-2">
-                                          Your provider will take this into consideration when creating your treatment plan.
-                                        </p>
-                                      </div>
-
-                                      <div className="p-6 space-y-4">
-                                        {medications.map((medication) => (
-                                          <div
-                                            key={medication.id}
-                                            className={`relative border rounded-2xl p-4 cursor-pointer transition-all ${selectedMedication === medication.id
-                                              ? "border-emerald-500 bg-emerald-50"
-                                              : "border-gray-200 hover:border-gray-300"
-                                              }`}
-                                            onClick={() => setSelectedMedication(medication.id)}
-                                          >
-                                            {selectedMedication === medication.id && (
-                                              <div className="absolute top-4 right-4 w-6 h-6 bg-emerald-500 rounded-full flex items-center justify-center">
-                                                <Icon icon="lucide:check" className="w-4 h-4 text-white" />
-                                              </div>
-                                            )}
-
-                                            <div className="flex items-start gap-4">
-                                              <div className="w-12 h-12 flex items-center justify-center">
-                                                {medication.icon === "heyfeels" ? (
-                                                  <div className="w-12 h-12 bg-gray-800 rounded-lg flex items-center justify-center">
-                                                    <div className="text-white text-xs font-bold">
-                                                      <div>hey</div>
-                                                      <div>feels</div>
-                                                    </div>
-                                                  </div>
-                                                ) : (
-                                                  <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center text-lg">
-                                                    {medication.icon}
-                                                  </div>
-                                                )}
-                                              </div>
-
-                                              <div className="flex-1">
-                                                <div className="flex items-center gap-2 mb-2">
-                                                  <h3 className="font-medium text-gray-900">{medication.name}</h3>
-                                                  {medication.badge && (
-                                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${medication.badgeColor}`}>
-                                                      {medication.badge}
-                                                    </span>
-                                                  )}
-                                                  <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded-full text-xs font-medium">
-                                                    {medication.type}
-                                                  </span>
-                                                </div>
-
-                                                <p className="text-emerald-600 font-medium text-sm mb-1">{medication.subtitle}</p>
-                                                <p className="text-gray-600 text-sm mb-3">{medication.description}</p>
-
-                                                <div className="space-y-1">
-                                                  {medication.benefits.map((benefit, index) => (
-                                                    <div key={index} className="flex items-center gap-2">
-                                                      <Icon icon="lucide:check" className="w-3 h-3 text-emerald-600" />
-                                                      <span className="text-gray-700 text-sm">{benefit}</span>
-                                                    </div>
-                                                  ))}
-                                                </div>
-                                              </div>
-                                            </div>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  </div>
-                                )}
-                              </>
-                            );
-                          })()
-                        ) : (currentStep?.title === 'Body Measurements' || currentStep?.questions?.some(q => q.questionSubtype === 'bmi')) ? (
-                          // Custom BMI calculator
-                          <BMICalculator
-                            currentStep={currentStep}
-                            answers={answers}
-                            onAnswerChange={handleAnswerChange}
-                          />
-                        ) : currentStep?.title === 'Success Stories' ? (
-                          // Custom success stories page
-                          <div className="space-y-4">
-                            <div>
-                              <h3 className="text-xl font-medium text-gray-900 mb-3">But first, I want you to meet...</h3>
-                              <p className="text-gray-600 text-sm">Real customers who've achieved amazing results with HeyFeels</p>
-                            </div>
-
-                            <div
-                              className="overflow-x-auto mb-8 cursor-grab active:cursor-grabbing scrollbar-hidden"
-                              onMouseDown={(e) => {
-                                const container = e.currentTarget;
-                                const startX = e.pageX - container.offsetLeft;
-                                const scrollLeft = container.scrollLeft;
-
-                                const handleMouseMove = (e: MouseEvent) => {
-                                  const x = e.pageX - container.offsetLeft;
-                                  const walk = (x - startX) * 1;
-                                  container.scrollLeft = scrollLeft - walk;
-                                };
-
-                                const handleMouseUp = () => {
-                                  document.removeEventListener('mousemove', handleMouseMove);
-                                  document.removeEventListener('mouseup', handleMouseUp);
-                                };
-
-                                document.addEventListener('mousemove', handleMouseMove);
-                                document.addEventListener('mouseup', handleMouseUp);
-                              }}
-                            >
-                              <div className="flex gap-4 pb-4" style={{ width: 'max-content' }}>
-                                {/* Alex's testimonial */}
-                                <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex-shrink-0" style={{ width: '254px' }}>
-                                  <div className="grid grid-cols-2 gap-2 mb-4">
-                                    <div className="relative">
-                                      <img
-                                        src="/before-after/m-before-0.webp"
-                                        alt="Alex before"
-                                        className="w-full h-48 object-cover rounded-lg"
-                                      />
-                                      <div className="absolute top-2 left-2 bg-gray-800 text-white px-2 py-1 rounded text-xs font-medium">
-                                        Before
-                                      </div>
-                                    </div>
-                                    <div className="relative">
-                                      <img
-                                        src="/before-after/m-after-0.webp"
-                                        alt="Alex after"
-                                        className="w-full h-48 object-cover rounded-lg"
-                                      />
-                                      <div className="absolute top-2 left-2 bg-emerald-600 text-white px-2 py-1 rounded text-xs font-medium">
-                                        After
-                                      </div>
-                                    </div>
-                                  </div>
-                                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Alex, 28</h3>
-                                  <p className="text-gray-600 mb-4">
-                                    Lost <span className="text-emerald-600 font-semibold">14 pounds</span> in 4 months
-                                  </p>
-                                  <div className="inline-flex items-center bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full text-sm">
-                                    <div className="w-2 h-2 bg-emerald-500 rounded-full mr-2"></div>
-                                    Verified Customer
-                                  </div>
-                                </div>
-
-                                {/* Jordan's testimonial */}
-                                <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex-shrink-0" style={{ width: '254px' }}>
-                                  <div className="grid grid-cols-2 gap-2 mb-4">
-                                    <div className="relative">
-                                      <img
-                                        src="/before-after/m-before-1.webp"
-                                        alt="Jordan before"
-                                        className="w-full h-48 object-cover rounded-lg"
-                                      />
-                                      <div className="absolute top-2 left-2 bg-gray-800 text-white px-2 py-1 rounded text-xs font-medium">
-                                        Before
-                                      </div>
-                                    </div>
-                                    <div className="relative">
-                                      <img
-                                        src="/before-after/m-after-1.webp"
-                                        alt="Jordan after"
-                                        className="w-full h-48 object-cover rounded-lg"
-                                      />
-                                      <div className="absolute top-2 left-2 bg-emerald-600 text-white px-2 py-1 rounded text-xs font-medium">
-                                        After
-                                      </div>
-                                    </div>
-                                  </div>
-                                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Jordan, 32</h3>
-                                  <p className="text-gray-600 mb-4">
-                                    Lost <span className="text-emerald-600 font-semibold">18 pounds</span> in 5 months
-                                  </p>
-                                  <div className="inline-flex items-center bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full text-sm">
-                                    <div className="w-2 h-2 bg-emerald-500 rounded-full mr-2"></div>
-                                    Verified Customer
-                                  </div>
-                                </div>
-
-                                {/* Taylor's testimonial */}
-                                <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex-shrink-0" style={{ width: '254px' }}>
-                                  <div className="grid grid-cols-2 gap-2 mb-4">
-                                    <div className="relative">
-                                      <img
-                                        src="/before-after/m-before-2.webp"
-                                        alt="Taylor before"
-                                        className="w-full h-48 object-cover rounded-lg"
-                                      />
-                                      <div className="absolute top-2 left-2 bg-gray-800 text-white px-2 py-1 rounded text-xs font-medium">
-                                        Before
-                                      </div>
-                                    </div>
-                                    <div className="relative">
-                                      <img
-                                        src="/before-after/m-after-2.webp"
-                                        alt="Taylor after"
-                                        className="w-full h-48 object-cover rounded-lg"
-                                      />
-                                      <div className="absolute top-2 left-2 bg-emerald-600 text-white px-2 py-1 rounded text-xs font-medium">
-                                        After
-                                      </div>
-                                    </div>
-                                  </div>
-                                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Taylor, 35</h3>
-                                  <p className="text-gray-600 mb-4">
-                                    Lost <span className="text-emerald-600 font-semibold">12 pounds</span> in 3 months
-                                  </p>
-                                  <div className="inline-flex items-center bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full text-sm">
-                                    <div className="w-2 h-2 bg-emerald-500 rounded-full mr-2"></div>
-                                    Verified Customer
-                                  </div>
-                                </div>
-
-                                {/* Casey's testimonial */}
-                                <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex-shrink-0" style={{ width: '254px' }}>
-                                  <div className="grid grid-cols-2 gap-2 mb-4">
-                                    <div className="relative">
-                                      <img
-                                        src="/before-after/m-before-3.webp"
-                                        alt="Casey before"
-                                        className="w-full h-48 object-cover rounded-lg"
-                                      />
-                                      <div className="absolute top-2 left-2 bg-gray-800 text-white px-2 py-1 rounded text-xs font-medium">
-                                        Before
-                                      </div>
-                                    </div>
-                                    <div className="relative">
-                                      <img
-                                        src="/before-after/m-after-3.webp"
-                                        alt="Casey after"
-                                        className="w-full h-48 object-cover rounded-lg"
-                                      />
-                                      <div className="absolute top-2 left-2 bg-emerald-600 text-white px-2 py-1 rounded text-xs font-medium">
-                                        After
-                                      </div>
-                                    </div>
-                                  </div>
-                                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Casey, 41</h3>
-                                  <p className="text-gray-600 mb-4">
-                                    Lost <span className="text-emerald-600 font-semibold">16 pounds</span> in 6 months
-                                  </p>
-                                  <div className="inline-flex items-center bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full text-sm">
-                                    <div className="w-2 h-2 bg-emerald-500 rounded-full mr-2"></div>
-                                    Verified Customer
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="text-center">
-                              <p className="text-gray-600 text-base leading-relaxed">
-                                Swipe to see more success stories and start your own transformation journey.
-                              </p>
-                            </div>
-                          </div>
-                        ) : currentStep?.title === 'Create Your Account' ? (
-                          isEmailVerificationMode ? (
-                            <EmailVerificationStep
-                              email={verificationEmail}
-                              code={verificationCode}
-                              onCodeChange={setVerificationCode}
-                              onVerify={emailVerificationHandlers.handleVerifyCode}
-                              onBack={() => {
-                                setIsEmailVerificationMode(false);
-                                setVerificationCode('');
-                                setVerificationError('');
-                              }}
-                              onResendCode={emailVerificationHandlers.handleResendCode}
-                              error={verificationError}
-                              isVerifying={isVerifying}
-                              clinicName={domainClinic?.name}
-                            />
-                          ) : (
-                            <AccountCreationStep
-                              isSignInMode={isSignInMode}
-                              onToggleMode={() => {
-                                setIsSignInMode(!isSignInMode);
-                                setSignInEmail('');
-                                setSignInPassword('');
-                                setSignInError('');
-                              }}
-                              firstName={answers['firstName'] || ''}
-                              lastName={answers['lastName'] || ''}
-                              email={answers['email'] || ''}
-                              mobile={answers['mobile'] || ''}
-                              onFieldChange={handleAnswerChange}
-                              signInEmail={signInEmail}
-                              signInPassword={signInPassword}
-                              signInError={signInError}
-                              isSigningIn={isSigningIn}
-                              onSignInEmailChange={(value) => {
-                                setSignInEmail(value);
-                                setSignInError('');
-                              }}
-                              onSignInPasswordChange={(value) => {
-                                setSignInPassword(value);
-                                setSignInError('');
-                              }}
-                              onSignIn={handleSignIn}
-                              onEmailSignIn={emailVerificationHandlers.handleEmailSignIn}
-                              onGoogleSignIn={handleGoogleSignIn}
-                              clinicId={domainClinic?.id}
-                              clinicName={domainClinic?.name}
-                            />
-                          )
-                        ) : currentStep?.questions && currentStep.questions.length > 0 ? (
-                          <div className="space-y-6">
-                            {currentStep.questions
-                              .filter((question) => {
-                                const conditionalLogic = (question as any).conditionalLogic;
-                                if (!conditionalLogic) return true;
-
-                                try {
-                                  // Find the parent question (conditionalLevel 0) in this step
-                                  const parentQuestion = currentStep.questions?.find(q =>
-                                    (q as any).conditionalLevel === 0 || !(q as any).conditionalLevel
-                                  );
-
-                                  if (!parentQuestion) return false;
-                                  const parentAnswer = answers[parentQuestion.id];
-
-                                  // Helper to check if a single condition is met
-                                  const checkCondition = (conditionStr: string): boolean => {
-                                    if (conditionStr.startsWith('answer_equals:')) {
-                                      const requiredValue = conditionStr.replace('answer_equals:', '').trim();
-
-                                      // Handle array answers (for checkboxes/multiple choice)
-                                      if (Array.isArray(parentAnswer)) {
-                                        return parentAnswer.includes(requiredValue);
-                                      }
-
-                                      return parentAnswer === requiredValue;
-                                    }
-                                    return false;
-                                  };
-
-                                  // Parse complex logic with AND/OR operators
-                                  // Format: "answer_equals:value1 OR answer_equals:value2 AND answer_equals:value3"
-                                  if (conditionalLogic.includes(' OR ') || conditionalLogic.includes(' AND ')) {
-                                    const tokens = conditionalLogic.split(' ');
-                                    const conditions: Array<{ check: boolean, operator?: 'OR' | 'AND' }> = [];
-
-                                    for (let i = 0; i < tokens.length; i++) {
-                                      const token = tokens[i];
-                                      if (token.startsWith('answer_equals:')) {
-                                        const isTrue = checkCondition(token);
-                                        // Look ahead for operator
-                                        const nextToken = tokens[i + 1];
-                                        const operator = (nextToken === 'OR' || nextToken === 'AND') ? nextToken as 'OR' | 'AND' : undefined;
-                                        conditions.push({ check: isTrue, operator });
-                                      }
-                                    }
-
-                                    // Evaluate the conditions with proper precedence (AND has higher precedence than OR)
-                                    // First, group AND conditions
-                                    let result = conditions[0]?.check ?? false;
-                                    let currentOperator: 'OR' | 'AND' | undefined = conditions[0]?.operator;
-
-                                    for (let i = 1; i < conditions.length; i++) {
-                                      const cond = conditions[i];
-                                      if (currentOperator === 'AND') {
-                                        result = result && cond.check;
-                                      } else if (currentOperator === 'OR') {
-                                        result = result || cond.check;
-                                      }
-                                      currentOperator = cond.operator;
-                                    }
-
-                                    return result;
-                                  }
-
-                                  // Simple single condition: "answer_equals:optionValue"
-                                  if (conditionalLogic.startsWith('answer_equals:')) {
-                                    return checkCondition(conditionalLogic);
-                                  }
-
-                                  // Support legacy format: "question:2,answer:yes"
-                                  const parts = conditionalLogic.split(',');
-                                  const targetQuestionOrder = parseInt(parts[0].split(':')[1]);
-                                  const answerPart = parts.slice(1).join(',');
-                                  const requiredAnswer = answerPart.substring(answerPart.indexOf(':') + 1);
-
-                                  const targetQuestion = currentStep.questions.find(q => q.questionOrder === targetQuestionOrder);
-                                  if (targetQuestion) {
-                                    const targetAnswer = answers[targetQuestion.id];
-
-                                    // Handle array answers (for checkboxes/multiple choice)
-                                    if (Array.isArray(targetAnswer)) {
-                                      return targetAnswer.includes(requiredAnswer);
-                                    }
-
-                                    return targetAnswer === requiredAnswer;
-                                  }
-                                  return false;
-                                } catch (error) {
-                                  console.error('Error parsing conditional logic:', conditionalLogic, error);
-                                  return true;
-                                }
-                              })
-                              .sort((a, b) => {
-                                const aLevel = (a as any).conditionalLevel || 0;
-                                const bLevel = (b as any).conditionalLevel || 0;
-                                const aSubOrder = (a as any).subQuestionOrder;
-                                const bSubOrder = (b as any).subQuestionOrder;
-                                const aConditional = (a as any).conditionalLogic;
-                                const bConditional = (b as any).conditionalLogic;
-
-                                if (aLevel !== bLevel) {
-                                  return aLevel - bLevel;
-                                }
-
-                                const sameConditionalGroup = aConditional && bConditional &&
-                                  aConditional.split(',')[0] === bConditional.split(',')[0] &&
-                                  aConditional.split(',')[1] === bConditional.split(',')[1];
-
-                                if (sameConditionalGroup &&
-                                  aSubOrder !== null && aSubOrder !== undefined &&
-                                  bSubOrder !== null && bSubOrder !== undefined) {
-                                  return aSubOrder - bSubOrder;
-                                }
-
-                                return a.questionOrder - b.questionOrder;
-                              })
-                              .map((question) => {
-                                // Apply dynamic variable replacement to question text
-                                const questionWithReplacedVars = {
-                                  ...question,
-                                  questionText: replaceCurrentVariables(question.questionText || ''),
-                                  placeholder: replaceCurrentVariables(question.placeholder || '')
-                                };
-
-                                return (
-                                  <QuestionRenderer
-                                    key={question.id}
-                                    question={questionWithReplacedVars}
-                                    answers={answers}
-                                    errors={errors}
-                                    theme={theme}
-                                    stepRequired={currentStep.required}
-                                    onAnswerChange={handleAnswerChange}
-                                    onRadioChange={(questionId: string, value: any) => {
-                                      // Clear any existing error on first selection
-                                      setErrors(prev => {
-                                        const next = { ...prev };
-                                        delete next[questionId];
-                                        return next;
-                                      });
-                                      handleRadioChange(questionId, value);
-                                    }}
-                                    onCheckboxChange={handleCheckboxChange}
-                                  />
-                                );
-                              })}
-                          </div>
-                        ) : (
-                          // Informational steps (like Welcome)
-                          <div className="text-center space-y-4">
-                            <h2 className="text-2xl font-medium text-gray-900 mb-3">
-                              {stepTitle}
-                            </h2>
-                            {stepDescription && (
-                              <p className="text-gray-600 text-base leading-relaxed max-w-md mx-auto">
-                                {stepDescription}
-                              </p>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Continue button for regular steps (but not during sign-in or email verification on account creation step) */}
-                        {!(isCheckoutStep() && paymentStatus !== 'succeeded') && !(currentStep?.title === 'Create Your Account' && (isSignInMode || isEmailVerificationMode)) && (() => {
-                          // Check if step itself is dead end OR if any VISIBLE question is a dead end
-                          // Use same filter logic as question rendering above
-                          const visibleQuestions = currentStep?.questions?.filter((question: any) => {
-                            const conditionalLogic = question.conditionalLogic;
-                            if (!conditionalLogic) return true;
-
-                            try {
-                              const parentQuestion = currentStep.questions?.find((q: any) =>
-                                q.conditionalLevel === 0 || !q.conditionalLevel
-                              );
-                              if (!parentQuestion) return false;
-
-                              const parentAnswer = answers[parentQuestion.id];
-                              if (!parentAnswer) return false;
-
-                              if (conditionalLogic.startsWith('answer_equals:')) {
-                                const requiredValue = conditionalLogic.replace('answer_equals:', '').trim();
-                                if (Array.isArray(parentAnswer)) {
-                                  return parentAnswer.includes(requiredValue);
-                                }
-                                return parentAnswer === requiredValue;
-                              }
-                              return false;
-                            } catch (error) {
-                              return true;
-                            }
-                          }) || []
-
-                          const hasDeadEndQuestion = visibleQuestions.some((q: any) => {
-                            const questionText = q.questionText?.toLowerCase() || ''
-                            return questionText.includes('unfortunat') || questionText.includes('disqualif') ||
-                              questionText.includes('do not qualify') || questionText.includes('cannot be medically')
-                          })
-
-                          const isDeadEndStep = currentStep?.isDeadEnd || hasDeadEndQuestion
-
-                          return isDeadEndStep ? (
-                            <div className="space-y-3">
-                              {currentStepIndex > 0 && (
-                                <button
-                                  onClick={() => setCurrentStepIndex(prev => prev - 1)}
-                                  className="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-4 px-6 rounded-2xl text-base h-auto flex items-center justify-center transition-colors"
-                                >
-                                  <Icon icon="lucide:arrow-left" className="mr-2 h-4 w-4" />
-                                  Go Back
-                                </button>
                               )}
-                              <button
-                                onClick={onClose}
-                                className="w-full bg-red-500 hover:bg-red-600 text-white font-medium py-4 px-6 rounded-2xl text-base h-auto flex items-center justify-center transition-colors"
-                              >
-                                Close Form
-                                <Icon icon="lucide:x" className="ml-2 h-4 w-4" />
-                              </button>
-                            </div>
-                          ) : (
-                            <button
-                              onClick={handleNext}
-                              disabled={isCheckoutStep() && paymentStatus !== 'succeeded'}
-                              className="w-full text-white font-medium py-4 px-6 rounded-2xl text-base h-auto flex items-center justify-center transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
-                              style={{
-                                backgroundColor: theme.primary,
-                                ...(isCheckoutStep() && paymentStatus !== 'succeeded' ? {} : { boxShadow: `0 10px 20px -10px ${theme.primaryDark}` })
-                              }}
-                            >
-                              {isLastStep ? (isCheckoutStep() ? 'Complete Order' : 'Continue') :
-                                (isCheckoutStep() && paymentStatus === 'succeeded') ? 'Continue' :
-                                  isProductSelectionStep() ? 'Continue to Checkout' :
-                                    isCheckoutStep() ? 'Complete Order' : 'Continue'}
-                              <Icon icon="lucide:chevron-right" className="ml-2 h-4 w-4" />
-                            </button>
-                          )
-                        })()}
+                            </>
+                          )}
                       </>
                     )}
 
-                    {/* Show payment completion status for checkout step */}
-                    {isCheckoutStep() && paymentStatus !== 'succeeded' && (
+                    {modal.isCheckoutStep() && modal.paymentStatus !== 'succeeded' && (
                       <div className="text-center text-sm text-gray-600 mt-4">
                         Complete payment above to continue
                       </div>
@@ -3245,20 +391,18 @@ export const QuestionnaireModal: React.FC<QuestionnaireModalProps> = ({
         </ModalContent>
       </Modal>
 
-      {/* Email Input Modal */}
-      {console.log('📧 About to render EmailInputModal, showEmailModal:', showEmailModal)}
       <EmailInputModal
-        isOpen={showEmailModal}
-        email={verificationEmail}
-        onEmailChange={setVerificationEmail}
-        onContinue={emailVerificationHandlers.handleSendCodeFromModal}
+        isOpen={modal.showEmailModal}
+        email={modal.verificationEmail}
+        onEmailChange={modal.setVerificationEmail}
+        onContinue={modal.emailVerificationHandlers.handleSendCodeFromModal}
         onCancel={() => {
-          setShowEmailModal(false);
-          setVerificationEmail('');
-          setEmailModalError('');
+          modal.setShowEmailModal(false);
+          modal.setVerificationEmail('');
+          modal.setEmailModalError('');
         }}
-        isLoading={emailModalLoading}
-        error={emailModalError}
+        isLoading={modal.emailModalLoading}
+        error={modal.emailModalError}
       />
     </>
   );

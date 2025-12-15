@@ -117,7 +117,8 @@ export default function PublicProductPage() {
 
     const handleModalClose = () => {
         setIsModalOpen(false)
-        router.push('/treatments')
+        // Stay on the current subdomain and go to home page
+        window.location.href = window.location.origin + '/'
     }
 
     return (

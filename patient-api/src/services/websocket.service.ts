@@ -319,6 +319,89 @@ class WebSocketService {
     });
   }
 
+  // Emit ticket created event
+  emitTicketCreated(ticketData: {
+    ticketId: string;
+    title: string;
+    clinicId?: string;
+    authorId?: string;
+    status: string;
+  }): void {
+    if (!this.io) return;
+
+    console.log("[WS] 📤 Emitting ticket:created");
+
+    // Notify the ticket author
+    if (ticketData.authorId) {
+      this.io.to(`user:${ticketData.authorId}`).emit("ticket:created", ticketData);
+    }
+
+    // Notify clinic staff
+    if (ticketData.clinicId) {
+      this.io
+        .to(`clinic:${ticketData.clinicId}`)
+        .emit("ticket:created", ticketData);
+    }
+
+    // Notify admins
+    this.io.to("admin").emit("ticket:created", ticketData);
+  }
+
+  // Emit ticket updated event
+  emitTicketUpdated(ticketData: {
+    ticketId: string;
+    title: string;
+    clinicId?: string;
+    authorId?: string;
+    status: string;
+  }): void {
+    if (!this.io) return;
+
+    console.log("[WS] 📤 Emitting ticket:updated");
+
+    // Notify the ticket author
+    if (ticketData.authorId) {
+      this.io.to(`user:${ticketData.authorId}`).emit("ticket:updated", ticketData);
+    }
+
+    // Notify clinic staff
+    if (ticketData.clinicId) {
+      this.io
+        .to(`clinic:${ticketData.clinicId}`)
+        .emit("ticket:updated", ticketData);
+    }
+
+    // Notify admins
+    this.io.to("admin").emit("ticket:updated", ticketData);
+  }
+
+  // Emit ticket message event
+  emitTicketMessage(ticketData: {
+    ticketId: string;
+    clinicId?: string;
+    authorId?: string;
+    senderType: string;
+  }): void {
+    if (!this.io) return;
+
+    console.log("[WS] 💬 Emitting ticket:message");
+
+    // Notify the ticket author
+    if (ticketData.authorId) {
+      this.io.to(`user:${ticketData.authorId}`).emit("ticket:message", ticketData);
+    }
+
+    // Notify clinic staff
+    if (ticketData.clinicId) {
+      this.io
+        .to(`clinic:${ticketData.clinicId}`)
+        .emit("ticket:message", ticketData);
+    }
+
+    // Notify admins
+    this.io.to("admin").emit("ticket:message", ticketData);
+  }
+
   getIO(): SocketIOServer | null {
     return this.io;
   }

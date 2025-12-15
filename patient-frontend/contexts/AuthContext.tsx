@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, checkAuth, signOut } from '../lib/auth';
+import { User, checkAuth, signOut, hasPatientFrontendAccess } from '../lib/auth';
 import { useRouter } from 'next/router';
 import { SessionTimeoutManager } from '../lib/sessionTimeout';
 import { SessionWarning } from '../components/SessionWarning';
@@ -70,6 +70,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userData = await checkAuth();
       console.log('🔍 AuthContext - Loaded user data:', userData);
       console.log('🔍 AuthContext - User clinicId:', userData?.clinicId);
+      
+      // Check if currently impersonating (superAdmin viewing as patient)
+      // This is now determined by the user.impersonating field from the JWT
+      const isImpersonating = userData?.impersonating === true;
+      
+      // Check if user has valid access to patient-frontend (patient or brand role)
+      // Skip this check if impersonating (superAdmin can view as patient)
+      if (userData && !isImpersonating && !hasPatientFrontendAccess(userData)) {
+        console.warn('⚠️ AuthContext - User does not have patient or brand role, denying access');
+        setUser(null);
+        return;
+      }
+      
       setUser(userData);
     } catch (error) {
       console.error('Failed to refresh user');
@@ -87,6 +100,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Remove JWT token from localStorage (using same key as api.ts)
       localStorage.removeItem('auth-token');
+      // Clear impersonation flag on sign out
+      localStorage.removeItem('impersonating');
 
       await signOut();
       setUser(null);

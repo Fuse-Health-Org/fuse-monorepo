@@ -498,6 +498,97 @@ export function registerDoctorEndpoints(
     }
   );
 
+  // Cancel an order
+  app.post(
+    "/doctor/orders/:orderId/cancel",
+    authenticateJWT,
+    async (req: any, res: any) => {
+      try {
+        const currentUser = getCurrentUser(req);
+        if (!currentUser) {
+          return res
+            .status(401)
+            .json({ success: false, message: "Unauthorized" });
+        }
+
+        const user = await User.findByPk(currentUser.id, {
+          include: [{ model: UserRoles, as: 'userRoles' }]
+        });
+        if (!user) {
+          return res
+            .status(401)
+            .json({ success: false, message: "User not found" });
+        }
+
+        if (!user.hasAnyRoleSync(['doctor', 'admin'])) {
+          return res.status(403).json({
+            success: false,
+            message: "Access denied. Doctor or admin role required.",
+          });
+        }
+
+        const { orderId } = req.params;
+
+        // Find the order
+        const order = await Order.findByPk(orderId);
+        if (!order) {
+          return res.status(404).json({
+            success: false,
+            message: "Order not found",
+          });
+        }
+
+        // Check if order is already cancelled
+        if (order.status === 'cancelled') {
+          return res.status(400).json({
+            success: false,
+            message: "Order is already cancelled",
+          });
+        }
+
+        // Check if order can be cancelled (not already shipped/delivered)
+        if (['shipped', 'delivered'].includes(order.status)) {
+          return res.status(400).json({
+            success: false,
+            message: `Cannot cancel order with status: ${order.status}`,
+          });
+        }
+
+        // Update order status to cancelled
+        await order.update({ status: 'cancelled' });
+
+        // Log the audit
+        await AuditService.log({
+          userId: currentUser.id,
+          action: AuditAction.UPDATE,
+          resourceType: AuditResourceType.ORDER,
+          resourceId: order.id,
+          details: {
+            previousStatus: order.status,
+            newStatus: 'cancelled',
+            cancelledBy: currentUser.id,
+          },
+          success: true,
+        });
+
+        console.log(`✅ Order ${order.orderNumber} cancelled by doctor ${currentUser.id}`);
+
+        res.json({
+          success: true,
+          message: `Order ${order.orderNumber} has been cancelled`,
+        });
+      } catch (error) {
+        console.error(
+          "❌ Error cancelling order:",
+          error instanceof Error ? error.message : String(error)
+        );
+        res
+          .status(500)
+          .json({ success: false, message: "Failed to cancel order" });
+      }
+    }
+  );
+
   // Get pharmacy coverage for an order (returns ALL coverages for the product)
   app.get(
     "/doctor/orders/:orderId/pharmacy-coverage",

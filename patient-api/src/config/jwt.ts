@@ -25,6 +25,9 @@ export interface JWTPayload {
   loginTime: number;
   iat?: number;
   exp?: number;
+  // Impersonation fields (set when superAdmin is viewing as another user)
+  impersonating?: boolean;
+  impersonatedBy?: string;
 }
 
 // Create JWT token
@@ -67,6 +70,9 @@ export const verifyJWTToken = (token: string): JWTPayload | null => {
         loginTime: decoded.loginTime || decoded.iat * 1000,
         iat: decoded.iat,
         exp: decoded.exp,
+        // Include impersonation fields if present
+        impersonating: decoded.impersonating,
+        impersonatedBy: decoded.impersonatedBy,
       };
     } catch (fallbackError) {
       // HIPAA: Do not log token details or error specifics
@@ -129,5 +135,8 @@ export const getCurrentUser = (req: any) => {
     role: req.user.userRole,
     clinicId: req.user.clinicId,
     loginTime: new Date(req.user.loginTime),
+    // Include impersonation fields if present in JWT
+    impersonating: req.user.impersonating,
+    impersonatedBy: req.user.impersonatedBy,
   };
 };
