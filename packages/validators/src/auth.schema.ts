@@ -5,7 +5,7 @@ import { emailSchema, passwordSchema } from './common.schema';
  * Authentication validation schemas
  */
 
-export const RoleEnum = z.enum(['patient', 'provider', 'brand', 'admin']);
+export const RoleEnum = z.enum(['patient', 'provider', 'brand', 'admin', 'affiliate']);
 
 export const signInSchema = z.object({
   email: emailSchema,

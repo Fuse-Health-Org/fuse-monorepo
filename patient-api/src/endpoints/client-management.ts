@@ -58,18 +58,32 @@ export function registerClientManagementEndpoints(
           .json({ success: false, message: "Not authenticated" });
       }
 
-      // Only admins can access this
+      // Check user permissions
       const user = await User.findByPk(currentUser.id, {
         include: [{ model: UserRoles, as: "userRoles", required: false }],
       });
-      if (!user || !user.hasRoleSync("admin")) {
-        return res.status(403).json({ success: false, message: "Forbidden" });
+      if (!user) {
+        return res.status(404).json({ success: false, message: "User not found" });
+      }
+
+      await user.getUserRoles();
+      const roleParam = req.query.role as string;
+      
+      // Allow admins/superAdmins full access
+      // Allow brand users to access affiliates only
+      if (!user.userRoles?.hasAnyRole(["admin", "superAdmin"])) {
+        if (roleParam !== "affiliate" || !user.userRoles?.hasRole("brand")) {
+          return res.status(403).json({ 
+            success: false, 
+            message: "Forbidden. Only admins can access all users, or brand users can access affiliates only." 
+          });
+        }
       }
 
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 50;
       const search = (req.query.search as string) || "";
-      const role = req.query.role as string;
+      const role = roleParam;
 
       const offset = (page - 1) * limit;
 
@@ -84,8 +98,34 @@ export function registerClientManagementEndpoints(
         ];
       }
 
+      // Build include clause for UserRoles with role filter
+      const userRolesInclude: any = {
+        model: UserRoles,
+        as: "userRoles",
+        required: false,
+      };
+
+      // If filtering by role, add where clause to UserRoles include
       if (role) {
-        whereClause.role = role;
+        // Map role names to UserRoles boolean fields
+        const roleFieldMap: Record<string, string> = {
+          affiliate: "affiliate",
+          patient: "patient",
+          doctor: "doctor",
+          admin: "admin",
+          brand: "brand",
+          superAdmin: "superAdmin",
+        };
+
+        const roleField = roleFieldMap[role];
+        if (roleField) {
+          // Filter by UserRoles field instead of deprecated role field
+          userRolesInclude.where = { [roleField]: true };
+          userRolesInclude.required = true; // Use INNER JOIN to filter
+        } else {
+          // Fallback to deprecated role field for backwards compatibility
+          whereClause.role = role;
+        }
       }
 
       const { rows: users, count } = await User.findAndCountAll({
@@ -100,6 +140,7 @@ export function registerClientManagementEndpoints(
           "businessType",
           "createdAt",
           "updatedAt",
+          "affiliateOwnerId",
         ],
         include: [
           {
@@ -112,11 +153,7 @@ export function registerClientManagementEndpoints(
             as: "tenantCustomFeatures",
             required: false,
           },
-          {
-            model: UserRoles,
-            as: "userRoles",
-            required: false,
-          },
+          userRolesInclude,
         ],
         order: [["createdAt", "DESC"]],
         limit,
@@ -210,6 +247,7 @@ export function registerClientManagementEndpoints(
           "phoneNumber",
           "createdAt",
           "updatedAt",
+          "affiliateOwnerId",
         ],
         include: [
           {
@@ -497,7 +535,7 @@ export function registerClientManagementEndpoints(
       }
 
       const { userId } = req.params;
-      const { patient, doctor, admin, brand, superAdmin } = req.body;
+      const { patient, doctor, admin, brand, superAdmin, affiliate } = req.body;
 
       // Validate at least one boolean was provided
       if (
@@ -505,12 +543,13 @@ export function registerClientManagementEndpoints(
         typeof doctor !== "boolean" &&
         typeof admin !== "boolean" &&
         typeof brand !== "boolean" &&
-        typeof superAdmin !== "boolean"
+        typeof superAdmin !== "boolean" &&
+        typeof affiliate !== "boolean"
       ) {
         return res.status(400).json({
           success: false,
           message:
-            "At least one role must be specified (patient, doctor, admin, brand, superAdmin)",
+            "At least one role must be specified (patient, doctor, admin, brand, superAdmin, affiliate)",
         });
       }
 
@@ -534,6 +573,7 @@ export function registerClientManagementEndpoints(
           admin: admin ?? false,
           brand: brand ?? false,
           superAdmin: superAdmin ?? false,
+          affiliate: affiliate ?? false,
         });
         console.log(`✅ [Client Mgmt] Created UserRoles for user ${userId}`);
       } else {
@@ -544,6 +584,7 @@ export function registerClientManagementEndpoints(
         if (typeof admin === "boolean") updates.admin = admin;
         if (typeof brand === "boolean") updates.brand = brand;
         if (typeof superAdmin === "boolean") updates.superAdmin = superAdmin;
+        if (typeof affiliate === "boolean") updates.affiliate = affiliate;
 
         await userRoles.update(updates);
         console.log(
@@ -573,6 +614,7 @@ export function registerClientManagementEndpoints(
           admin: userRoles.admin,
           brand: userRoles.brand,
           superAdmin: userRoles.superAdmin,
+          affiliate: userRoles.affiliate,
         },
       });
     } catch (error) {
@@ -631,6 +673,7 @@ export function registerClientManagementEndpoints(
           doctor: role === "doctor",
           admin: role === "admin",
           brand: role === "brand",
+          affiliate: role === "affiliate",
         });
       } else {
         await userRoles.update({
@@ -638,6 +681,7 @@ export function registerClientManagementEndpoints(
           doctor: role === "doctor",
           admin: role === "admin",
           brand: role === "brand",
+          affiliate: role === "affiliate",
         });
       }
 
@@ -716,6 +760,121 @@ export function registerClientManagementEndpoints(
         res.status(500).json({
           success: false,
           message: "Failed to generate impersonation token",
+        });
+      }
+    }
+  );
+
+  // Update affiliate owner (assign affiliate to brand)
+  app.patch(
+    "/admin/users/:userId/affiliate-owner",
+    authenticateJWT,
+    async (req, res) => {
+      try {
+        const currentUser = getCurrentUser(req);
+        if (!currentUser) {
+          return res
+            .status(401)
+            .json({ success: false, message: "Not authenticated" });
+        }
+
+        const user = await User.findByPk(currentUser.id, {
+          include: [{ model: UserRoles, as: "userRoles", required: false }],
+        });
+        if (!user) {
+          return res.status(404).json({
+            success: false,
+            message: "User not found",
+          });
+        }
+
+        await user.getUserRoles();
+        // Allow brand users and admins to assign affiliate owners
+        if (!user.userRoles?.hasAnyRole(["brand", "admin", "superAdmin"])) {
+          return res.status(403).json({
+            success: false,
+            message: "Access denied. Only brand users and admins can assign affiliate owners.",
+          });
+        }
+
+        const { userId } = req.params;
+        const { affiliateOwnerId } = req.body;
+
+        // Find the target user (affiliate)
+        const targetUser = await User.findByPk(userId, {
+          include: [{ model: UserRoles, as: "userRoles", required: false }],
+        });
+
+        if (!targetUser) {
+          return res
+            .status(404)
+            .json({ success: false, message: "User not found" });
+        }
+
+        await targetUser.getUserRoles();
+        // Verify the target user is an affiliate
+        if (!targetUser.userRoles?.hasRole("affiliate")) {
+          return res.status(400).json({
+            success: false,
+            message: "User is not an affiliate",
+          });
+        }
+
+        // If affiliateOwnerId is provided, verify it's a valid brand user
+        if (affiliateOwnerId) {
+          const owner = await User.findByPk(affiliateOwnerId, {
+            include: [{ model: UserRoles, as: "userRoles", required: false }],
+          });
+
+          if (!owner) {
+            return res.status(404).json({
+              success: false,
+              message: "Affiliate owner not found",
+            });
+          }
+
+          await owner.getUserRoles();
+          if (!owner.userRoles?.hasAnyRole(["brand", "admin", "superAdmin"])) {
+            return res.status(400).json({
+              success: false,
+              message: "Affiliate owner must be a brand user or admin",
+            });
+          }
+
+          // If current user is a brand user, ensure they can only assign themselves
+          if (user.userRoles?.hasRole("brand") && affiliateOwnerId !== currentUser.id) {
+            return res.status(403).json({
+              success: false,
+              message: "Brand users can only assign themselves as affiliate owner",
+            });
+          }
+        }
+
+        // Update affiliateOwnerId
+        await targetUser.update({
+          affiliateOwnerId: affiliateOwnerId || null,
+        });
+
+        console.log(
+          `✅ [Client Mgmt] Updated affiliate owner for user ${userId} to ${affiliateOwnerId || "null"}`
+        );
+
+        res.status(200).json({
+          success: true,
+          message: "Affiliate owner updated successfully",
+          data: {
+            id: targetUser.id,
+            email: targetUser.email,
+            firstName: targetUser.firstName,
+            lastName: targetUser.lastName,
+            affiliateOwnerId: targetUser.affiliateOwnerId,
+          },
+        });
+      } catch (error) {
+        console.error("❌ Error updating affiliate owner:", error);
+        res.status(500).json({
+          success: false,
+          message: "Failed to update affiliate owner",
         });
       }
     }

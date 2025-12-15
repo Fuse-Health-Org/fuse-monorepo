@@ -252,6 +252,7 @@ app.use(
               "http://localhost:3000",
               "http://localhost:3002",
               "http://localhost:3003",
+              "http://localhost:3005",
               "http://localhost:3030",
               // Development only - no production domains
             ];
@@ -2033,20 +2034,22 @@ app.get("/auth/me", authenticateJWT, async (req, res) => {
     // Get user data from JWT
     const currentUser = getCurrentUser(req);
 
-    // Optionally fetch fresh user data from database
-    const user = await User.findByPk(currentUser?.id);
-    if (!user) {
-      // User was deleted from database but JWT token still exists
-      return res.status(401).json({
-        success: false,
-        message: "User not found",
+      // Optionally fetch fresh user data from database
+      const user = await User.findByPk(currentUser?.id, {
+        include: [{ model: UserRoles, as: "userRoles", required: false }],
       });
-    }
+      if (!user) {
+        // User was deleted from database but JWT token still exists
+        return res.status(401).json({
+          success: false,
+          message: "User not found",
+        });
+      }
 
-    res.status(200).json({
-      success: true,
-      user: user.toSafeJSON(),
-    });
+      res.status(200).json({
+        success: true,
+        user: user.toSafeJSON(),
+      });
   } catch (error) {
     if (process.env.NODE_ENV === "development") {
       console.error("❌ Auth check error occurred:", error);
@@ -5563,6 +5566,7 @@ app.post("/orders/create-payment-intent", authenticateJWT, async (req, res) => {
       selectedPlan,
       shippingInfo,
       questionnaireAnswers,
+      affiliateId, // Optional: affiliate ID if order came from affiliate link
     } = validation.data;
 
     // Get treatment with products to validate order
@@ -5585,6 +5589,58 @@ app.post("/orders/create-payment-intent", authenticateJWT, async (req, res) => {
       });
     }
 
+    // Validate affiliateId if provided, or detect from hostname
+    let validAffiliateId: string | undefined = undefined;
+    
+    // First, try to get affiliateId from request body
+    if (affiliateId) {
+      const affiliate = await User.findByPk(affiliateId, {
+        include: [{ model: UserRoles, as: "userRoles", required: false }],
+      });
+      if (affiliate) {
+        await affiliate.getUserRoles();
+        if (affiliate.userRoles?.hasRole("affiliate")) {
+          validAffiliateId = affiliateId;
+        }
+      }
+    }
+    
+    // If no affiliateId in body, try to detect from hostname
+    if (!validAffiliateId) {
+      const hostname = req.get("host") || req.hostname;
+      if (hostname) {
+        const parts = hostname.split(".");
+        // Check for pattern: affiliateslug.brandslug.domain.extension
+        // e.g., checktwo.limitless.fusehealth.com
+        if (parts.length >= 4) {
+          const affiliateSlug = parts[0];
+          console.log("🔍 Detecting affiliate from hostname:", { hostname, affiliateSlug });
+          
+          // Find affiliate by website (slug) field
+          const affiliateBySlug = await User.findOne({
+            where: {
+              website: affiliateSlug,
+            },
+            include: [
+              {
+                model: UserRoles,
+                as: "userRoles",
+                required: true,
+              },
+            ],
+          });
+          
+          if (affiliateBySlug) {
+            await affiliateBySlug.getUserRoles();
+            if (affiliateBySlug.userRoles?.hasRole("affiliate")) {
+              validAffiliateId = affiliateBySlug.id;
+              console.log("✅ Found affiliate from hostname:", { affiliateId: validAffiliateId, slug: affiliateSlug });
+            }
+          }
+        }
+      }
+    }
+
     // Create order
     const orderNumber = await Order.generateOrderNumber();
     const order = await Order.create({
@@ -5600,6 +5656,7 @@ app.post("/orders/create-payment-intent", authenticateJWT, async (req, res) => {
       shippingAmount: 0,
       totalAmount: amount,
       questionnaireAnswers,
+      ...(validAffiliateId && { affiliateId: validAffiliateId }),
     });
 
     // Create order items
@@ -5978,6 +6035,41 @@ app.post(
         });
       }
 
+      // Detect affiliate from hostname if not provided
+      let validAffiliateId: string | undefined = undefined;
+      const hostname = req.get("host") || req.hostname;
+      if (hostname) {
+        const parts = hostname.split(".");
+        // Check for pattern: affiliateslug.brandslug.domain.extension
+        // e.g., checktwo.limitless.fusehealth.com
+        if (parts.length >= 4) {
+          const affiliateSlug = parts[0];
+          console.log("🔍 Detecting affiliate from hostname (product subscription):", { hostname, affiliateSlug });
+          
+          // Find affiliate by website (slug) field
+          const affiliateBySlug = await User.findOne({
+            where: {
+              website: affiliateSlug,
+            },
+            include: [
+              {
+                model: UserRoles,
+                as: "userRoles",
+                required: true,
+              },
+            ],
+          });
+          
+          if (affiliateBySlug) {
+            await affiliateBySlug.getUserRoles();
+            if (affiliateBySlug.userRoles?.hasRole("affiliate")) {
+              validAffiliateId = affiliateBySlug.id;
+              console.log("✅ Found affiliate from hostname (product subscription):", { affiliateId: validAffiliateId, slug: affiliateSlug });
+            }
+          }
+        }
+      }
+
       // Create order
       const orderNumber = await Order.generateOrderNumber();
       const order = await Order.create({
@@ -5990,6 +6082,7 @@ app.post(
         subtotalAmount: totalAmount,
         discountAmount: 0,
         taxAmount: 0,
+        ...(validAffiliateId && { affiliateId: validAffiliateId }),
         shippingAmount: 0,
         totalAmount: totalAmount,
         questionnaireAnswers,
@@ -6348,6 +6441,41 @@ app.post("/payments/product/sub", async (req, res) => {
       brandAmountUsd,
     });
 
+    // Detect affiliate from hostname if not provided
+    let validAffiliateId: string | undefined = undefined;
+    const hostname = req.get("host") || req.hostname;
+    if (hostname) {
+      const parts = hostname.split(".");
+      // Check for pattern: affiliateslug.brandslug.domain.extension
+      // e.g., checktwo.limitless.fusehealth.com
+      if (parts.length >= 4) {
+        const affiliateSlug = parts[0];
+        console.log("🔍 Detecting affiliate from hostname (confirm payment):", { hostname, affiliateSlug });
+        
+        // Find affiliate by website (slug) field
+        const affiliateBySlug = await User.findOne({
+          where: {
+            website: affiliateSlug,
+          },
+          include: [
+            {
+              model: UserRoles,
+              as: "userRoles",
+              required: true,
+            },
+          ],
+        });
+        
+        if (affiliateBySlug) {
+          await affiliateBySlug.getUserRoles();
+          if (affiliateBySlug.userRoles?.hasRole("affiliate")) {
+            validAffiliateId = affiliateBySlug.id;
+            console.log("✅ Found affiliate from hostname (confirm payment):", { affiliateId: validAffiliateId, slug: affiliateSlug });
+          }
+        }
+      }
+    }
+
     // Create order
     const orderNumber = await Order.generateOrderNumber();
     const order = await Order.create({
@@ -6360,6 +6488,7 @@ app.post("/payments/product/sub", async (req, res) => {
       subtotalAmount: totalAmount,
       discountAmount: 0,
       taxAmount: 0,
+      ...(validAffiliateId && { affiliateId: validAffiliateId }),
       shippingAmount: 0,
       totalAmount: totalAmount,
       questionnaireAnswers,
@@ -12659,19 +12788,21 @@ app.put("/users/profile", authenticateJWT, async (req, res) => {
           .json({ success: false, message: "Current password is required" });
       }
 
-      const bcrypt = require("bcrypt");
-      const isValidPassword = await bcrypt.compare(
-        currentPassword,
-        user.passwordHash
-      );
+      // Validate either permanent or temporary password
+      const isValidPassword = await user.validateAnyPassword(currentPassword);
       if (!isValidPassword) {
         return res
           .status(400)
           .json({ success: false, message: "Current password is incorrect" });
       }
 
+      const bcrypt = require("bcrypt");
       const hashedPassword = await bcrypt.hash(newPassword, 10);
-      await user.update({ passwordHash: hashedPassword });
+      // Update password and clear temporary password if it exists
+      await user.update({ 
+        passwordHash: hashedPassword,
+        temporaryPasswordHash: null // Clear temporary password after change
+      });
     }
 
     // Update other fields
@@ -13236,6 +13367,11 @@ async function startServer() {
     "./endpoints/client-management"
   );
   registerClientManagementEndpoints(app, authenticateJWT, getCurrentUser);
+
+  const { registerAffiliateEndpoints } = await import(
+    "./endpoints/affiliate"
+  );
+  registerAffiliateEndpoints(app, authenticateJWT, getCurrentUser);
 
   // ============= AUDIT LOGS ENDPOINTS =============
   const { registerAuditLogsEndpoints } = await import("./endpoints/audit-logs");

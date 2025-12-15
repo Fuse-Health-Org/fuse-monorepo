@@ -17,6 +17,7 @@ export interface User {
   zipCode?: string;
   clinicId?: string;
   affiliateOwnerId?: string;
+  website?: string;
   createdAt?: string;
   lastLoginAt?: string;
   gender?: string;
@@ -35,16 +36,34 @@ export async function checkAuth(): Promise<User | null> {
   try {
     const result = await authApi.getUser();
 
+    if (process.env.NODE_ENV === "development") {
+      console.log('🔍 checkAuth result:', result);
+    }
+
     if (!result.success) {
+      if (process.env.NODE_ENV === "development") {
+        console.log('❌ checkAuth failed:', result.error);
+      }
       return null;
     }
 
     // Handle potential double nesting from apiCall wrapper
     const userData = (result.data as any)?.user || result.data;
 
+    if (process.env.NODE_ENV === "development") {
+      console.log('✅ User data retrieved:', { 
+        id: userData?.id, 
+        email: userData?.email, 
+        role: userData?.role,
+        affiliate: userData?.userRoles?.affiliate 
+      });
+    }
+
     return userData as User;
-  } catch {
-    // Do not log details to avoid PHI exposure
+  } catch (error) {
+    if (process.env.NODE_ENV === "development") {
+      console.error('❌ checkAuth error:', error);
+    }
     return null;
   }
 }
@@ -59,31 +78,3 @@ export async function signOut(): Promise<boolean> {
   }
 }
 
-// Role-based access control helper
-export function hasPermission(
-  user: User | null,
-  requiredRole: User["role"][]
-): boolean {
-  if (!user) return false;
-  return requiredRole.includes(user.role);
-}
-
-// Check if user can access another user's data (RBAC)
-export function canAccessUserData(
-  currentUser: User | null,
-  targetUserId: string
-): boolean {
-  if (!currentUser) return false;
-
-  // Admins and doctors can access any patient data
-  if (currentUser.role === "admin" || currentUser.role === "doctor") {
-    return true;
-  }
-
-  // Patients can only access their own data
-  if (currentUser.role === "patient") {
-    return currentUser.id === targetUserId;
-  }
-
-  return false;
-}
