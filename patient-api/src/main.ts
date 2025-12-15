@@ -13464,6 +13464,10 @@ async function startServer() {
   const configRouter = (await import("./endpoints/config")).default;
   app.use("/config", configRouter);
 
+  // ============= LIKES ENDPOINTS =============
+  const likesRouter = (await import("./endpoints/likes")).default;
+  app.use("/", likesRouter);
+
   // ============= SUPPORT TICKETS ENDPOINTS =============
   const { registerSupportEndpoints } = await import('./endpoints/support');
   registerSupportEndpoints(app, authenticateJWT, getCurrentUser);
