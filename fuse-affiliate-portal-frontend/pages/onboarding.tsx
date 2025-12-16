@@ -159,8 +159,8 @@ export default function Onboarding() {
 
       // Refresh user data to get updated information
       await refreshUser();
-      // Redirect to dashboard (it will check if onboarding is still needed)
-      router.push("/dashboard");
+      // Redirect to analytics page
+      router.push("/analytics");
     } catch (err: any) {
       console.error("Error saving onboarding data:", err);
       setError(err.message || "An error occurred while saving");
