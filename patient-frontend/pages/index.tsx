@@ -1,9 +1,10 @@
 import { useRouter } from 'next/router';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { extractClinicSlugFromDomain } from '../lib/clinic-utils';
 import { apiCall } from '../lib/api';
 import ScrollingFeaturesBar from '../components/ScrollingFeaturesBar';
 import GetStartedButton from '../components/GetStartedButton';
+import { useBatchLikes } from '../hooks/useLikes';
 
 interface CustomWebsite {
   portalTitle?: string;
@@ -19,6 +20,7 @@ interface CustomWebsite {
 
 interface Product {
   id: string;
+  tenantProductId?: string;
   name: string;
   description?: string;
   imageUrl?: string;
@@ -38,6 +40,15 @@ export default function LandingPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [productsLoading, setProductsLoading] = useState(true);
   const [hoveredCardIndex, setHoveredCardIndex] = useState<number | null>(null);
+
+  // Extract tenant product IDs for batch likes
+  const tenantProductIds = useMemo(() =>
+    products.map(p => p.tenantProductId).filter((id): id is string => !!id),
+    [products]
+  );
+
+  // Fetch likes for all products
+  const { likeCounts, userLikes, toggle: toggleLike } = useBatchLikes(tenantProductIds);
 
   useEffect(() => {
     const loadCustomWebsite = async () => {
@@ -146,6 +157,19 @@ export default function LandingPage() {
 
     const isHovered = hoveredCardIndex === index;
 
+    // Get like status for this product
+    const tenantProductId = product.tenantProductId;
+    const isLiked = tenantProductId && userLikes ? userLikes[tenantProductId] || false : false;
+    const likeCount = tenantProductId && likeCounts ? likeCounts[tenantProductId] || 0 : 0;
+
+    const handleLikeClick = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      e.preventDefault();
+      if (tenantProductId) {
+        toggleLike(tenantProductId);
+      }
+    };
+
     return (
       <div
         key={product.id}
@@ -158,22 +182,35 @@ export default function LandingPage() {
           transition: "transform 0.3s ease",
         }}
       >
-        <button style={{
-          position: "absolute",
-          top: "0.5rem",
-          right: "0.5rem",
-          background: "white",
-          border: "1px solid #e2e8f0",
-          borderRadius: "50%",
-          width: "2.5rem",
-          height: "2.5rem",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          cursor: "pointer",
-          zIndex: 1,
-        }}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <button
+          onClick={handleLikeClick}
+          style={{
+            position: "absolute",
+            top: "0.5rem",
+            right: "0.5rem",
+            background: isLiked ? "#fee2e2" : "white",
+            border: isLiked ? "1px solid #fca5a5" : "1px solid #e2e8f0",
+            borderRadius: "50%",
+            width: "2.5rem",
+            height: "2.5rem",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            zIndex: 1,
+            transition: "all 0.2s ease",
+          }}
+          title={isLiked ? "Unlike" : "Like"}
+        >
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill={isLiked ? "#ef4444" : "none"}
+            stroke={isLiked ? "#ef4444" : "currentColor"}
+            strokeWidth="2"
+            style={{ transition: "all 0.2s ease" }}
+          >
             <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
           </svg>
         </button>

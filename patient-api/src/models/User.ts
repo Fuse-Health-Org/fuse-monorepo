@@ -11,6 +11,7 @@ import TenantCustomFeatures from './TenantCustomFeatures';
 import TenantAnalyticsEvents from './TenantAnalyticsEvents';
 import UserTag from './UserTag';
 import UserRoles from './UserRoles';
+import Like from './Like';
 
 @Table({
   freezeTableName: true,
@@ -318,6 +319,9 @@ export default class User extends Entity {
 
   @HasOne(() => UserRoles, 'userId')
   declare userRoles?: UserRoles;
+
+  @HasMany(() => Like)
+  declare likes: Like[];
 
   // Instance methods
   public async validatePassword(password: string): Promise<boolean> {

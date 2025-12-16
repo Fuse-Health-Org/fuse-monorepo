@@ -15,8 +15,11 @@ import {
     FileText,
     Edit,
     Palette,
-    DollarSign
+    DollarSign,
+    Heart,
+    TrendingUp
 } from 'lucide-react'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 interface Product {
     id: string
@@ -82,6 +85,13 @@ export default function ProductDetail() {
         stripeFeePercent: 3.9,
         doctorFlatFeeUsd: 15
     })
+    const [likesAnalytics, setLikesAnalytics] = useState<{
+        totalLikes: number;
+        userLikes: number;
+        anonymousLikes: number;
+        dailyLikes: { date: string; count: number }[];
+    } | null>(null)
+    const [likesLoading, setLikesLoading] = useState(true)
 
     const { user, token, authenticatedFetch } = useAuth()
     const [copiedPreview, setCopiedPreview] = useState<boolean>(false)
@@ -436,6 +446,35 @@ export default function ProductDetail() {
         }
         fetchData()
     }, [token, id, user])
+
+    // Fetch likes analytics
+    useEffect(() => {
+        const fetchLikesAnalytics = async () => {
+            if (!token || !tenantProduct?.id) {
+                setLikesLoading(false)
+                return
+            }
+
+            try {
+                setLikesLoading(true)
+                const response = await fetch(`${API_URL}/likes/admin/analytics/${tenantProduct.id}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                })
+
+                if (response.ok) {
+                    const data = await response.json()
+                    if (data.success && data.data) {
+                        setLikesAnalytics(data.data)
+                    }
+                }
+            } catch (err) {
+                console.error('Error fetching likes analytics:', err)
+            } finally {
+                setLikesLoading(false)
+            }
+        }
+        fetchLikesAnalytics()
+    }, [token, tenantProduct?.id])
 
     const handleUpdatePrice = async () => {
         if (!tenantProduct || !token) return
@@ -1181,29 +1220,148 @@ export default function ProductDetail() {
 
                     {/* Product Performance */}
                     <div className="bg-card rounded-2xl shadow-sm border border-border p-6 mb-6">
-                        <h3 className="text-sm font-semibold mb-4">Product Performance</h3>
-                        <div className="grid grid-cols-2 gap-6">
-
-                            {/* Total Orders */}
-                            <div className="p-5 border border-border rounded-lg bg-card hover:shadow-sm transition-shadow">
-                                <div className="flex items-center gap-2 mb-3">
-                                    <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-                                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Orders</span>
-                                </div>
-                                <div className="text-3xl font-semibold text-foreground">{productStats.totalOrders}</div>
-                                <p className="text-xs text-muted-foreground mt-2">All-time orders for this product</p>
+                        <Tabs defaultValue="overview" className="w-full">
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="text-sm font-semibold">Product Performance</h3>
+                                <TabsList>
+                                    <TabsTrigger value="overview">Overview</TabsTrigger>
+                                    <TabsTrigger value="likes">
+                                        <Heart className="h-3 w-3 mr-1" />
+                                        Likes Analytics
+                                    </TabsTrigger>
+                                </TabsList>
                             </div>
 
-                            {/* Active Subscribers */}
-                            <div className="p-5 border border-border rounded-lg bg-card hover:shadow-sm transition-shadow">
-                                <div className="flex items-center gap-2 mb-3">
-                                    <Users className="h-4 w-4 text-muted-foreground" />
-                                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Active Subscribers</span>
+                            <TabsContent value="overview">
+                                <div className="grid grid-cols-3 gap-6">
+                                    {/* Total Orders */}
+                                    <div className="p-5 border border-border rounded-lg bg-card hover:shadow-sm transition-shadow">
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+                                            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Orders</span>
+                                        </div>
+                                        <div className="text-3xl font-semibold text-foreground">{productStats.totalOrders}</div>
+                                        <p className="text-xs text-muted-foreground mt-2">All-time orders for this product</p>
+                                    </div>
+
+                                    {/* Active Subscribers */}
+                                    <div className="p-5 border border-border rounded-lg bg-card hover:shadow-sm transition-shadow">
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <Users className="h-4 w-4 text-muted-foreground" />
+                                            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Active Subscribers</span>
+                                        </div>
+                                        <div className="text-3xl font-semibold text-foreground">{productStats.activeSubscribers}</div>
+                                        <p className="text-xs text-muted-foreground mt-2">Customers with active subscriptions</p>
+                                    </div>
+
+                                    {/* Total Likes */}
+                                    <div className="p-5 border border-border rounded-lg bg-card hover:shadow-sm transition-shadow">
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <Heart className="h-4 w-4 text-red-500" />
+                                            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Likes</span>
+                                        </div>
+                                        <div className="text-3xl font-semibold text-foreground">
+                                            {likesLoading ? '...' : (likesAnalytics?.totalLikes || 0)}
+                                        </div>
+                                        <p className="text-xs text-muted-foreground mt-2">Customer engagement</p>
+                                    </div>
                                 </div>
-                                <div className="text-3xl font-semibold text-foreground">{productStats.activeSubscribers}</div>
-                                <p className="text-xs text-muted-foreground mt-2">Customers with active subscriptions</p>
-                            </div>
-                        </div>
+                            </TabsContent>
+
+                            <TabsContent value="likes">
+                                {likesLoading ? (
+                                    <div className="flex items-center justify-center py-12">
+                                        <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                                    </div>
+                                ) : likesAnalytics ? (
+                                    <div className="space-y-6">
+                                        {/* Likes Summary */}
+                                        <div className="grid grid-cols-3 gap-4">
+                                            <div className="p-4 border border-border rounded-lg bg-gradient-to-br from-red-50 to-pink-50 dark:from-red-950/20 dark:to-pink-950/20">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <Heart className="h-4 w-4 text-red-500" />
+                                                    <span className="text-xs font-medium text-muted-foreground">Total Likes</span>
+                                                </div>
+                                                <div className="text-2xl font-bold text-red-600 dark:text-red-400">
+                                                    {likesAnalytics.totalLikes}
+                                                </div>
+                                            </div>
+
+                                            <div className="p-4 border border-border rounded-lg bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <Users className="h-4 w-4 text-blue-500" />
+                                                    <span className="text-xs font-medium text-muted-foreground">From Logged-in Users</span>
+                                                </div>
+                                                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                                                    {likesAnalytics.userLikes}
+                                                </div>
+                                            </div>
+
+                                            <div className="p-4 border border-border rounded-lg bg-gradient-to-br from-gray-50 to-slate-50 dark:from-gray-950/20 dark:to-slate-950/20">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <Users className="h-4 w-4 text-gray-500" />
+                                                    <span className="text-xs font-medium text-muted-foreground">From Anonymous Visitors</span>
+                                                </div>
+                                                <div className="text-2xl font-bold text-gray-600 dark:text-gray-400">
+                                                    {likesAnalytics.anonymousLikes}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Daily Likes Chart */}
+                                        <div className="border border-border rounded-lg p-4">
+                                            <div className="flex items-center gap-2 mb-4">
+                                                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                                                <span className="text-sm font-medium">Likes Over Last 30 Days</span>
+                                            </div>
+
+                                            {likesAnalytics.dailyLikes.length > 0 ? (
+                                                <div className="h-48 flex items-end gap-1">
+                                                    {(() => {
+                                                        const maxCount = Math.max(...likesAnalytics.dailyLikes.map(d => d.count), 1)
+                                                        return likesAnalytics.dailyLikes.map((day, index) => (
+                                                            <div
+                                                                key={day.date}
+                                                                className="flex-1 bg-gradient-to-t from-red-500 to-pink-400 rounded-t hover:from-red-600 hover:to-pink-500 transition-colors cursor-pointer group relative"
+                                                                style={{ height: `${(day.count / maxCount) * 100}%`, minHeight: day.count > 0 ? '4px' : '0' }}
+                                                                title={`${day.date}: ${day.count} likes`}
+                                                            >
+                                                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 opacity-0 group-hover:opacity-100 transition-opacity bg-foreground text-background text-xs px-2 py-1 rounded whitespace-nowrap z-10">
+                                                                    {day.date}: {day.count}
+                                                                </div>
+                                                            </div>
+                                                        ))
+                                                    })()}
+                                                </div>
+                                            ) : (
+                                                <div className="h-48 flex items-center justify-center text-muted-foreground text-sm">
+                                                    No likes in the last 30 days
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Conversion Insight */}
+                                        {likesAnalytics.totalLikes > 0 && productStats.totalOrders > 0 && (
+                                            <div className="p-4 border border-border rounded-lg bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <TrendingUp className="h-4 w-4 text-green-600" />
+                                                    <span className="text-sm font-medium text-green-800 dark:text-green-300">Engagement Insight</span>
+                                                </div>
+                                                <p className="text-sm text-green-700 dark:text-green-400">
+                                                    {((productStats.totalOrders / likesAnalytics.totalLikes) * 100).toFixed(1)}% of users who liked this product have placed an order.
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="text-center py-12 text-muted-foreground">
+                                        <Heart className="h-12 w-12 mx-auto mb-3 text-muted-foreground/30" />
+                                        <p className="text-sm">No likes data available yet</p>
+                                        <p className="text-xs mt-1">Likes will appear here once customers start liking this product</p>
+                                    </div>
+                                )}
+                            </TabsContent>
+                        </Tabs>
                     </div>
 
                     {/* Product Details */}

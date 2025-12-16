@@ -53,6 +53,7 @@ import TicketMessage from '../models/TicketMessage';
 import AuditLog from '../models/AuditLog';
 import MfaToken from '../models/MfaToken';
 import CustomWebsite from '../models/CustomWebsite';
+import Like from '../models/Like';
 import { MigrationService } from '../services/migration.service';
 
 // Load environment variables from .env.local
@@ -139,7 +140,7 @@ export const sequelize = new Sequelize(databaseUrl, {
     TenantProductForm, GlobalFormStructure, Sale, DoctorPatientChats, Pharmacy, PharmacyCoverage, PharmacyProduct,
     TenantCustomFeatures, TierConfiguration, TenantAnalyticsEvents, FormAnalyticsDaily,
     MessageTemplate, Sequence, SequenceRun, Tag, UserTag, GlobalFees, UserRoles,
-    SupportTicket, TicketMessage, AuditLog, MfaToken, CustomWebsite
+    SupportTicket, TicketMessage, AuditLog, MfaToken, CustomWebsite, Like
   ],
 });
 
@@ -717,6 +718,36 @@ export async function initializeDatabase() {
     } catch (e) {
       if (process.env.NODE_ENV === 'development') {
         console.error('❌ Error creating IronSail pharmacy:', e);
+      }
+      // ignore - don't fail startup
+    }
+
+    // Ensure unique indexes for Likes table (partial indexes for user/anonymous)
+    try {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔄 Ensuring Likes table unique indexes...');
+      }
+
+      // Create partial unique index for logged-in users
+      await sequelize.query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS "likes_tenant_product_user_unique"
+        ON "likes" ("tenantProductId", "userId")
+        WHERE "userId" IS NOT NULL;
+      `);
+
+      // Create partial unique index for anonymous users
+      await sequelize.query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS "likes_tenant_product_anonymous_unique"
+        ON "likes" ("tenantProductId", "anonymousId")
+        WHERE "anonymousId" IS NOT NULL;
+      `);
+
+      if (process.env.NODE_ENV === 'development') {
+        console.log('✅ Likes table unique indexes ensured');
+      }
+    } catch (e) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('❌ Error creating Likes indexes:', e);
       }
       // ignore - don't fail startup
     }

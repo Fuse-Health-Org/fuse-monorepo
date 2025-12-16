@@ -4,6 +4,7 @@ import Clinic from './Clinic';
 import Product from './Product';
 import Questionnaire from './Questionnaire';
 import TenantAnalyticsEvents from './TenantAnalyticsEvents';
+import Like from './Like';
 
 @Table({
     freezeTableName: true,
@@ -75,4 +76,7 @@ export default class TenantProduct extends Entity {
 
     @HasMany(() => TenantAnalyticsEvents)
     declare analyticsEvents: TenantAnalyticsEvents[];
+
+    @HasMany(() => Like)
+    declare likes: Like[];
 }

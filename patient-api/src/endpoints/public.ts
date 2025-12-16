@@ -38,6 +38,7 @@ export function registerPublicEndpoints(app: Express) {
 
             return {
                 id: tp.product.id,
+                tenantProductId: tp.id, // TenantProduct ID - used for likes
                 name: tp.product.name,
                 description: tp.product.description,
                 imageUrl: tp.product.imageUrl,
