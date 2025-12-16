@@ -255,6 +255,16 @@ export default class Order extends Entity {
   @BelongsTo(() => TenantProduct)
   declare tenantProduct?: TenantProduct;
 
+  @ForeignKey(() => User)
+  @Column({
+    type: DataType.UUID,
+    allowNull: true,
+  })
+  declare affiliateId?: string;
+
+  @BelongsTo(() => User, 'affiliateId')
+  declare affiliate?: User;
+
 
 
 

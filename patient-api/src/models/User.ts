@@ -171,11 +171,11 @@ export default class User extends Entity {
    * To check roles, use: await user.getUserRoles() or include UserRoles in your query.
    */
   @Column({
-    type: DataType.ENUM('patient', 'doctor', 'admin', 'brand'),
+    type: DataType.ENUM('patient', 'doctor', 'admin', 'brand', 'affiliate'),
     allowNull: false,
     defaultValue: 'patient',
   })
-  declare role: 'patient' | 'doctor' | 'admin' | 'brand';
+  declare role: 'patient' | 'doctor' | 'admin' | 'brand' | 'affiliate';
 
   @Column({
     type: DataType.DATE,
@@ -296,6 +296,16 @@ export default class User extends Entity {
   @BelongsTo(() => Clinic)
   declare clinic?: Clinic;
 
+  @ForeignKey(() => User)
+  @Column({
+    type: DataType.UUID,
+    allowNull: true,
+  })
+  declare affiliateOwnerId?: string;
+
+  @BelongsTo(() => User, 'affiliateOwnerId')
+  declare affiliateOwner?: User;
+
   @HasMany(() => ShippingAddress)
   declare shippingAddresses: ShippingAddress[];
 
@@ -376,6 +386,7 @@ export default class User extends Entity {
         doctor: this.role === 'doctor',
         admin: this.role === 'admin',
         brand: this.role === 'brand',
+        affiliate: this.role === 'affiliate',
       });
     }
     this.userRoles = roles;
@@ -432,7 +443,7 @@ export default class User extends Entity {
    * Note: Make sure to include UserRoles in your query or this will use the deprecated role field
    * Example: User.findByPk(id, { include: [{ model: UserRoles, as: 'userRoles' }] })
    */
-  public hasAnyRoleSync(roles: Array<'patient' | 'doctor' | 'admin' | 'brand' | 'superAdmin'>): boolean {
+  public hasAnyRoleSync(roles: Array<'patient' | 'doctor' | 'admin' | 'brand' | 'superAdmin' | 'affiliate'>): boolean {
     // If userRoles is loaded, use it
     if (this.userRoles) {
       return this.userRoles.hasAnyRole(roles);
@@ -458,6 +469,7 @@ export default class User extends Entity {
       zipCode: this.zipCode,
       role: this.role, // @deprecated - use roles array instead
       clinicId: this.clinicId,
+      affiliateOwnerId: this.affiliateOwnerId,
       createdAt: this.createdAt,
       lastLoginAt: this.lastLoginAt,
     };
@@ -465,6 +477,14 @@ export default class User extends Entity {
     // Include roles if userRoles is loaded
     if (this.userRoles) {
       json.roles = this.userRoles.getActiveRoles();
+      json.userRoles = {
+        patient: this.userRoles.patient,
+        doctor: this.userRoles.doctor,
+        admin: this.userRoles.admin,
+        brand: this.userRoles.brand,
+        superAdmin: this.userRoles.superAdmin,
+        affiliate: this.userRoles.affiliate,
+      };
     }
 
     return json;
@@ -481,11 +501,12 @@ export default class User extends Entity {
     lastName: string;
     email: string;
     password: string;
-    role?: 'patient' | 'doctor' | 'admin' | 'brand';
+    role?: 'patient' | 'doctor' | 'admin' | 'brand' | 'affiliate';
     dob?: string;
     phoneNumber?: string;
     website?: string;
     businessType?: string;
+    affiliateOwnerId?: string;
   }): Promise<User> {
     const passwordHash = await this.hashPassword(userData.password);
     const finalRole = userData.role || 'patient';
@@ -500,6 +521,7 @@ export default class User extends Entity {
       phoneNumber: userData.phoneNumber,
       website: userData.website,
       businessType: userData.businessType,
+      affiliateOwnerId: userData.affiliateOwnerId,
       consentGivenAt: new Date(), // Record consent when user signs up
     });
 
@@ -510,6 +532,7 @@ export default class User extends Entity {
       doctor: finalRole === 'doctor',
       admin: finalRole === 'admin',
       brand: finalRole === 'brand',
+      affiliate: finalRole === 'affiliate',
     });
 
     return user;

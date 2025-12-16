@@ -4,6 +4,7 @@ packages:
   - fuse-admin-frontend/
   - fuse-tenant-portal-frontend/
   - fuse-doctor-portal-frontend/
+  - fuse-affiliate-portal-frontend/
   - packages/*
   - tooling/*
 

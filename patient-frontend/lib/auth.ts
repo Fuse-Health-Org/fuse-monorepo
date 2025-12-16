@@ -6,7 +6,7 @@ import { authApi } from "./api";
 export interface User {
   id: string;
   email: string;
-  role: "patient" | "doctor" | "admin" | "brand"; // @deprecated - use roles array instead
+  role: "patient" | "doctor" | "admin" | "brand" | "affiliate" | "brand"; // @deprecated - use roles array instead
   roles?: Array<"patient" | "doctor" | "admin" | "brand" | "superAdmin">; // New role system
   firstName?: string;
   lastName?: string;
@@ -17,6 +17,7 @@ export interface User {
   state?: string;
   zipCode?: string;
   clinicId?: string;
+  affiliateOwnerId?: string;
   createdAt?: string;
   lastLoginAt?: string;
   gender?: string;

@@ -1,0 +1,37 @@
+{
+  "name": "@fuse/affiliate-portal-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm with-env next dev -p 3005 -H 0.0.0.0",
+    "build": "NODE_ENV=production pnpm with-env next build",
+    "start": "next start -p 3005",
+    "lint": "next lint",
+    "pm2:start": "pnpm with-env pm2 start npm --name affiliate-portal-frontend --node-args='--max-old-space-size=1024 --no-warnings' -- start",
+    "pm2:reload": "pnpm build && pnpm with-env pm2 reload affiliate-portal-frontend --update-env",
+    "pm2:reload-no-build": "pnpm with-env pm2 reload affiliate-portal-frontend --update-env",
+    "pm2:stop": "pm2 stop affiliate-portal-frontend",
+    "clean": "git clean -xdf .cache .turbo dist .next node_modules",
+    "with-env": "dotenv -e ../.env.local --"
+  },
+  "dependencies": {
+    "@fuse/enums": "workspace:*",
+    "@heroui/react": "^2.8.3",
+    "@iconify/react": "^6.0.1",
+    "framer-motion": "^12.23.12",
+    "next": "catalog:next14",
+    "react": "catalog:react18",
+    "react-dom": "catalog:react18"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/react": "catalog:react18",
+    "autoprefixer": "catalog:",
+    "dotenv-cli": "catalog:",
+    "eslint": "catalog:",
+    "postcss": "catalog:",
+    "tailwindcss": "^3.4.17",
+    "typescript": "catalog:"
+  }
+}
+

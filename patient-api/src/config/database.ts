@@ -556,6 +556,7 @@ export async function initializeDatabase() {
             doctor: user.role === 'doctor',
             admin: user.role === 'admin',
             brand: user.role === 'brand',
+            affiliate: user.role === 'affiliate',
           });
           backfilledCount++;
         } else {

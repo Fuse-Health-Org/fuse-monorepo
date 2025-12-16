@@ -13,6 +13,7 @@ export const createPaymentIntentSchema = z.object({
   selectedPlan: z.string().optional().default('monthly'),
   shippingInfo: shippingInfoSchema,
   questionnaireAnswers: questionnaireAnswersSchema.optional(),
+  affiliateId: z.string().uuid('Invalid affiliate ID').optional(),
 });
 
 export const createProductSubscriptionSchema = z.object({

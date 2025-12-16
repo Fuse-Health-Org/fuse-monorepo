@@ -22,6 +22,7 @@ import {
   UserCircle,
   Tag,
   Globe,
+  UserPlus,
 } from "lucide-react"
 import Tutorial from "./ui/tutorial"
 
@@ -49,6 +50,7 @@ const services: { name: string; icon: any; current: boolean; href?: string; hasS
 
 const configuration = [
   { name: "Portal", icon: Globe, current: false, href: "/portal" },
+  { name: "Affiliates", icon: UserPlus, current: false, href: "/affiliates" },
   { name: "Settings", icon: Settings, current: false, href: "/settings" },
 ]
 

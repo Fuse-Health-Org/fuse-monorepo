@@ -20,6 +20,7 @@ function DashboardPage() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const [isMobileView, setIsMobileView] = React.useState(false);
 
+
   // Detect mobile view
   React.useEffect(() => {
     const checkIfMobile = () => {
