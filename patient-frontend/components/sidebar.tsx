@@ -10,7 +10,7 @@ import { getAvatarEmoji } from "../lib/avatarUtils";
 interface User {
   id: string;
   email: string;
-  role: 'patient' | 'doctor' | 'admin';
+  role: 'patient' | 'doctor' | 'admin' | 'brand' | 'affiliate';
   firstName?: string;
   lastName?: string;
   clinicId?: string;
