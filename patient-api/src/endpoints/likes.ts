@@ -222,7 +222,7 @@ router.post('/likes/batch', async (req: Request, res: Response) => {
     // Count likes and check user's likes
     likes.forEach((like) => {
       likeCounts[like.tenantProductId] = (likeCounts[like.tenantProductId] || 0) + 1;
-      
+
       if (userId && like.userId === userId) {
         userLikes[like.tenantProductId] = true;
       } else if (!userId && anonymousId && like.anonymousId === anonymousId) {
