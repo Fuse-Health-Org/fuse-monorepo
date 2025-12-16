@@ -12,12 +12,14 @@
     "build:admin": "cd /home/ec2-user/fuse-monorepo && pnpm --filter @fuse/admin-frontend run build",
     "build:patient": "cd /home/ec2-user/fuse-monorepo && pnpm --filter @fuse/frontend run build",
     "build:doctor": "cd /home/ec2-user/fuse-monorepo && pnpm --filter @fuse/doctor-portal-frontend run build",
+    "build:affiliate": "cd /home/ec2-user/fuse-monorepo && pnpm --filter @fuse/affiliate-portal-frontend run build",
     "build:api": "cd /home/ec2-user/fuse-monorepo && pnpm --filter @fuse/api run build",
     "deploy:backend": "turbo run pm2:reload --filter=@fuse/api || (cd patient-api && pnpm pm2:start) && pm2 logs patient-api",
     "deploy:patient": "turbo run pm2:reload --filter=@fuse/frontend || (cd patient-frontend && pnpm pm2:start) && pm2 logs patient-frontend",
     "deploy:admin": "turbo run pm2:reload --filter=@fuse/admin-frontend || (cd fuse-admin-frontend && pnpm pm2:start) && pm2 logs admin-frontend",
     "deploy:tenant": "turbo run pm2:reload --filter=@fuse/tenant-portal-frontend || (cd fuse-tenant-portal-frontend && pnpm pm2:start) && pm2 logs tenant-portal-frontend",
     "deploy:doctor": "turbo run pm2:reload --filter=@fuse/doctor-portal-frontend || (cd fuse-doctor-portal-frontend && pnpm pm2:start) && pm2 logs doctor-portal-frontend",
+    "deploy:affiliate": "turbo run pm2:reload --filter=@fuse/affiliate-portal-frontend || (cd fuse-affiliate-portal-frontend && pnpm pm2:start) && pm2 logs affiliate-portal-frontend",
     "migrate": "pnpm --filter @fuse/api run migrate"
   },
   "devDependencies": {
