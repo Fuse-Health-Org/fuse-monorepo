@@ -280,6 +280,9 @@ app.use(
         // Allow clinic subdomains in development (e.g., g-health.localhost:3000, saboia.xyz.localhost:3000)
         (process.env.NODE_ENV === "development" &&
           /^http:\/\/[a-zA-Z0-9.-]+\.localhost:3000$/.test(origin)) ||
+        // Allow affiliate portal subdomains in development (e.g., limitless.localhost:3005)
+        (process.env.NODE_ENV === "development" &&
+          /^http:\/\/[a-zA-Z0-9.-]+\.localhost:3005$/.test(origin)) ||
         // Allow production clinic domains (e.g., app.limitless.health, app.hims.com)
         (process.env.NODE_ENV === "production" &&
           /^https:\/\/app\.[a-zA-Z0-9-]+\.[a-zA-Z]{2,}$/.test(origin)) ||
@@ -5603,7 +5606,7 @@ app.post("/orders/create-payment-intent", authenticateJWT, async (req, res) => {
 
     // Validate affiliateId if provided, or detect from hostname
     let validAffiliateId: string | undefined = undefined;
-    
+
     // First, try to get affiliateId from request body
     if (affiliateId) {
       const affiliate = await User.findByPk(affiliateId, {
@@ -5616,7 +5619,7 @@ app.post("/orders/create-payment-intent", authenticateJWT, async (req, res) => {
         }
       }
     }
-    
+
     // If no affiliateId in body, try to detect from hostname
     if (!validAffiliateId) {
       const hostname = req.get("host") || req.hostname;
@@ -5627,7 +5630,7 @@ app.post("/orders/create-payment-intent", authenticateJWT, async (req, res) => {
         if (parts.length >= 4) {
           const affiliateSlug = parts[0];
           console.log("🔍 Detecting affiliate from hostname:", { hostname, affiliateSlug });
-          
+
           // Find affiliate by website (slug) field
           const affiliateBySlug = await User.findOne({
             where: {
@@ -5641,7 +5644,7 @@ app.post("/orders/create-payment-intent", authenticateJWT, async (req, res) => {
               },
             ],
           });
-          
+
           if (affiliateBySlug) {
             await affiliateBySlug.getUserRoles();
             if (affiliateBySlug.userRoles?.hasRole("affiliate")) {
@@ -6057,7 +6060,7 @@ app.post(
         if (parts.length >= 4) {
           const affiliateSlug = parts[0];
           console.log("🔍 Detecting affiliate from hostname (product subscription):", { hostname, affiliateSlug });
-          
+
           // Find affiliate by website (slug) field
           const affiliateBySlug = await User.findOne({
             where: {
@@ -6071,7 +6074,7 @@ app.post(
               },
             ],
           });
-          
+
           if (affiliateBySlug) {
             await affiliateBySlug.getUserRoles();
             if (affiliateBySlug.userRoles?.hasRole("affiliate")) {
@@ -6463,7 +6466,7 @@ app.post("/payments/product/sub", async (req, res) => {
       if (parts.length >= 4) {
         const affiliateSlug = parts[0];
         console.log("🔍 Detecting affiliate from hostname (confirm payment):", { hostname, affiliateSlug });
-        
+
         // Find affiliate by website (slug) field
         const affiliateBySlug = await User.findOne({
           where: {
@@ -6477,7 +6480,7 @@ app.post("/payments/product/sub", async (req, res) => {
             },
           ],
         });
-        
+
         if (affiliateBySlug) {
           await affiliateBySlug.getUserRoles();
           if (affiliateBySlug.userRoles?.hasRole("affiliate")) {
@@ -12994,7 +12997,7 @@ app.put("/users/profile", authenticateJWT, async (req, res) => {
       const bcrypt = require("bcrypt");
       const hashedPassword = await bcrypt.hash(newPassword, 10);
       // Update password and clear temporary password if it exists
-      await user.update({ 
+      await user.update({
         passwordHash: hashedPassword,
         temporaryPasswordHash: null // Clear temporary password after change
       });
