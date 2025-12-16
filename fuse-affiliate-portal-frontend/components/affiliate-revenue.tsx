@@ -45,7 +45,7 @@ export function AffiliateRevenue() {
           });
           setData(revenueData);
         } else {
-          setError(response.error || response.message || "Failed to fetch revenue");
+          setError(response.error || "Failed to fetch revenue");
         }
       } catch (err: any) {
         setError(err.message || "An error occurred");

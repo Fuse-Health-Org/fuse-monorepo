@@ -137,7 +137,7 @@ export default function Onboarding() {
       });
 
       if (!nameResponse.success) {
-        setError(nameResponse.message || nameResponse.error || "Error saving data");
+        setError(nameResponse.error || "Error saving data");
         setSaving(false);
         return;
       }
@@ -152,7 +152,7 @@ export default function Onboarding() {
       });
 
       if (!passwordResponse.success) {
-        setError(passwordResponse.message || passwordResponse.error || "Error updating password");
+        setError(passwordResponse.error || "Error updating password");
         setSaving(false);
         return;
       }

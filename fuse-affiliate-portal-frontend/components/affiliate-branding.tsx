@@ -71,7 +71,7 @@ export function AffiliateBranding() {
             });
           }, 100);
         } else {
-          setError(response.error || response.message || "Failed to fetch branding");
+          setError(response.error || "Failed to fetch branding");
         }
       } catch (err: any) {
         setError(err.message || "An error occurred");
@@ -146,7 +146,7 @@ export function AffiliateBranding() {
         
         showToast('success', 'Branding updated successfully!');
       } else {
-        const errorMessage = response.message || "Failed to update branding";
+        const errorMessage = response.error || "Failed to update branding";
         setError(errorMessage);
         showToast('error', errorMessage);
       }
