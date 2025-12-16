@@ -11,7 +11,7 @@ export default function Onboarding() {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Form fields
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -27,7 +27,7 @@ export default function Onboarding() {
       router.push("/signin");
       return;
     }
-    
+
     if (user) {
       // Pre-fill with existing data if available
       if (user.firstName && user.firstName !== user.email?.split("@")[0]) {
@@ -77,27 +77,27 @@ export default function Onboarding() {
 
   const validatePassword = (): boolean => {
     setPasswordError(null);
-    
+
     if (!currentPassword.trim()) {
       setPasswordError("Current password is required");
       return false;
     }
-    
+
     if (!newPassword.trim()) {
       setPasswordError("New password is required");
       return false;
     }
-    
+
     if (newPassword.length < 8) {
       setPasswordError("New password must be at least 8 characters");
       return false;
     }
-    
+
     if (newPassword !== confirmPassword) {
       setPasswordError("Passwords do not match");
       return false;
     }
-    
+
     return true;
   };
 
@@ -123,10 +123,10 @@ export default function Onboarding() {
     try {
       // Update user data and slug (website)
       // Combine firstName and lastName for the name field
-      const fullName = lastName.trim() 
+      const fullName = lastName.trim()
         ? `${firstName.trim()} ${lastName.trim()}`
         : firstName.trim();
-      
+
       // Update branding
       const nameResponse = await apiCall("/affiliate/branding", {
         method: "PUT",

@@ -44,9 +44,8 @@ export function AffiliateAnalytics() {
     setError(null);
 
     try {
-      const response = await apiCall("/affiliate/analytics", {
+      const response = await apiCall(`/affiliate/analytics?startDate=${startDate}&endDate=${endDate}`, {
         method: "GET",
-        body: JSON.stringify({ startDate, endDate }),
       });
 
       if (response.success) {

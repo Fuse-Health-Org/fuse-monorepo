@@ -320,7 +320,7 @@ export async function initializeDatabase() {
     }
 
     // Sync all models to database (safer sync mode)
-    await sequelize.sync();
+    await sequelize.sync({ alter: true });
     if (process.env.NODE_ENV === 'development') {
       console.log('✅ Database tables synchronized successfully');
     }
