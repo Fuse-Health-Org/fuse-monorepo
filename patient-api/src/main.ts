@@ -1999,7 +1999,7 @@ app.get("/auth/me", authenticateJWT, async (req, res) => {
     // Include clinic details for affiliates to check if onboarding is needed
     if (user.clinicId && user.userRoles?.affiliate) {
       const clinic = await Clinic.findByPk(user.clinicId, {
-        attributes: ['id', 'name', 'slug', 'isActive'],
+        attributes: ['id', 'name', 'slug', 'isActive', 'affiliateOwnerClinicId'],
       });
       if (clinic) {
         userData.clinic = {
@@ -2008,6 +2008,16 @@ app.get("/auth/me", authenticateJWT, async (req, res) => {
           slug: clinic.slug,
           isActive: clinic.isActive,
         };
+
+        // Include parent clinic slug for affiliates
+        if (clinic.affiliateOwnerClinicId) {
+          const parentClinic = await Clinic.findByPk(clinic.affiliateOwnerClinicId, {
+            attributes: ['id', 'slug'],
+          });
+          if (parentClinic) {
+            userData.clinic.parentClinicSlug = parentClinic.slug;
+          }
+        }
       }
     }
 

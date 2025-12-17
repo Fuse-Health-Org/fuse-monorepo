@@ -19,6 +19,7 @@ export default function Onboarding() {
 
   // Form fields - Clinic Info
   const [clinicName, setClinicName] = useState("");
+  const [clinicNameError, setClinicNameError] = useState<string | null>(null);
   const [slug, setSlug] = useState("");
   const [slugError, setSlugError] = useState<string | null>(null);
 
@@ -35,11 +36,33 @@ export default function Onboarding() {
     }
   }, [user, authLoading, router]);
 
+  const validateClinicName = (value: string): boolean => {
+    if (!value || !value.trim()) {
+      setClinicNameError("Clinic name is required");
+      return false;
+    }
+    if (value.trim().length < 2) {
+      setClinicNameError("Clinic name must be at least 2 characters");
+      return false;
+    }
+    setClinicNameError(null);
+    return true;
+  };
+
+  const handleClinicNameChange = (value: string) => {
+    setClinicName(value);
+    if (value.trim()) {
+      validateClinicName(value);
+    } else {
+      setClinicNameError(null);
+    }
+  };
+
   const validateSlug = (value: string): boolean => {
     // Slug should be lowercase, alphanumeric, and hyphens only
     const slugRegex = /^[a-z0-9-]+$/;
     if (!value) {
-      setSlugError("Slug is required");
+      setSlugError("Portal URL slug is required");
       return false;
     }
     if (value.length < 3) {
@@ -66,6 +89,24 @@ export default function Onboarding() {
     } else {
       setSlugError(null);
     }
+  };
+
+  const generateSlugFromClinicName = () => {
+    if (!clinicName.trim()) {
+      setClinicNameError("Enter a clinic name first");
+      return;
+    }
+    // Convert clinic name to slug: lowercase, replace spaces with hyphens, remove special chars
+    const generatedSlug = clinicName
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, "-") // Replace spaces with hyphens
+      .replace(/[^a-z0-9-]/g, "") // Remove special characters
+      .replace(/-+/g, "-") // Replace multiple hyphens with single hyphen
+      .replace(/^-|-$/g, ""); // Remove leading/trailing hyphens
+
+    setSlug(generatedSlug);
+    validateSlug(generatedSlug);
   };
 
   const validatePassword = (): boolean => {
@@ -97,6 +138,8 @@ export default function Onboarding() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setClinicNameError(null);
+    setSlugError(null);
 
     // Validate personal info
     if (!firstName.trim() || firstName.trim().length < 2) {
@@ -109,12 +152,18 @@ export default function Onboarding() {
       return;
     }
 
-    if (!clinicName.trim() || clinicName.trim().length < 2) {
-      setError("Clinic name is required (minimum 2 characters)");
-      return;
+    // Validate clinic info with inline errors
+    let hasClinicErrors = false;
+
+    if (!validateClinicName(clinicName)) {
+      hasClinicErrors = true;
     }
 
     if (!validateSlug(slug)) {
+      hasClinicErrors = true;
+    }
+
+    if (hasClinicErrors) {
       return;
     }
 
@@ -138,7 +187,13 @@ export default function Onboarding() {
       });
 
       if (!clinicResponse.success) {
-        setError(clinicResponse.error || "Error setting up clinic");
+        // Check if the error is about slug being taken
+        const errorMessage = clinicResponse.error || "Error setting up clinic";
+        if (errorMessage.toLowerCase().includes("slug") && errorMessage.toLowerCase().includes("taken")) {
+          setSlugError("This slug is already taken. Please choose a different one.");
+        } else {
+          setError(errorMessage);
+        }
         setSaving(false);
         return;
       }
@@ -277,41 +332,60 @@ export default function Onboarding() {
                       label="Clinic Name"
                       placeholder="e.g., My Health Clinic"
                       value={clinicName}
-                      onChange={(e) => setClinicName(e.target.value)}
+                      onChange={(e) => handleClinicNameChange(e.target.value)}
+                      onBlur={() => validateClinicName(clinicName)}
                       required
                       variant="bordered"
+                      errorMessage={clinicNameError || undefined}
+                      isInvalid={!!clinicNameError}
                       classNames={{
                         label: "text-foreground",
                         input: "text-foreground",
                       }}
-                      description="Your clinic's display name"
+                      description={!clinicNameError ? "Your clinic's display name" : undefined}
                       startContent={
                         <Icon icon="mdi:store" className="text-default-400" />
                       }
                     />
 
                     <div>
-                      <Input
-                        label="Portal URL Slug"
-                        placeholder="e.g., my-health-clinic"
-                        value={slug}
-                        onChange={(e) => handleSlugChange(e.target.value)}
-                        required
-                        variant="bordered"
-                        errorMessage={slugError || undefined}
-                        isInvalid={!!slugError}
-                        classNames={{
-                          label: "text-foreground",
-                          input: "text-foreground",
-                        }}
-                        description="Subdomain for your portal (lowercase letters, numbers, and hyphens only)"
-                        startContent={
-                          <Icon icon="mdi:link-variant" className="text-default-400" />
-                        }
-                      />
-                      {slug && !slugError && (
+                      <div className="flex gap-2 items-end">
+                        <div className="flex-1">
+                          <Input
+                            label="Portal URL Slug"
+                            placeholder="e.g., my-health-clinic"
+                            value={slug}
+                            onChange={(e) => handleSlugChange(e.target.value)}
+                            onBlur={() => slug && validateSlug(slug)}
+                            required
+                            variant="bordered"
+                            errorMessage={slugError || undefined}
+                            isInvalid={!!slugError}
+                            classNames={{
+                              label: "text-foreground",
+                              input: "text-foreground",
+                            }}
+                            description={!slugError ? "Subdomain for your portal (lowercase letters, numbers, and hyphens only)" : undefined}
+                            startContent={
+                              <Icon icon="mdi:link-variant" className="text-default-400" />
+                            }
+                          />
+                        </div>
+                        <Button
+                          type="button"
+                          variant="bordered"
+                          onPress={generateSlugFromClinicName}
+                          isDisabled={!clinicName.trim()}
+                          size="lg"
+                          className="mb-[27px]"
+                        >
+                          <Icon icon="mdi:auto-fix" className="text-lg" />
+                          Auto
+                        </Button>
+                      </div>
+                      {slug && !slugError && user?.clinic?.parentClinicSlug && (
                         <p className="text-xs text-success mt-1">
-                          Your URL will be: <span className="font-mono">{slug}.fuse.health</span>
+                          Your URL will be: <span className="font-mono">{slug}.{user.clinic.parentClinicSlug}.fusehealth.com</span>
                         </p>
                       )}
                     </div>
