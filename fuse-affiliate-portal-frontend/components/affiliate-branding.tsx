@@ -180,10 +180,14 @@ export function AffiliateBranding() {
       const formData = new FormData();
       formData.append('logo', file);
 
+      // Get auth token from localStorage
+      const token = typeof window !== 'undefined' ? localStorage.getItem('auth-token') : null;
+
       const response = await fetch(`${API_URL}/custom-website/upload-logo`, {
         method: 'POST',
         body: formData,
         credentials: 'include',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
       });
 
       if (response.ok) {
@@ -192,6 +196,12 @@ export function AffiliateBranding() {
           setSettings({ ...settings, logo: data.data.logoUrl });
           showToast('success', 'Logo uploaded successfully!');
         }
+      } else if (response.status === 401) {
+        showToast('error', 'Session expired. Please sign in again.');
+        // Optionally redirect to signin
+        window.location.href = '/signin';
+      } else if (response.status === 403) {
+        showToast('error', 'Access denied. You do not have permission to upload logos.');
       } else {
         showToast('error', 'Failed to upload logo');
       }
@@ -212,10 +222,14 @@ export function AffiliateBranding() {
       const formData = new FormData();
       formData.append('heroImage', file);
 
+      // Get auth token from localStorage
+      const token = typeof window !== 'undefined' ? localStorage.getItem('auth-token') : null;
+
       const response = await fetch(`${API_URL}/custom-website/upload-hero`, {
         method: 'POST',
         body: formData,
         credentials: 'include',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
       });
 
       if (response.ok) {
@@ -224,6 +238,12 @@ export function AffiliateBranding() {
           setSettings({ ...settings, heroImageUrl: data.data.heroImageUrl });
           showToast('success', 'Hero image uploaded successfully!');
         }
+      } else if (response.status === 401) {
+        showToast('error', 'Session expired. Please sign in again.');
+        // Optionally redirect to signin
+        window.location.href = '/signin';
+      } else if (response.status === 403) {
+        showToast('error', 'Access denied. You do not have permission to upload images.');
       } else {
         showToast('error', 'Failed to upload hero image');
       }
@@ -441,12 +461,37 @@ export function AffiliateBranding() {
             </CardHeader>
             <CardBody className="pt-0 space-y-3">
               {settings.logo && (
-                <div className="p-4 bg-content1 rounded-lg flex items-center justify-center">
+                <div className="p-4 bg-content1 rounded-lg flex flex-col items-center gap-3">
                   <img
                     src={settings.logo}
                     alt="Logo preview"
                     className="h-12 object-contain max-w-[200px]"
                   />
+                  <Button
+                    size="sm"
+                    color="danger"
+                    variant="flat"
+                    onPress={async () => {
+                      try {
+                        const response = await apiCall("/affiliate/clinic", {
+                          method: "PUT",
+                          body: JSON.stringify({ logo: "" }),
+                        });
+                        if (response.success) {
+                          setSettings({ ...settings, logo: "" });
+                          showToast('success', 'Logo removed successfully');
+                        } else {
+                          showToast('error', 'Failed to remove logo');
+                        }
+                      } catch (error) {
+                        console.error('Error removing logo:', error);
+                        showToast('error', 'Failed to remove logo');
+                      }
+                    }}
+                  >
+                    <Icon icon="lucide:trash-2" className="w-4 h-4 mr-1" />
+                    Clear Logo
+                  </Button>
                 </div>
               )}
 

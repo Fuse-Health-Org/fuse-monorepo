@@ -2733,8 +2733,8 @@ app.post("/custom-website/upload-logo", authenticateJWT, upload.single('logo'), 
       });
     }
 
-    // Only allow brand users to upload portal images
-    if (!user.hasAnyRoleSync(['brand', 'doctor'])) {
+    // Only allow brand, doctor, or affiliate users to upload portal images
+    if (!user.hasAnyRoleSync(['brand', 'doctor', 'affiliate'])) {
       return res.status(403).json({
         success: false,
         message: "Access denied"
@@ -2812,8 +2812,8 @@ app.post("/custom-website/upload-hero", authenticateJWT, upload.single('heroImag
       });
     }
 
-    // Only allow brand users to upload portal images
-    if (!user.hasAnyRoleSync(['brand', 'doctor'])) {
+    // Only allow brand, doctor, or affiliate users to upload portal images
+    if (!user.hasAnyRoleSync(['brand', 'doctor', 'affiliate'])) {
       return res.status(403).json({
         success: false,
         message: "Access denied"
