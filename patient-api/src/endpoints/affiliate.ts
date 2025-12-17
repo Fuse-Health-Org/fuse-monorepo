@@ -1,5 +1,6 @@
 import { Express } from "express";
 import { Op, QueryTypes } from "sequelize";
+import axios from "axios";
 import User from "../models/User";
 import Order from "../models/Order";
 import OrderItem from "../models/OrderItem";
@@ -728,11 +729,42 @@ export function registerAffiliateEndpoints(
 
       // Get frontend origin for affiliate portal
       const frontendOrigin = req.get("origin") || req.get("referer")?.split("/").slice(0, 3).join("/") || "http://localhost:3005";
-      const affiliatePortalUrl = process.env.NODE_ENV === "production"
-        ? "https://admin.limitless.health"
-        : frontendOrigin.includes("3005")
+
+      // Determine the best affiliate portal URL
+      let affiliatePortalUrl: string;
+
+      if (process.env.NODE_ENV === "production") {
+        // Check if parent clinic has custom domain configured
+        if (parentClinic.isCustomDomain && parentClinic.customDomain) {
+          // Try the main admin URL: admin.{customDomain without 'app.' prefix}
+          const mainAdminUrl = `https://admin.${parentClinic.customDomain.replace(/^app\./, '')}`;
+
+          try {
+            // Check if the URL is accessible with a quick HEAD request (timeout 3 seconds)
+            await axios.head(mainAdminUrl, {
+              timeout: 3000,
+              validateStatus: () => true, // Accept any status code (even 404 means domain resolves)
+            });
+
+            // If we get any response (even 404 is fine, means domain resolves), use it
+            affiliatePortalUrl = mainAdminUrl;
+            console.log(`✅ [Affiliate Invite] Using main admin URL: ${mainAdminUrl}`);
+          } catch (error: any) {
+            // If request fails (DNS not configured, timeout, etc.), use fallback
+            affiliatePortalUrl = `https://admin.${parentClinic.slug}.fusehealth.com`;
+            console.log(`⚠️ [Affiliate Invite] Main URL not accessible (${error.message}), using fallback: ${affiliatePortalUrl}`);
+          }
+        } else {
+          // No custom domain, use fallback URL format
+          affiliatePortalUrl = `https://admin.${parentClinic.slug}.fusehealth.com`;
+          console.log(`ℹ️ [Affiliate Invite] No custom domain configured, using fallback: ${affiliatePortalUrl}`);
+        }
+      } else {
+        // Development environment
+        affiliatePortalUrl = frontendOrigin.includes("3005")
           ? frontendOrigin
           : "http://localhost:3005";
+      }
 
       // Send invitation email with credentials
       const emailSent = await MailsSender.sendEmail({
