@@ -105,7 +105,18 @@ export async function extractClinicSlugFromDomain(): Promise<ClinicDomainInfo> {
     clinicSlug = parts[0];
     hasClinicSubdomain = true;
   } else if (hostname.endsWith('.fusehealth.com') && parts.length >= 3 && parts[0] !== 'app' && parts[0] !== 'www') {
-    // Production clinic subdomain: <clinic>.fusehealth.com
+    // Production clinic subdomain: <clinic>.fusehealth.com OR affiliate subdomain: <affiliate>.<brand>.fusehealth.com
+    if (parts.length === 4) {
+      // Affiliate subdomain: lala.limitless.fusehealth.com -> slug: "lala"
+      // parts[0] = affiliate slug, parts[1] = brand slug
+      clinicSlug = parts[0];
+      hasClinicSubdomain = true;
+      console.log('👤 Detected affiliate subdomain:', { affiliateSlug: parts[0], brandSlug: parts[1] });
+    } else if (parts.length === 3) {
+      // Regular clinic subdomain: limitless.fusehealth.com -> slug: "limitless"
+      clinicSlug = parts[0];
+      hasClinicSubdomain = true;
+    }
   } else if (hostname.endsWith('.fusehealthstaging.xyz') && parts.length >= 3 && parts[0] !== 'app' && parts[0] !== 'www') {
     // Staging clinic subdomain: <clinic>.fusehealthstaging.xyz
     clinicSlug = parts[0];
