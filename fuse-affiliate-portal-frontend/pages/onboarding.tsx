@@ -383,7 +383,12 @@ export default function Onboarding() {
                           Auto
                         </Button>
                       </div>
-                      {slug && !slugError && user?.clinic?.parentClinicSlug && (
+                      {slug && !slugError && user?.clinic?.parentClinicCustomDomain && (
+                        <p className="text-xs text-success mt-1">
+                          Your URL will be: <span className="font-mono">{slug}.{user.clinic.parentClinicCustomDomain.replace(/^app\./, '')}</span>
+                        </p>
+                      )}
+                      {slug && !slugError && !user?.clinic?.parentClinicCustomDomain && user?.clinic?.parentClinicSlug && (
                         <p className="text-xs text-success mt-1">
                           Your URL will be: <span className="font-mono">{slug}.{user.clinic.parentClinicSlug}.fusehealth.com</span>
                         </p>

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { Card, CardBody, CardHeader, Button, Input, Spinner, Switch } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { apiCall } from "../lib/api";
+import { useAuth } from "../contexts/AuthContext";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -28,9 +29,12 @@ interface PortalSettings {
   heroTitle: string;
   heroSubtitle: string;
   isActive: boolean;
+  parentClinicSlug?: string;
+  parentClinicCustomDomain?: string;
 }
 
 export function AffiliateBranding() {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [isTogglingActive, setIsTogglingActive] = useState(false);
@@ -39,7 +43,7 @@ export function AffiliateBranding() {
   const [heroInputMode, setHeroInputMode] = useState<"file" | "url">("url");
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [isUploadingHero, setIsUploadingHero] = useState(false);
-  
+
   const [settings, setSettings] = useState<PortalSettings>({
     clinicName: "",
     clinicSlug: "",
@@ -65,14 +69,10 @@ export function AffiliateBranding() {
     }, 5000);
   }, []);
 
-  useEffect(() => {
-    loadSettings();
-  }, []);
-
-  const loadSettings = async () => {
+  const loadSettings = useCallback(async () => {
     try {
       const response = await apiCall("/affiliate/clinic", { method: "GET" });
-      
+
       if (response.success) {
         const data = response.data?.data || response.data;
         const clinic = data?.clinic || {};
@@ -90,6 +90,8 @@ export function AffiliateBranding() {
           heroTitle: customWebsite.heroTitle || settings.heroTitle,
           heroSubtitle: customWebsite.heroSubtitle || settings.heroSubtitle,
           isActive: customWebsite.isActive ?? clinic.isActive ?? false,
+          parentClinicSlug: user?.clinic?.parentClinicSlug || "",
+          parentClinicCustomDomain: user?.clinic?.parentClinicCustomDomain || "",
         });
       }
     } catch (error) {
@@ -98,7 +100,13 @@ export function AffiliateBranding() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, showToast]);
+
+  useEffect(() => {
+    if (user) {
+      loadSettings();
+    }
+  }, [user, loadSettings]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -227,6 +235,49 @@ export function AffiliateBranding() {
     );
   }
 
+  // Main portal URL using parent clinic's custom domain (removing 'app.' prefix)
+  const mainPortalUrl = settings.clinicSlug && settings.parentClinicCustomDomain
+    ? `${settings.clinicSlug}.${settings.parentClinicCustomDomain.replace(/^app\./, '')}`
+    : '';
+
+  // Fallback portal URL using parent clinic slug
+  const fallbackPortalUrl = settings.clinicSlug && settings.parentClinicSlug
+    ? `${settings.clinicSlug}.${settings.parentClinicSlug}.fusehealth.com`
+    : '';
+
+  // Admin portal URLs
+  const adminPortalUrl = settings.parentClinicCustomDomain
+    ? `admin.${settings.parentClinicCustomDomain.replace(/^app\./, '')}`
+    : '';
+
+  const fallbackAdminPortalUrl = settings.parentClinicSlug
+    ? `admin.${settings.parentClinicSlug}.fusehealth.com`
+    : '';
+
+  const handlePreviewMain = () => {
+    if (mainPortalUrl) {
+      window.open(`https://${mainPortalUrl}`, '_blank');
+    }
+  };
+
+  const handlePreviewFallback = () => {
+    if (fallbackPortalUrl) {
+      window.open(`https://${fallbackPortalUrl}`, '_blank');
+    }
+  };
+
+  const handlePreviewAdmin = () => {
+    if (adminPortalUrl) {
+      window.open(`https://${adminPortalUrl}`, '_blank');
+    }
+  };
+
+  const handlePreviewFallbackAdmin = () => {
+    if (fallbackAdminPortalUrl) {
+      window.open(`https://${fallbackAdminPortalUrl}`, '_blank');
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -241,15 +292,15 @@ export function AffiliateBranding() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className={`p-3 rounded-full ${settings.isActive ? 'bg-green-100' : 'bg-content2'}`}>
-                <Icon 
-                  icon="lucide:globe" 
-                  className={`text-2xl ${settings.isActive ? 'text-green-600' : 'text-muted-foreground'}`} 
+                <Icon
+                  icon="lucide:globe"
+                  className={`text-2xl ${settings.isActive ? 'text-green-600' : 'text-muted-foreground'}`}
                 />
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-foreground">Custom Website</h3>
                 <p className="text-sm text-muted-foreground">
-                  {settings.isActive 
+                  {settings.isActive
                     ? "Your custom landing page is live and visible to visitors"
                     : "Enable to show your custom landing page to visitors"}
                 </p>
@@ -354,7 +405,7 @@ export function AffiliateBranding() {
               <p className="text-xs text-muted-foreground">
                 {FONT_OPTIONS.find((f) => f.value === settings.fontFamily)?.description}
               </p>
-              
+
               {/* Font Preview */}
               <div className="p-4 border border-content3 rounded-lg bg-content1">
                 <p className="text-xs text-muted-foreground mb-2">Preview:</p>
@@ -390,7 +441,7 @@ export function AffiliateBranding() {
                   />
                 </div>
               )}
-              
+
               <div className="flex gap-2">
                 <Button
                   size="sm"
@@ -586,9 +637,8 @@ export function AffiliateBranding() {
             </CardHeader>
             <CardBody className="pt-0">
               <div
-                className={`bg-white border border-content3 rounded-lg overflow-hidden shadow-sm ${
-                  previewMode === "mobile" ? "max-w-[375px] mx-auto" : ""
-                }`}
+                className={`bg-white border border-content3 rounded-lg overflow-hidden shadow-sm ${previewMode === "mobile" ? "max-w-[375px] mx-auto" : ""
+                  }`}
                 style={{ fontFamily: settings.fontFamily }}
               >
                 {/* Preview Header */}
@@ -661,23 +711,155 @@ export function AffiliateBranding() {
         </div>
       </div>
 
+      {/* Portal URLs Display */}
+      {(mainPortalUrl || fallbackPortalUrl || adminPortalUrl || fallbackAdminPortalUrl) && (
+        <div className="space-y-3">
+          {/* Main Portal URL */}
+          {mainPortalUrl && (
+            <Card>
+              <CardBody className="py-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3 flex-1">
+                    <div className="p-2 rounded-full bg-primary/10">
+                      <Icon icon="lucide:link" className="text-xl text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-sm font-medium text-foreground mb-1">Your Portal URL</h3>
+                      <p className="text-sm font-mono text-muted-foreground truncate mb-1">
+                        {mainPortalUrl}
+                      </p>
+                      <p className="text-xs text-warning flex items-center gap-1">
+                        <Icon icon="lucide:alert-circle" className="text-sm" />
+                        <span>May not work unless the brand configured wildcard DNS (*.{settings.parentClinicCustomDomain?.replace(/^app\./, '')})</span>
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    color="primary"
+                    variant="flat"
+                    onPress={handlePreviewMain}
+                    startContent={<Icon icon="lucide:external-link" className="text-lg" />}
+                  >
+                    Preview
+                  </Button>
+                </div>
+              </CardBody>
+            </Card>
+          )}
+
+          {/* Portal Fallback URL */}
+          {fallbackPortalUrl && (
+            <Card>
+              <CardBody className="py-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3 flex-1">
+                    <div className="p-2 rounded-full bg-default/10">
+                      <Icon icon="lucide:link-2" className="text-xl text-default-500" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-sm font-medium text-foreground mb-1">Portal Fallback URL</h3>
+                      <p className="text-sm font-mono text-muted-foreground truncate mb-1">
+                        {fallbackPortalUrl}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Use this if the main URL doesn't work
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="bordered"
+                    onPress={handlePreviewFallback}
+                    startContent={<Icon icon="lucide:external-link" className="text-lg" />}
+                  >
+                    Preview
+                  </Button>
+                </div>
+              </CardBody>
+            </Card>
+          )}
+
+          {/* Affiliate Admin Portal */}
+          {adminPortalUrl && (
+            <Card>
+              <CardBody className="py-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3 flex-1">
+                    <div className="p-2 rounded-full bg-success/10">
+                      <Icon icon="lucide:shield" className="text-xl text-success-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-sm font-medium text-foreground mb-1">Affiliate Admin Portal</h3>
+                      <p className="text-sm font-mono text-muted-foreground truncate mb-1">
+                        {adminPortalUrl}
+                      </p>
+                      <p className="text-xs text-warning flex items-center gap-1">
+                        <Icon icon="lucide:alert-circle" className="text-sm" />
+                        <span>May not work unless the brand configured wildcard DNS (*.{settings.parentClinicCustomDomain?.replace(/^app\./, '')})</span>
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    color="success"
+                    variant="flat"
+                    onPress={handlePreviewAdmin}
+                    startContent={<Icon icon="lucide:external-link" className="text-lg" />}
+                  >
+                    Preview
+                  </Button>
+                </div>
+              </CardBody>
+            </Card>
+          )}
+
+          {/* Fallback Affiliate Admin Portal */}
+          {fallbackAdminPortalUrl && (
+            <Card>
+              <CardBody className="py-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3 flex-1">
+                    <div className="p-2 rounded-full bg-default/10">
+                      <Icon icon="lucide:shield-check" className="text-xl text-default-500" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-sm font-medium text-foreground mb-1">Fallback Affiliate Admin Portal</h3>
+                      <p className="text-sm font-mono text-muted-foreground truncate mb-1">
+                        {fallbackAdminPortalUrl}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Use this if the main admin URL doesn't work
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="bordered"
+                    onPress={handlePreviewFallbackAdmin}
+                    startContent={<Icon icon="lucide:external-link" className="text-lg" />}
+                  >
+                    Preview
+                  </Button>
+                </div>
+              </CardBody>
+            </Card>
+          )}
+        </div>
+      )}
+
       {/* Toast Notifications */}
       <div className="fixed top-4 right-4 z-50 flex flex-col gap-2">
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            className={`px-4 py-3 rounded-lg shadow-lg text-white min-w-[300px] max-w-md animate-slide-in-right ${
-              toast.type === 'success' ? 'bg-success-500' :
+            className={`px-4 py-3 rounded-lg shadow-lg text-white min-w-[300px] max-w-md animate-slide-in-right ${toast.type === 'success' ? 'bg-success-500' :
               toast.type === 'error' ? 'bg-danger-500' :
-              'bg-primary-500'
-            }`}
+                'bg-primary-500'
+              }`}
           >
             <div className="flex items-start gap-3">
               <Icon
                 icon={
                   toast.type === 'success' ? 'lucide:check-circle' :
-                  toast.type === 'error' ? 'lucide:alert-circle' :
-                  'lucide:info'
+                    toast.type === 'error' ? 'lucide:alert-circle' :
+                      'lucide:info'
                 }
                 width={20}
                 className="flex-shrink-0 mt-0.5"

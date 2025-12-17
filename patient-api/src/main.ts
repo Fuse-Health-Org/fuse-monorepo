@@ -2009,13 +2009,16 @@ app.get("/auth/me", authenticateJWT, async (req, res) => {
           isActive: clinic.isActive,
         };
 
-        // Include parent clinic slug for affiliates
+        // Include parent clinic slug and custom domain for affiliates
         if (clinic.affiliateOwnerClinicId) {
           const parentClinic = await Clinic.findByPk(clinic.affiliateOwnerClinicId, {
-            attributes: ['id', 'slug'],
+            attributes: ['id', 'slug', 'customDomain', 'isCustomDomain'],
           });
           if (parentClinic) {
             userData.clinic.parentClinicSlug = parentClinic.slug;
+            if (parentClinic.isCustomDomain && parentClinic.customDomain) {
+              userData.clinic.parentClinicCustomDomain = parentClinic.customDomain;
+            }
           }
         }
       }

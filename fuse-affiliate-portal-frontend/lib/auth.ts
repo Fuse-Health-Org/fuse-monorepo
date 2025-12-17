@@ -35,6 +35,7 @@ export interface User {
     slug: string;
     isActive: boolean;
     parentClinicSlug?: string;
+    parentClinicCustomDomain?: string;
   };
 }
 
