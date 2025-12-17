@@ -685,7 +685,7 @@ export function registerAffiliateEndpoints(
       const affiliateClinic = await Clinic.create({
         name: `${emailPrefix}'s Clinic`, // Will be customized during onboarding
         slug: placeholderSlug, // Will be customized during onboarding
-        logo: null, // Empty logo - affiliate can set their own, patient-frontend will show parent logo if empty
+        logo: "", // Empty logo - affiliate can set their own, patient-frontend will show parent logo if empty
         isActive: false, // Not active until onboarding is complete
         affiliateOwnerClinicId: parentClinic.id, // Link to parent clinic
       });
