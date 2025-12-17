@@ -5,6 +5,7 @@ import Order from "../models/Order";
 import OrderItem from "../models/OrderItem";
 import Product from "../models/Product";
 import Clinic from "../models/Clinic";
+import CustomWebsite from "../models/CustomWebsite";
 import UserRoles from "../models/UserRoles";
 import { MailsSender } from "../services/mailsSender";
 import { sequelize } from "../config/database";
@@ -18,16 +19,16 @@ function isMedicalProduct(product: Product): boolean {
   // Check if product categories indicate it's medical
   const categories = product.categories || [];
   const medicalCategories = ['prescription', 'treatment', 'medication', 'pharmacy'];
-  
+
   // Check if any category matches medical categories
   if (Array.isArray(categories)) {
-    return categories.some(cat => 
-      medicalCategories.some(medCat => 
+    return categories.some(cat =>
+      medicalCategories.some(medCat =>
         cat?.toLowerCase().includes(medCat)
       )
     );
   }
-  
+
   // Default: if no clear indication, assume non-medical for affiliate tracking
   // This is conservative - affiliates should only see non-medical revenue
   return false;
@@ -73,26 +74,23 @@ export function registerAffiliateEndpoints(
         });
       }
 
-      // Get affiliate's owner (brand) to filter orders
-      if (!user.affiliateOwnerId) {
+      // Get affiliate's clinic and parent clinic
+      if (!user.clinicId) {
         return res.status(400).json({
           success: false,
-          message: "Affiliate owner not set",
+          message: "Affiliate clinic not set. Please complete onboarding.",
         });
       }
 
-      const affiliateOwner = await User.findByPk(user.affiliateOwnerId, {
-        include: [{ model: Clinic, as: "clinic" }],
-      });
-
-      if (!affiliateOwner?.clinicId) {
+      const affiliateClinic = await Clinic.findByPk(user.clinicId);
+      if (!affiliateClinic?.affiliateOwnerClinicId) {
         return res.status(400).json({
           success: false,
-          message: "Affiliate owner clinic not found",
+          message: "Affiliate parent clinic not found",
         });
       }
 
-      const clinicId = affiliateOwner.clinicId;
+      const clinicId = affiliateClinic.affiliateOwnerClinicId;
 
       // Get date range from query params (default to last 30 days)
       const startDateParam = req.query.startDate as string;
@@ -169,8 +167,8 @@ export function registerAffiliateEndpoints(
             const categories = product.categories || [];
             return Array.isArray(categories)
               ? categories.some((cat) =>
-                  cat?.toLowerCase().includes(category.toLowerCase())
-                )
+                cat?.toLowerCase().includes(category.toLowerCase())
+              )
               : false;
           });
         });
@@ -268,25 +266,23 @@ export function registerAffiliateEndpoints(
         });
       }
 
-      if (!user.affiliateOwnerId) {
+      // Get affiliate's clinic and parent clinic
+      if (!user.clinicId) {
         return res.status(400).json({
           success: false,
-          message: "Affiliate owner not set",
+          message: "Affiliate clinic not set. Please complete onboarding.",
         });
       }
 
-      const affiliateOwner = await User.findByPk(user.affiliateOwnerId, {
-        include: [{ model: Clinic, as: "clinic" }],
-      });
-
-      if (!affiliateOwner?.clinicId) {
+      const affiliateClinic = await Clinic.findByPk(user.clinicId);
+      if (!affiliateClinic?.affiliateOwnerClinicId) {
         return res.status(400).json({
           success: false,
-          message: "Affiliate owner clinic not found",
+          message: "Affiliate parent clinic not found",
         });
       }
 
-      const clinicId = affiliateOwner.clinicId;
+      const clinicId = affiliateClinic.affiliateOwnerClinicId;
 
       // Get all paid orders for this affiliate (non-medical only)
       const orders = await Order.findAll({
@@ -388,12 +384,12 @@ export function registerAffiliateEndpoints(
         affiliateName = user.email;
       }
 
-      console.log("📖 [Affiliate Branding] Fetching branding:", { 
-        userId: user.id, 
-        firstName: user.firstName, 
-        lastName: user.lastName, 
+      console.log("📖 [Affiliate Branding] Fetching branding:", {
+        userId: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
         website: user.website,
-        affiliateName 
+        affiliateName
       });
 
       res.status(200).json({
@@ -629,31 +625,31 @@ export function registerAffiliateEndpoints(
         });
       }
 
-      // Check current affiliate count for this brand (max 5)
-      // Get all users assigned to this brand with affiliate role
-      const brandAffiliates = await User.findAll({
-        where: {
-          affiliateOwnerId: user.id,
-        },
-        include: [
-          {
-            model: UserRoles,
-            as: "userRoles",
-            required: true,
-          },
-        ],
-      });
-
-      // Count only those with affiliate role
-      let affiliateCount = 0;
-      for (const brandUser of brandAffiliates) {
-        await brandUser.getUserRoles();
-        if (brandUser.userRoles?.hasRole("affiliate")) {
-          affiliateCount++;
-        }
+      // Get the brand user's clinic
+      if (!user.clinicId) {
+        return res.status(400).json({
+          success: false,
+          message: "Brand user must have a clinic to invite affiliates",
+        });
       }
 
-      if (affiliateCount >= 5) {
+      const parentClinic = await Clinic.findByPk(user.clinicId);
+      if (!parentClinic) {
+        return res.status(400).json({
+          success: false,
+          message: "Brand clinic not found",
+        });
+      }
+
+      // Check current affiliate count for this brand (max 5)
+      // Get all clinics that are affiliates of this parent clinic
+      const affiliateClinics = await Clinic.findAll({
+        where: {
+          affiliateOwnerClinicId: parentClinic.id,
+        },
+      });
+
+      if (affiliateClinics.length >= 5) {
         return res.status(400).json({
           success: false,
           message: "Maximum of 5 affiliates per brand. Please remove an affiliate before inviting a new one.",
@@ -681,19 +677,28 @@ export function registerAffiliateEndpoints(
       const tempPassword = Math.random().toString(36).slice(-12) + "Aa1!";
       const tempPasswordHash = await User.hashPassword(tempPassword);
 
-      // Create affiliate user with temporary password
-      // We'll set the temporary password hash separately so they can login with it
-      // Use a placeholder for lastName to satisfy validation, then clear it via raw SQL
+      // Create a placeholder clinic for the affiliate (they'll customize it during onboarding)
       const emailPrefix = email.split("@")[0];
+      const placeholderSlug = `affiliate-${emailPrefix}-${Date.now()}`.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+
+      const affiliateClinic = await Clinic.create({
+        name: `${emailPrefix}'s Clinic`, // Will be customized during onboarding
+        slug: placeholderSlug, // Will be customized during onboarding
+        logo: parentClinic.logo, // Inherit parent's logo initially
+        isActive: false, // Not active until onboarding is complete
+        affiliateOwnerClinicId: parentClinic.id, // Link to parent clinic
+      });
+
+      // Create affiliate user with temporary password linked to their new clinic
       const affiliateUser = await User.createUser({
         firstName: emailPrefix,
         lastName: "-", // Placeholder to satisfy validation (len >= 1), will be cleared via raw SQL
         email: email.toLowerCase().trim(),
         password: tempPassword, // This will be hashed and stored in passwordHash
         role: "affiliate",
-        affiliateOwnerId: user.id, // Auto-assign to the inviting brand user
+        clinicId: affiliateClinic.id, // Link to affiliate's new clinic
       });
-      
+
       // Clear lastName after creation using raw SQL to bypass Sequelize validation
       await sequelize.query(
         `UPDATE users SET "lastName" = '' WHERE id = :userId`,
@@ -702,30 +707,31 @@ export function registerAffiliateEndpoints(
           type: QueryTypes.UPDATE,
         }
       );
-      
+
       // Reload the user to get the updated lastName
       await affiliateUser.reload();
 
       // Also set as temporary password (so they can login with it until they change it)
       affiliateUser.temporaryPasswordHash = tempPasswordHash;
-      
+
       // Auto-activate the account
       affiliateUser.activated = true;
-      
+
       await affiliateUser.save();
 
-      console.log("✅ [Affiliate Invite] Created affiliate user:", {
-        id: affiliateUser.id,
+      console.log("✅ [Affiliate Invite] Created affiliate user and clinic:", {
+        userId: affiliateUser.id,
         email: affiliateUser.email,
-        affiliateOwnerId: affiliateUser.affiliateOwnerId,
+        clinicId: affiliateClinic.id,
+        parentClinicId: parentClinic.id,
       });
 
       // Get frontend origin for affiliate portal
       const frontendOrigin = req.get("origin") || req.get("referer")?.split("/").slice(0, 3).join("/") || "http://localhost:3005";
-      const affiliatePortalUrl = process.env.NODE_ENV === "production" 
-        ? "https://admin.limitless.health" 
-        : frontendOrigin.includes("3005") 
-          ? frontendOrigin 
+      const affiliatePortalUrl = process.env.NODE_ENV === "production"
+        ? "https://admin.limitless.health"
+        : frontendOrigin.includes("3005")
+          ? frontendOrigin
           : "http://localhost:3005";
 
       // Send invitation email with credentials
@@ -824,6 +830,359 @@ The Fuse Team`,
       res.status(500).json({
         success: false,
         message: "Failed to invite affiliate",
+      });
+    }
+  });
+
+  // Setup affiliate clinic (during onboarding)
+  app.post("/affiliate/setup-clinic", authenticateJWT, async (req, res) => {
+    try {
+      const currentUser = getCurrentUser(req);
+      if (!currentUser) {
+        return res.status(401).json({
+          success: false,
+          message: "Not authenticated",
+        });
+      }
+
+      const user = await User.findByPk(currentUser.id, {
+        include: [
+          { model: UserRoles, as: "userRoles", required: false },
+          { model: Clinic, as: "clinic", required: false },
+        ],
+      });
+
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found",
+        });
+      }
+
+      await user.getUserRoles();
+      if (!user.userRoles?.hasRole("affiliate")) {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied. Affiliate role required.",
+        });
+      }
+
+      const { firstName, lastName, website, clinicName, slug } = req.body;
+
+      // Validate personal info
+      if (!firstName || typeof firstName !== "string" || firstName.trim().length < 2) {
+        return res.status(400).json({
+          success: false,
+          message: "First name is required (minimum 2 characters)",
+        });
+      }
+
+      if (!lastName || typeof lastName !== "string" || lastName.trim().length < 2) {
+        return res.status(400).json({
+          success: false,
+          message: "Last name is required (minimum 2 characters)",
+        });
+      }
+
+      if (!clinicName || typeof clinicName !== "string" || clinicName.trim().length < 2) {
+        return res.status(400).json({
+          success: false,
+          message: "Clinic name is required (minimum 2 characters)",
+        });
+      }
+
+      if (!slug || typeof slug !== "string" || slug.trim().length < 3) {
+        return res.status(400).json({
+          success: false,
+          message: "Slug is required (minimum 3 characters)",
+        });
+      }
+
+      // Validate slug format
+      const slugRegex = /^[a-z0-9-]+$/;
+      if (!slugRegex.test(slug)) {
+        return res.status(400).json({
+          success: false,
+          message: "Slug can only contain lowercase letters, numbers, and hyphens",
+        });
+      }
+
+      // Check if slug is already taken by another clinic
+      const existingClinic = await Clinic.findOne({
+        where: { slug: slug.trim() },
+      });
+
+      if (existingClinic && existingClinic.id !== user.clinicId) {
+        return res.status(409).json({
+          success: false,
+          message: "This slug is already taken. Please choose a different one.",
+        });
+      }
+
+      // Update the user's personal info
+      await user.update({
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        website: website?.trim() || user.website,
+      });
+
+      console.log("✅ [Affiliate Setup] Updated user info:", {
+        userId: user.id,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        website: website?.trim() || null,
+      });
+
+      // Update the affiliate's clinic
+      if (user.clinic) {
+        await user.clinic.update({
+          name: clinicName.trim(),
+          slug: slug.trim(),
+          isActive: true, // Activate the clinic after setup
+        });
+
+        console.log("✅ [Affiliate Setup] Updated clinic:", {
+          clinicId: user.clinic.id,
+          name: clinicName.trim(),
+          slug: slug.trim(),
+        });
+
+        res.status(200).json({
+          success: true,
+          message: "Clinic setup completed successfully",
+          data: {
+            clinicId: user.clinic.id,
+            name: user.clinic.name,
+            slug: user.clinic.slug,
+            affiliateOwnerClinicId: user.clinic.affiliateOwnerClinicId,
+          },
+        });
+      } else {
+        // This shouldn't happen if invite flow works correctly, but handle it
+        return res.status(400).json({
+          success: false,
+          message: "Affiliate clinic not found. Please contact support.",
+        });
+      }
+    } catch (error: any) {
+      console.error("❌ Error setting up affiliate clinic:", error);
+
+      if (error.name === "SequelizeUniqueConstraintError") {
+        return res.status(409).json({
+          success: false,
+          message: "This slug is already taken. Please choose a different one.",
+        });
+      }
+
+      res.status(500).json({
+        success: false,
+        message: "Failed to setup affiliate clinic",
+      });
+    }
+  });
+
+  // Get affiliate clinic settings (for portal customization)
+  app.get("/affiliate/clinic", authenticateJWT, async (req, res) => {
+    try {
+      const currentUser = getCurrentUser(req);
+      if (!currentUser) {
+        return res.status(401).json({
+          success: false,
+          message: "Not authenticated",
+        });
+      }
+
+      const user = await User.findByPk(currentUser.id, {
+        include: [
+          { model: UserRoles, as: "userRoles", required: false },
+          { model: Clinic, as: "clinic", required: false },
+        ],
+      });
+
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found",
+        });
+      }
+
+      await user.getUserRoles();
+      if (!user.userRoles?.hasRole("affiliate")) {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied. Affiliate role required.",
+        });
+      }
+
+      if (!user.clinic) {
+        return res.status(404).json({
+          success: false,
+          message: "Affiliate clinic not found",
+        });
+      }
+
+      // Get clinic's custom website settings if any
+      const customWebsite = await CustomWebsite.findOne({
+        where: { clinicId: user.clinic.id },
+      });
+
+      res.status(200).json({
+        success: true,
+        data: {
+          clinic: {
+            id: user.clinic.id,
+            name: user.clinic.name,
+            slug: user.clinic.slug,
+            logo: user.clinic.logo,
+            isActive: user.clinic.isActive,
+            affiliateOwnerClinicId: user.clinic.affiliateOwnerClinicId,
+            defaultFormColor: user.clinic.defaultFormColor,
+          },
+          customWebsite: customWebsite ? {
+            portalTitle: customWebsite.portalTitle,
+            portalDescription: customWebsite.portalDescription,
+            primaryColor: customWebsite.primaryColor,
+            fontFamily: customWebsite.fontFamily,
+            logo: customWebsite.logo,
+            heroImageUrl: customWebsite.heroImageUrl,
+            heroTitle: customWebsite.heroTitle,
+            heroSubtitle: customWebsite.heroSubtitle,
+            isActive: customWebsite.isActive,
+          } : null,
+        },
+      });
+    } catch (error) {
+      console.error("❌ Error fetching affiliate clinic:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to fetch affiliate clinic",
+      });
+    }
+  });
+
+  // Update affiliate clinic settings (portal customization)
+  app.put("/affiliate/clinic", authenticateJWT, async (req, res) => {
+    try {
+      const currentUser = getCurrentUser(req);
+      if (!currentUser) {
+        return res.status(401).json({
+          success: false,
+          message: "Not authenticated",
+        });
+      }
+
+      const user = await User.findByPk(currentUser.id, {
+        include: [
+          { model: UserRoles, as: "userRoles", required: false },
+          { model: Clinic, as: "clinic", required: false },
+        ],
+      });
+
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found",
+        });
+      }
+
+      await user.getUserRoles();
+      if (!user.userRoles?.hasRole("affiliate")) {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied. Affiliate role required.",
+        });
+      }
+
+      if (!user.clinic) {
+        return res.status(404).json({
+          success: false,
+          message: "Affiliate clinic not found",
+        });
+      }
+
+      const {
+        // Clinic fields
+        name,
+        logo,
+        defaultFormColor,
+        // CustomWebsite fields
+        portalTitle,
+        portalDescription,
+        primaryColor,
+        fontFamily,
+        heroImageUrl,
+        heroTitle,
+        heroSubtitle,
+        isActive,
+      } = req.body;
+
+      // Update clinic fields
+      if (name) user.clinic.name = name.trim();
+      if (logo !== undefined) user.clinic.logo = logo;
+      if (defaultFormColor !== undefined) user.clinic.defaultFormColor = defaultFormColor;
+
+      await user.clinic.save();
+
+      // Update or create CustomWebsite
+      let customWebsite = await CustomWebsite.findOne({
+        where: { clinicId: user.clinic.id },
+      });
+
+      const customWebsiteData: any = {};
+      if (portalTitle !== undefined) customWebsiteData.portalTitle = portalTitle;
+      if (portalDescription !== undefined) customWebsiteData.portalDescription = portalDescription;
+      if (primaryColor !== undefined) customWebsiteData.primaryColor = primaryColor;
+      if (fontFamily !== undefined) customWebsiteData.fontFamily = fontFamily;
+      if (logo !== undefined) customWebsiteData.logo = logo;
+      if (heroImageUrl !== undefined) customWebsiteData.heroImageUrl = heroImageUrl;
+      if (heroTitle !== undefined) customWebsiteData.heroTitle = heroTitle;
+      if (heroSubtitle !== undefined) customWebsiteData.heroSubtitle = heroSubtitle;
+      if (isActive !== undefined) customWebsiteData.isActive = isActive;
+
+      if (customWebsite) {
+        await customWebsite.update(customWebsiteData);
+      } else if (Object.keys(customWebsiteData).length > 0) {
+        customWebsite = await CustomWebsite.create({
+          clinicId: user.clinic.id,
+          ...customWebsiteData,
+        });
+      }
+
+      console.log("✅ [Affiliate Clinic] Updated settings:", {
+        clinicId: user.clinic.id,
+        name: user.clinic.name,
+      });
+
+      res.status(200).json({
+        success: true,
+        message: "Clinic settings updated successfully",
+        data: {
+          clinic: {
+            id: user.clinic.id,
+            name: user.clinic.name,
+            slug: user.clinic.slug,
+            logo: user.clinic.logo,
+            isActive: user.clinic.isActive,
+            defaultFormColor: user.clinic.defaultFormColor,
+          },
+          customWebsite: customWebsite ? {
+            portalTitle: customWebsite.portalTitle,
+            portalDescription: customWebsite.portalDescription,
+            primaryColor: customWebsite.primaryColor,
+            fontFamily: customWebsite.fontFamily,
+            logo: customWebsite.logo,
+            heroImageUrl: customWebsite.heroImageUrl,
+            heroTitle: customWebsite.heroTitle,
+            heroSubtitle: customWebsite.heroSubtitle,
+            isActive: customWebsite.isActive,
+          } : null,
+        },
+      });
+    } catch (error) {
+      console.error("❌ Error updating affiliate clinic:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to update affiliate clinic",
       });
     }
   });

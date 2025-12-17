@@ -5,6 +5,7 @@ import BrandSubscription from "../models/BrandSubscription";
 import BrandSubscriptionPlans from "../models/BrandSubscriptionPlans";
 import TenantCustomFeatures from "../models/TenantCustomFeatures";
 import UserRoles from "../models/UserRoles";
+import Clinic from "../models/Clinic";
 import { createJWTToken } from "../config/jwt";
 
 export function registerClientManagementEndpoints(
@@ -140,7 +141,7 @@ export function registerClientManagementEndpoints(
           "businessType",
           "createdAt",
           "updatedAt",
-          "affiliateOwnerId",
+          "clinicId",
         ],
         include: [
           {
@@ -152,6 +153,12 @@ export function registerClientManagementEndpoints(
             model: TenantCustomFeatures,
             as: "tenantCustomFeatures",
             required: false,
+          },
+          {
+            model: Clinic,
+            as: "clinic",
+            required: false,
+            attributes: ["id", "name", "slug", "affiliateOwnerClinicId"],
           },
           userRolesInclude,
         ],
@@ -247,7 +254,7 @@ export function registerClientManagementEndpoints(
           "phoneNumber",
           "createdAt",
           "updatedAt",
-          "affiliateOwnerId",
+          "clinicId",
         ],
         include: [
           {
@@ -769,7 +776,7 @@ export function registerClientManagementEndpoints(
     }
   );
 
-  // Update affiliate owner (assign affiliate to brand)
+  // Update affiliate parent clinic (assign affiliate to brand's clinic)
   app.patch(
     "/admin/users/:userId/affiliate-owner",
     authenticateJWT,
@@ -793,20 +800,23 @@ export function registerClientManagementEndpoints(
         }
 
         await user.getUserRoles();
-        // Allow brand users and admins to assign affiliate owners
+        // Allow brand users and admins to assign affiliate parent clinics
         if (!user.userRoles?.hasAnyRole(["brand", "admin", "superAdmin"])) {
           return res.status(403).json({
             success: false,
-            message: "Access denied. Only brand users and admins can assign affiliate owners.",
+            message: "Access denied. Only brand users and admins can assign affiliate parent clinics.",
           });
         }
 
         const { userId } = req.params;
-        const { affiliateOwnerId } = req.body;
+        const { parentClinicId } = req.body;
 
         // Find the target user (affiliate)
         const targetUser = await User.findByPk(userId, {
-          include: [{ model: UserRoles, as: "userRoles", required: false }],
+          include: [
+            { model: UserRoles, as: "userRoles", required: false },
+            { model: Clinic, as: "clinic", required: false },
+          ],
         });
 
         if (!targetUser) {
@@ -824,61 +834,59 @@ export function registerClientManagementEndpoints(
           });
         }
 
-        // If affiliateOwnerId is provided, verify it's a valid brand user
-        if (affiliateOwnerId) {
-          const owner = await User.findByPk(affiliateOwnerId, {
-            include: [{ model: UserRoles, as: "userRoles", required: false }],
+        // Verify affiliate has a clinic
+        if (!targetUser.clinicId || !targetUser.clinic) {
+          return res.status(400).json({
+            success: false,
+            message: "Affiliate does not have a clinic configured",
           });
+        }
 
-          if (!owner) {
+        // If parentClinicId is provided, verify it's a valid clinic
+        if (parentClinicId) {
+          const parentClinic = await Clinic.findByPk(parentClinicId);
+          if (!parentClinic) {
             return res.status(404).json({
               success: false,
-              message: "Affiliate owner not found",
+              message: "Parent clinic not found",
             });
           }
 
-          await owner.getUserRoles();
-          if (!owner.userRoles?.hasAnyRole(["brand", "admin", "superAdmin"])) {
-            return res.status(400).json({
-              success: false,
-              message: "Affiliate owner must be a brand user or admin",
-            });
-          }
-
-          // If current user is a brand user, ensure they can only assign themselves
-          if (user.userRoles?.hasRole("brand") && affiliateOwnerId !== currentUser.id) {
+          // If current user is a brand user, ensure they can only assign their own clinic
+          if (user.userRoles?.hasRole("brand") && user.clinicId !== parentClinicId) {
             return res.status(403).json({
               success: false,
-              message: "Brand users can only assign themselves as affiliate owner",
+              message: "Brand users can only assign their own clinic as parent",
             });
           }
         }
 
-        // Update affiliateOwnerId
-        await targetUser.update({
-          affiliateOwnerId: affiliateOwnerId || null,
+        // Update the affiliate's clinic's affiliateOwnerClinicId
+        await targetUser.clinic.update({
+          affiliateOwnerClinicId: parentClinicId || null,
         });
 
         console.log(
-          `✅ [Client Mgmt] Updated affiliate owner for user ${userId} to ${affiliateOwnerId || "null"}`
+          `✅ [Client Mgmt] Updated affiliate parent clinic for user ${userId} to ${parentClinicId || "null"}`
         );
 
         res.status(200).json({
           success: true,
-          message: "Affiliate owner updated successfully",
+          message: "Affiliate parent clinic updated successfully",
           data: {
             id: targetUser.id,
             email: targetUser.email,
             firstName: targetUser.firstName,
             lastName: targetUser.lastName,
-            affiliateOwnerId: targetUser.affiliateOwnerId,
+            clinicId: targetUser.clinicId,
+            affiliateOwnerClinicId: targetUser.clinic.affiliateOwnerClinicId,
           },
         });
       } catch (error) {
-        console.error("❌ Error updating affiliate owner:", error);
+        console.error("❌ Error updating affiliate parent clinic:", error);
         res.status(500).json({
           success: false,
-          message: "Failed to update affiliate owner",
+          message: "Failed to update affiliate parent clinic",
         });
       }
     }

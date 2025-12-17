@@ -296,16 +296,6 @@ export default class User extends Entity {
   @BelongsTo(() => Clinic)
   declare clinic?: Clinic;
 
-  @ForeignKey(() => User)
-  @Column({
-    type: DataType.UUID,
-    allowNull: true,
-  })
-  declare affiliateOwnerId?: string;
-
-  @BelongsTo(() => User, 'affiliateOwnerId')
-  declare affiliateOwner?: User;
-
   @HasMany(() => ShippingAddress)
   declare shippingAddresses: ShippingAddress[];
 
@@ -375,7 +365,7 @@ export default class User extends Entity {
       return this.userRoles;
     }
 
-    let roles = await UserRoles.findOne({ 
+    let roles = await UserRoles.findOne({
       where: { userId: this.id }
     });
     if (!roles) {
@@ -469,7 +459,6 @@ export default class User extends Entity {
       zipCode: this.zipCode,
       role: this.role, // @deprecated - use roles array instead
       clinicId: this.clinicId,
-      affiliateOwnerId: this.affiliateOwnerId,
       createdAt: this.createdAt,
       lastLoginAt: this.lastLoginAt,
     };
@@ -506,7 +495,7 @@ export default class User extends Entity {
     phoneNumber?: string;
     website?: string;
     businessType?: string;
-    affiliateOwnerId?: string;
+    clinicId?: string;
   }): Promise<User> {
     const passwordHash = await this.hashPassword(userData.password);
     const finalRole = userData.role || 'patient';
@@ -521,7 +510,7 @@ export default class User extends Entity {
       phoneNumber: userData.phoneNumber,
       website: userData.website,
       businessType: userData.businessType,
-      affiliateOwnerId: userData.affiliateOwnerId,
+      clinicId: userData.clinicId,
       consentGivenAt: new Date(), // Record consent when user signs up
     });
 

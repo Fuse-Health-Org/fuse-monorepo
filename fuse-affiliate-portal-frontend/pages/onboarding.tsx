@@ -12,11 +12,18 @@ export default function Onboarding() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Form fields
+  // Form fields - Personal Info
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [website, setWebsite] = useState("");
+
+  // Form fields - Clinic Info
+  const [clinicName, setClinicName] = useState("");
+  const [clinicNameError, setClinicNameError] = useState<string | null>(null);
   const [slug, setSlug] = useState("");
   const [slugError, setSlugError] = useState<string | null>(null);
+
+  // Form fields - Password
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -27,26 +34,35 @@ export default function Onboarding() {
       router.push("/signin");
       return;
     }
-
-    if (user) {
-      // Pre-fill with existing data if available
-      if (user.firstName && user.firstName !== user.email?.split("@")[0]) {
-        setFirstName(user.firstName);
-      }
-      if (user.lastName) {
-        setLastName(user.lastName);
-      }
-      if (user.website) {
-        setSlug(user.website);
-      }
-    }
   }, [user, authLoading, router]);
+
+  const validateClinicName = (value: string): boolean => {
+    if (!value || !value.trim()) {
+      setClinicNameError("Clinic name is required");
+      return false;
+    }
+    if (value.trim().length < 2) {
+      setClinicNameError("Clinic name must be at least 2 characters");
+      return false;
+    }
+    setClinicNameError(null);
+    return true;
+  };
+
+  const handleClinicNameChange = (value: string) => {
+    setClinicName(value);
+    if (value.trim()) {
+      validateClinicName(value);
+    } else {
+      setClinicNameError(null);
+    }
+  };
 
   const validateSlug = (value: string): boolean => {
     // Slug should be lowercase, alphanumeric, and hyphens only
     const slugRegex = /^[a-z0-9-]+$/;
     if (!value) {
-      setSlugError("Slug is required");
+      setSlugError("Portal URL slug is required");
       return false;
     }
     if (value.length < 3) {
@@ -73,6 +89,24 @@ export default function Onboarding() {
     } else {
       setSlugError(null);
     }
+  };
+
+  const generateSlugFromClinicName = () => {
+    if (!clinicName.trim()) {
+      setClinicNameError("Enter a clinic name first");
+      return;
+    }
+    // Convert clinic name to slug: lowercase, replace spaces with hyphens, remove special chars
+    const generatedSlug = clinicName
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, "-") // Replace spaces with hyphens
+      .replace(/[^a-z0-9-]/g, "") // Remove special characters
+      .replace(/-+/g, "-") // Replace multiple hyphens with single hyphen
+      .replace(/^-|-$/g, ""); // Remove leading/trailing hyphens
+
+    setSlug(generatedSlug);
+    validateSlug(generatedSlug);
   };
 
   const validatePassword = (): boolean => {
@@ -104,13 +138,32 @@ export default function Onboarding() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setClinicNameError(null);
+    setSlugError(null);
 
-    if (!firstName.trim()) {
-      setError("First name is required");
+    // Validate personal info
+    if (!firstName.trim() || firstName.trim().length < 2) {
+      setError("First name is required (minimum 2 characters)");
       return;
     }
 
+    if (!lastName.trim() || lastName.trim().length < 2) {
+      setError("Last name is required (minimum 2 characters)");
+      return;
+    }
+
+    // Validate clinic info with inline errors
+    let hasClinicErrors = false;
+
+    if (!validateClinicName(clinicName)) {
+      hasClinicErrors = true;
+    }
+
     if (!validateSlug(slug)) {
+      hasClinicErrors = true;
+    }
+
+    if (hasClinicErrors) {
       return;
     }
 
@@ -121,23 +174,26 @@ export default function Onboarding() {
     setSaving(true);
 
     try {
-      // Update user data and slug (website)
-      // Combine firstName and lastName for the name field
-      const fullName = lastName.trim()
-        ? `${firstName.trim()} ${lastName.trim()}`
-        : firstName.trim();
-
-      // Update branding
-      const nameResponse = await apiCall("/affiliate/branding", {
-        method: "PUT",
+      // Setup affiliate clinic with name, slug, and personal info
+      const clinicResponse = await apiCall("/affiliate/setup-clinic", {
+        method: "POST",
         body: JSON.stringify({
-          name: fullName,
-          website: slug.trim(),
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          website: website.trim() || undefined,
+          clinicName: clinicName.trim(),
+          slug: slug.trim(),
         }),
       });
 
-      if (!nameResponse.success) {
-        setError(nameResponse.error || "Error saving data");
+      if (!clinicResponse.success) {
+        // Check if the error is about slug being taken
+        const errorMessage = clinicResponse.error || "Error setting up clinic";
+        if (errorMessage.toLowerCase().includes("slug") && errorMessage.toLowerCase().includes("taken")) {
+          setSlugError("This slug is already taken. Please choose a different one.");
+        } else {
+          setError(errorMessage);
+        }
         setSaving(false);
         return;
       }
@@ -159,8 +215,8 @@ export default function Onboarding() {
 
       // Refresh user data to get updated information
       await refreshUser();
-      // Redirect to dashboard (it will check if onboarding is still needed)
-      router.push("/dashboard");
+      // Redirect to branding page to continue customization
+      router.push("/branding");
     } catch (err: any) {
       console.error("Error saving onboarding data:", err);
       setError(err.message || "An error occurred while saving");
@@ -192,14 +248,14 @@ export default function Onboarding() {
             <CardHeader className="flex flex-col items-start gap-2 pb-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-primary/10 rounded-lg">
-                  <Icon icon="mdi:account-plus" className="text-2xl text-primary" />
+                  <Icon icon="mdi:store" className="text-2xl text-primary" />
                 </div>
                 <div>
                   <h1 className="text-2xl font-bold text-foreground">
-                    Welcome to Fuse Affiliate Portal
+                    Set Up Your Affiliate Portal
                   </h1>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Complete your profile to get started
+                    Create your clinic to get started
                   </p>
                 </div>
               </div>
@@ -213,66 +269,136 @@ export default function Onboarding() {
                 )}
 
                 <div className="space-y-4">
-                  <Input
-                    label="First Name"
-                    placeholder="e.g., Check"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    required
-                    variant="bordered"
-                    classNames={{
-                      label: "text-foreground",
-                      input: "text-foreground",
-                    }}
-                    description="Your first name"
-                    startContent={
-                      <Icon icon="mdi:account" className="text-default-400" />
-                    }
-                  />
+                  {/* Personal Information Section */}
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-medium text-foreground">Personal Information</h3>
 
-                  <Input
-                    label="Last Name"
-                    placeholder="e.g., Two"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    variant="bordered"
-                    classNames={{
-                      label: "text-foreground",
-                      input: "text-foreground",
-                    }}
-                    description="Your last name (optional)"
-                    startContent={
-                      <Icon icon="mdi:account" className="text-default-400" />
-                    }
-                  />
+                    <div className="grid grid-cols-2 gap-4">
+                      <Input
+                        label="First Name"
+                        placeholder="e.g., John"
+                        value={firstName}
+                        onChange={(e) => setFirstName(e.target.value)}
+                        required
+                        variant="bordered"
+                        classNames={{
+                          label: "text-foreground",
+                          input: "text-foreground",
+                        }}
+                        startContent={
+                          <Icon icon="mdi:account" className="text-default-400" />
+                        }
+                      />
 
-                  <div>
+                      <Input
+                        label="Last Name"
+                        placeholder="e.g., Doe"
+                        value={lastName}
+                        onChange={(e) => setLastName(e.target.value)}
+                        required
+                        variant="bordered"
+                        classNames={{
+                          label: "text-foreground",
+                          input: "text-foreground",
+                        }}
+                        startContent={
+                          <Icon icon="mdi:account" className="text-default-400" />
+                        }
+                      />
+                    </div>
+
                     <Input
-                      label="Affiliate Slug"
-                      placeholder="e.g., checktwo"
-                      value={slug}
-                      onChange={(e) => handleSlugChange(e.target.value)}
-                      required
+                      label="Website (optional)"
+                      placeholder="e.g., https://mywebsite.com"
+                      value={website}
+                      onChange={(e) => setWebsite(e.target.value)}
                       variant="bordered"
-                      errorMessage={slugError || undefined}
-                      isInvalid={!!slugError}
                       classNames={{
                         label: "text-foreground",
                         input: "text-foreground",
                       }}
-                      description="Subdomain for your portal (lowercase letters, numbers, and hyphens only)"
+                      description="Your personal or business website"
                       startContent={
-                        <Icon icon="mdi:link-variant" className="text-default-400" />
+                        <Icon icon="mdi:web" className="text-default-400" />
                       }
                     />
-                    {slug && !slugError && (
-                      <p className="text-xs text-success mt-1">
-                        Your URL will be: <span className="font-mono">{slug}.limitless.health</span>
-                      </p>
-                    )}
                   </div>
 
-                  <div className="space-y-4 pt-2 border-t border-divider">
+                  {/* Clinic Information Section */}
+                  <div className="space-y-4 pt-4 border-t border-divider">
+                    <h3 className="text-sm font-medium text-foreground">Clinic Information</h3>
+
+                    <Input
+                      label="Clinic Name"
+                      placeholder="e.g., My Health Clinic"
+                      value={clinicName}
+                      onChange={(e) => handleClinicNameChange(e.target.value)}
+                      onBlur={() => validateClinicName(clinicName)}
+                      required
+                      variant="bordered"
+                      errorMessage={clinicNameError || undefined}
+                      isInvalid={!!clinicNameError}
+                      classNames={{
+                        label: "text-foreground",
+                        input: "text-foreground",
+                      }}
+                      description={!clinicNameError ? "Your clinic's display name" : undefined}
+                      startContent={
+                        <Icon icon="mdi:store" className="text-default-400" />
+                      }
+                    />
+
+                    <div>
+                      <div className="flex gap-2 items-end">
+                        <div className="flex-1">
+                          <Input
+                            label="Portal URL Slug"
+                            placeholder="e.g., my-health-clinic"
+                            value={slug}
+                            onChange={(e) => handleSlugChange(e.target.value)}
+                            onBlur={() => slug && validateSlug(slug)}
+                            required
+                            variant="bordered"
+                            errorMessage={slugError || undefined}
+                            isInvalid={!!slugError}
+                            classNames={{
+                              label: "text-foreground",
+                              input: "text-foreground",
+                            }}
+                            description={!slugError ? "Subdomain for your portal (lowercase letters, numbers, and hyphens only)" : undefined}
+                            startContent={
+                              <Icon icon="mdi:link-variant" className="text-default-400" />
+                            }
+                          />
+                        </div>
+                        <Button
+                          type="button"
+                          variant="bordered"
+                          onPress={generateSlugFromClinicName}
+                          isDisabled={!clinicName.trim()}
+                          size="lg"
+                          className="mb-[27px]"
+                        >
+                          <Icon icon="mdi:auto-fix" className="text-lg" />
+                          Auto
+                        </Button>
+                      </div>
+                      {slug && !slugError && user?.clinic?.parentClinicCustomDomain && (
+                        <p className="text-xs text-success mt-1">
+                          Your URL will be: <span className="font-mono">{slug}.{user.clinic.parentClinicCustomDomain.replace(/^app\./, '')}</span>
+                        </p>
+                      )}
+                      {slug && !slugError && !user?.clinic?.parentClinicCustomDomain && user?.clinic?.parentClinicSlug && (
+                        <p className="text-xs text-success mt-1">
+                          Your URL will be: <span className="font-mono">{slug}.{user.clinic.parentClinicSlug}.fusehealth.com</span>
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-4 pt-4 border-t border-divider">
+                    <h3 className="text-sm font-medium text-foreground">Change Your Password</h3>
+
                     <Input
                       label="Current Password"
                       type="password"
@@ -338,14 +464,14 @@ export default function Onboarding() {
                     size="lg"
                     className="flex-1"
                     isLoading={saving}
-                    disabled={saving || !firstName.trim() || !slug.trim() || !!slugError || !currentPassword.trim() || !newPassword.trim() || !confirmPassword.trim() || !!passwordError}
+                    disabled={saving || !firstName.trim() || !lastName.trim() || !clinicName.trim() || !slug.trim() || !!slugError || !currentPassword.trim() || !newPassword.trim() || !confirmPassword.trim() || !!passwordError}
                   >
-                    {saving ? "Saving..." : "Continue"}
+                    {saving ? "Setting Up..." : "Continue to Portal Customization"}
                   </Button>
                 </div>
 
                 <p className="text-xs text-muted-foreground text-center">
-                  You can change this information later in the Branding section
+                  You can customize your portal appearance in the next step
                 </p>
               </form>
             </CardBody>

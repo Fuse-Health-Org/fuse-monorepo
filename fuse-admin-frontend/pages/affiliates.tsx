@@ -14,7 +14,13 @@ interface Affiliate {
   firstName: string
   lastName: string
   email: string
-  affiliateOwnerId: string | null
+  clinicId: string | null
+  clinic?: {
+    id: string
+    name: string
+    slug: string
+    affiliateOwnerClinicId: string | null
+  }
   createdAt: string
   userRoles?: {
     affiliate: boolean
@@ -58,7 +64,7 @@ export default function Affiliates() {
       if (response.ok) {
         const data = await response.json()
         if (data.success) {
-          // Filter to only affiliates and include affiliateOwnerId
+          // Filter to only affiliates and include clinic info
           const affiliateUsers = (data.data?.users || []).filter((u: any) => 
             u.userRoles?.affiliate === true
           ).map((u: any) => ({
@@ -66,7 +72,8 @@ export default function Affiliates() {
             firstName: u.firstName || '',
             lastName: u.lastName || '',
             email: u.email,
-            affiliateOwnerId: u.affiliateOwnerId || null,
+            clinicId: u.clinicId || null,
+            clinic: u.clinic || null,
             createdAt: u.createdAt,
             userRoles: u.userRoles
           }))
@@ -98,7 +105,7 @@ export default function Affiliates() {
     try {
       setRemoving(affiliateId)
 
-      // Remove affiliate owner
+      // Remove affiliate parent clinic
       const response = await fetch(
         `${API_URL}/admin/users/${affiliateId}/affiliate-owner`,
         {
@@ -108,7 +115,7 @@ export default function Affiliates() {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            affiliateOwnerId: null
+            parentClinicId: null
           })
         }
       )
@@ -189,8 +196,8 @@ export default function Affiliates() {
     }
   }
 
-  // Only show affiliates assigned to this brand
-  const myAffiliates = affiliates.filter(a => a.affiliateOwnerId === user?.id)
+  // Only show affiliates whose clinic is linked to this brand's clinic
+  const myAffiliates = affiliates.filter(a => a.clinic?.affiliateOwnerClinicId === user?.clinicId)
   
   const filteredAffiliates = myAffiliates.filter(affiliate =>
     searchTerm === '' ||

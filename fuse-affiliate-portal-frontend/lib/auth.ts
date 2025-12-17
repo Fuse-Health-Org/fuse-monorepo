@@ -16,7 +16,6 @@ export interface User {
   state?: string;
   zipCode?: string;
   clinicId?: string;
-  affiliateOwnerId?: string;
   website?: string;
   createdAt?: string;
   lastLoginAt?: string;
@@ -28,6 +27,15 @@ export interface User {
     brand?: boolean;
     affiliate?: boolean;
     superAdmin?: boolean;
+  };
+  // Clinic details for affiliates to check onboarding status
+  clinic?: {
+    id: string;
+    name: string;
+    slug: string;
+    isActive: boolean;
+    parentClinicSlug?: string;
+    parentClinicCustomDomain?: string;
   };
 }
 
@@ -51,11 +59,11 @@ export async function checkAuth(): Promise<User | null> {
     const userData = (result.data as any)?.user || result.data;
 
     if (process.env.NODE_ENV === "development") {
-      console.log('✅ User data retrieved:', { 
-        id: userData?.id, 
-        email: userData?.email, 
+      console.log('✅ User data retrieved:', {
+        id: userData?.id,
+        email: userData?.email,
         role: userData?.role,
-        affiliate: userData?.userRoles?.affiliate 
+        affiliate: userData?.userRoles?.affiliate
       });
     }
 

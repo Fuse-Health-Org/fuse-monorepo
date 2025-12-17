@@ -4,9 +4,9 @@ import { useAuth } from "../contexts/AuthContext";
 import { Icon } from "@iconify/react";
 
 const navigation = [
-    { name: "Analytics", icon: "lucide:bar-chart-3", href: "/dashboard?tab=analytics" },
-    { name: "Revenue", icon: "lucide:dollar-sign", href: "/dashboard?tab=revenue" },
-    { name: "Branding", icon: "lucide:palette", href: "/dashboard?tab=branding" },
+    { name: "Analytics", icon: "lucide:bar-chart-3", href: "/analytics" },
+    { name: "Revenue", icon: "lucide:dollar-sign", href: "/revenue" },
+    { name: "Branding", icon: "lucide:palette", href: "/branding" },
 ];
 
 export function Sidebar() {
@@ -18,8 +18,7 @@ export function Sidebar() {
     };
 
     const isActive = (href: string) => {
-        const tab = router.query.tab || "analytics";
-        return href.includes(`tab=${tab}`);
+        return router.pathname === href;
     };
 
     const getDisplayName = () => {
@@ -51,7 +50,7 @@ export function Sidebar() {
                         return (
                             <button
                                 key={item.name}
-                                onClick={() => router.push(item.href, undefined, { shallow: true })}
+                                onClick={() => router.push(item.href)}
                                 className={`
                                     w-full group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors
                                     ${active
