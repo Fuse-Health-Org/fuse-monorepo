@@ -26,6 +26,7 @@ interface ClinicInfo {
   isAffiliate?: boolean;
   parentClinicLogo?: string;
   parentClinicName?: string;
+  parentClinicHeroImageUrl?: string;
 }
 
 interface Product {
@@ -157,7 +158,11 @@ export default function LandingPage() {
   // Handle nested data structure from API response
   const websiteData = (customWebsite as any)?.data || customWebsite;
 
-  const heroImageUrl = websiteData?.heroImageUrl || "https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=1920&q=80";
+  // Hero image logic for affiliates: fallback to parent's hero image if affiliate has none
+  const affiliateHeroImageUrl = websiteData?.heroImageUrl;
+  const parentHeroImageUrl = clinicInfo?.parentClinicHeroImageUrl;
+  const heroImageUrl = affiliateHeroImageUrl || parentHeroImageUrl || "https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=1920&q=80";
+
   const heroTitle = websiteData?.heroTitle || "Your Daily Health, Simplified";
   const heroSubtitle = websiteData?.heroSubtitle || "All-in-one nutritional support in one simple drink";
   const primaryColor = websiteData?.primaryColor || "#004d4d";

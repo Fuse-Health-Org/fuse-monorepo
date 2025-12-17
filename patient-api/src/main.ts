@@ -2921,9 +2921,10 @@ app.get("/custom-website/by-slug/:slug", async (req, res) => {
       where: { clinicId: clinic.id }
     });
 
-    // If this is an affiliate clinic, get the parent clinic's logo
+    // If this is an affiliate clinic, get the parent clinic's logo and hero image
     let parentClinicLogo: string | null = null;
     let parentClinicName: string | null = null;
+    let parentClinicHeroImageUrl: string | null = null;
 
     console.log('📍 [custom-website/by-slug] Clinic:', {
       id: clinic.id,
@@ -2936,7 +2937,7 @@ app.get("/custom-website/by-slug/:slug", async (req, res) => {
         attributes: ['id', 'name', 'logo']
       });
 
-      // Also fetch parent's CustomWebsite for the logo (preferred over Clinic.logo)
+      // Also fetch parent's CustomWebsite for the logo and hero image
       const parentCustomWebsite = await CustomWebsite.findOne({
         where: { clinicId: clinic.affiliateOwnerClinicId }
       });
@@ -2945,13 +2946,15 @@ app.get("/custom-website/by-slug/:slug", async (req, res) => {
         id: parentClinic.id,
         name: parentClinic.name,
         clinicLogo: parentClinic.logo || 'none',
-        customWebsiteLogo: parentCustomWebsite?.logo || 'none'
+        customWebsiteLogo: parentCustomWebsite?.logo || 'none',
+        customWebsiteHeroImage: parentCustomWebsite?.heroImageUrl || 'none'
       } : 'not found');
 
       if (parentClinic) {
         // Prefer CustomWebsite logo, fallback to Clinic logo
         parentClinicLogo = parentCustomWebsite?.logo || parentClinic.logo || null;
         parentClinicName = parentClinic.name || null;
+        parentClinicHeroImageUrl = parentCustomWebsite?.heroImageUrl || null;
       }
     }
 
@@ -2966,6 +2969,7 @@ app.get("/custom-website/by-slug/:slug", async (req, res) => {
         isAffiliate: !!clinic.affiliateOwnerClinicId,
         parentClinicLogo,
         parentClinicName,
+        parentClinicHeroImageUrl,
       }
     });
   } catch (error) {
