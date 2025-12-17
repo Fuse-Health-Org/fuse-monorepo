@@ -19,15 +19,11 @@ export default function RevenuePage() {
   const needsOnboarding = useMemo(() => {
     if (!user || !isAffiliate) return false;
     
-    // Check if firstName is just the email prefix (auto-generated during invite)
-    const emailPrefix = user.email?.split("@")[0] || "";
-    const firstNameMatchesEmailPrefix = user.firstName === emailPrefix;
+    // Check if clinic is not set up (no clinicId)
+    const hasNoClinic = !user.clinicId;
     
-    // Check if website/slug is missing
-    const hasNoWebsite = !user.website || user.website.trim() === "";
-    
-    // Needs onboarding if firstName is auto-generated OR website is missing
-    return firstNameMatchesEmailPrefix || hasNoWebsite;
+    // Needs onboarding if clinic is not properly configured
+    return hasNoClinic;
   }, [user, isAffiliate]);
 
   useEffect(() => {

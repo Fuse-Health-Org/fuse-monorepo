@@ -19,15 +19,12 @@ export default function AnalyticsPage() {
   const needsOnboarding = useMemo(() => {
     if (!user || !isAffiliate) return false;
     
-    // Check if firstName is just the email prefix (auto-generated during invite)
-    const emailPrefix = user.email?.split("@")[0] || "";
-    const firstNameMatchesEmailPrefix = user.firstName === emailPrefix;
+    // Check if clinic is not set up (no clinicId or placeholder slug)
+    // Placeholder slugs start with "affiliate-" and are auto-generated during invite
+    const hasNoClinic = !user.clinicId;
     
-    // Check if website/slug is missing
-    const hasNoWebsite = !user.website || user.website.trim() === "";
-    
-    // Needs onboarding if firstName is auto-generated OR website is missing
-    return firstNameMatchesEmailPrefix || hasNoWebsite;
+    // Needs onboarding if clinic is not properly configured
+    return hasNoClinic;
   }, [user, isAffiliate]);
 
   useEffect(() => {

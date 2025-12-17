@@ -13,8 +13,7 @@ export default function Onboarding() {
   const [error, setError] = useState<string | null>(null);
 
   // Form fields
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
+  const [clinicName, setClinicName] = useState("");
   const [slug, setSlug] = useState("");
   const [slugError, setSlugError] = useState<string | null>(null);
   const [currentPassword, setCurrentPassword] = useState("");
@@ -26,19 +25,6 @@ export default function Onboarding() {
     if (!authLoading && !user) {
       router.push("/signin");
       return;
-    }
-
-    if (user) {
-      // Pre-fill with existing data if available
-      if (user.firstName && user.firstName !== user.email?.split("@")[0]) {
-        setFirstName(user.firstName);
-      }
-      if (user.lastName) {
-        setLastName(user.lastName);
-      }
-      if (user.website) {
-        setSlug(user.website);
-      }
     }
   }, [user, authLoading, router]);
 
@@ -105,8 +91,8 @@ export default function Onboarding() {
     e.preventDefault();
     setError(null);
 
-    if (!firstName.trim()) {
-      setError("First name is required");
+    if (!clinicName.trim() || clinicName.trim().length < 2) {
+      setError("Clinic name is required (minimum 2 characters)");
       return;
     }
 
@@ -121,23 +107,17 @@ export default function Onboarding() {
     setSaving(true);
 
     try {
-      // Update user data and slug (website)
-      // Combine firstName and lastName for the name field
-      const fullName = lastName.trim()
-        ? `${firstName.trim()} ${lastName.trim()}`
-        : firstName.trim();
-
-      // Update branding
-      const nameResponse = await apiCall("/affiliate/branding", {
-        method: "PUT",
+      // Setup affiliate clinic with name and slug
+      const clinicResponse = await apiCall("/affiliate/setup-clinic", {
+        method: "POST",
         body: JSON.stringify({
-          name: fullName,
-          website: slug.trim(),
+          clinicName: clinicName.trim(),
+          slug: slug.trim(),
         }),
       });
 
-      if (!nameResponse.success) {
-        setError(nameResponse.error || "Error saving data");
+      if (!clinicResponse.success) {
+        setError(clinicResponse.error || "Error setting up clinic");
         setSaving(false);
         return;
       }
@@ -159,8 +139,8 @@ export default function Onboarding() {
 
       // Refresh user data to get updated information
       await refreshUser();
-      // Redirect to analytics page
-      router.push("/analytics");
+      // Redirect to branding page to continue customization
+      router.push("/branding");
     } catch (err: any) {
       console.error("Error saving onboarding data:", err);
       setError(err.message || "An error occurred while saving");
@@ -192,14 +172,14 @@ export default function Onboarding() {
             <CardHeader className="flex flex-col items-start gap-2 pb-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-primary/10 rounded-lg">
-                  <Icon icon="mdi:account-plus" className="text-2xl text-primary" />
+                  <Icon icon="mdi:store" className="text-2xl text-primary" />
                 </div>
                 <div>
                   <h1 className="text-2xl font-bold text-foreground">
-                    Welcome to Fuse Affiliate Portal
+                    Set Up Your Affiliate Portal
                   </h1>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Complete your profile to get started
+                    Create your clinic to get started
                   </p>
                 </div>
               </div>
@@ -214,42 +194,26 @@ export default function Onboarding() {
 
                 <div className="space-y-4">
                   <Input
-                    label="First Name"
-                    placeholder="e.g., Check"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
+                    label="Clinic Name"
+                    placeholder="e.g., My Health Clinic"
+                    value={clinicName}
+                    onChange={(e) => setClinicName(e.target.value)}
                     required
                     variant="bordered"
                     classNames={{
                       label: "text-foreground",
                       input: "text-foreground",
                     }}
-                    description="Your first name"
+                    description="Your clinic's display name"
                     startContent={
-                      <Icon icon="mdi:account" className="text-default-400" />
-                    }
-                  />
-
-                  <Input
-                    label="Last Name"
-                    placeholder="e.g., Two"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    variant="bordered"
-                    classNames={{
-                      label: "text-foreground",
-                      input: "text-foreground",
-                    }}
-                    description="Your last name (optional)"
-                    startContent={
-                      <Icon icon="mdi:account" className="text-default-400" />
+                      <Icon icon="mdi:store" className="text-default-400" />
                     }
                   />
 
                   <div>
                     <Input
-                      label="Affiliate Slug"
-                      placeholder="e.g., checktwo"
+                      label="Portal URL Slug"
+                      placeholder="e.g., my-health-clinic"
                       value={slug}
                       onChange={(e) => handleSlugChange(e.target.value)}
                       required
@@ -267,12 +231,14 @@ export default function Onboarding() {
                     />
                     {slug && !slugError && (
                       <p className="text-xs text-success mt-1">
-                        Your URL will be: <span className="font-mono">{slug}.limitless.health</span>
+                        Your URL will be: <span className="font-mono">{slug}.fuse.health</span>
                       </p>
                     )}
                   </div>
 
-                  <div className="space-y-4 pt-2 border-t border-divider">
+                  <div className="space-y-4 pt-4 border-t border-divider">
+                    <h3 className="text-sm font-medium text-foreground">Change Your Password</h3>
+                    
                     <Input
                       label="Current Password"
                       type="password"
@@ -338,14 +304,14 @@ export default function Onboarding() {
                     size="lg"
                     className="flex-1"
                     isLoading={saving}
-                    disabled={saving || !firstName.trim() || !slug.trim() || !!slugError || !currentPassword.trim() || !newPassword.trim() || !confirmPassword.trim() || !!passwordError}
+                    disabled={saving || !clinicName.trim() || !slug.trim() || !!slugError || !currentPassword.trim() || !newPassword.trim() || !confirmPassword.trim() || !!passwordError}
                   >
-                    {saving ? "Saving..." : "Continue"}
+                    {saving ? "Setting Up..." : "Continue to Portal Customization"}
                   </Button>
                 </div>
 
                 <p className="text-xs text-muted-foreground text-center">
-                  You can change this information later in the Branding section
+                  You can customize your portal appearance in the next step
                 </p>
               </form>
             </CardBody>

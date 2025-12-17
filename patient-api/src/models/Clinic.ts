@@ -1,4 +1,4 @@
-import { Table, Column, DataType, HasOne, HasMany } from 'sequelize-typescript';
+import { Table, Column, DataType, HasOne, HasMany, ForeignKey, BelongsTo } from 'sequelize-typescript';
 import Entity from './Entity';
 import Subscription from './Subscription';
 import Treatment from './Treatment';
@@ -135,6 +135,20 @@ export default class Clinic extends Entity {
         allowNull: true,
     })
     declare defaultFormColor?: string;
+
+    // Affiliate relationship - if this clinic belongs to an affiliate of another clinic
+    @ForeignKey(() => Clinic)
+    @Column({
+        type: DataType.UUID,
+        allowNull: true,
+    })
+    declare affiliateOwnerClinicId?: string;
+
+    @BelongsTo(() => Clinic, 'affiliateOwnerClinicId')
+    declare affiliateOwnerClinic?: Clinic;
+
+    @HasMany(() => Clinic, 'affiliateOwnerClinicId')
+    declare affiliateClinics: Clinic[];
 
     @HasOne(() => Subscription)
     declare subscription?: Subscription;

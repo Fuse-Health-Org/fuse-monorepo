@@ -16,7 +16,6 @@ export interface User {
   state?: string;
   zipCode?: string;
   clinicId?: string;
-  affiliateOwnerId?: string;
   website?: string;
   createdAt?: string;
   lastLoginAt?: string;
