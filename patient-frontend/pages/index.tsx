@@ -18,6 +18,16 @@ interface CustomWebsite {
   isActive?: boolean;
 }
 
+interface ClinicInfo {
+  id: string;
+  name: string;
+  slug: string;
+  logo?: string;
+  isAffiliate?: boolean;
+  parentClinicLogo?: string;
+  parentClinicName?: string;
+}
+
 interface Product {
   id: string;
   tenantProductId?: string;
@@ -35,6 +45,7 @@ interface Product {
 export default function LandingPage() {
   const router = useRouter();
   const [customWebsite, setCustomWebsite] = useState<CustomWebsite | null>(null);
+  const [clinicInfo, setClinicInfo] = useState<ClinicInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRedirecting, setIsRedirecting] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
@@ -63,8 +74,16 @@ export default function LandingPage() {
           console.log('🌐 Fetching custom website for slug:', domainInfo.clinicSlug);
           const result = await apiCall(`/custom-website/by-slug/${domainInfo.clinicSlug}`);
           console.log('✅ Custom website data:', result);
+
+          // Extract clinic info from response (check both nested and top-level locations)
+          const clinicData = result.data?.clinic || (result as any).clinic;
+          if (clinicData) {
+            console.log('🏥 Clinic info:', clinicData);
+            setClinicInfo(clinicData);
+          }
+
           if (result.success && result.data?.data) {
-            // API returns { success, data: { data: {...} } }
+            // API returns { success, data: { data: {...}, clinic: {...} } }
             websiteData = result.data.data;
           } else if (result.success && result.data) {
             websiteData = result.data;
@@ -143,7 +162,14 @@ export default function LandingPage() {
   const heroSubtitle = websiteData?.heroSubtitle || "All-in-one nutritional support in one simple drink";
   const primaryColor = websiteData?.primaryColor || "#004d4d";
   const fontFamily = websiteData?.fontFamily || "Georgia, serif";
-  const logo = websiteData?.logo;
+
+  // Logo logic for affiliates:
+  // - If affiliate has no logo: show parent logo only
+  // - If affiliate has logo: show "Parent Logo × Affiliate Logo"
+  const affiliateLogo = websiteData?.logo;
+  const parentLogo = clinicInfo?.parentClinicLogo;
+  const isAffiliate = clinicInfo?.isAffiliate;
+  const logo = affiliateLogo || parentLogo; // Fallback to parent logo if affiliate has none
 
   // Helper function to render a product card
   const renderProductCard = (product: Product, index: number) => {
@@ -430,7 +456,14 @@ export default function LandingPage() {
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "3rem" }}>
-            {logo ? (
+            {/* Logo display: Parent × Affiliate if both exist, otherwise just one */}
+            {isAffiliate && parentLogo && affiliateLogo ? (
+              <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                <img src={parentLogo} alt="Brand Logo" style={{ height: "2rem", objectFit: "contain" }} />
+                <span style={{ color: "#9ca3af", fontSize: "1.25rem", fontWeight: 300 }}>×</span>
+                <img src={affiliateLogo} alt="Affiliate Logo" style={{ height: "2rem", objectFit: "contain" }} />
+              </div>
+            ) : logo ? (
               <img src={logo} alt="Logo" style={{ height: "2rem", objectFit: "contain" }} />
             ) : (
               <h1 style={{ fontFamily: fontFamily, fontSize: "1.875rem", fontWeight: 400 }}>AG1</h1>

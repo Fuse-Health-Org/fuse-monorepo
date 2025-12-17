@@ -78,6 +78,12 @@ export function AffiliateBranding() {
         const clinic = data?.clinic || {};
         const customWebsite = data?.customWebsite || {};
 
+        console.log('🔧 [AffiliateBranding] DEPLOYED v2 - Loading settings:', {
+          customWebsiteLogo: customWebsite.logo,
+          clinicLogo: clinic.logo,
+          usingLogo: customWebsite.logo || "(empty - no fallback)"
+        });
+
         setSettings({
           clinicName: clinic.name || "",
           clinicSlug: clinic.slug || "",
@@ -85,7 +91,9 @@ export function AffiliateBranding() {
           portalDescription: customWebsite.portalDescription || settings.portalDescription,
           primaryColor: customWebsite.primaryColor || clinic.defaultFormColor || settings.primaryColor,
           fontFamily: customWebsite.fontFamily || settings.fontFamily,
-          logo: customWebsite.logo || clinic.logo || settings.logo,
+          // Don't fallback to clinic.logo - show only what affiliate has set in their CustomWebsite
+          // Parent logo fallback only applies on patient-facing landing page, not admin branding page
+          logo: customWebsite.logo || "",
           heroImageUrl: customWebsite.heroImageUrl || settings.heroImageUrl,
           heroTitle: customWebsite.heroTitle || settings.heroTitle,
           heroSubtitle: customWebsite.heroSubtitle || settings.heroSubtitle,

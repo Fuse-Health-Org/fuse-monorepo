@@ -2921,6 +2921,40 @@ app.get("/custom-website/by-slug/:slug", async (req, res) => {
       where: { clinicId: clinic.id }
     });
 
+    // If this is an affiliate clinic, get the parent clinic's logo
+    let parentClinicLogo: string | null = null;
+    let parentClinicName: string | null = null;
+
+    console.log('📍 [custom-website/by-slug] Clinic:', {
+      id: clinic.id,
+      slug: clinic.slug,
+      affiliateOwnerClinicId: clinic.affiliateOwnerClinicId || 'none'
+    });
+
+    if (clinic.affiliateOwnerClinicId) {
+      const parentClinic = await Clinic.findByPk(clinic.affiliateOwnerClinicId, {
+        attributes: ['id', 'name', 'logo']
+      });
+
+      // Also fetch parent's CustomWebsite for the logo (preferred over Clinic.logo)
+      const parentCustomWebsite = await CustomWebsite.findOne({
+        where: { clinicId: clinic.affiliateOwnerClinicId }
+      });
+
+      console.log('📍 [custom-website/by-slug] Parent clinic:', parentClinic ? {
+        id: parentClinic.id,
+        name: parentClinic.name,
+        clinicLogo: parentClinic.logo || 'none',
+        customWebsiteLogo: parentCustomWebsite?.logo || 'none'
+      } : 'not found');
+
+      if (parentClinic) {
+        // Prefer CustomWebsite logo, fallback to Clinic logo
+        parentClinicLogo = parentCustomWebsite?.logo || parentClinic.logo || null;
+        parentClinicName = parentClinic.name || null;
+      }
+    }
+
     res.status(200).json({
       success: true,
       data: customWebsite || null,
@@ -2928,7 +2962,10 @@ app.get("/custom-website/by-slug/:slug", async (req, res) => {
         id: clinic.id,
         name: clinic.name,
         slug: clinic.slug,
-        logo: clinic.logo
+        logo: clinic.logo,
+        isAffiliate: !!clinic.affiliateOwnerClinicId,
+        parentClinicLogo,
+        parentClinicName,
       }
     });
   } catch (error) {
