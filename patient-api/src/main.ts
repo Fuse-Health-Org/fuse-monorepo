@@ -1996,6 +1996,21 @@ app.get("/auth/me", authenticateJWT, async (req, res) => {
       userData.impersonatedBy = currentUser.impersonatedBy;
     }
 
+    // Include clinic details for affiliates to check if onboarding is needed
+    if (user.clinicId && user.userRoles?.affiliate) {
+      const clinic = await Clinic.findByPk(user.clinicId, {
+        attributes: ['id', 'name', 'slug', 'isActive'],
+      });
+      if (clinic) {
+        userData.clinic = {
+          id: clinic.id,
+          name: clinic.name,
+          slug: clinic.slug,
+          isActive: clinic.isActive,
+        };
+      }
+    }
+
     res.status(200).json({
       success: true,
       user: userData,

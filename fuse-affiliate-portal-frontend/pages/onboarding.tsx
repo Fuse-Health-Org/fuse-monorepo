@@ -12,10 +12,17 @@ export default function Onboarding() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Form fields
+  // Form fields - Personal Info
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [website, setWebsite] = useState("");
+
+  // Form fields - Clinic Info
   const [clinicName, setClinicName] = useState("");
   const [slug, setSlug] = useState("");
   const [slugError, setSlugError] = useState<string | null>(null);
+
+  // Form fields - Password
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -91,6 +98,17 @@ export default function Onboarding() {
     e.preventDefault();
     setError(null);
 
+    // Validate personal info
+    if (!firstName.trim() || firstName.trim().length < 2) {
+      setError("First name is required (minimum 2 characters)");
+      return;
+    }
+
+    if (!lastName.trim() || lastName.trim().length < 2) {
+      setError("Last name is required (minimum 2 characters)");
+      return;
+    }
+
     if (!clinicName.trim() || clinicName.trim().length < 2) {
       setError("Clinic name is required (minimum 2 characters)");
       return;
@@ -107,10 +125,13 @@ export default function Onboarding() {
     setSaving(true);
 
     try {
-      // Setup affiliate clinic with name and slug
+      // Setup affiliate clinic with name, slug, and personal info
       const clinicResponse = await apiCall("/affiliate/setup-clinic", {
         method: "POST",
         body: JSON.stringify({
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          website: website.trim() || undefined,
           clinicName: clinicName.trim(),
           slug: slug.trim(),
         }),
@@ -193,52 +214,112 @@ export default function Onboarding() {
                 )}
 
                 <div className="space-y-4">
-                  <Input
-                    label="Clinic Name"
-                    placeholder="e.g., My Health Clinic"
-                    value={clinicName}
-                    onChange={(e) => setClinicName(e.target.value)}
-                    required
-                    variant="bordered"
-                    classNames={{
-                      label: "text-foreground",
-                      input: "text-foreground",
-                    }}
-                    description="Your clinic's display name"
-                    startContent={
-                      <Icon icon="mdi:store" className="text-default-400" />
-                    }
-                  />
+                  {/* Personal Information Section */}
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-medium text-foreground">Personal Information</h3>
 
-                  <div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <Input
+                        label="First Name"
+                        placeholder="e.g., John"
+                        value={firstName}
+                        onChange={(e) => setFirstName(e.target.value)}
+                        required
+                        variant="bordered"
+                        classNames={{
+                          label: "text-foreground",
+                          input: "text-foreground",
+                        }}
+                        startContent={
+                          <Icon icon="mdi:account" className="text-default-400" />
+                        }
+                      />
+
+                      <Input
+                        label="Last Name"
+                        placeholder="e.g., Doe"
+                        value={lastName}
+                        onChange={(e) => setLastName(e.target.value)}
+                        required
+                        variant="bordered"
+                        classNames={{
+                          label: "text-foreground",
+                          input: "text-foreground",
+                        }}
+                        startContent={
+                          <Icon icon="mdi:account" className="text-default-400" />
+                        }
+                      />
+                    </div>
+
                     <Input
-                      label="Portal URL Slug"
-                      placeholder="e.g., my-health-clinic"
-                      value={slug}
-                      onChange={(e) => handleSlugChange(e.target.value)}
-                      required
+                      label="Website (optional)"
+                      placeholder="e.g., https://mywebsite.com"
+                      value={website}
+                      onChange={(e) => setWebsite(e.target.value)}
                       variant="bordered"
-                      errorMessage={slugError || undefined}
-                      isInvalid={!!slugError}
                       classNames={{
                         label: "text-foreground",
                         input: "text-foreground",
                       }}
-                      description="Subdomain for your portal (lowercase letters, numbers, and hyphens only)"
+                      description="Your personal or business website"
                       startContent={
-                        <Icon icon="mdi:link-variant" className="text-default-400" />
+                        <Icon icon="mdi:web" className="text-default-400" />
                       }
                     />
-                    {slug && !slugError && (
-                      <p className="text-xs text-success mt-1">
-                        Your URL will be: <span className="font-mono">{slug}.fuse.health</span>
-                      </p>
-                    )}
+                  </div>
+
+                  {/* Clinic Information Section */}
+                  <div className="space-y-4 pt-4 border-t border-divider">
+                    <h3 className="text-sm font-medium text-foreground">Clinic Information</h3>
+
+                    <Input
+                      label="Clinic Name"
+                      placeholder="e.g., My Health Clinic"
+                      value={clinicName}
+                      onChange={(e) => setClinicName(e.target.value)}
+                      required
+                      variant="bordered"
+                      classNames={{
+                        label: "text-foreground",
+                        input: "text-foreground",
+                      }}
+                      description="Your clinic's display name"
+                      startContent={
+                        <Icon icon="mdi:store" className="text-default-400" />
+                      }
+                    />
+
+                    <div>
+                      <Input
+                        label="Portal URL Slug"
+                        placeholder="e.g., my-health-clinic"
+                        value={slug}
+                        onChange={(e) => handleSlugChange(e.target.value)}
+                        required
+                        variant="bordered"
+                        errorMessage={slugError || undefined}
+                        isInvalid={!!slugError}
+                        classNames={{
+                          label: "text-foreground",
+                          input: "text-foreground",
+                        }}
+                        description="Subdomain for your portal (lowercase letters, numbers, and hyphens only)"
+                        startContent={
+                          <Icon icon="mdi:link-variant" className="text-default-400" />
+                        }
+                      />
+                      {slug && !slugError && (
+                        <p className="text-xs text-success mt-1">
+                          Your URL will be: <span className="font-mono">{slug}.fuse.health</span>
+                        </p>
+                      )}
+                    </div>
                   </div>
 
                   <div className="space-y-4 pt-4 border-t border-divider">
                     <h3 className="text-sm font-medium text-foreground">Change Your Password</h3>
-                    
+
                     <Input
                       label="Current Password"
                       type="password"
@@ -304,7 +385,7 @@ export default function Onboarding() {
                     size="lg"
                     className="flex-1"
                     isLoading={saving}
-                    disabled={saving || !clinicName.trim() || !slug.trim() || !!slugError || !currentPassword.trim() || !newPassword.trim() || !confirmPassword.trim() || !!passwordError}
+                    disabled={saving || !firstName.trim() || !lastName.trim() || !clinicName.trim() || !slug.trim() || !!slugError || !currentPassword.trim() || !newPassword.trim() || !confirmPassword.trim() || !!passwordError}
                   >
                     {saving ? "Setting Up..." : "Continue to Portal Customization"}
                   </Button>

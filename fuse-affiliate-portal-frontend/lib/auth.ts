@@ -28,6 +28,13 @@ export interface User {
     affiliate?: boolean;
     superAdmin?: boolean;
   };
+  // Clinic details for affiliates to check onboarding status
+  clinic?: {
+    id: string;
+    name: string;
+    slug: string;
+    isActive: boolean;
+  };
 }
 
 // Check if user is authenticated by calling the backend
@@ -50,11 +57,11 @@ export async function checkAuth(): Promise<User | null> {
     const userData = (result.data as any)?.user || result.data;
 
     if (process.env.NODE_ENV === "development") {
-      console.log('✅ User data retrieved:', { 
-        id: userData?.id, 
-        email: userData?.email, 
+      console.log('✅ User data retrieved:', {
+        id: userData?.id,
+        email: userData?.email,
         role: userData?.role,
-        affiliate: userData?.userRoles?.affiliate 
+        affiliate: userData?.userRoles?.affiliate
       });
     }
 

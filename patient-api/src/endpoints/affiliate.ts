@@ -867,7 +867,22 @@ The Fuse Team`,
         });
       }
 
-      const { clinicName, slug } = req.body;
+      const { firstName, lastName, website, clinicName, slug } = req.body;
+
+      // Validate personal info
+      if (!firstName || typeof firstName !== "string" || firstName.trim().length < 2) {
+        return res.status(400).json({
+          success: false,
+          message: "First name is required (minimum 2 characters)",
+        });
+      }
+
+      if (!lastName || typeof lastName !== "string" || lastName.trim().length < 2) {
+        return res.status(400).json({
+          success: false,
+          message: "Last name is required (minimum 2 characters)",
+        });
+      }
 
       if (!clinicName || typeof clinicName !== "string" || clinicName.trim().length < 2) {
         return res.status(400).json({
@@ -903,6 +918,20 @@ The Fuse Team`,
           message: "This slug is already taken. Please choose a different one.",
         });
       }
+
+      // Update the user's personal info
+      await user.update({
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        website: website?.trim() || user.website,
+      });
+
+      console.log("✅ [Affiliate Setup] Updated user info:", {
+        userId: user.id,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        website: website?.trim() || null,
+      });
 
       // Update the affiliate's clinic
       if (user.clinic) {

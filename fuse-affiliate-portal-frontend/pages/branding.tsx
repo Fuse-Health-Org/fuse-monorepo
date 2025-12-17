@@ -22,8 +22,14 @@ export default function BrandingPage() {
     // Check if clinic is not set up (no clinicId)
     const hasNoClinic = !user.clinicId;
 
+    // Check if clinic has a placeholder slug (auto-generated during invite)
+    const hasPlaceholderSlug = user.clinic?.slug?.startsWith('affiliate-');
+
+    // Check if clinic is not active (not yet configured)
+    const isClinicInactive = user.clinic && !user.clinic.isActive;
+
     // Needs onboarding if clinic is not properly configured
-    return hasNoClinic;
+    return hasNoClinic || hasPlaceholderSlug || isClinicInactive;
   }, [user, isAffiliate]);
 
   useEffect(() => {
