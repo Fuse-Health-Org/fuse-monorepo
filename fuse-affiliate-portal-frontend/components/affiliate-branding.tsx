@@ -52,7 +52,7 @@ export function AffiliateBranding() {
     primaryColor: "#000000",
     fontFamily: "Playfair Display",
     logo: "",
-    heroImageUrl: "https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=1920&q=80",
+    heroImageUrl: "", // Empty by default - show grey background when not set
     heroTitle: "Your Daily Health, Simplified",
     heroSubtitle: "All-in-one nutritional support in one simple drink",
     isActive: false,
@@ -94,7 +94,8 @@ export function AffiliateBranding() {
           // Don't fallback to clinic.logo - show only what affiliate has set in their CustomWebsite
           // Parent logo fallback only applies on patient-facing landing page, not admin branding page
           logo: customWebsite.logo || "",
-          heroImageUrl: customWebsite.heroImageUrl || settings.heroImageUrl,
+          // Don't fallback to placeholder - show empty so affiliate sees what they've actually set
+          heroImageUrl: customWebsite.heroImageUrl || "",
           heroTitle: customWebsite.heroTitle || settings.heroTitle,
           heroSubtitle: customWebsite.heroSubtitle || settings.heroSubtitle,
           isActive: customWebsite.isActive ?? clinic.isActive ?? false,
@@ -556,13 +557,44 @@ export function AffiliateBranding() {
               <p className="text-xs text-muted-foreground">Large viewport image displayed at the top of your landing page (recommended: 1920x1080px)</p>
             </CardHeader>
             <CardBody className="pt-0 space-y-3">
-              {settings.heroImageUrl && (
-                <div className="rounded-lg overflow-hidden border border-content3">
+              {settings.heroImageUrl ? (
+                <div className="rounded-lg overflow-hidden border border-content3 flex flex-col">
                   <img
                     src={settings.heroImageUrl}
                     alt="Hero preview"
                     className="w-full h-48 object-cover"
                   />
+                  <div className="p-2 bg-content1 flex justify-center">
+                    <Button
+                      size="sm"
+                      color="danger"
+                      variant="flat"
+                      onPress={async () => {
+                        try {
+                          const response = await apiCall("/affiliate/clinic", {
+                            method: "PUT",
+                            body: JSON.stringify({ heroImageUrl: "" }),
+                          });
+                          if (response.success) {
+                            setSettings({ ...settings, heroImageUrl: "" });
+                            showToast('success', 'Hero image removed successfully');
+                          } else {
+                            showToast('error', 'Failed to remove hero image');
+                          }
+                        } catch (error) {
+                          console.error('Error removing hero image:', error);
+                          showToast('error', 'Failed to remove hero image');
+                        }
+                      }}
+                    >
+                      <Icon icon="lucide:trash-2" className="w-4 h-4 mr-1" />
+                      Clear Hero Image
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-lg border border-content3 h-48 bg-gray-200 flex items-center justify-center">
+                  <p className="text-sm text-muted-foreground">No hero image set</p>
                 </div>
               )}
 
@@ -714,7 +746,10 @@ export function AffiliateBranding() {
                 {/* Preview Hero */}
                 <div
                   className="relative h-64 bg-cover bg-center flex items-center justify-center"
-                  style={{ backgroundImage: `url(${settings.heroImageUrl})` }}
+                  style={{
+                    backgroundImage: settings.heroImageUrl ? `url(${settings.heroImageUrl})` : 'none',
+                    backgroundColor: settings.heroImageUrl ? 'transparent' : '#6b7280' // grey-500 when no image
+                  }}
                 >
                   <div className="absolute inset-0 bg-black/40" />
                   <div className="relative z-10 text-center text-white px-4">
