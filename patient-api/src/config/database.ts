@@ -55,6 +55,7 @@ import AuditLog from '../models/AuditLog';
 import MfaToken from '../models/MfaToken';
 import CustomWebsite from '../models/CustomWebsite';
 import Like from '../models/Like';
+import BrandFavoritedProduct from '../models/BrandFavoritedProduct';
 import { MigrationService } from '../services/migration.service';
 
 // Load environment variables from .env.local
@@ -141,7 +142,7 @@ export const sequelize = new Sequelize(databaseUrl, {
     TenantProductForm, FormProducts, GlobalFormStructure, Sale, DoctorPatientChats, Pharmacy, PharmacyCoverage, PharmacyProduct,
     TenantCustomFeatures, TierConfiguration, TenantAnalyticsEvents, FormAnalyticsDaily,
     MessageTemplate, Sequence, SequenceRun, Tag, UserTag, GlobalFees, UserRoles,
-    SupportTicket, TicketMessage, AuditLog, MfaToken, CustomWebsite, Like
+    SupportTicket, TicketMessage, AuditLog, MfaToken, CustomWebsite, Like, BrandFavoritedProduct
   ],
 });
 
