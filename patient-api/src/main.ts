@@ -284,6 +284,9 @@ app.use(
         // Allow affiliate portal subdomains in development (e.g., limitless.localhost:3005)
         (process.env.NODE_ENV === "development" &&
           /^http:\/\/[a-zA-Z0-9.-]+\.localhost:3005$/.test(origin)) ||
+        // Allow admin portal subdomains in development (e.g., limitless.localhost:3002)
+        (process.env.NODE_ENV === "development" &&
+          /^http:\/\/[a-zA-Z0-9.-]+\.localhost:3002$/.test(origin)) ||
         // Allow production clinic domains (e.g., app.limitless.health, app.hims.com)
         (process.env.NODE_ENV === "production" &&
           /^https:\/\/app\.[a-zA-Z0-9-]+\.[a-zA-Z]{2,}$/.test(origin)) ||

@@ -91,11 +91,27 @@ export async function extractClinicSlugFromDomain(): Promise<ClinicDomainInfo> {
   let hasClinicSubdomain = false;
 
   if (isDevelopment && localhostIndex > 0) {
-    // Development: extract everything before 'localhost' 
-    // saboia.xyz.localhost -> saboia.xyz
-    // g-health.localhost -> g-health
-    clinicSlug = parts.slice(0, localhostIndex).join('.');
-    hasClinicSubdomain = true;
+    // Development: extract slug(s) before 'localhost'
+    const partsBeforeLocalhost = parts.slice(0, localhostIndex);
+    
+    if (partsBeforeLocalhost.length === 2) {
+      // Affiliate subdomain: ufc.limitless.localhost -> affiliateSlug: "ufc", brandSlug: "limitless"
+      // The first part is the affiliate's clinic slug
+      clinicSlug = partsBeforeLocalhost[0];
+      hasClinicSubdomain = true;
+      console.log('👤 Detected affiliate subdomain (dev):', { 
+        affiliateSlug: partsBeforeLocalhost[0], 
+        brandSlug: partsBeforeLocalhost[1] 
+      });
+    } else if (partsBeforeLocalhost.length === 1) {
+      // Regular clinic subdomain: limitless.localhost -> slug: "limitless"
+      clinicSlug = partsBeforeLocalhost[0];
+      hasClinicSubdomain = true;
+    } else if (partsBeforeLocalhost.length > 2) {
+      // More complex subdomain - join all parts
+      clinicSlug = partsBeforeLocalhost.join('.');
+      hasClinicSubdomain = true;
+    }
   } else if (isProduction) {
     // Production: extract everything after 'app.' (fuse.health from app.fuse.health)
     clinicSlug = parts.slice(1).join('.');
