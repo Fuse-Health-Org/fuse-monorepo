@@ -4,7 +4,6 @@ import Head from 'next/head'
 import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import Layout from '@/components/Layout'
 import {
@@ -39,7 +38,7 @@ export default function ProgramEditor() {
     const [loading, setLoading] = useState(!isCreateMode)
     const [saving, setSaving] = useState(false)
     const [error, setError] = useState<string | null>(null)
-    
+
     // Form state
     const [name, setName] = useState('')
     const [description, setDescription] = useState('')
@@ -48,7 +47,7 @@ export default function ProgramEditor() {
 
     // Step state for creation flow
     const [currentStep, setCurrentStep] = useState(1)
-    
+
     // Medical templates
     const [templates, setTemplates] = useState<MedicalTemplate[]>([])
     const [templatesLoading, setTemplatesLoading] = useState(true)
@@ -213,9 +212,8 @@ export default function ProgramEditor() {
                     {isCreateMode && (
                         <div className="mb-8 flex items-center justify-center gap-4">
                             <div className="flex items-center gap-2">
-                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                                    currentStep === 1 ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
-                                }`}>
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${currentStep === 1 ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+                                    }`}>
                                     1
                                 </div>
                                 <span className={`text-sm font-medium ${currentStep === 1 ? 'text-foreground' : 'text-muted-foreground'}`}>
@@ -224,9 +222,8 @@ export default function ProgramEditor() {
                             </div>
                             <div className="w-12 h-px bg-border"></div>
                             <div className="flex items-center gap-2">
-                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                                    currentStep === 2 ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
-                                }`}>
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${currentStep === 2 ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+                                    }`}>
                                     2
                                 </div>
                                 <span className={`text-sm font-medium ${currentStep === 2 ? 'text-foreground' : 'text-muted-foreground'}`}>
@@ -240,7 +237,7 @@ export default function ProgramEditor() {
                     {(currentStep === 1 || !isCreateMode) && (
                         <div className="bg-card rounded-2xl shadow-sm border border-border p-6 mb-6">
                             <h3 className="text-lg font-semibold mb-4">Program Details</h3>
-                            
+
                             <div className="space-y-4">
                                 <div>
                                     <label className="block text-sm font-medium mb-2">
@@ -258,12 +255,12 @@ export default function ProgramEditor() {
                                     <label className="block text-sm font-medium mb-2">
                                         Description (Optional)
                                     </label>
-                                    <Textarea
+                                    <textarea
                                         value={description}
                                         onChange={(e) => setDescription(e.target.value)}
                                         placeholder="Describe what this program includes..."
                                         rows={3}
-                                        className="w-full"
+                                        className="w-full px-3 py-2 border border-input rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                                     />
                                 </div>
 
@@ -347,11 +344,10 @@ export default function ProgramEditor() {
                                                 <div
                                                     key={template.id}
                                                     onClick={() => setMedicalTemplateId(template.id)}
-                                                    className={`p-4 border rounded-lg cursor-pointer transition-all ${
-                                                        medicalTemplateId === template.id
+                                                    className={`p-4 border rounded-lg cursor-pointer transition-all ${medicalTemplateId === template.id
                                                             ? 'border-primary bg-primary/5 shadow-sm'
                                                             : 'border-border hover:border-primary/50 hover:bg-muted/50'
-                                                    }`}
+                                                        }`}
                                                 >
                                                     <div className="flex items-start justify-between">
                                                         <div className="flex-1">
@@ -418,7 +414,7 @@ export default function ProgramEditor() {
                     {!isCreateMode && (
                         <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
                             <h3 className="text-lg font-semibold mb-4">Medical Template</h3>
-                            
+
                             {/* Search */}
                             <div className="mb-4">
                                 <div className="relative">
@@ -443,11 +439,10 @@ export default function ProgramEditor() {
                                             <div
                                                 key={template.id}
                                                 onClick={() => setMedicalTemplateId(template.id)}
-                                                className={`p-4 border rounded-lg cursor-pointer transition-all ${
-                                                    medicalTemplateId === template.id
+                                                className={`p-4 border rounded-lg cursor-pointer transition-all ${medicalTemplateId === template.id
                                                         ? 'border-primary bg-primary/5 shadow-sm'
                                                         : 'border-border hover:border-primary/50 hover:bg-muted/50'
-                                                }`}
+                                                    }`}
                                             >
                                                 <div className="flex items-start justify-between">
                                                     <div className="flex-1">
