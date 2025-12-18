@@ -682,7 +682,7 @@ export default function PortalPage() {
                 <span>Local Development Mode: Preview your portal on localhost</span>
               </div>
             )}
-            
+
             <Card className="mt-6">
               <CardContent className="py-4">
                 <div className="flex items-center justify-between gap-4">
@@ -692,8 +692,8 @@ export default function PortalPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <h3 className="text-sm font-medium mb-1">
-                        {typeof window !== 'undefined' && window.location.hostname.includes('localhost') 
-                          ? 'Your Brand Portal URL (Local)' 
+                        {typeof window !== 'undefined' && window.location.hostname.includes('localhost')
+                          ? 'Your Brand Portal URL (Local)'
                           : 'Your Brand Portal URL'}
                       </h3>
                       <p className="text-sm font-mono text-muted-foreground truncate">
