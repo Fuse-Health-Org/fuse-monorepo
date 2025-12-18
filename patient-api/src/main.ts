@@ -106,6 +106,7 @@ import MessageService from "./services/Message.service";
 import ProductService from "./services/product.service";
 import TenantProductForm from "./models/TenantProductForm";
 import TenantProduct from "./models/TenantProduct";
+import FormProducts from "./models/FormProducts";
 import GlobalFormStructure from "./models/GlobalFormStructure";
 // import QuestionnaireStep twice causes duplicate identifier; keep single import below
 import Question from "./models/Question";
@@ -8800,6 +8801,97 @@ app.post("/questionnaires/templates", authenticateJWT, async (req, res) => {
       });
   }
 });
+
+// Get all product-to-form assignments
+app.get(
+  "/questionnaires/product-assignments",
+  authenticateJWT,
+  async (req, res) => {
+    try {
+      const currentUser = getCurrentUser(req);
+
+      if (!currentUser) {
+        return res
+          .status(401)
+          .json({ success: false, message: "Not authenticated" });
+      }
+
+      const assignments = await FormProducts.findAll({
+        attributes: ["id", "questionnaireId", "productId", "createdAt"],
+      });
+
+      // Transform to simpler format
+      const formattedAssignments = assignments.map((a: any) => ({
+        id: a.id,
+        formTemplateId: a.questionnaireId,
+        productId: a.productId,
+        createdAt: a.createdAt,
+      }));
+
+      res.status(200).json({ success: true, data: formattedAssignments });
+    } catch (error) {
+      console.error("❌ Error fetching product assignments:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to fetch product assignments",
+      });
+    }
+  }
+);
+
+// Assign products to a form template
+app.post(
+  "/questionnaires/:id/assign-products",
+  authenticateJWT,
+  async (req, res) => {
+    try {
+      const currentUser = getCurrentUser(req);
+
+      if (!currentUser) {
+        return res
+          .status(401)
+          .json({ success: false, message: "Not authenticated" });
+      }
+
+      const { id: formTemplateId } = req.params;
+      const { productIds } = req.body;
+
+      if (!Array.isArray(productIds)) {
+        return res.status(400).json({
+          success: false,
+          message: "productIds must be an array",
+        });
+      }
+
+      // Delete existing assignments for this form
+      await FormProducts.destroy({
+        where: { questionnaireId: formTemplateId },
+      });
+
+      // Create new assignments
+      const assignments = await Promise.all(
+        productIds.map((productId: string) =>
+          FormProducts.create({
+            questionnaireId: formTemplateId,
+            productId,
+          })
+        )
+      );
+
+      res.status(200).json({
+        success: true,
+        message: `Assigned ${productIds.length} products to form`,
+        data: assignments,
+      });
+    } catch (error) {
+      console.error("❌ Error assigning products:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to assign products",
+      });
+    }
+  }
+);
 
 // Create Account Template by cloning user_profile steps from master_template
 app.post(
