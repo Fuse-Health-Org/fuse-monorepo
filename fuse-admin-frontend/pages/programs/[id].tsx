@@ -10,8 +10,16 @@ import {
     ArrowLeft,
     FileText,
     Check,
-    Search
+    Search,
+    Package
 } from 'lucide-react'
+
+interface TemplateProduct {
+    id: string
+    name: string
+    imageUrl?: string
+    price?: number
+}
 
 interface MedicalTemplate {
     id: string
@@ -25,6 +33,11 @@ interface MedicalTemplate {
         firstName?: string
         lastName?: string
     }
+    formProducts?: {
+        id: string
+        productId: string
+        product?: TemplateProduct
+    }[]
 }
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
@@ -158,9 +171,14 @@ export default function ProgramEditor() {
         }
     }
 
-    const filteredTemplates = templates.filter(t =>
-        t.title.toLowerCase().includes(templateSearch.toLowerCase())
-    )
+    const filteredTemplates = templates
+        .filter(t => t.title.toLowerCase().includes(templateSearch.toLowerCase()))
+        .sort((a, b) => {
+            // Sort by number of products (descending) - templates with more products appear first
+            const aProductCount = a.formProducts?.length || 0
+            const bProductCount = b.formProducts?.length || 0
+            return bProductCount - aProductCount
+        })
 
     if (loading) {
         return (
@@ -340,47 +358,90 @@ export default function ProgramEditor() {
                                     {/* Templates List */}
                                     <div className="space-y-2 mb-6 max-h-96 overflow-y-auto">
                                         {filteredTemplates.length > 0 ? (
-                                            filteredTemplates.map((template) => (
-                                                <div
-                                                    key={template.id}
-                                                    onClick={() => setMedicalTemplateId(template.id)}
-                                                    className={`p-4 border rounded-lg cursor-pointer transition-all ${medicalTemplateId === template.id
-                                                            ? 'border-primary bg-primary/5 shadow-sm'
-                                                            : 'border-border hover:border-primary/50 hover:bg-muted/50'
-                                                        }`}
-                                                >
-                                                    <div className="flex items-start justify-between">
-                                                        <div className="flex-1">
-                                                            <div className="flex items-center gap-2 mb-1">
-                                                                <FileText className="h-4 w-4 text-muted-foreground" />
-                                                                <h4 className="text-sm font-medium">{template.title}</h4>
-                                                            </div>
-                                                            {template.description && (
-                                                                <p className="text-xs text-muted-foreground mt-1">
-                                                                    {template.description}
-                                                                </p>
-                                                            )}
-                                                            <div className="flex items-center gap-2 mt-2">
-                                                                <Badge variant="secondary" className="text-xs">
-                                                                    {template.user ? 'Custom' : 'System'}
-                                                                </Badge>
-                                                                {template.user && (
-                                                                    <span className="text-xs text-muted-foreground">
-                                                                        Created by {template.user.firstName} {template.user.lastName}
-                                                                    </span>
+                                            filteredTemplates.map((template) => {
+                                                const products = template.formProducts
+                                                    ?.map(fp => fp.product)
+                                                    .filter((p): p is TemplateProduct => !!p) || []
+                                                
+                                                return (
+                                                    <div
+                                                        key={template.id}
+                                                        onClick={() => setMedicalTemplateId(template.id)}
+                                                        className={`p-4 border rounded-lg cursor-pointer transition-all ${medicalTemplateId === template.id
+                                                                ? 'border-primary bg-primary/5 shadow-sm'
+                                                                : 'border-border hover:border-primary/50 hover:bg-muted/50'
+                                                            }`}
+                                                    >
+                                                        <div className="flex items-start justify-between">
+                                                            <div className="flex-1">
+                                                                <div className="flex items-center gap-2 mb-1">
+                                                                    <FileText className="h-4 w-4 text-muted-foreground" />
+                                                                    <h4 className="text-sm font-medium">{template.title}</h4>
+                                                                </div>
+                                                                {template.description && (
+                                                                    <p className="text-xs text-muted-foreground mt-1">
+                                                                        {template.description}
+                                                                    </p>
+                                                                )}
+                                                                <div className="flex items-center gap-2 mt-2">
+                                                                    <Badge variant="secondary" className="text-xs">
+                                                                        {template.user ? 'Custom' : 'System'}
+                                                                    </Badge>
+                                                                    {template.user && (
+                                                                        <span className="text-xs text-muted-foreground">
+                                                                            Created by {template.user.firstName} {template.user.lastName}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                {/* Products Section */}
+                                                                {products.length > 0 && (
+                                                                    <div className="mt-3 pt-3 border-t border-border">
+                                                                        <div className="flex items-center gap-1.5 mb-2">
+                                                                            <Package className="h-3 w-3 text-muted-foreground" />
+                                                                            <span className="text-xs font-medium text-muted-foreground">
+                                                                                Products ({products.length})
+                                                                            </span>
+                                                                        </div>
+                                                                        <div className="flex flex-wrap gap-1.5">
+                                                                            {products.slice(0, 5).map((product) => (
+                                                                                <div
+                                                                                    key={product.id}
+                                                                                    className="flex items-center gap-1.5 px-2 py-1 bg-muted rounded-md"
+                                                                                >
+                                                                                    {product.imageUrl && (
+                                                                                        <img
+                                                                                            src={product.imageUrl}
+                                                                                            alt={product.name}
+                                                                                            className="w-4 h-4 rounded object-cover"
+                                                                                        />
+                                                                                    )}
+                                                                                    <span className="text-xs truncate max-w-[120px]">
+                                                                                        {product.name}
+                                                                                    </span>
+                                                                                </div>
+                                                                            ))}
+                                                                            {products.length > 5 && (
+                                                                                <div className="px-2 py-1 bg-muted rounded-md">
+                                                                                    <span className="text-xs text-muted-foreground">
+                                                                                        +{products.length - 5} more
+                                                                                    </span>
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
                                                                 )}
                                                             </div>
-                                                        </div>
-                                                        {medicalTemplateId === template.id && (
-                                                            <div className="ml-4">
-                                                                <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center">
-                                                                    <Check className="h-4 w-4 text-primary-foreground" />
+                                                            {medicalTemplateId === template.id && (
+                                                                <div className="ml-4">
+                                                                    <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center">
+                                                                        <Check className="h-4 w-4 text-primary-foreground" />
+                                                                    </div>
                                                                 </div>
-                                                            </div>
-                                                        )}
+                                                            )}
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            ))
+                                                )
+                                            })
                                         ) : (
                                             <div className="text-center py-8 text-muted-foreground">
                                                 <p className="text-sm">No templates found</p>
@@ -435,47 +496,90 @@ export default function ProgramEditor() {
                             ) : (
                                 <div className="space-y-2 max-h-96 overflow-y-auto">
                                     {filteredTemplates.length > 0 ? (
-                                        filteredTemplates.map((template) => (
-                                            <div
-                                                key={template.id}
-                                                onClick={() => setMedicalTemplateId(template.id)}
-                                                className={`p-4 border rounded-lg cursor-pointer transition-all ${medicalTemplateId === template.id
-                                                        ? 'border-primary bg-primary/5 shadow-sm'
-                                                        : 'border-border hover:border-primary/50 hover:bg-muted/50'
-                                                    }`}
-                                            >
-                                                <div className="flex items-start justify-between">
-                                                    <div className="flex-1">
-                                                        <div className="flex items-center gap-2 mb-1">
-                                                            <FileText className="h-4 w-4 text-muted-foreground" />
-                                                            <h4 className="text-sm font-medium">{template.title}</h4>
-                                                        </div>
-                                                        {template.description && (
-                                                            <p className="text-xs text-muted-foreground mt-1">
-                                                                {template.description}
-                                                            </p>
-                                                        )}
-                                                        <div className="flex items-center gap-2 mt-2">
-                                                            <Badge variant="secondary" className="text-xs">
-                                                                {template.user ? 'Custom' : 'System'}
-                                                            </Badge>
-                                                            {template.user && (
-                                                                <span className="text-xs text-muted-foreground">
-                                                                    Created by {template.user.firstName} {template.user.lastName}
-                                                                </span>
+                                        filteredTemplates.map((template) => {
+                                            const products = template.formProducts
+                                                ?.map(fp => fp.product)
+                                                .filter((p): p is TemplateProduct => !!p) || []
+                                            
+                                            return (
+                                                <div
+                                                    key={template.id}
+                                                    onClick={() => setMedicalTemplateId(template.id)}
+                                                    className={`p-4 border rounded-lg cursor-pointer transition-all ${medicalTemplateId === template.id
+                                                            ? 'border-primary bg-primary/5 shadow-sm'
+                                                            : 'border-border hover:border-primary/50 hover:bg-muted/50'
+                                                        }`}
+                                                >
+                                                    <div className="flex items-start justify-between">
+                                                        <div className="flex-1">
+                                                            <div className="flex items-center gap-2 mb-1">
+                                                                <FileText className="h-4 w-4 text-muted-foreground" />
+                                                                <h4 className="text-sm font-medium">{template.title}</h4>
+                                                            </div>
+                                                            {template.description && (
+                                                                <p className="text-xs text-muted-foreground mt-1">
+                                                                    {template.description}
+                                                                </p>
+                                                            )}
+                                                            <div className="flex items-center gap-2 mt-2">
+                                                                <Badge variant="secondary" className="text-xs">
+                                                                    {template.user ? 'Custom' : 'System'}
+                                                                </Badge>
+                                                                {template.user && (
+                                                                    <span className="text-xs text-muted-foreground">
+                                                                        Created by {template.user.firstName} {template.user.lastName}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            {/* Products Section */}
+                                                            {products.length > 0 && (
+                                                                <div className="mt-3 pt-3 border-t border-border">
+                                                                    <div className="flex items-center gap-1.5 mb-2">
+                                                                        <Package className="h-3 w-3 text-muted-foreground" />
+                                                                        <span className="text-xs font-medium text-muted-foreground">
+                                                                            Products ({products.length})
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="flex flex-wrap gap-1.5">
+                                                                        {products.slice(0, 5).map((product) => (
+                                                                            <div
+                                                                                key={product.id}
+                                                                                className="flex items-center gap-1.5 px-2 py-1 bg-muted rounded-md"
+                                                                            >
+                                                                                {product.imageUrl && (
+                                                                                    <img
+                                                                                        src={product.imageUrl}
+                                                                                        alt={product.name}
+                                                                                        className="w-4 h-4 rounded object-cover"
+                                                                                    />
+                                                                                )}
+                                                                                <span className="text-xs truncate max-w-[120px]">
+                                                                                    {product.name}
+                                                                                </span>
+                                                                            </div>
+                                                                        ))}
+                                                                        {products.length > 5 && (
+                                                                            <div className="px-2 py-1 bg-muted rounded-md">
+                                                                                <span className="text-xs text-muted-foreground">
+                                                                                    +{products.length - 5} more
+                                                                                </span>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
                                                             )}
                                                         </div>
-                                                    </div>
-                                                    {medicalTemplateId === template.id && (
-                                                        <div className="ml-4">
-                                                            <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center">
-                                                                <Check className="h-4 w-4 text-primary-foreground" />
+                                                        {medicalTemplateId === template.id && (
+                                                            <div className="ml-4">
+                                                                <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center">
+                                                                    <Check className="h-4 w-4 text-primary-foreground" />
+                                                                </div>
                                                             </div>
-                                                        </div>
-                                                    )}
+                                                        )}
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        ))
+                                            )
+                                        })
                                     ) : (
                                         <div className="text-center py-8 text-muted-foreground">
                                             <p className="text-sm">No templates found</p>

@@ -5,6 +5,7 @@ import QuestionnaireStep from './QuestionnaireStep';
 import User from './User';
 import TenantProduct from './TenantProduct';
 import Product from './Product';
+import FormProducts from './FormProducts';
 
 @Table({
     freezeTableName: true,
@@ -156,4 +157,7 @@ export default class Questionnaire extends Entity {
 
     @HasMany(() => TenantProduct)
     declare tenantProducts: TenantProduct[];
+
+    @HasMany(() => FormProducts)
+    declare formProducts: FormProducts[];
 }

@@ -6,15 +6,13 @@ e4Uv$^9hJG:K\*)s%
 
 OR LOCALLY:
 
-pg_dump -h localhost -p 5432 -U fusehealth_user -d fusehealth_database --verbose --clean --create > Guilherme_full_database_dump_18_Dec_2025.sql
-
 pg_dump -h localhost -p 5432 -U fusehealth_user -d fusehealth_database --verbose --clean --create > Guilherme_full_database_dump_15_Nov_2025.sql
 
 TO RESTORE (LOCALLY):
 
-psql -h localhost -p 5432 -U postgres -d postgres -c "DROP DATABASE IF EXISTS fusehealth_database;"
+psql -h localhost -p 5432 -U guilhermereis -d postgres -c "DROP DATABASE IF EXISTS fusehealth_database;"
 
-psql -h localhost -p 5432 -U postgres -d postgres < full_database_dump_03_Nov_2025.sql
+psql -h localhost -p 5432 -U guilhermereis -d postgres < Guilherme_full_database_dump_18_Dec_2025.sql
 
 TO RESTORE (PROD):
 
