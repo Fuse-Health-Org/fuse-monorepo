@@ -13,6 +13,7 @@ import {
     LogOut,
     ClipboardList,
     FileQuestion,
+    Package,
 } from "lucide-react"
 
 const navigation = [
@@ -22,6 +23,7 @@ const navigation = [
     { name: "Appointments", icon: Calendar, current: false, href: "/appointments" },
     { name: "Records", icon: FileText, current: false, href: "/records" },
     { name: "Medical Question Templates", icon: FileQuestion, current: false, href: "/forms" },
+    { name: "Multi-Choice Forms", icon: Package, current: false, href: "/multi-choice-forms" },
 ]
 
 const configuration = [

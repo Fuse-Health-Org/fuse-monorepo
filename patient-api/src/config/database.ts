@@ -31,6 +31,7 @@ import UserPatient from '../models/UserPatient';
 import TenantProduct from '../models/TenantProduct';
 import FormSectionTemplate from '../models/FormSectionTemplate';
 import TenantProductForm from '../models/TenantProductForm';
+import FormProducts from '../models/FormProducts';
 import GlobalFormStructure from '../models/GlobalFormStructure';
 import Sale from '../models/Sale';
 import DoctorPatientChats from '../models/DoctorPatientChats';
@@ -137,7 +138,7 @@ export const sequelize = new Sequelize(databaseUrl, {
     ShippingAddress, ShippingOrder, Subscription,
     TreatmentPlan, BrandSubscription, BrandSubscriptionPlans, Physician, BrandTreatment,
     UserPatient, TenantProduct, FormSectionTemplate,
-    TenantProductForm, GlobalFormStructure, Sale, DoctorPatientChats, Pharmacy, PharmacyCoverage, PharmacyProduct,
+    TenantProductForm, FormProducts, GlobalFormStructure, Sale, DoctorPatientChats, Pharmacy, PharmacyCoverage, PharmacyProduct,
     TenantCustomFeatures, TierConfiguration, TenantAnalyticsEvents, FormAnalyticsDaily,
     MessageTemplate, Sequence, SequenceRun, Tag, UserTag, GlobalFees, UserRoles,
     SupportTicket, TicketMessage, AuditLog, MfaToken, CustomWebsite, Like
@@ -323,6 +324,33 @@ export async function initializeDatabase() {
     await sequelize.sync({ alter: true });
     if (process.env.NODE_ENV === 'development') {
       console.log('✅ Database tables synchronized successfully');
+    }
+
+    // Ensure FormProducts table exists for multi-choice forms feature
+    try {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔄 Ensuring FormProducts table exists...');
+      }
+      await sequelize.query(`
+        CREATE TABLE IF NOT EXISTS "FormProducts" (
+          "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          "questionnaireId" UUID NOT NULL REFERENCES "Questionnaire"("id") ON DELETE CASCADE,
+          "productId" UUID NOT NULL REFERENCES "Product"("id") ON DELETE CASCADE,
+          "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "deletedAt" TIMESTAMP WITH TIME ZONE
+        );
+
+        CREATE INDEX IF NOT EXISTS "FormProducts_questionnaireId_idx" ON "FormProducts" ("questionnaireId");
+        CREATE INDEX IF NOT EXISTS "FormProducts_productId_idx" ON "FormProducts" ("productId");
+      `);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('✅ FormProducts table verified/created successfully');
+      }
+    } catch (tableError) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('⚠️  FormProducts table check:', tableError instanceof Error ? tableError.message : tableError);
+      }
     }
 
     // Add new enum value for amount_capturable_updated status
