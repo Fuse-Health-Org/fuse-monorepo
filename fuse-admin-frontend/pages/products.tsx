@@ -166,7 +166,7 @@ export default function Products() {
 
             clearTimeout(timeoutId)
             console.log('✅ Loaded products (combined):', combined.length)
-            
+
             // Fetch pharmacy coverages for each product
             const productsWithCoverages = await Promise.all(
                 combined.map(async (product) => {
@@ -186,7 +186,7 @@ export default function Products() {
                     return product
                 })
             )
-            
+
             setAllProducts(productsWithCoverages)
         } catch (err: any) {
             console.error('❌ Failed to load products:', err)
@@ -1099,7 +1099,7 @@ export default function Products() {
 
                                                 {/* Clinic Retail Price */}
                                                 <div className="flex-shrink-0 w-28" onClick={(e) => quickEditMode && e.stopPropagation()}>
-                                                    <div className="text-xs text-muted-foreground mb-0.5">Your Price</div>
+                                                    <div className="text-xs text-muted-foreground mb-0.5">Non-Medical Service Fee</div>
                                                     {(() => {
                                                         const tenantProduct = tenantProducts.find(tp => tp.productId === product.id)
 
