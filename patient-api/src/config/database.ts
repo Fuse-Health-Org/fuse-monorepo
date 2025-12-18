@@ -56,6 +56,7 @@ import MfaToken from '../models/MfaToken';
 import CustomWebsite from '../models/CustomWebsite';
 import Like from '../models/Like';
 import BrandFavoritedProduct from '../models/BrandFavoritedProduct';
+import Program from '../models/Program';
 import { MigrationService } from '../services/migration.service';
 
 // Load environment variables from .env.local
@@ -142,7 +143,7 @@ export const sequelize = new Sequelize(databaseUrl, {
     TenantProductForm, FormProducts, GlobalFormStructure, Sale, DoctorPatientChats, Pharmacy, PharmacyCoverage, PharmacyProduct,
     TenantCustomFeatures, TierConfiguration, TenantAnalyticsEvents, FormAnalyticsDaily,
     MessageTemplate, Sequence, SequenceRun, Tag, UserTag, GlobalFees, UserRoles,
-    SupportTicket, TicketMessage, AuditLog, MfaToken, CustomWebsite, Like, BrandFavoritedProduct
+    SupportTicket, TicketMessage, AuditLog, MfaToken, CustomWebsite, Like, BrandFavoritedProduct, Program
   ],
 });
 
@@ -329,9 +330,7 @@ export async function initializeDatabase() {
 
     // Ensure FormProducts table exists for multi-choice forms feature
     try {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('🔄 Ensuring FormProducts table exists...');
-      }
+      console.log('🔄 Ensuring FormProducts table exists...');
       await sequelize.query(`
         CREATE TABLE IF NOT EXISTS "FormProducts" (
           "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -345,13 +344,9 @@ export async function initializeDatabase() {
         CREATE INDEX IF NOT EXISTS "FormProducts_questionnaireId_idx" ON "FormProducts" ("questionnaireId");
         CREATE INDEX IF NOT EXISTS "FormProducts_productId_idx" ON "FormProducts" ("productId");
       `);
-      if (process.env.NODE_ENV === 'development') {
-        console.log('✅ FormProducts table verified/created successfully');
-      }
+      console.log('✅ FormProducts table verified/created successfully');
     } catch (tableError) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('⚠️  FormProducts table check:', tableError instanceof Error ? tableError.message : tableError);
-      }
+      console.log('⚠️  FormProducts table check:', tableError instanceof Error ? tableError.message : tableError);
     }
 
     // Add new enum value for amount_capturable_updated status

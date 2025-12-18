@@ -6,6 +6,8 @@ e4Uv$^9hJG:K\*)s%
 
 OR LOCALLY:
 
+pg_dump -h localhost -p 5432 -U fusehealth_user -d fusehealth_database --verbose --clean --create > Guilherme_full_database_dump_18_Dec_2025.sql
+
 pg_dump -h localhost -p 5432 -U fusehealth_user -d fusehealth_database --verbose --clean --create > Guilherme_full_database_dump_15_Nov_2025.sql
 
 TO RESTORE (LOCALLY):

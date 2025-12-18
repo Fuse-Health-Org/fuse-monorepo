@@ -33,7 +33,7 @@ const navigation = [
 ]
 
 const allOperations = [
-  { name: "Treatments", icon: Stethoscope, current: false, href: "#", comingSoon: true },
+  { name: "Programs", icon: Stethoscope, current: false, href: "/programs" },
   // { name: "Offerings", icon: Gift, current: false, href: "/offerings" },
   { name: "Products", icon: Package, current: false, href: "/products", id: "tutorial-step-3" },
   { name: "Orders", icon: ShoppingCart, current: false, href: "/orders", hasSubmenu: true },
