@@ -13,7 +13,10 @@ import {
     Search,
     Package,
     DollarSign,
-    Sparkles
+    Sparkles,
+    ExternalLink,
+    Copy,
+    Pill
 } from 'lucide-react'
 
 interface TemplateProduct {
@@ -21,6 +24,9 @@ interface TemplateProduct {
     name: string
     imageUrl?: string
     price?: number
+    placeholderSig?: string
+    pharmacyWholesaleCost?: number
+    slug?: string
 }
 
 interface MedicalTemplate {
@@ -42,6 +48,11 @@ interface MedicalTemplate {
     }[]
 }
 
+interface EnabledForm {
+    id: string
+    productId: string
+    globalFormStructureId?: string
+}
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
 
@@ -50,7 +61,7 @@ export default function ProgramEditor() {
     const { id } = router.query
     const isCreateMode = id === 'create'
 
-    const { token } = useAuth()
+    const { token, user } = useAuth()
     const [loading, setLoading] = useState(!isCreateMode)
     const [saving, setSaving] = useState(false)
     const [error, setError] = useState<string | null>(null)
@@ -82,6 +93,17 @@ export default function ProgramEditor() {
     const [templatesLoading, setTemplatesLoading] = useState(true)
     const [templateSearch, setTemplateSearch] = useState('')
 
+    // Selected template details (for edit mode display)
+    const [selectedTemplateDetails, setSelectedTemplateDetails] = useState<MedicalTemplate | null>(null)
+    
+    // Clinic info for building form URLs
+    const [clinicSlug, setClinicSlug] = useState<string | null>(null)
+    const [clinicCustomDomain, setClinicCustomDomain] = useState<string | null>(null)
+    
+    // Enabled forms for each product
+    const [enabledForms, setEnabledForms] = useState<EnabledForm[]>([])
+    const [copiedUrl, setCopiedUrl] = useState<string | null>(null)
+
     // Load existing program if editing
     useEffect(() => {
         if (!isCreateMode && token && id) {
@@ -95,6 +117,87 @@ export default function ProgramEditor() {
             fetchTemplates()
         }
     }, [token])
+
+    // Load clinic info for form URLs
+    useEffect(() => {
+        const fetchClinic = async () => {
+            console.log('🏥 Fetching clinic info...', { token: !!token, clinicId: user?.clinicId })
+            if (!token || !user?.clinicId) {
+                console.log('⚠️ Missing token or clinicId')
+                return
+            }
+            try {
+                const response = await fetch(`${API_URL}/clinic/${user.clinicId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                })
+                if (response.ok) {
+                    const data = await response.json()
+                    console.log('🏥 Clinic data:', data)
+                    if (data.success && data.data) {
+                        setClinicSlug(data.data.slug)
+                        setClinicCustomDomain(data.data.customDomain || null)
+                        console.log('✅ Clinic slug set:', data.data.slug)
+                    }
+                } else {
+                    console.error('❌ Failed to fetch clinic:', response.status)
+                }
+            } catch (err) {
+                console.error('Failed to load clinic:', err)
+            }
+        }
+        fetchClinic()
+    }, [token, user?.clinicId])
+
+    // Load selected template details and forms when template is selected
+    useEffect(() => {
+        if (!medicalTemplateId || !token) {
+            setSelectedTemplateDetails(null)
+            setEnabledForms([])
+            return
+        }
+
+        // Find template from loaded templates list
+        const template = templates.find(t => t.id === medicalTemplateId)
+        console.log('📋 Selected template:', template)
+        console.log('📦 Products in template:', template?.formProducts?.map(fp => ({
+            id: fp.product?.id,
+            name: fp.product?.name,
+            slug: fp.product?.slug
+        })))
+        if (template) {
+            setSelectedTemplateDetails(template)
+            
+            // Fetch enabled forms for each product in this template
+            const fetchFormsForProducts = async () => {
+                if (!template.formProducts?.length) return
+                
+                const allForms: EnabledForm[] = []
+                for (const fp of template.formProducts) {
+                    if (!fp.product?.id) continue
+                    try {
+                        const res = await fetch(`${API_URL}/admin/tenant-product-forms?productId=${fp.product.id}`, {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        })
+                        if (res.ok) {
+                            const data = await res.json()
+                            if (Array.isArray(data?.data)) {
+                                allForms.push(...data.data.map((f: any) => ({
+                                    id: f.id,
+                                    productId: f.productId,
+                                    globalFormStructureId: f.globalFormStructureId
+                                })))
+                            }
+                        }
+                    } catch (err) {
+                        console.error('Error fetching forms for product:', fp.product.id, err)
+                    }
+                }
+                setEnabledForms(allForms)
+            }
+            
+            fetchFormsForProducts()
+        }
+    }, [medicalTemplateId, templates, token])
 
     const fetchProgram = async () => {
         try {
@@ -207,6 +310,53 @@ export default function ProgramEditor() {
         } finally {
             setSaving(false)
         }
+    }
+
+    // Helper to build form URL for a product
+    const buildFormUrl = (formId: string, productSlug: string | undefined | null) => {
+        // Debug logging
+        console.log('buildFormUrl:', { formId, productSlug, clinicSlug, clinicCustomDomain })
+        
+        if (!formId || !productSlug || !clinicSlug) {
+            console.log('Missing required info:', { hasFormId: !!formId, hasProductSlug: !!productSlug, hasClinicSlug: !!clinicSlug })
+            return null
+        }
+        
+        const isLocalhost = process.env.NODE_ENV !== 'production'
+        const protocol = isLocalhost ? 'http' : 'https'
+        
+        // Custom domain URL
+        if (clinicCustomDomain) {
+            return `${protocol}://${clinicCustomDomain}/my-products/${formId}/${productSlug}`
+        }
+        
+        // Subdomain URL
+        const isStaging = process.env.NEXT_PUBLIC_IS_STAGING === 'true'
+        const baseDomain = isStaging ? 'fusehealthstaging.xyz' : 'fusehealth.com'
+        const baseUrl = isLocalhost
+            ? `http://${clinicSlug}.localhost:3000`
+            : `https://${clinicSlug}.${baseDomain}`
+        
+        return `${baseUrl}/my-products/${formId}/${productSlug}`
+    }
+
+    // Copy URL to clipboard
+    const handleCopyUrl = async (url: string, productId: string) => {
+        try {
+            await navigator.clipboard.writeText(url)
+            setCopiedUrl(productId)
+            setTimeout(() => setCopiedUrl(null), 2000)
+        } catch (err) {
+            console.error('Failed to copy:', err)
+        }
+    }
+
+    // Format price helper
+    const formatPrice = (price: number) => {
+        return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'USD'
+        }).format(price)
     }
 
     const filteredTemplates = templates
@@ -787,6 +937,119 @@ export default function ProgramEditor() {
                                     )}
                                 </div>
                             )}
+                        </div>
+                    )}
+
+                    {/* Edit Mode: Selected Template Products & Form Links */}
+                    {!isCreateMode && selectedTemplateDetails && selectedTemplateDetails.formProducts && selectedTemplateDetails.formProducts.length > 0 && (
+                        <div className="bg-card rounded-2xl shadow-sm border border-border p-6 mt-6">
+                            <div className="flex items-center gap-2 mb-2">
+                                <Pill className="h-5 w-5 text-blue-500" />
+                                <h3 className="text-lg font-semibold">Program Products & Form Links</h3>
+                            </div>
+                            <p className="text-sm text-muted-foreground mb-4">
+                                Products from template: <span className="font-medium text-foreground">{selectedTemplateDetails.title}</span>
+                            </p>
+
+                            <div className="space-y-4">
+                                {selectedTemplateDetails.formProducts
+                                    .filter(fp => fp.product)
+                                    .map((fp) => {
+                                        const product = fp.product!
+                                        const productForms = enabledForms.filter(f => f.productId === product.id)
+                                        
+                                        return (
+                                            <div key={fp.id} className="border border-border rounded-xl overflow-hidden">
+                                                {/* Product Header */}
+                                                <div className="bg-muted/30 p-4 border-b border-border">
+                                                    <div className="flex items-center gap-4">
+                                                        {product.imageUrl && (
+                                                            <img
+                                                                src={product.imageUrl}
+                                                                alt={product.name}
+                                                                className="w-16 h-16 rounded-lg object-cover border border-border"
+                                                            />
+                                                        )}
+                                                        <div className="flex-1">
+                                                            <h4 className="font-semibold text-foreground">{product.name}</h4>
+                                                            {product.placeholderSig && (
+                                                                <p className="text-sm text-muted-foreground mt-1">
+                                                                    <span className="font-medium">SIG:</span> {product.placeholderSig}
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <div className="text-xs text-muted-foreground uppercase tracking-wide">Wholesale Cost</div>
+                                                            <div className="text-lg font-semibold text-foreground">
+                                                                {formatPrice(product.pharmacyWholesaleCost || product.price || 0)}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Form Links */}
+                                                <div className="p-4">
+                                                    {productForms.length > 0 ? (
+                                                        <div className="space-y-3">
+                                                            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                                                                <FileText className="h-4 w-4" />
+                                                                Form Links ({productForms.length})
+                                                            </div>
+                                                            {productForms.map((form, idx) => {
+                                                                const url = buildFormUrl(form.id, product.slug || '')
+                                                                return url ? (
+                                                                    <div key={form.id} className="flex items-center gap-2 bg-muted/50 rounded-lg p-3">
+                                                                        <div className="flex-1 font-mono text-xs text-muted-foreground truncate">
+                                                                            {url}
+                                                                        </div>
+                                                                        <Button
+                                                                            size="sm"
+                                                                            variant="outline"
+                                                                            onClick={() => window.open(url, '_blank')}
+                                                                            className="flex-shrink-0"
+                                                                        >
+                                                                            <ExternalLink className="h-3 w-3 mr-1" />
+                                                                            Open
+                                                                        </Button>
+                                                                        <Button
+                                                                            size="sm"
+                                                                            variant="outline"
+                                                                            onClick={() => handleCopyUrl(url, product.id + '-' + idx)}
+                                                                            className="flex-shrink-0"
+                                                                        >
+                                                                            <Copy className="h-3 w-3 mr-1" />
+                                                                            {copiedUrl === product.id + '-' + idx ? 'Copied!' : 'Copy'}
+                                                                        </Button>
+                                                                    </div>
+                                                                ) : (
+                                                                    <div key={form.id} className="text-xs text-muted-foreground bg-amber-50 dark:bg-amber-950/20 p-2 rounded">
+                                                                        Form URL not available - Missing: 
+                                                                        {!product.slug && ' product slug'}
+                                                                        {!clinicSlug && ' clinic slug'}
+                                                                        {product.slug && clinicSlug && ' (unknown issue)'}
+                                                                    </div>
+                                                                )
+                                                            })}
+                                                        </div>
+                                                    ) : (
+                                                        <div className="text-sm text-muted-foreground flex items-center gap-2">
+                                                            <FileText className="h-4 w-4" />
+                                                            No forms enabled for this product yet. 
+                                                            <a 
+                                                                href={`/products/${product.id}`} 
+                                                                className="text-primary hover:underline"
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                            >
+                                                                Configure in Products →
+                                                            </a>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )
+                                    })}
+                            </div>
                         </div>
                     )}
 

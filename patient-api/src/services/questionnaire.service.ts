@@ -114,7 +114,7 @@ class QuestionnaireService {
             {
               model: Product,
               as: "product",
-              attributes: ["id", "name", "imageUrl", "price"],
+              attributes: ["id", "name", "imageUrl", "price", "placeholderSig", "pharmacyWholesaleCost", "slug"],
               required: false,
             },
           ],
