@@ -59,17 +59,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // Fallback: parse subdomain formats
         if (!clinicSlug) {
             if (process.env.NODE_ENV === 'production' && hostname.endsWith('.fusehealth.com')) {
-                const parts = hostname.split('.fusehealth.com')
-                clinicSlug = parts.length > 1 ? parts[0] : null
+                const beforeDomain = hostname.replace('.fusehealth.com', '')
+                const subdomainParts = beforeDomain.split('.')
+                // If 2+ parts: affiliate.brand → use brand (last part)
+                clinicSlug = subdomainParts.length >= 2 ? subdomainParts[subdomainParts.length - 1] : beforeDomain
             } else if (process.env.NODE_ENV === 'production' && hostname.endsWith('.fuse.health')) {
-                const parts = hostname.split('.fuse.health')
-                clinicSlug = parts.length > 1 ? parts[0] : null
+                const beforeDomain = hostname.replace('.fuse.health', '')
+                const subdomainParts = beforeDomain.split('.')
+                clinicSlug = subdomainParts.length >= 2 ? subdomainParts[subdomainParts.length - 1] : beforeDomain
             } else if (process.env.NODE_ENV === 'production' && hostname.endsWith('.fusehealthstaging.xyz')) {
-                const parts = hostname.split('.fusehealthstaging.xyz')
-                clinicSlug = parts.length > 1 ? parts[0] : null
+                const beforeDomain = hostname.replace('.fusehealthstaging.xyz', '')
+                const subdomainParts = beforeDomain.split('.')
+                clinicSlug = subdomainParts.length >= 2 ? subdomainParts[subdomainParts.length - 1] : beforeDomain
             } else if (process.env.NODE_ENV !== 'production' && hostname.includes('.localhost')) {
-                const parts = hostname.split('.localhost')
-                clinicSlug = parts.length > 1 ? parts[0] : null
+                const beforeLocalhost = hostname.split('.localhost')[0]
+                const subdomainParts = beforeLocalhost.split('.')
+                // For affiliate portals: check.test.localhost → use "test" (brand clinic)
+                // For regular clinics: test.localhost → use "test"
+                clinicSlug = subdomainParts.length >= 2 ? subdomainParts[subdomainParts.length - 1] : beforeLocalhost
+                console.log('[brand-products] localhost subdomain parsing', { 
+                    hostname, 
+                    beforeLocalhost, 
+                    subdomainParts, 
+                    clinicSlug,
+                    isAffiliate: subdomainParts.length >= 2
+                })
             }
             console.log('[brand-products] derived clinicSlug from host fallback', { hostname, clinicSlug })
         }

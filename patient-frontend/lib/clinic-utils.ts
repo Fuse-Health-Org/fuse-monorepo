@@ -95,13 +95,14 @@ export async function extractClinicSlugFromDomain(): Promise<ClinicDomainInfo> {
     const partsBeforeLocalhost = parts.slice(0, localhostIndex);
     
     if (partsBeforeLocalhost.length === 2) {
-      // Affiliate subdomain: ufc.limitless.localhost -> affiliateSlug: "ufc", brandSlug: "limitless"
-      // The first part is the affiliate's clinic slug
-      clinicSlug = partsBeforeLocalhost[0];
+      // Affiliate subdomain: check.test.localhost -> affiliateSlug: "check", brandSlug: "test"
+      // For product loading, we need the brand clinic slug (second part), not the affiliate
+      clinicSlug = partsBeforeLocalhost[1];  // Use brand clinic slug for products
       hasClinicSubdomain = true;
       console.log('👤 Detected affiliate subdomain (dev):', { 
         affiliateSlug: partsBeforeLocalhost[0], 
-        brandSlug: partsBeforeLocalhost[1] 
+        brandSlug: partsBeforeLocalhost[1],
+        clinicSlugUsed: clinicSlug
       });
     } else if (partsBeforeLocalhost.length === 1) {
       // Regular clinic subdomain: limitless.localhost -> slug: "limitless"
@@ -123,11 +124,16 @@ export async function extractClinicSlugFromDomain(): Promise<ClinicDomainInfo> {
   } else if (hostname.endsWith('.fusehealth.com') && parts.length >= 3 && parts[0] !== 'app' && parts[0] !== 'www') {
     // Production clinic subdomain: <clinic>.fusehealth.com OR affiliate subdomain: <affiliate>.<brand>.fusehealth.com
     if (parts.length === 4) {
-      // Affiliate subdomain: lala.limitless.fusehealth.com -> slug: "lala"
+      // Affiliate subdomain: check.test.fusehealth.com
       // parts[0] = affiliate slug, parts[1] = brand slug
-      clinicSlug = parts[0];
+      // For product loading, use the brand clinic slug
+      clinicSlug = parts[1];  // Use brand clinic slug for products
       hasClinicSubdomain = true;
-      console.log('👤 Detected affiliate subdomain:', { affiliateSlug: parts[0], brandSlug: parts[1] });
+      console.log('👤 Detected affiliate subdomain:', { 
+        affiliateSlug: parts[0], 
+        brandSlug: parts[1],
+        clinicSlugUsed: clinicSlug
+      });
     } else if (parts.length === 3) {
       // Regular clinic subdomain: limitless.fusehealth.com -> slug: "limitless"
       clinicSlug = parts[0];

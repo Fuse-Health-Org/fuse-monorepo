@@ -119,8 +119,12 @@ export function AffiliateAnalytics() {
   // Check if there's insufficient data
   const MIN_RECORDS_REQUIRED = 10;
   const currentRecordCount = data?.recordCount ?? 0;
-  const hasInsufficientData =
-    !data || !data.analytics || currentRecordCount < MIN_RECORDS_REQUIRED;
+  const isDevelopment = process.env.NODE_ENV === 'development';
+  
+  // In development, skip minimum record requirements
+  const hasInsufficientData = isDevelopment 
+    ? false 
+    : (!data || !data.analytics || currentRecordCount < MIN_RECORDS_REQUIRED);
   const recordsNeeded = Math.max(0, MIN_RECORDS_REQUIRED - currentRecordCount);
 
   if (hasInsufficientData) {
@@ -236,7 +240,23 @@ export function AffiliateAnalytics() {
     );
   }
 
-  const analytics = data.analytics!;
+  // In development, provide default analytics if none exist
+  const analytics = data.analytics || (isDevelopment ? {
+    totalRevenue: 0,
+    orderCount: 0,
+    avgOrderValue: 0,
+    timeRange: {
+      start: startDate,
+      end: endDate,
+    },
+    categoryData: null,
+    timeSeries: [],
+  } : null);
+
+  // If still no analytics after fallback, something is wrong
+  if (!analytics) {
+    return null;
+  }
 
   return (
     <div className="space-y-6">
