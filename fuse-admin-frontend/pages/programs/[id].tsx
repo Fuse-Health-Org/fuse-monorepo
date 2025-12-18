@@ -11,7 +11,9 @@ import {
     FileText,
     Check,
     Search,
-    Package
+    Package,
+    DollarSign,
+    Sparkles
 } from 'lucide-react'
 
 interface TemplateProduct {
@@ -40,6 +42,7 @@ interface MedicalTemplate {
     }[]
 }
 
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
 
 export default function ProgramEditor() {
@@ -57,6 +60,19 @@ export default function ProgramEditor() {
     const [description, setDescription] = useState('')
     const [medicalTemplateId, setMedicalTemplateId] = useState<string | null>(null)
     const [isActive, setIsActive] = useState(true)
+
+    // Non-medical services state
+    const [hasPatientPortal, setHasPatientPortal] = useState(false)
+    const [patientPortalPrice, setPatientPortalPrice] = useState(0)
+    const [hasBmiCalculator, setHasBmiCalculator] = useState(false)
+    const [bmiCalculatorPrice, setBmiCalculatorPrice] = useState(0)
+    const [hasProteinIntakeCalculator, setHasProteinIntakeCalculator] = useState(false)
+    const [proteinIntakeCalculatorPrice, setProteinIntakeCalculatorPrice] = useState(0)
+    const [hasCalorieDeficitCalculator, setHasCalorieDeficitCalculator] = useState(false)
+    const [calorieDeficitCalculatorPrice, setCalorieDeficitCalculatorPrice] = useState(0)
+    const [hasEasyShopping, setHasEasyShopping] = useState(false)
+    const [easyShoppingPrice, setEasyShoppingPrice] = useState(0)
+
 
     // Step state for creation flow
     const [currentStep, setCurrentStep] = useState(1)
@@ -95,6 +111,17 @@ export default function ProgramEditor() {
                     setDescription(program.description || '')
                     setMedicalTemplateId(program.medicalTemplateId || null)
                     setIsActive(program.isActive)
+                    // Load non-medical services
+                    setHasPatientPortal(program.hasPatientPortal || false)
+                    setPatientPortalPrice(parseFloat(program.patientPortalPrice) || 0)
+                    setHasBmiCalculator(program.hasBmiCalculator || false)
+                    setBmiCalculatorPrice(parseFloat(program.bmiCalculatorPrice) || 0)
+                    setHasProteinIntakeCalculator(program.hasProteinIntakeCalculator || false)
+                    setProteinIntakeCalculatorPrice(parseFloat(program.proteinIntakeCalculatorPrice) || 0)
+                    setHasCalorieDeficitCalculator(program.hasCalorieDeficitCalculator || false)
+                    setCalorieDeficitCalculatorPrice(parseFloat(program.calorieDeficitCalculatorPrice) || 0)
+                    setHasEasyShopping(program.hasEasyShopping || false)
+                    setEasyShoppingPrice(parseFloat(program.easyShoppingPrice) || 0)
                 }
             } else {
                 setError('Failed to load program')
@@ -141,6 +168,17 @@ export default function ProgramEditor() {
                 name: name.trim(),
                 description: description.trim() || undefined,
                 medicalTemplateId: medicalTemplateId || undefined,
+                // Non-medical services
+                hasPatientPortal,
+                patientPortalPrice,
+                hasBmiCalculator,
+                bmiCalculatorPrice,
+                hasProteinIntakeCalculator,
+                proteinIntakeCalculatorPrice,
+                hasCalorieDeficitCalculator,
+                calorieDeficitCalculatorPrice,
+                hasEasyShopping,
+                easyShoppingPrice,
                 isActive,
             }
 
@@ -228,24 +266,34 @@ export default function ProgramEditor() {
 
                     {/* Step Indicator for Create Mode */}
                     {isCreateMode && (
-                        <div className="mb-8 flex items-center justify-center gap-4">
+                        <div className="mb-8 flex items-center justify-center gap-3">
                             <div className="flex items-center gap-2">
-                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${currentStep === 1 ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${currentStep === 1 ? 'bg-primary text-primary-foreground' : currentStep > 1 ? 'bg-green-500 text-white' : 'bg-muted text-muted-foreground'
                                     }`}>
-                                    1
+                                    {currentStep > 1 ? <Check className="h-4 w-4" /> : '1'}
                                 </div>
-                                <span className={`text-sm font-medium ${currentStep === 1 ? 'text-foreground' : 'text-muted-foreground'}`}>
+                                <span className={`text-sm font-medium hidden sm:inline ${currentStep === 1 ? 'text-foreground' : 'text-muted-foreground'}`}>
                                     Program Details
                                 </span>
                             </div>
-                            <div className="w-12 h-px bg-border"></div>
+                            <div className="w-8 h-px bg-border"></div>
                             <div className="flex items-center gap-2">
-                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${currentStep === 2 ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${currentStep === 2 ? 'bg-primary text-primary-foreground' : currentStep > 2 ? 'bg-green-500 text-white' : 'bg-muted text-muted-foreground'
                                     }`}>
-                                    2
+                                    {currentStep > 2 ? <Check className="h-4 w-4" /> : '2'}
                                 </div>
-                                <span className={`text-sm font-medium ${currentStep === 2 ? 'text-foreground' : 'text-muted-foreground'}`}>
+                                <span className={`text-sm font-medium hidden sm:inline ${currentStep === 2 ? 'text-foreground' : 'text-muted-foreground'}`}>
                                     Medical Template
+                                </span>
+                            </div>
+                            <div className="w-8 h-px bg-border"></div>
+                            <div className="flex items-center gap-2">
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${currentStep === 3 ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+                                    }`}>
+                                    3
+                                </div>
+                                <span className={`text-sm font-medium hidden sm:inline ${currentStep === 3 ? 'text-foreground' : 'text-muted-foreground'}`}>
+                                    Services
                                 </span>
                             </div>
                         </div>
@@ -459,15 +507,167 @@ export default function ProgramEditor() {
                                             Back
                                         </Button>
                                         <Button
-                                            onClick={handleSave}
-                                            disabled={saving || !name.trim()}
+                                            onClick={() => setCurrentStep(3)}
                                             className="flex-1"
                                         >
-                                            {saving ? 'Creating Program...' : 'Create Program'}
+                                            Next: Non-Medical Services
                                         </Button>
                                     </div>
                                 </>
                             )}
+                        </div>
+                    )}
+
+                    {/* Step 3: Non-Medical Services (Create Mode Only) */}
+                    {isCreateMode && currentStep === 3 && (
+                        <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
+                            <div className="flex items-center gap-2 mb-2">
+                                <Sparkles className="h-5 w-5 text-primary" />
+                                <h3 className="text-lg font-semibold">Non-Medical Services</h3>
+                            </div>
+                            <p className="text-sm text-muted-foreground mb-6">
+                                Select which non-medical services to offer in this program and set their prices.
+                            </p>
+
+                            {/* Services List */}
+                            <div className="space-y-3 mb-6">
+                                {/* Patient Portal */}
+                                <div className={`p-4 border rounded-lg transition-all ${hasPatientPortal ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'}`}>
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <input type="checkbox" checked={hasPatientPortal} onChange={(e) => setHasPatientPortal(e.target.checked)} className="w-5 h-5 rounded border-gray-300 text-primary focus:ring-primary" />
+                                            <span className="font-medium">Patient Portal</span>
+                                        </div>
+                                        {hasPatientPortal && (
+                                            <div className="flex items-center gap-1">
+                                                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                                                <Input type="number" min="0" step="0.01" value={patientPortalPrice} onChange={(e) => setPatientPortalPrice(parseFloat(e.target.value) || 0)} className="w-24 text-right" placeholder="0.00" />
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* BMI Calculator */}
+                                <div className={`p-4 border rounded-lg transition-all ${hasBmiCalculator ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'}`}>
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <input type="checkbox" checked={hasBmiCalculator} onChange={(e) => setHasBmiCalculator(e.target.checked)} className="w-5 h-5 rounded border-gray-300 text-primary focus:ring-primary" />
+                                            <span className="font-medium">BMI Calculator</span>
+                                        </div>
+                                        {hasBmiCalculator && (
+                                            <div className="flex items-center gap-1">
+                                                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                                                <Input type="number" min="0" step="0.01" value={bmiCalculatorPrice} onChange={(e) => setBmiCalculatorPrice(parseFloat(e.target.value) || 0)} className="w-24 text-right" placeholder="0.00" />
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Protein Intake Calculator */}
+                                <div className={`p-4 border rounded-lg transition-all ${hasProteinIntakeCalculator ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'}`}>
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <input type="checkbox" checked={hasProteinIntakeCalculator} onChange={(e) => setHasProteinIntakeCalculator(e.target.checked)} className="w-5 h-5 rounded border-gray-300 text-primary focus:ring-primary" />
+                                            <span className="font-medium">Protein Intake Calculator</span>
+                                        </div>
+                                        {hasProteinIntakeCalculator && (
+                                            <div className="flex items-center gap-1">
+                                                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                                                <Input type="number" min="0" step="0.01" value={proteinIntakeCalculatorPrice} onChange={(e) => setProteinIntakeCalculatorPrice(parseFloat(e.target.value) || 0)} className="w-24 text-right" placeholder="0.00" />
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Calorie Deficit Calculator */}
+                                <div className={`p-4 border rounded-lg transition-all ${hasCalorieDeficitCalculator ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'}`}>
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <input type="checkbox" checked={hasCalorieDeficitCalculator} onChange={(e) => setHasCalorieDeficitCalculator(e.target.checked)} className="w-5 h-5 rounded border-gray-300 text-primary focus:ring-primary" />
+                                            <span className="font-medium">Calorie Deficit Calculator</span>
+                                        </div>
+                                        {hasCalorieDeficitCalculator && (
+                                            <div className="flex items-center gap-1">
+                                                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                                                <Input type="number" min="0" step="0.01" value={calorieDeficitCalculatorPrice} onChange={(e) => setCalorieDeficitCalculatorPrice(parseFloat(e.target.value) || 0)} className="w-24 text-right" placeholder="0.00" />
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Easy Shopping */}
+                                <div className={`p-4 border rounded-lg transition-all ${hasEasyShopping ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'}`}>
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <input type="checkbox" checked={hasEasyShopping} onChange={(e) => setHasEasyShopping(e.target.checked)} className="w-5 h-5 rounded border-gray-300 text-primary focus:ring-primary" />
+                                            <span className="font-medium">Easy Shopping</span>
+                                        </div>
+                                        {hasEasyShopping && (
+                                            <div className="flex items-center gap-1">
+                                                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                                                <Input type="number" min="0" step="0.01" value={easyShoppingPrice} onChange={(e) => setEasyShoppingPrice(parseFloat(e.target.value) || 0)} className="w-24 text-right" placeholder="0.00" />
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Summary */}
+                            {(hasPatientPortal || hasBmiCalculator || hasProteinIntakeCalculator || hasCalorieDeficitCalculator || hasEasyShopping) && (
+                                <div className="bg-muted/50 rounded-lg p-4 mb-6">
+                                    <h4 className="text-sm font-medium mb-2">Selected Services Summary</h4>
+                                    <div className="space-y-1">
+                                        {hasPatientPortal && (
+                                            <div className="flex justify-between text-sm">
+                                                <span className="text-muted-foreground">Patient Portal</span>
+                                                <span className="font-medium">{patientPortalPrice > 0 ? `$${patientPortalPrice.toFixed(2)}` : 'Free'}</span>
+                                            </div>
+                                        )}
+                                        {hasBmiCalculator && (
+                                            <div className="flex justify-between text-sm">
+                                                <span className="text-muted-foreground">BMI Calculator</span>
+                                                <span className="font-medium">{bmiCalculatorPrice > 0 ? `$${bmiCalculatorPrice.toFixed(2)}` : 'Free'}</span>
+                                            </div>
+                                        )}
+                                        {hasProteinIntakeCalculator && (
+                                            <div className="flex justify-between text-sm">
+                                                <span className="text-muted-foreground">Protein Intake Calculator</span>
+                                                <span className="font-medium">{proteinIntakeCalculatorPrice > 0 ? `$${proteinIntakeCalculatorPrice.toFixed(2)}` : 'Free'}</span>
+                                            </div>
+                                        )}
+                                        {hasCalorieDeficitCalculator && (
+                                            <div className="flex justify-between text-sm">
+                                                <span className="text-muted-foreground">Calorie Deficit Calculator</span>
+                                                <span className="font-medium">{calorieDeficitCalculatorPrice > 0 ? `$${calorieDeficitCalculatorPrice.toFixed(2)}` : 'Free'}</span>
+                                            </div>
+                                        )}
+                                        {hasEasyShopping && (
+                                            <div className="flex justify-between text-sm">
+                                                <span className="text-muted-foreground">Easy Shopping</span>
+                                                <span className="font-medium">{easyShoppingPrice > 0 ? `$${easyShoppingPrice.toFixed(2)}` : 'Free'}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Navigation Buttons */}
+                            <div className="flex gap-3">
+                                <Button
+                                    variant="outline"
+                                    onClick={() => setCurrentStep(2)}
+                                    className="flex-1"
+                                >
+                                    Back
+                                </Button>
+                                <Button
+                                    onClick={handleSave}
+                                    disabled={saving || !name.trim()}
+                                    className="flex-1"
+                                >
+                                    {saving ? 'Creating Program...' : 'Create Program'}
+                                </Button>
+                            </div>
                         </div>
                     )}
 
@@ -587,6 +787,102 @@ export default function ProgramEditor() {
                                     )}
                                 </div>
                             )}
+                        </div>
+                    )}
+
+                    {/* Edit Mode: Non-Medical Services */}
+                    {!isCreateMode && (
+                        <div className="bg-card rounded-2xl shadow-sm border border-border p-6 mt-6">
+                            <div className="flex items-center gap-2 mb-2">
+                                <Sparkles className="h-5 w-5 text-primary" />
+                                <h3 className="text-lg font-semibold">Non-Medical Services</h3>
+                            </div>
+                            <p className="text-sm text-muted-foreground mb-6">
+                                Select which non-medical services to offer in this program and set their prices.
+                            </p>
+
+                            {/* Services List */}
+                            <div className="space-y-3">
+                                {/* Patient Portal */}
+                                <div className={`p-4 border rounded-lg transition-all ${hasPatientPortal ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'}`}>
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <input type="checkbox" checked={hasPatientPortal} onChange={(e) => setHasPatientPortal(e.target.checked)} className="w-5 h-5 rounded border-gray-300 text-primary focus:ring-primary" />
+                                            <span className="font-medium">Patient Portal</span>
+                                        </div>
+                                        {hasPatientPortal && (
+                                            <div className="flex items-center gap-1">
+                                                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                                                <Input type="number" min="0" step="0.01" value={patientPortalPrice} onChange={(e) => setPatientPortalPrice(parseFloat(e.target.value) || 0)} className="w-24 text-right" placeholder="0.00" />
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* BMI Calculator */}
+                                <div className={`p-4 border rounded-lg transition-all ${hasBmiCalculator ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'}`}>
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <input type="checkbox" checked={hasBmiCalculator} onChange={(e) => setHasBmiCalculator(e.target.checked)} className="w-5 h-5 rounded border-gray-300 text-primary focus:ring-primary" />
+                                            <span className="font-medium">BMI Calculator</span>
+                                        </div>
+                                        {hasBmiCalculator && (
+                                            <div className="flex items-center gap-1">
+                                                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                                                <Input type="number" min="0" step="0.01" value={bmiCalculatorPrice} onChange={(e) => setBmiCalculatorPrice(parseFloat(e.target.value) || 0)} className="w-24 text-right" placeholder="0.00" />
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Protein Intake Calculator */}
+                                <div className={`p-4 border rounded-lg transition-all ${hasProteinIntakeCalculator ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'}`}>
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <input type="checkbox" checked={hasProteinIntakeCalculator} onChange={(e) => setHasProteinIntakeCalculator(e.target.checked)} className="w-5 h-5 rounded border-gray-300 text-primary focus:ring-primary" />
+                                            <span className="font-medium">Protein Intake Calculator</span>
+                                        </div>
+                                        {hasProteinIntakeCalculator && (
+                                            <div className="flex items-center gap-1">
+                                                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                                                <Input type="number" min="0" step="0.01" value={proteinIntakeCalculatorPrice} onChange={(e) => setProteinIntakeCalculatorPrice(parseFloat(e.target.value) || 0)} className="w-24 text-right" placeholder="0.00" />
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Calorie Deficit Calculator */}
+                                <div className={`p-4 border rounded-lg transition-all ${hasCalorieDeficitCalculator ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'}`}>
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <input type="checkbox" checked={hasCalorieDeficitCalculator} onChange={(e) => setHasCalorieDeficitCalculator(e.target.checked)} className="w-5 h-5 rounded border-gray-300 text-primary focus:ring-primary" />
+                                            <span className="font-medium">Calorie Deficit Calculator</span>
+                                        </div>
+                                        {hasCalorieDeficitCalculator && (
+                                            <div className="flex items-center gap-1">
+                                                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                                                <Input type="number" min="0" step="0.01" value={calorieDeficitCalculatorPrice} onChange={(e) => setCalorieDeficitCalculatorPrice(parseFloat(e.target.value) || 0)} className="w-24 text-right" placeholder="0.00" />
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Easy Shopping */}
+                                <div className={`p-4 border rounded-lg transition-all ${hasEasyShopping ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'}`}>
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <input type="checkbox" checked={hasEasyShopping} onChange={(e) => setHasEasyShopping(e.target.checked)} className="w-5 h-5 rounded border-gray-300 text-primary focus:ring-primary" />
+                                            <span className="font-medium">Easy Shopping</span>
+                                        </div>
+                                        {hasEasyShopping && (
+                                            <div className="flex items-center gap-1">
+                                                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                                                <Input type="number" min="0" step="0.01" value={easyShoppingPrice} onChange={(e) => setEasyShoppingPrice(parseFloat(e.target.value) || 0)} className="w-24 text-right" placeholder="0.00" />
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     )}
                 </div>

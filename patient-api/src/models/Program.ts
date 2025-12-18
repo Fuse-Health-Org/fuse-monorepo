@@ -40,6 +40,81 @@ export default class Program extends Entity {
     @BelongsTo(() => Questionnaire, 'medicalTemplateId')
     declare medicalTemplate?: Questionnaire;
 
+    // Non-Medical Services - Patient Portal
+    @Column({
+        type: DataType.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+    })
+    declare hasPatientPortal: boolean;
+
+    @Column({
+        type: DataType.DECIMAL(10, 2),
+        allowNull: false,
+        defaultValue: 0,
+    })
+    declare patientPortalPrice: number;
+
+    // Non-Medical Services - BMI Calculator
+    @Column({
+        type: DataType.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+    })
+    declare hasBmiCalculator: boolean;
+
+    @Column({
+        type: DataType.DECIMAL(10, 2),
+        allowNull: false,
+        defaultValue: 0,
+    })
+    declare bmiCalculatorPrice: number;
+
+    // Non-Medical Services - Protein Intake Calculator
+    @Column({
+        type: DataType.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+    })
+    declare hasProteinIntakeCalculator: boolean;
+
+    @Column({
+        type: DataType.DECIMAL(10, 2),
+        allowNull: false,
+        defaultValue: 0,
+    })
+    declare proteinIntakeCalculatorPrice: number;
+
+    // Non-Medical Services - Calorie Deficit Calculator
+    @Column({
+        type: DataType.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+    })
+    declare hasCalorieDeficitCalculator: boolean;
+
+    @Column({
+        type: DataType.DECIMAL(10, 2),
+        allowNull: false,
+        defaultValue: 0,
+    })
+    declare calorieDeficitCalculatorPrice: number;
+
+    // Non-Medical Services - Easy Shopping
+    @Column({
+        type: DataType.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+    })
+    declare hasEasyShopping: boolean;
+
+    @Column({
+        type: DataType.DECIMAL(10, 2),
+        allowNull: false,
+        defaultValue: 0,
+    })
+    declare easyShoppingPrice: number;
+
     @Column({
         type: DataType.BOOLEAN,
         allowNull: false,
