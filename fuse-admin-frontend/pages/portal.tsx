@@ -5,7 +5,7 @@ import Layout from "@/components/Layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Monitor, Smartphone, Upload, Link as LinkIcon, Globe, Crown } from "lucide-react"
+import { Monitor, Smartphone, Upload, Link as LinkIcon, Globe, Crown, ExternalLink } from "lucide-react"
 import { Switch } from "@/components/ui/switch"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
@@ -38,7 +38,7 @@ interface PortalSettings {
 
 export default function PortalPage() {
   const router = useRouter()
-  const { authenticatedFetch, subscription } = useAuth()
+  const { authenticatedFetch, subscription, user } = useAuth()
   const [previewMode, setPreviewMode] = useState<"desktop" | "mobile">("desktop")
   const [isSaving, setIsSaving] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
@@ -58,6 +58,7 @@ export default function PortalPage() {
     isActive: true,
   })
   const [isTogglingActive, setIsTogglingActive] = useState(false)
+  const [clinicSlug, setClinicSlug] = useState<string | null>(null)
 
   // Check if user has access to Portal based on their subscription plan
   const hasPortalAccess = subscription?.plan?.type && PORTAL_ALLOWED_PLAN_TYPES.includes(subscription.plan.type)
@@ -73,8 +74,24 @@ export default function PortalPage() {
   useEffect(() => {
     if (hasPortalAccess) {
       loadSettings()
+      // Fetch clinic slug
+      const fetchClinicSlug = async () => {
+        if (!user?.clinicId) return
+        try {
+          const response = await authenticatedFetch(`${API_URL}/clinic/${user.clinicId}`)
+          if (response.ok) {
+            const data = await response.json()
+            if (data.success && data.data?.slug) {
+              setClinicSlug(data.data.slug)
+            }
+          }
+        } catch (error) {
+          console.error("Error fetching clinic:", error)
+        }
+      }
+      fetchClinicSlug()
     }
-  }, [hasPortalAccess])
+  }, [hasPortalAccess, user?.clinicId])
 
   const loadSettings = async () => {
     try {
@@ -110,7 +127,7 @@ export default function PortalPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(settings),
       })
-      
+
       if (response.ok) {
         alert("Portal settings saved successfully!")
       } else {
@@ -132,7 +149,7 @@ export default function PortalPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isActive: checked }),
       })
-      
+
       if (response.ok) {
         setSettings({ ...settings, isActive: checked })
       } else {
@@ -257,7 +274,7 @@ export default function PortalPage() {
                 <div>
                   <h3 className="text-lg font-semibold">Custom Website</h3>
                   <p className="text-sm text-muted-foreground">
-                    {settings.isActive 
+                    {settings.isActive
                       ? "Your custom landing page is live and visible to visitors"
                       : "Enable to show your custom landing page to visitors"}
                   </p>
@@ -281,267 +298,267 @@ export default function PortalPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Settings Panel */}
           <div className="space-y-4">
-                {/* Portal Title */}
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium">Portal Title</CardTitle>
-                  </CardHeader>
-                  <CardContent>
+            {/* Portal Title */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium">Portal Title</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Input
+                  value={settings.portalTitle}
+                  onChange={(e) => setSettings({ ...settings, portalTitle: e.target.value })}
+                  placeholder="Enter portal title"
+                />
+              </CardContent>
+            </Card>
+
+            {/* Portal Description */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium">Portal Description</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <textarea
+                  className="w-full p-3 border rounded-md text-sm min-h-[80px] resize-none"
+                  value={settings.portalDescription}
+                  onChange={(e) => setSettings({ ...settings, portalDescription: e.target.value })}
+                  placeholder="Enter portal description"
+                />
+              </CardContent>
+            </Card>
+
+            {/* Primary Color */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium">Primary Color</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="color"
+                    value={settings.primaryColor}
+                    onChange={(e) => setSettings({ ...settings, primaryColor: e.target.value })}
+                    className="w-10 h-10 rounded cursor-pointer border-0"
+                  />
+                  <div
+                    className="w-10 h-10 rounded border"
+                    style={{ backgroundColor: settings.primaryColor }}
+                  />
+                  <Input
+                    value={settings.primaryColor}
+                    onChange={(e) => setSettings({ ...settings, primaryColor: e.target.value })}
+                    placeholder="#000000"
+                    className="w-28"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Font Selection */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium">Choose a Font</CardTitle>
+                <CardDescription>Previews update in real-time</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <select
+                  className="w-full p-3 border rounded-md text-sm"
+                  value={settings.fontFamily}
+                  onChange={(e) => setSettings({ ...settings, fontFamily: e.target.value })}
+                >
+                  {FONT_OPTIONS.map((font) => (
+                    <option key={font.value} value={font.value}>
+                      {font.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-muted-foreground">
+                  {FONT_OPTIONS.find((f) => f.value === settings.fontFamily)?.description}
+                </p>
+
+                {/* Font Preview */}
+                <div className="p-4 border rounded-md bg-muted/30">
+                  <p className="text-xs text-muted-foreground mb-2">Preview:</p>
+                  <h3
+                    className="text-xl font-semibold mb-1"
+                    style={{ fontFamily: settings.fontFamily }}
+                  >
+                    {settings.portalTitle || "Sample Title"}
+                  </h3>
+                  <p
+                    className="text-sm text-muted-foreground"
+                    style={{ fontFamily: settings.fontFamily }}
+                  >
+                    We're looking for talented professionals to join our growing team. Apply today and start your
+                    journey with us!
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Logo */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium">Logo</CardTitle>
+                <CardDescription>Upload your brand logo (recommended: 200x60px)</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {settings.logo && (
+                  <div className="mb-3 p-4 bg-muted/30 rounded-lg flex items-center justify-center">
+                    <img
+                      src={settings.logo}
+                      alt="Logo preview"
+                      className="h-12 object-contain max-w-[200px]"
+                    />
+                  </div>
+                )}
+
+                <div className="flex gap-2 mb-3">
+                  <Button
+                    variant={logoInputMode === "file" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setLogoInputMode("file")}
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    Upload a file
+                  </Button>
+                  <Button
+                    variant={logoInputMode === "url" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setLogoInputMode("url")}
+                  >
+                    <LinkIcon className="w-4 h-4 mr-2" />
+                    Enter URL
+                  </Button>
+                </div>
+
+                {logoInputMode === "file" ? (
+                  <div>
                     <Input
-                      value={settings.portalTitle}
-                      onChange={(e) => setSettings({ ...settings, portalTitle: e.target.value })}
-                      placeholder="Enter portal title"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleLogoUpload}
+                      disabled={isUploadingLogo}
                     />
-                  </CardContent>
-                </Card>
-
-                {/* Portal Description */}
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium">Portal Description</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <textarea
-                      className="w-full p-3 border rounded-md text-sm min-h-[80px] resize-none"
-                      value={settings.portalDescription}
-                      onChange={(e) => setSettings({ ...settings, portalDescription: e.target.value })}
-                      placeholder="Enter portal description"
+                    {isUploadingLogo && (
+                      <p className="text-xs text-blue-600 mt-2">Uploading to S3...</p>
+                    )}
+                    <p className="text-xs text-muted-foreground mt-2">Accepted formats: PNG, JPG, SVG. Max size: 2MB</p>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <Input
+                      value={settings.logo}
+                      onChange={(e) => setSettings({ ...settings, logo: e.target.value })}
+                      placeholder="https://example.com/logo.png"
                     />
-                  </CardContent>
-                </Card>
-
-                {/* Primary Color */}
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium">Primary Color</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="color"
-                        value={settings.primaryColor}
-                        onChange={(e) => setSettings({ ...settings, primaryColor: e.target.value })}
-                        className="w-10 h-10 rounded cursor-pointer border-0"
-                      />
-                      <div
-                        className="w-10 h-10 rounded border"
-                        style={{ backgroundColor: settings.primaryColor }}
-                      />
-                      <Input
-                        value={settings.primaryColor}
-                        onChange={(e) => setSettings({ ...settings, primaryColor: e.target.value })}
-                        placeholder="#000000"
-                        className="w-28"
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Font Selection */}
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium">Choose a Font</CardTitle>
-                    <CardDescription>Previews update in real-time</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <select
-                      className="w-full p-3 border rounded-md text-sm"
-                      value={settings.fontFamily}
-                      onChange={(e) => setSettings({ ...settings, fontFamily: e.target.value })}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSettings({ ...settings, logo: "" })}
                     >
-                      {FONT_OPTIONS.map((font) => (
-                        <option key={font.value} value={font.value}>
-                          {font.label}
-                        </option>
-                      ))}
-                    </select>
-                    <p className="text-xs text-muted-foreground">
-                      {FONT_OPTIONS.find((f) => f.value === settings.fontFamily)?.description}
-                    </p>
-                    
-                    {/* Font Preview */}
-                    <div className="p-4 border rounded-md bg-muted/30">
-                      <p className="text-xs text-muted-foreground mb-2">Preview:</p>
-                      <h3
-                        className="text-xl font-semibold mb-1"
-                        style={{ fontFamily: settings.fontFamily }}
-                      >
-                        {settings.portalTitle || "Sample Title"}
-                      </h3>
-                      <p
-                        className="text-sm text-muted-foreground"
-                        style={{ fontFamily: settings.fontFamily }}
-                      >
-                        We're looking for talented professionals to join our growing team. Apply today and start your
-                        journey with us!
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
+                      Clear
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
-                {/* Logo */}
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium">Logo</CardTitle>
-                    <CardDescription>Upload your brand logo (recommended: 200x60px)</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {settings.logo && (
-                      <div className="mb-3 p-4 bg-muted/30 rounded-lg flex items-center justify-center">
-                        <img
-                          src={settings.logo}
-                          alt="Logo preview"
-                          className="h-12 object-contain max-w-[200px]"
-                        />
-                      </div>
-                    )}
-                    
-                    <div className="flex gap-2 mb-3">
-                      <Button
-                        variant={logoInputMode === "file" ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setLogoInputMode("file")}
-                      >
-                        <Upload className="w-4 h-4 mr-2" />
-                        Upload a file
-                      </Button>
-                      <Button
-                        variant={logoInputMode === "url" ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setLogoInputMode("url")}
-                      >
-                        <LinkIcon className="w-4 h-4 mr-2" />
-                        Enter URL
-                      </Button>
-                    </div>
-
-                    {logoInputMode === "file" ? (
-                      <div>
-                        <Input
-                          type="file"
-                          accept="image/*"
-                          onChange={handleLogoUpload}
-                          disabled={isUploadingLogo}
-                        />
-                        {isUploadingLogo && (
-                          <p className="text-xs text-blue-600 mt-2">Uploading to S3...</p>
-                        )}
-                        <p className="text-xs text-muted-foreground mt-2">Accepted formats: PNG, JPG, SVG. Max size: 2MB</p>
-                      </div>
-                    ) : (
-                      <div className="flex gap-2">
-                        <Input
-                          value={settings.logo}
-                          onChange={(e) => setSettings({ ...settings, logo: e.target.value })}
-                          placeholder="https://example.com/logo.png"
-                        />
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setSettings({ ...settings, logo: "" })}
-                        >
-                          Clear
-                        </Button>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                {/* Hero Image */}
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium">Hero Banner Image</CardTitle>
-                    <CardDescription>Large viewport image displayed at the top of your landing page (recommended: 1920x1080px)</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {settings.heroImageUrl && (
-                      <div className="mb-3 rounded-lg overflow-hidden border">
-                        <img
-                          src={settings.heroImageUrl}
-                          alt="Hero preview"
-                          className="w-full h-48 object-cover"
-                        />
-                      </div>
-                    )}
-
-                    <div className="flex gap-2 mb-3">
-                      <Button
-                        variant={heroInputMode === "file" ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setHeroInputMode("file")}
-                      >
-                        <Upload className="w-4 h-4 mr-2" />
-                        Upload a file
-                      </Button>
-                      <Button
-                        variant={heroInputMode === "url" ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setHeroInputMode("url")}
-                      >
-                        <LinkIcon className="w-4 h-4 mr-2" />
-                        Enter URL
-                      </Button>
-                    </div>
-
-                    {heroInputMode === "file" ? (
-                      <div>
-                        <Input
-                          type="file"
-                          accept="image/*"
-                          onChange={handleHeroImageUpload}
-                          disabled={isUploadingHero}
-                        />
-                        {isUploadingHero && (
-                          <p className="text-xs text-blue-600 mt-2">Uploading to S3...</p>
-                        )}
-                        <p className="text-xs text-muted-foreground mt-2">Accepted formats: PNG, JPG, WebP. Max size: 5MB. Recommended: 1920x1080px or larger</p>
-                      </div>
-                    ) : (
-                      <div className="flex gap-2">
-                        <Input
-                          value={settings.heroImageUrl}
-                          onChange={(e) => setSettings({ ...settings, heroImageUrl: e.target.value })}
-                          placeholder="https://example.com/hero-image.jpg"
-                        />
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setSettings({ ...settings, heroImageUrl: "" })}
-                        >
-                          Clear
-                        </Button>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                {/* Hero Title */}
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium">Hero Title</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <Input
-                      value={settings.heroTitle}
-                      onChange={(e) => setSettings({ ...settings, heroTitle: e.target.value })}
-                      placeholder="Enter hero title"
+            {/* Hero Image */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium">Hero Banner Image</CardTitle>
+                <CardDescription>Large viewport image displayed at the top of your landing page (recommended: 1920x1080px)</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {settings.heroImageUrl && (
+                  <div className="mb-3 rounded-lg overflow-hidden border">
+                    <img
+                      src={settings.heroImageUrl}
+                      alt="Hero preview"
+                      className="w-full h-48 object-cover"
                     />
-                  </CardContent>
-                </Card>
+                  </div>
+                )}
 
-                {/* Hero Subtitle */}
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium">Hero Subtitle</CardTitle>
-                  </CardHeader>
-                  <CardContent>
+                <div className="flex gap-2 mb-3">
+                  <Button
+                    variant={heroInputMode === "file" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setHeroInputMode("file")}
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    Upload a file
+                  </Button>
+                  <Button
+                    variant={heroInputMode === "url" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setHeroInputMode("url")}
+                  >
+                    <LinkIcon className="w-4 h-4 mr-2" />
+                    Enter URL
+                  </Button>
+                </div>
+
+                {heroInputMode === "file" ? (
+                  <div>
                     <Input
-                      value={settings.heroSubtitle}
-                      onChange={(e) => setSettings({ ...settings, heroSubtitle: e.target.value })}
-                      placeholder="Enter hero subtitle"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleHeroImageUpload}
+                      disabled={isUploadingHero}
                     />
-                  </CardContent>
-                </Card>
+                    {isUploadingHero && (
+                      <p className="text-xs text-blue-600 mt-2">Uploading to S3...</p>
+                    )}
+                    <p className="text-xs text-muted-foreground mt-2">Accepted formats: PNG, JPG, WebP. Max size: 5MB. Recommended: 1920x1080px or larger</p>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <Input
+                      value={settings.heroImageUrl}
+                      onChange={(e) => setSettings({ ...settings, heroImageUrl: e.target.value })}
+                      placeholder="https://example.com/hero-image.jpg"
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSettings({ ...settings, heroImageUrl: "" })}
+                    >
+                      Clear
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Hero Title */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium">Hero Title</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Input
+                  value={settings.heroTitle}
+                  onChange={(e) => setSettings({ ...settings, heroTitle: e.target.value })}
+                  placeholder="Enter hero title"
+                />
+              </CardContent>
+            </Card>
+
+            {/* Hero Subtitle */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium">Hero Subtitle</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Input
+                  value={settings.heroSubtitle}
+                  onChange={(e) => setSettings({ ...settings, heroSubtitle: e.target.value })}
+                  placeholder="Enter hero subtitle"
+                />
+              </CardContent>
+            </Card>
 
             {/* Save Button */}
             <Button onClick={handleSave} className="w-full" disabled={isSaving}>
@@ -577,9 +594,8 @@ export default function PortalPage() {
               </CardHeader>
               <CardContent>
                 <div
-                  className={`bg-white border rounded-lg overflow-hidden shadow-sm ${
-                    previewMode === "mobile" ? "max-w-[375px] mx-auto" : ""
-                  }`}
+                  className={`bg-white border rounded-lg overflow-hidden shadow-sm ${previewMode === "mobile" ? "max-w-[375px] mx-auto" : ""
+                    }`}
                   style={{ fontFamily: settings.fontFamily }}
                 >
                   {/* Preview Header */}
@@ -653,6 +669,57 @@ export default function PortalPage() {
             </Card>
           </div>
         </div>
+
+        {/* Portal Preview URL */}
+        {clinicSlug && (
+          <>
+            {/* Local Development Preview */}
+            {typeof window !== 'undefined' && window.location.hostname.includes('localhost') && (
+              <div className="mt-6 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700 flex items-center gap-2">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>Local Development Mode: Preview your portal on localhost</span>
+              </div>
+            )}
+            
+            <Card className="mt-6">
+              <CardContent className="py-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3 flex-1">
+                    <div className="p-2 rounded-full bg-primary/10">
+                      <LinkIcon className="h-5 w-5 text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-sm font-medium mb-1">
+                        {typeof window !== 'undefined' && window.location.hostname.includes('localhost') 
+                          ? 'Your Brand Portal URL (Local)' 
+                          : 'Your Brand Portal URL'}
+                      </h3>
+                      <p className="text-sm font-mono text-muted-foreground truncate">
+                        {typeof window !== 'undefined' && window.location.hostname.includes('localhost')
+                          ? `http://${clinicSlug}.localhost:3000`
+                          : `https://${clinicSlug}.yourdomain.com`}
+                      </p>
+                      {typeof window !== 'undefined' && window.location.hostname.includes('localhost') && (
+                        <p className="text-xs text-blue-600 mt-1">
+                          This is your patient-facing portal URL for local testing
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={() => window.open(`http://${clinicSlug}.localhost:3000`, '_blank')}
+                  >
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    Preview
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        )}
       </div>
     </Layout>
   )

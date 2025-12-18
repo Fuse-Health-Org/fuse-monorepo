@@ -800,134 +800,210 @@ export function AffiliateBranding() {
       </div>
 
       {/* Portal URLs Display */}
-      {(mainPortalUrl || fallbackPortalUrl || adminPortalUrl || fallbackAdminPortalUrl) && (
+      {(settings.clinicSlug && settings.parentClinicSlug) && (
         <div className="space-y-3">
-          {/* Main Portal URL */}
-          {mainPortalUrl && (
-            <Card>
-              <CardBody className="py-4">
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-3 flex-1">
-                    <div className="p-2 rounded-full bg-primary/10">
-                      <Icon icon="lucide:link" className="text-xl text-primary" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-medium text-foreground mb-1">Your Portal URL</h3>
-                      <p className="text-sm font-mono text-muted-foreground truncate mb-1">
-                        {mainPortalUrl}
-                      </p>
-                      <p className="text-xs text-warning flex items-center gap-1">
-                        <Icon icon="lucide:alert-circle" className="text-sm" />
-                        <span>May not work unless the brand configured wildcard DNS (*.{settings.parentClinicCustomDomain?.replace(/^app\./, '')})</span>
-                      </p>
-                    </div>
-                  </div>
-                  <Button
-                    color="primary"
-                    variant="flat"
-                    onPress={handlePreviewMain}
-                    startContent={<Icon icon="lucide:external-link" className="text-lg" />}
-                  >
-                    Preview
-                  </Button>
-                </div>
-              </CardBody>
-            </Card>
-          )}
+          {/* Check if we're in local development */}
+          {typeof window !== 'undefined' && window.location.hostname.includes('localhost') ? (
+            <>
+              {/* Local Development Notice */}
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700 flex items-center gap-2">
+                <Icon icon="lucide:info" className="text-lg" />
+                <span>Local Development Mode: URLs below use localhost.</span>
+              </div>
 
-          {/* Portal Fallback URL */}
-          {fallbackPortalUrl && (
-            <Card>
-              <CardBody className="py-4">
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-3 flex-1">
-                    <div className="p-2 rounded-full bg-default/10">
-                      <Icon icon="lucide:link-2" className="text-xl text-default-500" />
+              {/* Patient-facing Portal URL (Local) */}
+              <Card>
+                <CardBody className="py-4">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3 flex-1">
+                      <div className="p-2 rounded-full bg-primary/10">
+                        <Icon icon="lucide:link" className="text-xl text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-sm font-medium text-foreground mb-1">Your Portal URL</h3>
+                        <p className="text-sm font-mono text-muted-foreground truncate mb-1">
+                          {`http://${settings.clinicSlug}.${settings.parentClinicSlug}.localhost:3000`}
+                        </p>
+                        <p className="text-xs text-blue-700 flex items-center gap-1">
+                          <Icon icon="lucide:info" className="text-sm" />
+                          <span>This is your patient-facing portal URL for local testing.</span>
+                        </p>
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-medium text-foreground mb-1">Portal Fallback URL</h3>
-                      <p className="text-sm font-mono text-muted-foreground truncate mb-1">
-                        {fallbackPortalUrl}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Use this if the main URL doesn't work
-                      </p>
-                    </div>
+                    <Button
+                      color="primary"
+                      variant="flat"
+                      onPress={() => window.open(`http://${settings.clinicSlug}.${settings.parentClinicSlug}.localhost:3000`, '_blank')}
+                      startContent={<Icon icon="lucide:external-link" className="text-lg" />}
+                    >
+                      Preview
+                    </Button>
                   </div>
-                  <Button
-                    variant="bordered"
-                    onPress={handlePreviewFallback}
-                    startContent={<Icon icon="lucide:external-link" className="text-lg" />}
-                  >
-                    Preview
-                  </Button>
-                </div>
-              </CardBody>
-            </Card>
-          )}
+                </CardBody>
+              </Card>
 
-          {/* Affiliate Admin Portal */}
-          {adminPortalUrl && (
-            <Card>
-              <CardBody className="py-4">
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-3 flex-1">
-                    <div className="p-2 rounded-full bg-success/10">
-                      <Icon icon="lucide:shield" className="text-xl text-success-600" />
+              {/* Affiliate Admin Portal URL (Local) */}
+              <Card>
+                <CardBody className="py-4">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3 flex-1">
+                      <div className="p-2 rounded-full bg-success/10">
+                        <Icon icon="lucide:shield" className="text-xl text-success-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-sm font-medium text-foreground mb-1">Affiliate Admin Portal</h3>
+                        <p className="text-sm font-mono text-muted-foreground truncate mb-1">
+                          {`http://${settings.clinicSlug}.${settings.parentClinicSlug}.localhost:3005`}
+                        </p>
+                        <p className="text-xs text-blue-700 flex items-center gap-1">
+                          <Icon icon="lucide:info" className="text-sm" />
+                          <span>This is your affiliate admin portal URL for local testing.</span>
+                        </p>
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-medium text-foreground mb-1">Affiliate Admin Portal</h3>
-                      <p className="text-sm font-mono text-muted-foreground truncate mb-1">
-                        {adminPortalUrl}
-                      </p>
-                      <p className="text-xs text-warning flex items-center gap-1">
-                        <Icon icon="lucide:alert-circle" className="text-sm" />
-                        <span>May not work unless the brand configured wildcard DNS (*.{settings.parentClinicCustomDomain?.replace(/^app\./, '')})</span>
-                      </p>
-                    </div>
+                    <Button
+                      color="success"
+                      variant="flat"
+                      onPress={() => window.open(`http://${settings.clinicSlug}.${settings.parentClinicSlug}.localhost:3005`, '_blank')}
+                      startContent={<Icon icon="lucide:external-link" className="text-lg" />}
+                    >
+                      Preview
+                    </Button>
                   </div>
-                  <Button
-                    color="success"
-                    variant="flat"
-                    onPress={handlePreviewAdmin}
-                    startContent={<Icon icon="lucide:external-link" className="text-lg" />}
-                  >
-                    Preview
-                  </Button>
-                </div>
-              </CardBody>
-            </Card>
-          )}
+                </CardBody>
+              </Card>
+            </>
+          ) : (
+            <>
+              {/* Production URLs */}
+              {/* Main Portal URL */}
+              {mainPortalUrl && (
+                <Card>
+                  <CardBody className="py-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-3 flex-1">
+                        <div className="p-2 rounded-full bg-primary/10">
+                          <Icon icon="lucide:link" className="text-xl text-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-sm font-medium text-foreground mb-1">Your Portal URL</h3>
+                          <p className="text-sm font-mono text-muted-foreground truncate mb-1">
+                            {mainPortalUrl}
+                          </p>
+                          <p className="text-xs text-warning flex items-center gap-1">
+                            <Icon icon="lucide:alert-circle" className="text-sm" />
+                            <span>May not work unless the brand configured wildcard DNS (*.{settings.parentClinicCustomDomain?.replace(/^app\./, '')})</span>
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        color="primary"
+                        variant="flat"
+                        onPress={handlePreviewMain}
+                        startContent={<Icon icon="lucide:external-link" className="text-lg" />}
+                      >
+                        Preview
+                      </Button>
+                    </div>
+                  </CardBody>
+                </Card>
+              )}
 
-          {/* Fallback Affiliate Admin Portal */}
-          {fallbackAdminPortalUrl && (
-            <Card>
-              <CardBody className="py-4">
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-3 flex-1">
-                    <div className="p-2 rounded-full bg-default/10">
-                      <Icon icon="lucide:shield-check" className="text-xl text-default-500" />
+              {/* Portal Fallback URL */}
+              {fallbackPortalUrl && (
+                <Card>
+                  <CardBody className="py-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-3 flex-1">
+                        <div className="p-2 rounded-full bg-default/10">
+                          <Icon icon="lucide:link-2" className="text-xl text-default-500" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-sm font-medium text-foreground mb-1">Portal Fallback URL</h3>
+                          <p className="text-sm font-mono text-muted-foreground truncate mb-1">
+                            {fallbackPortalUrl}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Use this if the main URL doesn't work
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        variant="bordered"
+                        onPress={handlePreviewFallback}
+                        startContent={<Icon icon="lucide:external-link" className="text-lg" />}
+                      >
+                        Preview
+                      </Button>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-medium text-foreground mb-1">Fallback Affiliate Admin Portal</h3>
-                      <p className="text-sm font-mono text-muted-foreground truncate mb-1">
-                        {fallbackAdminPortalUrl}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Use this if the main admin URL doesn't work
-                      </p>
+                  </CardBody>
+                </Card>
+              )}
+
+              {/* Affiliate Admin Portal */}
+              {adminPortalUrl && (
+                <Card>
+                  <CardBody className="py-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-3 flex-1">
+                        <div className="p-2 rounded-full bg-success/10">
+                          <Icon icon="lucide:shield" className="text-xl text-success-600" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-sm font-medium text-foreground mb-1">Affiliate Admin Portal</h3>
+                          <p className="text-sm font-mono text-muted-foreground truncate mb-1">
+                            {adminPortalUrl}
+                          </p>
+                          <p className="text-xs text-warning flex items-center gap-1">
+                            <Icon icon="lucide:alert-circle" className="text-sm" />
+                            <span>May not work unless the brand configured wildcard DNS (*.{settings.parentClinicCustomDomain?.replace(/^app\./, '')})</span>
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        color="success"
+                        variant="flat"
+                        onPress={handlePreviewAdmin}
+                        startContent={<Icon icon="lucide:external-link" className="text-lg" />}
+                      >
+                        Preview
+                      </Button>
                     </div>
-                  </div>
-                  <Button
-                    variant="bordered"
-                    onPress={handlePreviewFallbackAdmin}
-                    startContent={<Icon icon="lucide:external-link" className="text-lg" />}
-                  >
-                    Preview
-                  </Button>
-                </div>
-              </CardBody>
-            </Card>
+                  </CardBody>
+                </Card>
+              )}
+
+              {/* Fallback Affiliate Admin Portal */}
+              {fallbackAdminPortalUrl && (
+                <Card>
+                  <CardBody className="py-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-3 flex-1">
+                        <div className="p-2 rounded-full bg-default/10">
+                          <Icon icon="lucide:shield-check" className="text-xl text-default-500" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-sm font-medium text-foreground mb-1">Fallback Affiliate Admin Portal</h3>
+                          <p className="text-sm font-mono text-muted-foreground truncate mb-1">
+                            {fallbackAdminPortalUrl}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Use this if the main admin URL doesn't work
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        variant="bordered"
+                        onPress={handlePreviewFallbackAdmin}
+                        startContent={<Icon icon="lucide:external-link" className="text-lg" />}
+                      >
+                        Preview
+                      </Button>
+                    </div>
+                  </CardBody>
+                </Card>
+              )}
+            </>
           )}
         </div>
       )}
