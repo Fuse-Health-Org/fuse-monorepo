@@ -6529,36 +6529,65 @@ app.post("/payments/product/sub", async (req, res) => {
       brandAmountUsd,
     });
 
-    // Detect affiliate from hostname if not provided
+    // Detect affiliate from body or hostname
     let validAffiliateId: string | undefined = undefined;
-    const hostname = req.get("host") || req.hostname;
-    if (hostname) {
-      const parts = hostname.split(".");
-      // Check for pattern: affiliateslug.brandslug.domain.extension
-      // e.g., checktwo.limitless.fusehealth.com
-      if (parts.length >= 4) {
-        const affiliateSlug = parts[0];
-        console.log("🔍 Detecting affiliate from hostname (confirm payment):", { hostname, affiliateSlug });
-
-        // Find affiliate by website (slug) field
-        const affiliateBySlug = await User.findOne({
-          where: {
-            website: affiliateSlug,
+    const affiliateSlugFromBody = req.body.affiliateSlug;
+    
+    if (affiliateSlugFromBody) {
+      // Prefer affiliate slug from request body (sent by frontend)
+      console.log("🔍 Detecting affiliate from request body:", { affiliateSlug: affiliateSlugFromBody });
+      
+      const affiliateBySlug = await User.findOne({
+        where: {
+          website: affiliateSlugFromBody,
+        },
+        include: [
+          {
+            model: UserRoles,
+            as: "userRoles",
+            required: true,
           },
-          include: [
-            {
-              model: UserRoles,
-              as: "userRoles",
-              required: true,
-            },
-          ],
-        });
+        ],
+      });
 
-        if (affiliateBySlug) {
-          await affiliateBySlug.getUserRoles();
-          if (affiliateBySlug.userRoles?.hasRole("affiliate")) {
-            validAffiliateId = affiliateBySlug.id;
-            console.log("✅ Found affiliate from hostname (confirm payment):", { affiliateId: validAffiliateId, slug: affiliateSlug });
+      if (affiliateBySlug) {
+        await affiliateBySlug.getUserRoles();
+        if (affiliateBySlug.userRoles?.hasRole("affiliate")) {
+          validAffiliateId = affiliateBySlug.id;
+          console.log("✅ Found affiliate from request body:", { affiliateId: validAffiliateId, slug: affiliateSlugFromBody });
+        }
+      }
+    } else {
+      // Fallback: try to detect from hostname
+      const hostname = req.get("host") || req.hostname;
+      if (hostname) {
+        const parts = hostname.split(".");
+        // Check for pattern: affiliateslug.brandslug.domain.extension
+        // e.g., checktwo.limitless.fusehealth.com
+        if (parts.length >= 4) {
+          const affiliateSlug = parts[0];
+          console.log("🔍 Detecting affiliate from hostname (fallback):", { hostname, affiliateSlug });
+
+          // Find affiliate by website (slug) field
+          const affiliateBySlug = await User.findOne({
+            where: {
+              website: affiliateSlug,
+            },
+            include: [
+              {
+                model: UserRoles,
+                as: "userRoles",
+                required: true,
+              },
+            ],
+          });
+
+          if (affiliateBySlug) {
+            await affiliateBySlug.getUserRoles();
+            if (affiliateBySlug.userRoles?.hasRole("affiliate")) {
+              validAffiliateId = affiliateBySlug.id;
+              console.log("✅ Found affiliate from hostname (fallback):", { affiliateId: validAffiliateId, slug: affiliateSlug });
+            }
           }
         }
       }
@@ -6566,6 +6595,16 @@ app.post("/payments/product/sub", async (req, res) => {
 
     // Create order
     const orderNumber = await Order.generateOrderNumber();
+    
+    console.log("📝 [ORDER CREATION] Creating order with:", {
+      orderNumber,
+      userId: currentUser.id,
+      clinicId: (tenantProduct as any).clinicId,
+      affiliateId: validAffiliateId || 'NO AFFILIATE',
+      hasAffiliateSlugFromBody: !!affiliateSlugFromBody,
+      affiliateSlugValue: affiliateSlugFromBody,
+    });
+    
     const order = await Order.create({
       orderNumber,
       userId: currentUser.id,
@@ -6587,6 +6626,13 @@ app.post("/payments/product/sub", async (req, res) => {
       doctorAmount: Number(doctorUsd.toFixed(2)),
       pharmacyWholesaleAmount: Number(pharmacyWholesaleUsd.toFixed(2)),
       brandAmount: Number(brandAmountUsd.toFixed(2)),
+    });
+    
+    console.log("✅ [ORDER CREATION] Order created successfully:", {
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      affiliateId: order.affiliateId || 'NO AFFILIATE ASSIGNED',
+      status: order.status,
     });
 
     // Order item

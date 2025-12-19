@@ -10,7 +10,8 @@ export function useQuestionnaireAnalytics(
   productName: string | undefined,
   currentStepIndex: number,
   getCurrentStage: () => 'product' | 'payment' | 'account',
-  questionnaire: any
+  questionnaire: any,
+  affiliateSlug?: string | null
 ) {
   const hasTrackedViewRef = useRef(false);
   const hasConvertedRef = useRef(false);
@@ -31,12 +32,24 @@ export function useQuestionnaireAnalytics(
         formIdForTracking,
         tenantProductId,
         hasTrackedView: hasTrackedViewRef.current,
-        domainClinic: domainClinic ? { id: domainClinic.id, name: domainClinic.name, userId: (domainClinic as any).userId } : null
+        affiliateSlug,
+        domainClinic: domainClinic ? { 
+          id: domainClinic.id, 
+          name: domainClinic.name, 
+          userId: (domainClinic as any).userId,
+          ownerId: (domainClinic as any).ownerId,
+          fullClinic: domainClinic
+        } : null
       });
 
       // Only track if modal is open and we have the required data
       if (!isOpen || !formIdForTracking || !tenantProductId || !domainClinic) {
-        console.log('⚠️ [Analytics] Skipping tracking - missing required data');
+        console.log('⚠️ [Analytics] Skipping tracking - missing required data', {
+          isOpen,
+          hasFormId: !!formIdForTracking,
+          hasProductId: !!tenantProductId,
+          hasClinic: !!domainClinic
+        });
         return;
       }
 
@@ -50,11 +63,17 @@ export function useQuestionnaireAnalytics(
       const userId = (domainClinic as any).userId || (domainClinic as any).ownerId;
 
       if (!userId) {
-        console.warn('⚠️ [Analytics] Cannot track view: no userId found on clinic. Clinic data:', domainClinic);
+        console.warn('⚠️ [Analytics] Cannot track view: no userId found on clinic. Full clinic data:', JSON.stringify(domainClinic, null, 2));
         return;
       }
 
-      console.log('✅ [Analytics] All conditions met, calling trackFormView...');
+      console.log('✅ [Analytics] All conditions met, calling trackFormView with:', {
+        userId,
+        productId: tenantProductId,
+        formId: formIdForTracking,
+        sourceType: affiliateSlug ? 'affiliate' : 'brand',
+        affiliateSlug
+      });
 
       // Mark as tracked IMMEDIATELY to prevent duplicate calls
       hasTrackedViewRef.current = true;
@@ -65,12 +84,16 @@ export function useQuestionnaireAnalytics(
         formId: formIdForTracking,
         clinicId: domainClinic.id,
         clinicName: domainClinic.name,
-        productName: productName || undefined
+        productName: productName || undefined,
+        sourceType: affiliateSlug ? 'affiliate' : 'brand',
+        affiliateSlug: affiliateSlug || undefined
       });
+
+      console.log('✅ [Analytics] trackFormView call completed successfully');
     };
 
     handleTrackFormView();
-  }, [isOpen, questionnaireId, tenantProductFormId, tenantProductId, domainClinic, productName]);
+  }, [isOpen, questionnaireId, tenantProductFormId, tenantProductId, domainClinic, productName, affiliateSlug]);
 
   // Track drop-off when user leaves page or closes modal
   useEffect(() => {
@@ -176,6 +199,12 @@ export function useQuestionnaireAnalytics(
       const userId = (domainClinic as any).userId || (domainClinic as any).ownerId;
 
       if (userId) {
+        console.log('📊 [Analytics] Tracking conversion with:', {
+          sourceType: affiliateSlug ? 'affiliate' : 'brand',
+          affiliateSlug,
+          orderId
+        });
+
         await trackFormConversion({
           userId,
           productId: tenantProductId,
@@ -184,7 +213,9 @@ export function useQuestionnaireAnalytics(
           clinicName: domainClinic.name,
           productName: productName || undefined,
           paymentIntentId: paymentIntentId,
-          orderId: orderId || undefined
+          orderId: orderId || undefined,
+          sourceType: affiliateSlug ? 'affiliate' : 'brand',
+          affiliateSlug: affiliateSlug || undefined
         });
 
         // Mark as converted so we don't track a drop-off

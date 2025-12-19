@@ -54,6 +54,33 @@ export function useQuestionnaireModal(
     cardNumber: "", expiryDate: "", securityCode: "", country: "brazil"
   });
 
+  // Affiliate tracking: Extract affiliate slug from URL
+  const [affiliateSlug, setAffiliateSlug] = useState<string | null>(null);
+  
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const hostname = window.location.hostname;
+      const parts = hostname.split('.');
+      
+      // Check for affiliate subdomain pattern
+      if (hostname.includes('.localhost')) {
+        const beforeLocalhost = hostname.split('.localhost')[0];
+        const subdomainParts = beforeLocalhost.split('.');
+        if (subdomainParts.length >= 2) {
+          // affiliate.brand.localhost -> affiliateSlug = first part
+          setAffiliateSlug(subdomainParts[0]);
+          console.log('👤 Detected affiliate slug (dev):', subdomainParts[0]);
+        }
+      } else if (hostname.endsWith('.fusehealth.com') || hostname.endsWith('.fuse.health') || hostname.endsWith('.fusehealthstaging.xyz')) {
+        if (parts.length >= 4) {
+          // affiliate.brand.fusehealth.com -> affiliateSlug = first part
+          setAffiliateSlug(parts[0]);
+          console.log('👤 Detected affiliate slug (prod):', parts[0]);
+        }
+      }
+    }
+  }, []);
+
   // Auth state
   const [isSignInMode, setIsSignInMode] = useState(false);
   const [isSignInOptionsMode, setIsSignInOptionsMode] = useState(false);
@@ -184,7 +211,7 @@ export function useQuestionnaireModal(
 
   const { trackConversion, resetTrackingFlags } = useQuestionnaireAnalytics(
     isOpen, questionnaireId, tenantProductFormId, tenantProductId, domainClinic, productName,
-    currentStepIndex, getCurrentStage, questionnaire
+    currentStepIndex, getCurrentStage, questionnaire, affiliateSlug
   );
 
   // Plans and theme
@@ -523,6 +550,11 @@ export function useQuestionnaireModal(
         clinicName: domainClinic?.name
       };
       if (isClinicMOR) requestBody.useOnBehalfOf = true;
+      // Include affiliate slug for tracking
+      if (affiliateSlug) {
+        requestBody.affiliateSlug = affiliateSlug;
+        console.log('🎯 Including affiliate slug in payment request:', affiliateSlug);
+      }
       const result = await apiCall('/payments/product/sub', { method: 'POST', body: JSON.stringify(requestBody) });
       if (result.success && result.data) {
         const subscriptionData = result.data.data || result.data;
@@ -540,7 +572,7 @@ export function useQuestionnaireModal(
       setPaymentStatus('failed');
       return null;
     }
-  }, [plans, answers, domainClinic, tenantProductId, shippingInfo, buildQuestionnaireAnswers]);
+  }, [plans, answers, domainClinic, tenantProductId, shippingInfo, affiliateSlug, buildQuestionnaireAnswers]);
 
   const handlePlanSelection = useCallback(async (planId: string) => {
     setSelectedPlan(planId);

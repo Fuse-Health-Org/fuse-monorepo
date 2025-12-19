@@ -25,6 +25,8 @@ export const trackFormView = async (params: {
   clinicId?: string;
   clinicName?: string;
   productName?: string;
+  sourceType?: 'brand' | 'affiliate';
+  affiliateSlug?: string;
 }): Promise<void> => {
   try {
     const eventKey = `${params.userId}:${params.productId}:${params.formId}:view`;
@@ -39,7 +41,10 @@ export const trackFormView = async (params: {
     }
 
     if (process.env.NODE_ENV === "development") {
-      console.log("📊 [Analytics] Tracking form view");
+      console.log("📊 [Analytics] Tracking form view", {
+        sourceType: params.sourceType || 'brand',
+        affiliateSlug: params.affiliateSlug,
+      });
     }
 
     const payload = {
@@ -48,10 +53,12 @@ export const trackFormView = async (params: {
       formId: params.formId,
       eventType: "view" as const,
       sessionId: generateSessionId(),
+      sourceType: params.sourceType || 'brand',
       metadata: {
         clinicId: params.clinicId,
         clinicName: params.clinicName,
         productName: params.productName || "Unknown Product",
+        ...(params.affiliateSlug && { affiliateSlug: params.affiliateSlug }),
         timestamp: new Date().toISOString(),
       },
     };
@@ -78,6 +85,8 @@ export const trackFormConversion = async (params: {
   productName?: string;
   paymentIntentId?: string;
   orderId?: string;
+  sourceType?: 'brand' | 'affiliate';
+  affiliateSlug?: string;
 }): Promise<void> => {
   try {
     const eventKey = `${params.userId}:${params.productId}:${params.formId}:conversion`;
@@ -85,6 +94,13 @@ export const trackFormConversion = async (params: {
     const lastTracked = recentEvents.get(eventKey);
 
     if (lastTracked && now - lastTracked < DEDUP_WINDOW_MS) return;
+
+    if (process.env.NODE_ENV === "development") {
+      console.log("📊 [Analytics] Tracking form conversion", {
+        sourceType: params.sourceType || 'brand',
+        affiliateSlug: params.affiliateSlug,
+      });
+    }
 
     await apiCall("/analytics/track", {
       method: "POST",
@@ -94,12 +110,14 @@ export const trackFormConversion = async (params: {
         formId: params.formId,
         eventType: "conversion",
         sessionId: generateSessionId(),
+        sourceType: params.sourceType || 'brand',
         metadata: {
           clinicId: params.clinicId,
           clinicName: params.clinicName,
           productName: params.productName || "Unknown Product",
           paymentIntentId: params.paymentIntentId,
           orderId: params.orderId,
+          ...(params.affiliateSlug && { affiliateSlug: params.affiliateSlug }),
           timestamp: new Date().toISOString(),
         },
       }),

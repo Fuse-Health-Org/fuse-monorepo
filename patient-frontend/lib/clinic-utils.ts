@@ -96,14 +96,44 @@ export async function extractClinicSlugFromDomain(): Promise<ClinicDomainInfo> {
     
     if (partsBeforeLocalhost.length === 2) {
       // Affiliate subdomain: check.test.localhost -> affiliateSlug: "check", brandSlug: "test"
-      // For product loading, we need the brand clinic slug (second part), not the affiliate
-      clinicSlug = partsBeforeLocalhost[1];  // Use brand clinic slug for products
-      hasClinicSubdomain = true;
+      const affiliateSlug = partsBeforeLocalhost[0];
+      const brandSlug = partsBeforeLocalhost[1];
+      
       console.log('👤 Detected affiliate subdomain (dev):', { 
-        affiliateSlug: partsBeforeLocalhost[0], 
-        brandSlug: partsBeforeLocalhost[1],
-        clinicSlugUsed: clinicSlug
+        affiliateSlug, 
+        brandSlug,
       });
+      
+      // SECURITY: Validate that this affiliate really belongs to this brand
+      try {
+        const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+        const response = await fetch(`${API_BASE}/public/affiliate/validate-access`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ affiliateSlug, brandSlug }),
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+          // Validation passed - use the brand clinic slug
+          clinicSlug = data.data.brandClinic.slug;
+          hasClinicSubdomain = true;
+          console.log('✅ Affiliate access validated (dev):', { 
+            affiliateSlug,
+            brandSlug: data.data.brandClinic.slug,
+          });
+        } else {
+          // Validation failed - invalid affiliate or doesn't belong to this brand
+          console.error('❌ Affiliate validation failed (dev):', data.message);
+          clinicSlug = null;
+          hasClinicSubdomain = false;
+        }
+      } catch (error) {
+        console.error('❌ Error validating affiliate (dev):', error);
+        clinicSlug = null;
+        hasClinicSubdomain = false;
+      }
     } else if (partsBeforeLocalhost.length === 1) {
       // Regular clinic subdomain: limitless.localhost -> slug: "limitless"
       clinicSlug = partsBeforeLocalhost[0];
@@ -126,14 +156,44 @@ export async function extractClinicSlugFromDomain(): Promise<ClinicDomainInfo> {
     if (parts.length === 4) {
       // Affiliate subdomain: check.test.fusehealth.com
       // parts[0] = affiliate slug, parts[1] = brand slug
-      // For product loading, use the brand clinic slug
-      clinicSlug = parts[1];  // Use brand clinic slug for products
-      hasClinicSubdomain = true;
-      console.log('👤 Detected affiliate subdomain:', { 
-        affiliateSlug: parts[0], 
-        brandSlug: parts[1],
-        clinicSlugUsed: clinicSlug
+      const affiliateSlug = parts[0];
+      const brandSlug = parts[1];
+      
+      console.log('👤 Detected affiliate subdomain (prod fusehealth.com):', { 
+        affiliateSlug, 
+        brandSlug
       });
+      
+      // SECURITY: Validate that this affiliate really belongs to this brand
+      try {
+        const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+        const response = await fetch(`${API_BASE}/public/affiliate/validate-access`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ affiliateSlug, brandSlug }),
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+          // Validation passed - use the brand clinic slug
+          clinicSlug = data.data.brandClinic.slug;
+          hasClinicSubdomain = true;
+          console.log('✅ Affiliate access validated (prod fusehealth.com):', { 
+            affiliateSlug,
+            brandSlug: data.data.brandClinic.slug,
+          });
+        } else {
+          // Validation failed - invalid affiliate or doesn't belong to this brand
+          console.error('❌ Affiliate validation failed (prod fusehealth.com):', data.message);
+          clinicSlug = null;
+          hasClinicSubdomain = false;
+        }
+      } catch (error) {
+        console.error('❌ Error validating affiliate (prod fusehealth.com):', error);
+        clinicSlug = null;
+        hasClinicSubdomain = false;
+      }
     } else if (parts.length === 3) {
       // Regular clinic subdomain: limitless.fusehealth.com -> slug: "limitless"
       clinicSlug = parts[0];

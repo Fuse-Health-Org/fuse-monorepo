@@ -285,6 +285,13 @@ export function registerAffiliateEndpoints(
 
       const clinicId = affiliateClinic.affiliateOwnerClinicId;
 
+      console.log("🔍 [AFFILIATE REVENUE] Searching for orders with:", {
+        affiliateId: user.id,
+        affiliateEmail: user.email,
+        clinicId,
+        status: "paid",
+      });
+
       // Get all paid orders for this affiliate (non-medical only)
       const orders = await Order.findAll({
         where: {
@@ -307,6 +314,14 @@ export function registerAffiliateEndpoints(
         ],
       });
 
+      console.log(`🔍 [AFFILIATE REVENUE] Found ${orders.length} orders:`, orders.map(o => ({
+        id: o.id,
+        orderNumber: o.orderNumber,
+        totalAmount: o.totalAmount,
+        status: o.status,
+        createdAt: o.createdAt,
+      })));
+
       // Filter to only non-medical products
       const nonMedicalOrders = orders.filter((order) => {
         return order.orderItems?.some((item) => {
@@ -315,6 +330,8 @@ export function registerAffiliateEndpoints(
           return !isMedicalProduct(product);
         });
       });
+
+      console.log(`🔍 [AFFILIATE REVENUE] After filtering non-medical: ${nonMedicalOrders.length} orders`);
 
       const totalRevenue = nonMedicalOrders.reduce(
         (sum, order) => sum + Number(order.totalAmount || 0),
@@ -691,6 +708,7 @@ export function registerAffiliateEndpoints(
       });
 
       // Create affiliate user with temporary password linked to their new clinic
+      // IMPORTANT: Set website to placeholderSlug for affiliate tracking
       const affiliateUser = await User.createUser({
         firstName: emailPrefix,
         lastName: "-", // Placeholder to satisfy validation (len >= 1), will be cleared via raw SQL
@@ -698,6 +716,7 @@ export function registerAffiliateEndpoints(
         password: tempPassword, // This will be hashed and stored in passwordHash
         role: "affiliate",
         clinicId: affiliateClinic.id, // Link to affiliate's new clinic
+        website: placeholderSlug, // Set website to match clinic slug for tracking
       });
 
       // Clear lastName after creation using raw SQL to bypass Sequelize validation
@@ -973,10 +992,17 @@ The Fuse Team`,
           isActive: true, // Activate the clinic after setup
         });
 
-        console.log("✅ [Affiliate Setup] Updated clinic:", {
+        // IMPORTANT: Sync User.website with Clinic.slug for affiliate tracking
+        // The order tracking system uses User.website to detect affiliate from URL
+        await user.update({
+          website: slug.trim(),
+        });
+
+        console.log("✅ [Affiliate Setup] Updated clinic and user:", {
           clinicId: user.clinic.id,
           name: clinicName.trim(),
           slug: slug.trim(),
+          userWebsite: slug.trim(),
         });
 
         res.status(200).json({
@@ -1155,6 +1181,18 @@ The Fuse Team`,
 
       await user.clinic.save();
 
+      // IMPORTANT: Keep User.website in sync with Clinic.slug for affiliate tracking
+      // The order tracking system uses User.website to detect affiliate from URL
+      if (user.website !== user.clinic.slug) {
+        await user.update({
+          website: user.clinic.slug,
+        });
+        console.log("✅ [Affiliate Clinic] Synced User.website with Clinic.slug:", {
+          userId: user.id,
+          website: user.clinic.slug,
+        });
+      }
+
       // Update or create CustomWebsite
       let customWebsite = await CustomWebsite.findOne({
         where: { clinicId: user.clinic.id },
@@ -1215,6 +1253,220 @@ The Fuse Team`,
       res.status(500).json({
         success: false,
         message: "Failed to update affiliate clinic",
+      });
+    }
+  });
+
+  // Admin endpoint: Sync all affiliate User.website with their Clinic.slug
+  app.post("/admin/affiliates/sync-websites", authenticateJWT, async (req, res) => {
+    try {
+      const currentUser = getCurrentUser(req);
+      if (!currentUser) {
+        return res.status(401).json({
+          success: false,
+          message: "Not authenticated",
+        });
+      }
+
+      // Only allow brand users or admins to sync
+      const user = await User.findByPk(currentUser.id, {
+        include: [{ model: UserRoles, as: "userRoles", required: false }],
+      });
+
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found",
+        });
+      }
+
+      await user.getUserRoles();
+      if (!user.userRoles?.hasAnyRole(["brand", "admin", "superAdmin"])) {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied. Only brand users and admins can sync affiliates.",
+        });
+      }
+
+      // Get all affiliate users with their clinics
+      const affiliates = await User.findAll({
+        include: [
+          { 
+            model: UserRoles, 
+            as: "userRoles", 
+            required: true,
+            where: {
+              affiliate: true,
+            },
+          },
+          {
+            model: Clinic,
+            as: "clinic",
+            required: true,
+          },
+        ],
+      });
+
+      let syncedCount = 0;
+      const syncedAffiliates: Array<{
+        id: string;
+        email: string;
+        oldWebsite: string | null;
+        newWebsite: string;
+      }> = [];
+
+      for (const affiliate of affiliates) {
+        if (affiliate.clinic && affiliate.clinic.slug) {
+          // Only update if website is different from clinic slug
+          if (affiliate.website !== affiliate.clinic.slug) {
+            await affiliate.update({
+              website: affiliate.clinic.slug,
+            });
+            syncedCount++;
+            syncedAffiliates.push({
+              id: affiliate.id,
+              email: affiliate.email,
+              oldWebsite: affiliate.website || null,
+              newWebsite: affiliate.clinic.slug,
+            });
+            console.log(`✅ Synced affiliate ${affiliate.email}: website = '${affiliate.clinic.slug}'`);
+          }
+        }
+      }
+
+      res.status(200).json({
+        success: true,
+        message: `Synced ${syncedCount} affiliate(s)`,
+        data: {
+          totalAffiliates: affiliates.length,
+          syncedCount,
+          syncedAffiliates,
+        },
+      });
+    } catch (error) {
+      console.error("❌ Error syncing affiliate websites:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to sync affiliate websites",
+      });
+    }
+  });
+
+  // Public endpoint: Validate affiliate + brand relationship
+  // This prevents unauthorized access by validating that the affiliate belongs to the brand
+  app.post("/public/affiliate/validate-access", async (req, res) => {
+    try {
+      const { affiliateSlug, brandSlug } = req.body;
+
+      console.log("🔐 Validating affiliate access:", { affiliateSlug, brandSlug });
+
+      if (!affiliateSlug || typeof affiliateSlug !== "string") {
+        return res.status(400).json({
+          success: false,
+          message: "Affiliate slug is required",
+        });
+      }
+
+      if (!brandSlug || typeof brandSlug !== "string") {
+        return res.status(400).json({
+          success: false,
+          message: "Brand slug is required",
+        });
+      }
+
+      // Step 1: Find the affiliate by website (slug)
+      const affiliate = await User.findOne({
+        where: {
+          website: affiliateSlug.trim(),
+        },
+        include: [
+          {
+            model: UserRoles,
+            as: "userRoles",
+            required: true,
+          },
+          {
+            model: Clinic,
+            as: "clinic",
+            required: true,
+          },
+        ],
+      });
+
+      if (!affiliate) {
+        console.log("❌ Affiliate not found:", affiliateSlug);
+        return res.status(403).json({
+          success: false,
+          message: "Invalid affiliate",
+        });
+      }
+
+      await affiliate.getUserRoles();
+
+      if (!affiliate.userRoles?.hasRole("affiliate")) {
+        console.log("❌ User is not an affiliate:", affiliateSlug);
+        return res.status(403).json({
+          success: false,
+          message: "Invalid affiliate",
+        });
+      }
+
+      // Step 2: Get the parent clinic (brand) that this affiliate belongs to
+      if (!affiliate.clinic?.affiliateOwnerClinicId) {
+        console.log("❌ Affiliate has no parent clinic:", affiliateSlug);
+        return res.status(403).json({
+          success: false,
+          message: "Invalid affiliate configuration",
+        });
+      }
+
+      const parentClinic = await Clinic.findByPk(affiliate.clinic.affiliateOwnerClinicId);
+
+      if (!parentClinic) {
+        console.log("❌ Parent clinic not found:", affiliate.clinic.affiliateOwnerClinicId);
+        return res.status(403).json({
+          success: false,
+          message: "Invalid affiliate configuration",
+        });
+      }
+
+      // Step 3: Verify that the parent clinic slug matches the brand slug in URL
+      if (parentClinic.slug !== brandSlug.trim()) {
+        console.log("❌ Brand slug mismatch:", {
+          expected: parentClinic.slug,
+          provided: brandSlug,
+        });
+        return res.status(403).json({
+          success: false,
+          message: "Affiliate does not belong to this brand",
+        });
+      }
+
+      // Step 4: All validations passed - return the parent clinic info
+      console.log("✅ Affiliate access validated:", {
+        affiliateSlug,
+        brandSlug,
+        affiliateId: affiliate.id,
+        parentClinicId: parentClinic.id,
+      });
+
+      res.status(200).json({
+        success: true,
+        data: {
+          affiliateId: affiliate.id,
+          affiliateSlug: affiliate.website,
+          brandClinic: {
+            id: parentClinic.id,
+            slug: parentClinic.slug,
+            name: parentClinic.name,
+          },
+        },
+      });
+    } catch (error) {
+      console.error("❌ Error validating affiliate access:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to validate affiliate access",
       });
     }
   });

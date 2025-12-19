@@ -61,29 +61,141 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             if (process.env.NODE_ENV === 'production' && hostname.endsWith('.fusehealth.com')) {
                 const beforeDomain = hostname.replace('.fusehealth.com', '')
                 const subdomainParts = beforeDomain.split('.')
-                // If 2+ parts: affiliate.brand → use brand (last part)
-                clinicSlug = subdomainParts.length >= 2 ? subdomainParts[subdomainParts.length - 1] : beforeDomain
+                
+                if (subdomainParts.length >= 2) {
+                    // Affiliate subdomain: validate relationship
+                    const affiliateSlug = subdomainParts[0]
+                    const brandSlug = subdomainParts[subdomainParts.length - 1]
+                    
+                    try {
+                        const validateResponse = await fetch(`${API_BASE}/public/affiliate/validate-access`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ affiliateSlug, brandSlug }),
+                        })
+                        const validateData = await validateResponse.json()
+                        
+                        if (validateResponse.ok && validateData.success) {
+                            clinicSlug = validateData.data.brandClinic.slug
+                            console.log('[brand-products] ✅ Affiliate validated (prod fusehealth.com):', { affiliateSlug, brandSlug: clinicSlug })
+                        } else {
+                            console.error('[brand-products] ❌ Affiliate validation failed (prod fusehealth.com):', validateData.message)
+                            return res.status(403).json({ success: false, message: 'Invalid affiliate access' })
+                        }
+                    } catch (error) {
+                        console.error('[brand-products] ❌ Error validating affiliate (prod fusehealth.com):', error)
+                        return res.status(500).json({ success: false, message: 'Failed to validate affiliate' })
+                    }
+                } else {
+                    clinicSlug = beforeDomain
+                }
             } else if (process.env.NODE_ENV === 'production' && hostname.endsWith('.fuse.health')) {
                 const beforeDomain = hostname.replace('.fuse.health', '')
                 const subdomainParts = beforeDomain.split('.')
-                clinicSlug = subdomainParts.length >= 2 ? subdomainParts[subdomainParts.length - 1] : beforeDomain
+                
+                if (subdomainParts.length >= 2) {
+                    // Affiliate subdomain: validate relationship
+                    const affiliateSlug = subdomainParts[0]
+                    const brandSlug = subdomainParts[subdomainParts.length - 1]
+                    
+                    try {
+                        const validateResponse = await fetch(`${API_BASE}/public/affiliate/validate-access`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ affiliateSlug, brandSlug }),
+                        })
+                        const validateData = await validateResponse.json()
+                        
+                        if (validateResponse.ok && validateData.success) {
+                            clinicSlug = validateData.data.brandClinic.slug
+                            console.log('[brand-products] ✅ Affiliate validated (prod fuse.health):', { affiliateSlug, brandSlug: clinicSlug })
+                        } else {
+                            console.error('[brand-products] ❌ Affiliate validation failed (prod fuse.health):', validateData.message)
+                            return res.status(403).json({ success: false, message: 'Invalid affiliate access' })
+                        }
+                    } catch (error) {
+                        console.error('[brand-products] ❌ Error validating affiliate (prod fuse.health):', error)
+                        return res.status(500).json({ success: false, message: 'Failed to validate affiliate' })
+                    }
+                } else {
+                    clinicSlug = beforeDomain
+                }
             } else if (process.env.NODE_ENV === 'production' && hostname.endsWith('.fusehealthstaging.xyz')) {
                 const beforeDomain = hostname.replace('.fusehealthstaging.xyz', '')
                 const subdomainParts = beforeDomain.split('.')
-                clinicSlug = subdomainParts.length >= 2 ? subdomainParts[subdomainParts.length - 1] : beforeDomain
+                
+                if (subdomainParts.length >= 2) {
+                    // Affiliate subdomain: validate relationship
+                    const affiliateSlug = subdomainParts[0]
+                    const brandSlug = subdomainParts[subdomainParts.length - 1]
+                    
+                    try {
+                        const validateResponse = await fetch(`${API_BASE}/public/affiliate/validate-access`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ affiliateSlug, brandSlug }),
+                        })
+                        const validateData = await validateResponse.json()
+                        
+                        if (validateResponse.ok && validateData.success) {
+                            clinicSlug = validateData.data.brandClinic.slug
+                            console.log('[brand-products] ✅ Affiliate validated (staging):', { affiliateSlug, brandSlug: clinicSlug })
+                        } else {
+                            console.error('[brand-products] ❌ Affiliate validation failed (staging):', validateData.message)
+                            return res.status(403).json({ success: false, message: 'Invalid affiliate access' })
+                        }
+                    } catch (error) {
+                        console.error('[brand-products] ❌ Error validating affiliate (staging):', error)
+                        return res.status(500).json({ success: false, message: 'Failed to validate affiliate' })
+                    }
+                } else {
+                    clinicSlug = beforeDomain
+                }
             } else if (process.env.NODE_ENV !== 'production' && hostname.includes('.localhost')) {
                 const beforeLocalhost = hostname.split('.localhost')[0]
                 const subdomainParts = beforeLocalhost.split('.')
-                // For affiliate portals: check.test.localhost → use "test" (brand clinic)
-                // For regular clinics: test.localhost → use "test"
-                clinicSlug = subdomainParts.length >= 2 ? subdomainParts[subdomainParts.length - 1] : beforeLocalhost
-                console.log('[brand-products] localhost subdomain parsing', { 
-                    hostname, 
-                    beforeLocalhost, 
-                    subdomainParts, 
-                    clinicSlug,
-                    isAffiliate: subdomainParts.length >= 2
-                })
+                
+                if (subdomainParts.length >= 2) {
+                    // Affiliate subdomain: validate relationship
+                    const affiliateSlug = subdomainParts[0]
+                    const brandSlug = subdomainParts[subdomainParts.length - 1]
+                    
+                    console.log('[brand-products] localhost subdomain parsing (affiliate):', { 
+                        hostname, 
+                        beforeLocalhost, 
+                        subdomainParts, 
+                        affiliateSlug,
+                        brandSlug
+                    })
+                    
+                    try {
+                        const validateResponse = await fetch(`${API_BASE}/public/affiliate/validate-access`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ affiliateSlug, brandSlug }),
+                        })
+                        const validateData = await validateResponse.json()
+                        
+                        if (validateResponse.ok && validateData.success) {
+                            clinicSlug = validateData.data.brandClinic.slug
+                            console.log('[brand-products] ✅ Affiliate validated (localhost):', { affiliateSlug, brandSlug: clinicSlug })
+                        } else {
+                            console.error('[brand-products] ❌ Affiliate validation failed (localhost):', validateData.message)
+                            return res.status(403).json({ success: false, message: 'Invalid affiliate access' })
+                        }
+                    } catch (error) {
+                        console.error('[brand-products] ❌ Error validating affiliate (localhost):', error)
+                        return res.status(500).json({ success: false, message: 'Failed to validate affiliate' })
+                    }
+                } else {
+                    // Regular clinic
+                    clinicSlug = beforeLocalhost
+                    console.log('[brand-products] localhost subdomain parsing (regular):', { 
+                        hostname, 
+                        beforeLocalhost, 
+                        clinicSlug
+                    })
+                }
             }
             console.log('[brand-products] derived clinicSlug from host fallback', { hostname, clinicSlug })
         }
