@@ -267,7 +267,10 @@ export function OrderDetailModal({ order, isOpen, onClose, onApprove, onCancel, 
 
                     {/* Pharmacy Coverage */}
                     <section>
-                        <h3 className="text-lg font-semibold mb-3">Pharmacy Coverage</h3>
+                        <h3 className="text-lg font-semibold mb-3">
+                            Pharmacy Coverage
+                            {order.program && <span className="ml-2 text-sm font-normal text-purple-600">(Program Order)</span>}
+                        </h3>
                         {loadingCoverage ? (
                             <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
                                 <p className="text-blue-800">Checking pharmacy coverage...</p>
@@ -277,18 +280,26 @@ export function OrderDetailModal({ order, isOpen, onClose, onApprove, onCancel, 
                                 <p className="text-red-800 font-semibold mb-2">⚠️ No Pharmacy Coverage</p>
                                 <p className="text-red-700 text-sm">{coverageError}</p>
                                 <p className="text-red-600 text-xs mt-2">
-                                    Please ensure the product has pharmacy coverage configured for the patient's state before approving this order.
+                                    Please ensure {order.program ? 'all products in this program have' : 'the product has'} pharmacy coverage configured for the patient's state before approving this order.
                                 </p>
                             </div>
                         ) : pharmacyCoverages.length > 0 ? (
                             <div className="space-y-4">
                                 {pharmacyCoverages.map((pharmacyCoverage, index) => (
                                     <div key={index} className="bg-green-50 border border-green-200 p-4 rounded-lg">
-                                        <div className="flex items-center mb-2">
-                                            <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-                                            <p className="text-green-800 font-semibold">
-                                                Coverage Available {pharmacyCoverages.length > 1 ? `(${index + 1}/${pharmacyCoverages.length})` : ''}
-                                            </p>
+                                        <div className="flex items-center justify-between mb-2">
+                                            <div className="flex items-center">
+                                                <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                                                <p className="text-green-800 font-semibold">
+                                                    Coverage Available {pharmacyCoverages.length > 1 ? `(${index + 1}/${pharmacyCoverages.length})` : ''}
+                                                </p>
+                                            </div>
+                                            {/* Show which product this coverage is for (useful for programs) */}
+                                            {pharmacyCoverage.productName && (
+                                                <span className="text-xs bg-green-200 text-green-800 px-2 py-1 rounded">
+                                                    {pharmacyCoverage.productName}
+                                                </span>
+                                            )}
                                         </div>
                                         <div className="space-y-2 text-sm">
                                             {pharmacyCoverage.coverage.customName && (

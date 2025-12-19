@@ -21,6 +21,8 @@ import Pharmacy from "../models/Pharmacy";
 import PharmacyCoverage from "../models/PharmacyCoverage";
 import Prescription from "../models/Prescription";
 import PrescriptionProducts from "../models/PrescriptionProducts";
+import Program from "../models/Program";
+import { Op } from "sequelize";
 
 interface ListOrdersByClinicResult {
   success: boolean;
@@ -281,6 +283,12 @@ class OrderService {
               },
             ],
           },
+          {
+            model: Program,
+            as: "program",
+            required: false,
+            attributes: ["id", "name"],
+          },
         ],
       });
 
@@ -306,12 +314,15 @@ class OrderService {
           orderNumber: order.orderNumber,
           status: order.status,
           hasPayment: !!order.payment,
+          isProgramOrder: !!order.programId,
         });
       }
 
       // Check pharmacy coverage before proceeding
       const patientState = order.shippingAddress?.state || order.user?.state;
-      const productId = order.tenantProduct?.product?.id;
+      
+      // Check if this is a program order (has orderItems) or regular product order
+      const isProgramOrder = order.programId && order.orderItems && order.orderItems.length > 0;
 
       if (!patientState) {
         console.error(
@@ -324,8 +335,21 @@ class OrderService {
         };
       }
 
-      if (!productId) {
-        console.error(`❌ No product found for order: ${order.orderNumber}`);
+      // For program orders, get all product IDs from order items
+      // For regular orders, get product ID from tenantProduct
+      let productIds: string[] = [];
+      
+      if (isProgramOrder) {
+        productIds = order.orderItems
+          .filter((item: any) => item.product?.id)
+          .map((item: any) => item.product.id);
+        console.log(`📦 Program order with ${productIds.length} products`);
+      } else if (order.tenantProduct?.product?.id) {
+        productIds = [order.tenantProduct.product.id];
+      }
+
+      if (productIds.length === 0) {
+        console.error(`❌ No products found for order: ${order.orderNumber}`);
         return {
           success: false,
           message: "Product not found",
@@ -333,10 +357,10 @@ class OrderService {
         };
       }
 
-      // Find ALL pharmacy coverages for this product in the patient's state
+      // Find ALL pharmacy coverages for all products in the patient's state
       const coverages = await PharmacyProduct.findAll({
         where: {
-          productId,
+          productId: { [Op.in]: productIds },
           state: patientState,
         },
         include: [
@@ -349,6 +373,11 @@ class OrderService {
             model: PharmacyCoverage,
             as: "pharmacyCoverage",
           },
+          {
+            model: Product,
+            as: "product",
+            attributes: ["id", "name", "placeholderSig"],
+          },
         ],
       });
 
@@ -356,15 +385,15 @@ class OrderService {
       const activeCoverages = coverages.filter((c) => c.pharmacy?.isActive);
 
       if (activeCoverages.length === 0) {
-        console.error(`❌ No active pharmacy coverage for product in state`);
+        console.error(`❌ No active pharmacy coverage for product(s) in state`);
         return {
           success: false,
-          message: `No pharmacy coverage for this product in the patient's state`,
+          message: `No pharmacy coverage for ${isProgramOrder ? 'program products' : 'this product'} in the patient's state`,
           error: "Pharmacy coverage not configured",
         };
       }
 
-      console.log(`✅ Found ${activeCoverages.length} pharmacy coverage(s)`);
+      console.log(`✅ Found ${activeCoverages.length} pharmacy coverage(s) for ${isProgramOrder ? 'program' : 'product'} order`);
 
       // Handle payment capture and pharmacy order creation based on order status
       if (order.status === OrderStatus.PAID) {

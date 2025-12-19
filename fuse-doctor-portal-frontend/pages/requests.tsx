@@ -273,8 +273,13 @@ export default function Requests() {
                                                             {order.patient?.firstName} {order.patient?.lastName}
                                                         </td>
                                                         <td className="px-4 py-3 text-sm">
-                                                            {(order as any).tenantProduct?.name || order.treatment?.name || 'N/A'}
-                                                            {(order as any).tenantProduct?.placeholderSig && (
+                                                            {(order as any).program?.name || (order as any).tenantProduct?.name || order.treatment?.name || 'N/A'}
+                                                            {(order as any).program && (
+                                                                <span className="ml-2 text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">
+                                                                    Program
+                                                                </span>
+                                                            )}
+                                                            {(order as any).tenantProduct?.placeholderSig && !(order as any).program && (
                                                                 <span className="ml-2 text-xs text-gray-500">
                                                                     {(order as any).tenantProduct.placeholderSig}
                                                                 </span>
