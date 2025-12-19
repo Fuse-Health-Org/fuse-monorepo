@@ -501,7 +501,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                                 </div>
                                 <Elements stripe={stripePromise} options={{ clientSecret }}>
                                     <StripePaymentForm
-                                        amount={selectedPlanData?.price || 0}
+                                        amount={isProgramCheckout ? programTotal : (selectedPlanData?.price || 0)}
                                         onSuccess={onPaymentSuccess}
                                         onError={onPaymentError}
                                         loading={false}
