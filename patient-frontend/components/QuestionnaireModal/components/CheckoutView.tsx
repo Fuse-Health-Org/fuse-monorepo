@@ -36,8 +36,48 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
     selectedProducts,
     treatmentName,
     pharmacyCoverages = [],
+    // Program props
+    programData,
+    selectedProgramProducts = {},
+    onProgramProductToggle,
+    onCreateProgramSubscription,
 }) => {
     const selectedPlanData = plans.find((plan) => plan.id === selectedPlan);
+    const isProgramCheckout = !!programData;
+
+    // Calculate program total
+    const calculateProgramTotal = () => {
+        if (!programData) return 0;
+        const productsTotal = programData.products
+            .filter(p => selectedProgramProducts[p.id])
+            .reduce((sum, p) => sum + p.displayPrice, 0);
+        return productsTotal + programData.nonMedicalServicesFee;
+    };
+
+    const programTotal = isProgramCheckout ? calculateProgramTotal() : 0;
+    const hasSelectedProgramProducts = isProgramCheckout && Object.values(selectedProgramProducts).some(v => v);
+
+    // Get enabled non-medical services for display
+    const getEnabledNonMedicalServices = () => {
+        if (!programData) return [];
+        const services: { name: string; price: number }[] = [];
+        if (programData.nonMedicalServices.patientPortal.enabled) {
+            services.push({ name: 'Patient Portal', price: programData.nonMedicalServices.patientPortal.price });
+        }
+        if (programData.nonMedicalServices.bmiCalculator.enabled) {
+            services.push({ name: 'BMI Calculator', price: programData.nonMedicalServices.bmiCalculator.price });
+        }
+        if (programData.nonMedicalServices.proteinIntakeCalculator.enabled) {
+            services.push({ name: 'Protein Intake Calculator', price: programData.nonMedicalServices.proteinIntakeCalculator.price });
+        }
+        if (programData.nonMedicalServices.calorieDeficitCalculator.enabled) {
+            services.push({ name: 'Calorie Deficit Calculator', price: programData.nonMedicalServices.calorieDeficitCalculator.price });
+        }
+        if (programData.nonMedicalServices.easyShopping.enabled) {
+            services.push({ name: 'Easy Shopping', price: programData.nonMedicalServices.easyShopping.price });
+        }
+        return services;
+    };
 
     // 15-minute countdown timer
     const [timeRemaining, setTimeRemaining] = React.useState<number>(15 * 60); // 15 minutes in seconds
@@ -80,70 +120,163 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                     <p className="text-gray-600">Secure checkout for your {treatmentName} subscription</p>
                 </div>
 
-                <Card>
-                    <CardBody className="p-6">
-                        <h3 className="text-lg font-medium text-gray-900 mb-6">Choose Your Plan</h3>
-                        <RadioGroup
-                            value={selectedPlan}
-                            onValueChange={onPlanChange}
-                            className="space-y-4"
-                            isDisabled={paymentStatus === 'processing' || !!clientSecret}
-                        >
-                            {plans.map((plan) => (
-                                <div
-                                    key={plan.id}
-                                    className={`relative rounded-lg border-2 p-4 transition-all ${paymentStatus === 'processing' || !!clientSecret ? 'opacity-60 cursor-not-allowed bg-gray-50' : ''} ${selectedPlan === plan.id ? 'border-success-500 bg-success-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}
-                                >
-                                    <div className="flex items-start gap-3">
-                                        <Radio value={plan.id} className="mt-1" />
-                                        <div className="flex-1">
-                                            <div className="flex items-center gap-2 mb-2">
-                                                <label className="font-medium text-gray-900 cursor-pointer">
-                                                    {plan.name}
-                                                </label>
-                                                {plan.badge && (
-                                                    <Chip color={plan.badgeColor} size="sm" variant="flat">
-                                                        {plan.badge}
-                                                    </Chip>
-                                                )}
+                {/* Program Product Selection - Only for programs */}
+                {isProgramCheckout && programData && (
+                    <Card>
+                        <CardBody className="p-6">
+                            <h3 className="text-lg font-medium text-gray-900 mb-2">Select Your Products</h3>
+                            <p className="text-sm text-gray-600 mb-6">Choose which products you'd like to include in your subscription</p>
+                            
+                            <div className="space-y-3">
+                                {programData.products.map((product) => (
+                                    <div
+                                        key={product.id}
+                                        className={`relative rounded-lg border-2 p-4 transition-all cursor-pointer ${
+                                            paymentStatus === 'processing' || !!clientSecret 
+                                                ? 'opacity-60 cursor-not-allowed bg-gray-50' 
+                                                : ''
+                                        } ${
+                                            selectedProgramProducts[product.id] 
+                                                ? 'border-success-500 bg-success-50' 
+                                                : 'border-gray-200 bg-white hover:border-gray-300'
+                                        }`}
+                                        onClick={() => {
+                                            if (paymentStatus !== 'processing' && !clientSecret && onProgramProductToggle) {
+                                                onProgramProductToggle(product.id);
+                                            }
+                                        }}
+                                    >
+                                        <div className="flex items-center gap-4">
+                                            <input
+                                                type="checkbox"
+                                                checked={!!selectedProgramProducts[product.id]}
+                                                onChange={() => {}}
+                                                disabled={paymentStatus === 'processing' || !!clientSecret}
+                                                className="w-5 h-5 rounded border-gray-300"
+                                                style={{ accentColor: theme.primary }}
+                                            />
+                                            {product.imageUrl && (
+                                                <img
+                                                    src={product.imageUrl}
+                                                    alt={product.name}
+                                                    className="w-12 h-12 rounded-lg object-cover"
+                                                />
+                                            )}
+                                            <div className="flex-1">
+                                                <div className="font-medium text-gray-900">{product.name}</div>
                                             </div>
-                                            <div className="text-sm text-gray-600 mb-2">{plan.description}</div>
-                                            <div className="flex items-baseline gap-2 mb-3">
-                                                <span className="text-xl font-semibold" style={{ color: theme.primary }}>
-                                                    ${plan.price.toFixed(2)}/mo
-                                                </span>
-                                            </div>
-                                            <div className="space-y-1 text-sm text-gray-600">
-                                                <div className="font-medium">Includes:</div>
-                                                {plan.features?.map((feature, index) => (
-                                                    <div key={index} className="flex items-center gap-2">
-                                                        <Icon icon="lucide:check" className="w-3 h-3" style={{ color: theme.primary }} />
-                                                        <span>{feature}</span>
-                                                    </div>
-                                                ))}
-                                                
-                                                {/* Display pharmacy coverages if multiple exist */}
-                                                {pharmacyCoverages && pharmacyCoverages.length > 1 && (
-                                                    <div className="mt-4 pt-4 border-t border-gray-200">
-                                                        <div className="font-medium mb-2">Contains products:</div>
-                                                        <div className="space-y-2">
-                                                            {pharmacyCoverages.map((coverage) => (
-                                                                <div key={coverage.id} className="pl-2">
-                                                                    <div className="font-medium text-gray-900">{coverage.customName}</div>
-                                                                    <div className="text-xs text-gray-500">Note: {coverage.customSig}</div>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                )}
+                                            <div className="text-lg font-semibold" style={{ color: theme.primary }}>
+                                                ${product.displayPrice.toFixed(2)}
                                             </div>
                                         </div>
                                     </div>
+                                ))}
+                            </div>
+
+                            {/* Non-Medical Services */}
+                            {programData.nonMedicalServicesFee > 0 && (
+                                <div className="mt-6 pt-6 border-t border-gray-200">
+                                    <h4 className="text-md font-medium text-gray-900 mb-3">Included Services</h4>
+                                    <div className="space-y-2">
+                                        {getEnabledNonMedicalServices().map((service, idx) => (
+                                            <div key={idx} className="flex justify-between items-center text-sm">
+                                                <div className="flex items-center gap-2">
+                                                    <Icon icon="lucide:check-circle" className="w-4 h-4" style={{ color: theme.primary }} />
+                                                    <span className="text-gray-700">{service.name}</span>
+                                                </div>
+                                                <span className="font-medium">${service.price.toFixed(2)}</span>
+                                            </div>
+                                        ))}
+                                        <div className="flex justify-between items-center text-sm pt-2 border-t border-gray-100">
+                                            <span className="font-medium text-gray-900">Services Total</span>
+                                            <span className="font-semibold" style={{ color: theme.primary }}>
+                                                ${programData.nonMedicalServicesFee.toFixed(2)}
+                                            </span>
+                                        </div>
+                                    </div>
                                 </div>
-                            ))}
-                        </RadioGroup>
-                    </CardBody>
-                </Card>
+                            )}
+
+                            {/* Program Total */}
+                            <div className="mt-6 pt-6 border-t border-gray-200">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-lg font-medium text-gray-900">Monthly Total</span>
+                                    <span className="text-2xl font-bold" style={{ color: theme.primary }}>
+                                        ${programTotal.toFixed(2)}/mo
+                                    </span>
+                                </div>
+                            </div>
+                        </CardBody>
+                    </Card>
+                )}
+
+                {/* Regular Plan Selection - Only for non-programs */}
+                {!isProgramCheckout && (
+                    <Card>
+                        <CardBody className="p-6">
+                            <h3 className="text-lg font-medium text-gray-900 mb-6">Choose Your Plan</h3>
+                            <RadioGroup
+                                value={selectedPlan}
+                                onValueChange={onPlanChange}
+                                className="space-y-4"
+                                isDisabled={paymentStatus === 'processing' || !!clientSecret}
+                            >
+                                {plans.map((plan) => (
+                                    <div
+                                        key={plan.id}
+                                        className={`relative rounded-lg border-2 p-4 transition-all ${paymentStatus === 'processing' || !!clientSecret ? 'opacity-60 cursor-not-allowed bg-gray-50' : ''} ${selectedPlan === plan.id ? 'border-success-500 bg-success-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}
+                                    >
+                                        <div className="flex items-start gap-3">
+                                            <Radio value={plan.id} className="mt-1" />
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <label className="font-medium text-gray-900 cursor-pointer">
+                                                        {plan.name}
+                                                    </label>
+                                                    {plan.badge && (
+                                                        <Chip color={plan.badgeColor} size="sm" variant="flat">
+                                                            {plan.badge}
+                                                        </Chip>
+                                                    )}
+                                                </div>
+                                                <div className="text-sm text-gray-600 mb-2">{plan.description}</div>
+                                                <div className="flex items-baseline gap-2 mb-3">
+                                                    <span className="text-xl font-semibold" style={{ color: theme.primary }}>
+                                                        ${plan.price.toFixed(2)}/mo
+                                                    </span>
+                                                </div>
+                                                <div className="space-y-1 text-sm text-gray-600">
+                                                    <div className="font-medium">Includes:</div>
+                                                    {plan.features?.map((feature, index) => (
+                                                        <div key={index} className="flex items-center gap-2">
+                                                            <Icon icon="lucide:check" className="w-3 h-3" style={{ color: theme.primary }} />
+                                                            <span>{feature}</span>
+                                                        </div>
+                                                    ))}
+                                                    
+                                                    {/* Display pharmacy coverages if multiple exist */}
+                                                    {pharmacyCoverages && pharmacyCoverages.length > 1 && (
+                                                        <div className="mt-4 pt-4 border-t border-gray-200">
+                                                            <div className="font-medium mb-2">Contains products:</div>
+                                                            <div className="space-y-2">
+                                                                {pharmacyCoverages.map((coverage) => (
+                                                                    <div key={coverage.id} className="pl-2">
+                                                                        <div className="font-medium text-gray-900">{coverage.customName}</div>
+                                                                        <div className="text-xs text-gray-500">Note: {coverage.customSig}</div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </RadioGroup>
+                        </CardBody>
+                    </Card>
+                )}
 
                 <Card>
                     <CardBody className="p-6">
@@ -290,7 +423,8 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                             </div>
                         )}
 
-                        {!clientSecret && paymentStatus === 'idle' && selectedPlan && (
+                        {/* Regular product flow */}
+                        {!isProgramCheckout && !clientSecret && paymentStatus === 'idle' && selectedPlan && (
                             <div className="space-y-4">
                                 <div className="text-center py-6 bg-blue-50 rounded-lg border border-blue-200">
                                     <Icon icon="lucide:check-circle" className="text-3xl text-blue-500 mx-auto mb-2" />
@@ -316,11 +450,46 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                             </div>
                         )}
 
-                        {!clientSecret && paymentStatus === 'idle' && !selectedPlan && (
+                        {!isProgramCheckout && !clientSecret && paymentStatus === 'idle' && !selectedPlan && (
                             <div className="text-center py-8 bg-gray-50 rounded-lg border border-gray-200">
                                 <Icon icon="lucide:mouse-pointer-click" className="text-3xl text-gray-400 mx-auto mb-2" />
                                 <p className="text-lg font-medium text-gray-700 mb-1">Select a Plan Above</p>
                                 <p className="text-sm text-gray-500">Choose your preferred billing cycle to continue</p>
+                            </div>
+                        )}
+
+                        {/* Program flow */}
+                        {isProgramCheckout && !clientSecret && paymentStatus === 'idle' && hasSelectedProgramProducts && (
+                            <div className="space-y-4">
+                                <div className="text-center py-6 bg-blue-50 rounded-lg border border-blue-200">
+                                    <Icon icon="lucide:check-circle" className="text-3xl text-blue-500 mx-auto mb-2" />
+                                    <p className="text-lg font-medium text-blue-900 mb-1">Products Selected</p>
+                                    <p className="text-sm text-blue-700">
+                                        {Object.values(selectedProgramProducts).filter(v => v).length} product(s) - ${programTotal.toFixed(2)}/mo
+                                    </p>
+                                </div>
+                                <Button
+                                    color="primary"
+                                    size="lg"
+                                    className="w-full"
+                                    isDisabled={!canContinue}
+                                    onPress={() => onCreateProgramSubscription?.()}
+                                >
+                                    Continue - ${programTotal.toFixed(2)}/mo
+                                </Button>
+                                {!canContinue && (
+                                    <div className="text-center text-xs text-gray-500">
+                                        Fill out shipping address to continue
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {isProgramCheckout && !clientSecret && paymentStatus === 'idle' && !hasSelectedProgramProducts && (
+                            <div className="text-center py-8 bg-gray-50 rounded-lg border border-gray-200">
+                                <Icon icon="lucide:mouse-pointer-click" className="text-3xl text-gray-400 mx-auto mb-2" />
+                                <p className="text-lg font-medium text-gray-700 mb-1">Select Products Above</p>
+                                <p className="text-sm text-gray-500">Choose at least one product to continue</p>
                             </div>
                         )}
 
@@ -413,48 +582,114 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
 
                         <h3 className="font-medium text-gray-900 mb-4">Order Summary</h3>
 
-                        <div className="space-y-3 mb-4">
-                            {questionnaireProducts?.filter((product) => (selectedProducts[product.id] || 0) > 0).map((product) => (
-                                <div key={product.id} className="flex gap-3 p-3 bg-gray-50 rounded-lg">
-                                    <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-sm">
-                                        <Icon icon="lucide:pill" className="w-5 h-5 text-gray-600" />
-                                    </div>
-                                    <div className="flex-1">
-                                        <div className="font-medium text-gray-900 text-sm">{product.name}</div>
-                                        <div className="text-xs text-gray-600 mb-1">{product.description}</div>
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-xs text-gray-500">Qty: {selectedProducts[product.id]}</span>
-                                            <span className="text-sm font-medium text-gray-900">
-                                                ${(product.price * (selectedProducts[product.id] || 0)).toFixed(2)}
-                                            </span>
+                        {/* Program Order Summary */}
+                        {isProgramCheckout && programData && (
+                            <>
+                                <div className="space-y-3 mb-4">
+                                    {programData.products
+                                        .filter((product) => selectedProgramProducts[product.id])
+                                        .map((product) => (
+                                            <div key={product.id} className="flex gap-3 p-3 bg-gray-50 rounded-lg">
+                                                {product.imageUrl ? (
+                                                    <img
+                                                        src={product.imageUrl}
+                                                        alt={product.name}
+                                                        className="w-10 h-10 rounded-lg object-cover"
+                                                    />
+                                                ) : (
+                                                    <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-sm">
+                                                        <Icon icon="lucide:pill" className="w-5 h-5 text-gray-600" />
+                                                    </div>
+                                                )}
+                                                <div className="flex-1">
+                                                    <div className="font-medium text-gray-900 text-sm">{product.name}</div>
+                                                    <div className="text-sm font-medium" style={{ color: theme.primary }}>
+                                                        ${product.displayPrice.toFixed(2)}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                </div>
+
+                                {/* Non-medical services in summary */}
+                                {programData.nonMedicalServicesFee > 0 && (
+                                    <>
+                                        <Divider className="my-4" />
+                                        <div className="space-y-2 mb-4">
+                                            <div className="text-sm font-medium text-gray-700">Services</div>
+                                            {getEnabledNonMedicalServices().map((service, idx) => (
+                                                <div key={idx} className="flex justify-between items-center text-sm">
+                                                    <span className="text-gray-600">{service.name}</span>
+                                                    <span>${service.price.toFixed(2)}</span>
+                                                </div>
+                                            ))}
                                         </div>
+                                    </>
+                                )}
+
+                                <Divider className="my-4" />
+
+                                <div className="space-y-2 mb-4">
+                                    <div className="flex justify-between items-center">
+                                        <span className="font-medium text-gray-900">Total Due Today</span>
+                                        <span className="text-xl font-semibold">
+                                            ${programTotal.toFixed(2)}
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-gray-500">
+                                        Only charged if prescribed by a licensed physician. We'll securely hold your payment method. No charge until prescribed.
+                                    </p>
+                                </div>
+                            </>
+                        )}
+
+                        {/* Regular Order Summary */}
+                        {!isProgramCheckout && (
+                            <>
+                                <div className="space-y-3 mb-4">
+                                    {questionnaireProducts?.filter((product) => (selectedProducts[product.id] || 0) > 0).map((product) => (
+                                        <div key={product.id} className="flex gap-3 p-3 bg-gray-50 rounded-lg">
+                                            <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-sm">
+                                                <Icon icon="lucide:pill" className="w-5 h-5 text-gray-600" />
+                                            </div>
+                                            <div className="flex-1">
+                                                <div className="font-medium text-gray-900 text-sm">{product.name}</div>
+                                                <div className="text-xs text-gray-600 mb-1">{product.description}</div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-xs text-gray-500">Qty: {selectedProducts[product.id]}</span>
+                                                    <span className="text-sm font-medium text-gray-900">
+                                                        ${(product.price * (selectedProducts[product.id] || 0)).toFixed(2)}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <Divider className="my-4" />
+
+                                <div className="space-y-2 mb-4">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-gray-600">Selected Plan: {selectedPlanData?.name || 'None'}</span>
+                                        <span className="font-medium">${selectedPlanData?.price.toFixed(2) || '0.00'}/mo</span>
                                     </div>
                                 </div>
-                            ))}
-                        </div>
 
-                        <Divider className="my-4" />
+                                <Divider className="my-4" />
 
-                        <div className="space-y-2 mb-4">
-                            <div className="flex justify-between items-center">
-                                <span className="text-gray-600">Selected Plan: {selectedPlanData?.name || 'None'}</span>
-                                <span className="font-medium">${selectedPlanData?.price.toFixed(2) || '0.00'}/mo</span>
-                            </div>
-                        </div>
-
-                        <Divider className="my-4" />
-
-                        <div className="space-y-2 mb-4">
-                            <div className="flex justify-between items-center">
-                                <span className="font-medium text-gray-900">Total Due Today</span>
-                                <span className="text-xl font-semibold">
-                                    ${selectedPlanData?.price.toFixed(2) || '0.00'}
-                                </span>
-                            </div>
-                            <p className="text-xs text-gray-500">
-                                Only charged if prescribed by a licensed physician. We'll securely hold your payment method. No charge until prescribed.
-                            </p>
-                        </div>
+                                <div className="space-y-2 mb-4">
+                                    <div className="flex justify-between items-center">
+                                        <span className="font-medium text-gray-900">Total Due Today</span>
+                                        <span className="text-xl font-semibold">
+                                            ${selectedPlanData?.price.toFixed(2) || '0.00'}
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-gray-500">
+                                        Only charged if prescribed by a licensed physician. We'll securely hold your payment method. No charge until prescribed.
+                                    </p>
+                                </div>
+                            </>
+                        )}
 
                         <Divider className="my-4" />
 

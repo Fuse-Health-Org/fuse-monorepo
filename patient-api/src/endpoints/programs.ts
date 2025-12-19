@@ -52,61 +52,96 @@ router.get('/public/programs/:id', async (req: Request, res: Response) => {
       });
     }
 
-    // Get the first product from the program's template
+    // Get all products from the program's template with their tenant pricing
     const formProducts = (program.medicalTemplate as any)?.formProducts || [];
-    const firstFormProduct = formProducts.find((fp: any) => fp.product);
-    const firstProduct = firstFormProduct?.product;
+    const productsWithPricing: any[] = [];
 
-    // If we have a first product, get its tenant product info for pricing
-    let tenantProductInfo: any = null;
-    let tenantProductFormInfo: any = null;
+    for (const fp of formProducts) {
+      if (!fp.product) continue;
+      
+      const product = fp.product;
+      let tenantProductInfo: { id: string; price: number; isActive: boolean } | null = null;
 
-    if (firstProduct?.id && program.clinicId) {
-      // Find TenantProduct for this product and clinic
-      const tenantProduct = await TenantProduct.findOne({
-        where: {
-          productId: firstProduct.id,
-          clinicId: program.clinicId,
-        },
-        attributes: ['id', 'productId', 'clinicId', 'isActive', 'stripeProductId', 'stripePriceId', 'price'],
-      });
-
-      if (tenantProduct) {
-        tenantProductInfo = {
-          id: tenantProduct.id,
-          productId: tenantProduct.productId,
-          isActive: tenantProduct.isActive,
-          stripeProductId: tenantProduct.stripeProductId,
-          stripePriceId: tenantProduct.stripePriceId,
-          price: tenantProduct.price,
-        };
-
-        // Also get the default tenant product form (for the form ID)
-        const tenantProductForm = await TenantProductForm.findOne({
+      // Get TenantProduct for this product and clinic
+      if (program.clinicId) {
+        const tenantProduct = await TenantProduct.findOne({
           where: {
-            productId: firstProduct.id,
+            productId: product.id,
             clinicId: program.clinicId,
           },
-          attributes: ['id', 'productId', 'globalFormStructureId'],
-          order: [['createdAt', 'ASC']], // Get first/oldest form
+          attributes: ['id', 'productId', 'isActive', 'price'],
         });
 
-        if (tenantProductForm) {
-          tenantProductFormInfo = {
-            id: tenantProductForm.id,
-            productId: tenantProductForm.productId,
-            globalFormStructureId: tenantProductForm.globalFormStructureId,
+        if (tenantProduct) {
+          tenantProductInfo = {
+            id: tenantProduct.id,
+            price: Number(tenantProduct.price) || 0,
+            isActive: tenantProduct.isActive,
           };
         }
       }
+
+      const displayPrice = tenantProductInfo ? tenantProductInfo.price : (product.price || 0);
+
+      productsWithPricing.push({
+        id: product.id,
+        name: product.name,
+        slug: product.slug,
+        imageUrl: product.imageUrl,
+        basePrice: product.price,
+        categories: product.categories,
+        tenantProduct: tenantProductInfo,
+        displayPrice,
+      });
     }
 
-    // Build response with tenant product info
+    // Build non-medical services info from program
+    const nonMedicalServices = {
+      patientPortal: {
+        enabled: program.hasPatientPortal,
+        price: parseFloat(String(program.patientPortalPrice)) || 0,
+      },
+      bmiCalculator: {
+        enabled: program.hasBmiCalculator,
+        price: parseFloat(String(program.bmiCalculatorPrice)) || 0,
+      },
+      proteinIntakeCalculator: {
+        enabled: program.hasProteinIntakeCalculator,
+        price: parseFloat(String(program.proteinIntakeCalculatorPrice)) || 0,
+      },
+      calorieDeficitCalculator: {
+        enabled: program.hasCalorieDeficitCalculator,
+        price: parseFloat(String(program.calorieDeficitCalculatorPrice)) || 0,
+      },
+      easyShopping: {
+        enabled: program.hasEasyShopping,
+        price: parseFloat(String(program.easyShoppingPrice)) || 0,
+      },
+    };
+
+    // Calculate total non-medical services fee
+    const nonMedicalServicesFee = Object.values(nonMedicalServices)
+      .filter((s: any) => s.enabled)
+      .reduce((sum: number, s: any) => sum + s.price, 0);
+
+    // Build response
     const responseData = {
-      ...(program.toJSON ? program.toJSON() : program),
-      tenantProduct: tenantProductInfo,
-      tenantProductForm: tenantProductFormInfo,
-      firstProductCategory: firstProduct?.categories?.[0] || null,
+      id: program.id,
+      name: program.name,
+      description: program.description,
+      clinicId: program.clinicId,
+      medicalTemplateId: program.medicalTemplateId,
+      medicalTemplate: program.medicalTemplate ? {
+        id: (program.medicalTemplate as any).id,
+        title: (program.medicalTemplate as any).title,
+        description: (program.medicalTemplate as any).description,
+      } : null,
+      isActive: program.isActive,
+      // All products with pricing
+      products: productsWithPricing,
+      // Non-medical services
+      nonMedicalServices,
+      nonMedicalServicesFee,
     };
 
     return res.json({

@@ -22,47 +22,51 @@ interface PublicProduct {
     globalFormStructure?: any | null
 }
 
-interface ProgramProduct {
+interface ProgramProductWithPricing {
     id: string
     name: string
     slug: string
-    price?: number
     imageUrl?: string
+    basePrice: number
+    displayPrice: number
+    categories?: string[]
+    tenantProduct?: {
+        id: string
+        price: number
+        isActive: boolean
+    }
 }
 
-interface TenantProductInfo {
-    id: string
-    productId: string
-    isActive: boolean
-    stripeProductId?: string
-    stripePriceId?: string
-    price?: number
+interface NonMedicalService {
+    enabled: boolean
+    price: number
 }
 
-interface TenantProductFormInfo {
-    id: string
-    productId: string
-    globalFormStructureId?: string
+interface ProgramNonMedicalServices {
+    patientPortal: NonMedicalService
+    bmiCalculator: NonMedicalService
+    proteinIntakeCalculator: NonMedicalService
+    calorieDeficitCalculator: NonMedicalService
+    easyShopping: NonMedicalService
 }
 
 interface ProgramData {
     id: string
     name: string
+    description?: string
+    clinicId: string
     medicalTemplateId: string
     medicalTemplate?: {
         id: string
         title: string
-        formProducts?: Array<{
-            id: string
-            productId: string
-            product?: ProgramProduct
-        }>
+        description?: string
     }
-    // First product info for pricing
-    firstProduct?: ProgramProduct
-    firstProductCategory?: string
-    tenantProduct?: TenantProductInfo
-    tenantProductForm?: TenantProductFormInfo
+    isActive: boolean
+    // All products with pricing
+    products: ProgramProductWithPricing[]
+    // Non-medical services
+    nonMedicalServices: ProgramNonMedicalServices
+    nonMedicalServicesFee: number
 }
 
 export default function PublicProductPage() {
@@ -114,24 +118,21 @@ export default function PublicProductPage() {
                 return
             }
 
-            // Extract first product for pricing info
-            const formProducts = programData.medicalTemplate?.formProducts || []
-            const firstFormProduct = formProducts.find((fp: any) => fp.product)
-            const firstProduct = firstFormProduct?.product || null
-
-            console.log('[PublicProduct] Program products:', formProducts.length, 'First product:', firstProduct?.name)
-            console.log('[PublicProduct] TenantProduct:', programData.tenantProduct)
-            console.log('[PublicProduct] TenantProductForm:', programData.tenantProductForm)
+            console.log('[PublicProduct] Program loaded:', programData.name)
+            console.log('[PublicProduct] Products:', programData.products?.length)
+            console.log('[PublicProduct] Non-medical services fee:', programData.nonMedicalServicesFee)
 
             setProgram({
                 id: programData.id,
                 name: programData.name,
+                description: programData.description,
+                clinicId: programData.clinicId,
                 medicalTemplateId: programData.medicalTemplateId,
                 medicalTemplate: programData.medicalTemplate,
-                firstProduct: firstProduct,
-                firstProductCategory: programData.firstProductCategory,
-                tenantProduct: programData.tenantProduct,
-                tenantProductForm: programData.tenantProductForm
+                isActive: programData.isActive,
+                products: programData.products || [],
+                nonMedicalServices: programData.nonMedicalServices,
+                nonMedicalServicesFee: programData.nonMedicalServicesFee || 0,
             })
             setIsModalOpen(true)
         } catch (err) {
@@ -260,12 +261,8 @@ export default function PublicProductPage() {
                     onClose={handleModalClose}
                     questionnaireId={program.medicalTemplateId}
                     productName={program.name}
-                    productCategory={program.firstProductCategory || undefined}
-                    // Pass pricing data from tenant product
-                    productPrice={program.tenantProduct?.price || program.firstProduct?.price || undefined}
-                    productStripePriceId={program.tenantProduct?.stripePriceId || undefined}
-                    tenantProductId={program.tenantProduct?.id || undefined}
-                    tenantProductFormId={program.tenantProductForm?.id || undefined}
+                    // Pass full program data for checkout
+                    programData={program}
                 />
             )}
 

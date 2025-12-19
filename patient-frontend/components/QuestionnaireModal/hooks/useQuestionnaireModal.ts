@@ -18,7 +18,7 @@ export function useQuestionnaireModal(
   domainClinic: any,
   isLoadingClinic: boolean
 ) {
-  const { isOpen, onClose, questionnaireId, tenantProductId, tenantProductFormId, productName } = props;
+  const { isOpen, onClose, questionnaireId, tenantProductId, tenantProductFormId, productName, programData } = props;
 
   // Data loading
   const { questionnaire, loading, setQuestionnaire } = useQuestionnaireData(
@@ -39,6 +39,8 @@ export function useQuestionnaireModal(
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [selectedProducts, setSelectedProducts] = useState<Record<string, number>>({});
+  // Program-specific state
+  const [selectedProgramProducts, setSelectedProgramProducts] = useState<Record<string, boolean>>({});
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
@@ -675,6 +677,71 @@ export function useQuestionnaireModal(
     setSelectedProducts(prev => ({ ...prev, [productId]: quantity }));
   }, []);
 
+  // Program product toggle
+  const handleProgramProductToggle = useCallback((productId: string) => {
+    setSelectedProgramProducts(prev => ({ ...prev, [productId]: !prev[productId] }));
+  }, []);
+
+  // Create program subscription with dynamic pricing
+  const createProgramSubscription = useCallback(async () => {
+    if (!programData) return null;
+    
+    try {
+      setPaymentStatus('processing');
+      
+      // Calculate total from selected products + non-medical services fee
+      const selectedProductsList = programData.products.filter(p => selectedProgramProducts[p.id]);
+      const productsTotal = selectedProductsList.reduce((sum, p) => sum + p.displayPrice, 0);
+      const totalAmount = productsTotal + programData.nonMedicalServicesFee;
+      
+      const userDetails = {
+        firstName: answers['firstName'],
+        lastName: answers['lastName'],
+        email: answers['email'],
+        phoneNumber: answers['mobile']
+      };
+      const questionnaireAnswersData = buildQuestionnaireAnswers(answers);
+      
+      const requestBody = {
+        programId: programData.id,
+        selectedProductIds: selectedProductsList.map(p => p.id),
+        totalAmount,
+        productsTotal,
+        nonMedicalServicesFee: programData.nonMedicalServicesFee,
+        userDetails,
+        questionnaireAnswers: questionnaireAnswersData.structured,
+        shippingInfo,
+        clinicId: programData.clinicId,
+        clinicName: domainClinic?.name,
+        isProgramSubscription: true,
+      };
+      
+      console.log('🚀 Creating program subscription:', requestBody);
+      
+      const result = await apiCall('/payments/program/sub', { 
+        method: 'POST', 
+        body: JSON.stringify(requestBody) 
+      });
+      
+      if (result.success && result.data) {
+        const subscriptionData = result.data.data || result.data;
+        if (subscriptionData.clientSecret) {
+          setClientSecret(subscriptionData.clientSecret);
+          setPaymentIntentId(subscriptionData.paymentIntentId || subscriptionData.subscriptionId || subscriptionData.id);
+          if (subscriptionData.orderId) setOrderId(subscriptionData.orderId);
+          setPaymentStatus('idle');
+          return subscriptionData.clientSecret;
+        }
+      }
+      setPaymentStatus('failed');
+      return null;
+    } catch (error) {
+      console.error('❌ Program subscription error:', error);
+      setPaymentStatus('failed');
+      return null;
+    }
+  }, [programData, selectedProgramProducts, answers, shippingInfo, domainClinic, buildQuestionnaireAnswers]);
+
   // Step initialization
   useEffect(() => {
     if (questionnaire && isOpen) {
@@ -788,6 +855,11 @@ export function useQuestionnaireModal(
     handleSignIn, handleGoogleSignIn, createUserAccount, emailVerificationHandlers,
     handlePlanSelection, createSubscriptionForPlan, handlePaymentSuccess, handlePaymentError,
     handleNext, handlePrevious, handleSubmit,
-    buildQuestionnaireAnswers
+    buildQuestionnaireAnswers,
+    // Program-related
+    programData,
+    selectedProgramProducts,
+    handleProgramProductToggle,
+    createProgramSubscription,
   };
 }

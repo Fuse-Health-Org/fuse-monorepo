@@ -108,6 +108,7 @@ import TenantProductForm from "./models/TenantProductForm";
 import TenantProduct from "./models/TenantProduct";
 import FormProducts from "./models/FormProducts";
 import GlobalFormStructure from "./models/GlobalFormStructure";
+import Program from "./models/Program";
 // import QuestionnaireStep twice causes duplicate identifier; keep single import below
 import Question from "./models/Question";
 import QuestionOption from "./models/QuestionOption";
@@ -6789,6 +6790,262 @@ app.post("/payments/product/sub", async (req, res) => {
         success: false,
         message: "Failed to create product subscription",
       });
+  }
+});
+
+// Program subscription: creates PaymentIntent for program with multiple products
+app.post("/payments/program/sub", async (req, res) => {
+  try {
+    const {
+      programId,
+      selectedProductIds,
+      totalAmount,
+      productsTotal,
+      nonMedicalServicesFee,
+      userDetails,
+      questionnaireAnswers,
+      shippingInfo,
+      clinicId,
+      clinicName,
+    } = req.body || {};
+
+    console.log("🚀 Program subscription request:", {
+      programId,
+      selectedProductIds,
+      totalAmount,
+      productsTotal,
+      nonMedicalServicesFee,
+    });
+
+    if (!programId || !selectedProductIds?.length || !totalAmount) {
+      return res.status(400).json({
+        success: false,
+        message: "programId, selectedProductIds, and totalAmount are required",
+      });
+    }
+
+    // Find or create user
+    let currentUser: any = null;
+    const authHeader = req.headers.authorization;
+    if (authHeader) {
+      try {
+        currentUser = getCurrentUser(req);
+      } catch {}
+    }
+
+    if (!currentUser) {
+      const { firstName, lastName, email, phoneNumber } = userDetails || {};
+      if (!email || !firstName || !lastName) {
+        return res.status(400).json({
+          success: false,
+          message: "userDetails with firstName, lastName, and email is required",
+        });
+      }
+      currentUser = await User.findByEmail(email);
+      if (!currentUser) {
+        currentUser = await User.createUser({
+          firstName,
+          lastName,
+          email,
+          password: "TempPassword123!",
+          role: "patient",
+          phoneNumber,
+        });
+      }
+    }
+
+    // Fetch program
+    const program = await Program.findByPk(programId);
+    if (!program) {
+      return res.status(404).json({
+        success: false,
+        message: "Program not found",
+      });
+    }
+
+    // Fetch clinic
+    const clinic = await Clinic.findByPk(clinicId || program.clinicId);
+
+    // Ensure Stripe customer
+    const user = await User.findByPk(currentUser.id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+    const userService = new UserService();
+    const stripeCustomerId = await userService.getOrCreateCustomerId(user, {
+      userId: user.id,
+      programId,
+    });
+
+    // Create dynamic Stripe product and price for this program subscription
+    console.log("📦 Creating Stripe product for program subscription...");
+    
+    const stripeProduct = await stripe.products.create({
+      name: `${program.name} Subscription`,
+      metadata: {
+        programId: program.id,
+        clinicId: program.clinicId,
+        selectedProductIds: selectedProductIds.join(","),
+      },
+    });
+
+    const stripePrice = await stripe.prices.create({
+      product: stripeProduct.id,
+      currency: "usd",
+      unit_amount: Math.round(totalAmount * 100), // Convert to cents
+      recurring: {
+        interval: "month",
+        interval_count: 1,
+      },
+      metadata: {
+        programId: program.id,
+        clinicId: program.clinicId,
+        productsTotal: String(productsTotal),
+        nonMedicalServicesFee: String(nonMedicalServicesFee),
+      },
+    });
+
+    console.log("✅ Stripe product and price created:", {
+      productId: stripeProduct.id,
+      priceId: stripePrice.id,
+      amount: totalAmount,
+    });
+
+    // Calculate fee breakdown
+    const fees = await getGlobalFees();
+    const platformFeePercent = fees.platformFeePercent;
+    const stripeFeePercent = fees.stripeFeePercent;
+    const doctorFlatUsd = fees.doctorFlatFeeUsd;
+    const platformFeeUsd = Math.max(0, (platformFeePercent / 100) * totalAmount);
+    const stripeFeeUsd = Math.max(0, (stripeFeePercent / 100) * totalAmount);
+    const doctorUsd = Math.max(0, doctorFlatUsd);
+    const brandAmountUsd = Math.max(
+      0,
+      totalAmount - platformFeeUsd - stripeFeeUsd - doctorUsd - productsTotal
+    );
+
+    // Create order
+    const orderNumber = await Order.generateOrderNumber();
+    const order = await Order.create({
+      orderNumber,
+      userId: currentUser.id,
+      clinicId: program.clinicId,
+      status: "pending",
+      billingInterval: BillingInterval.MONTHLY,
+      subtotalAmount: totalAmount,
+      discountAmount: 0,
+      taxAmount: 0,
+      shippingAmount: 0,
+      totalAmount: totalAmount,
+      questionnaireAnswers,
+      stripePriceId: stripePrice.id,
+      programId: program.id,
+      platformFeeAmount: Number(platformFeeUsd.toFixed(2)),
+      stripeAmount: Number(stripeFeeUsd.toFixed(2)),
+      doctorAmount: Number(doctorUsd.toFixed(2)),
+      brandAmount: Number(brandAmountUsd.toFixed(2)),
+    });
+
+    // Create order items for each selected product
+    for (const productId of selectedProductIds) {
+      const product = await Product.findByPk(productId);
+      if (product) {
+        // Get tenant product for this product/clinic for pricing
+        const tenantProduct = await TenantProduct.findOne({
+          where: { productId, clinicId: program.clinicId },
+        });
+        const unitPrice = tenantProduct?.price || product.price || 0;
+        
+        await OrderItem.create({
+          orderId: order.id,
+          productId: product.id,
+          quantity: 1,
+          unitPrice: unitPrice,
+          totalPrice: unitPrice,
+          placeholderSig: product.placeholderSig,
+        });
+      }
+    }
+
+    // Shipping address
+    if (
+      shippingInfo?.address &&
+      shippingInfo?.city &&
+      shippingInfo?.state &&
+      shippingInfo?.zipCode
+    ) {
+      const createdAddress = await ShippingAddress.create({
+        orderId: order.id,
+        address: shippingInfo.address,
+        apartment: shippingInfo.apartment || null,
+        city: shippingInfo.city,
+        state: shippingInfo.state,
+        zipCode: shippingInfo.zipCode,
+        country: shippingInfo.country || "US",
+        userId: currentUser.id,
+      });
+      await order.update({ shippingAddressId: createdAddress.id });
+    }
+
+    // Create PaymentIntent
+    const paymentIntentParams: any = {
+      amount: Math.round(totalAmount * 100),
+      currency: "usd",
+      customer: stripeCustomerId,
+      capture_method: "manual",
+      metadata: {
+        userId: currentUser.id,
+        programId: program.id,
+        orderId: order.id,
+        orderNumber: orderNumber,
+        orderType: "program_subscription_initial_authorization",
+      },
+      description: `Program Subscription ${orderNumber} - ${program.name}`,
+      automatic_payment_methods: { enabled: true, allow_redirects: "never" },
+      setup_future_usage: "off_session",
+    };
+
+    // Add statement descriptor
+    if (clinicName || clinic?.name) {
+      const statementClinicName = (clinicName || clinic?.name)
+        .replace(/[^a-zA-Z0-9\s]/g, "")
+        .substring(0, 22);
+      paymentIntentParams.statement_descriptor_suffix = statementClinicName;
+    }
+
+    const paymentIntent = await stripe.paymentIntents.create(paymentIntentParams);
+
+    // Create Payment record
+    await Payment.create({
+      orderId: order.id,
+      stripePaymentIntentId: paymentIntent.id,
+      status: "pending",
+      paymentMethod: "card",
+      amount: totalAmount,
+      currency: "USD",
+    });
+
+    console.log("✅ Program subscription created:", {
+      orderId: order.id,
+      orderNumber,
+      paymentIntentId: paymentIntent.id,
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        clientSecret: paymentIntent.client_secret,
+        paymentIntentId: paymentIntent.id,
+        orderId: order.id,
+        orderNumber,
+      },
+    });
+  } catch (error) {
+    console.error("❌ Error in /payments/program/sub:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to create program subscription",
+    });
   }
 });
 

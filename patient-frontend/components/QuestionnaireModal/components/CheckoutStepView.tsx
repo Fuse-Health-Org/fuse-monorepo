@@ -3,7 +3,7 @@ import { Button } from "@heroui/react";
 import { ProgressBar } from "./ProgressBar";
 import { StepHeader } from "./StepHeader";
 import { CheckoutView } from "./CheckoutView";
-import { PlanOption } from "../types";
+import { PlanOption, ProgramData } from "../types";
 
 interface CheckoutStepViewProps {
   progressPercent: number;
@@ -29,6 +29,11 @@ interface CheckoutStepViewProps {
   treatmentName: string;
   pharmacyCoverages: any[];
   onNext: () => void;
+  // Program props
+  programData?: ProgramData;
+  selectedProgramProducts?: Record<string, boolean>;
+  onProgramProductToggle?: (productId: string) => void;
+  onCreateProgramSubscription?: () => Promise<void>;
 }
 
 export const CheckoutStepView: React.FC<CheckoutStepViewProps> = ({
@@ -55,6 +60,11 @@ export const CheckoutStepView: React.FC<CheckoutStepViewProps> = ({
   treatmentName,
   pharmacyCoverages,
   onNext,
+  // Program props
+  programData,
+  selectedProgramProducts,
+  onProgramProductToggle,
+  onCreateProgramSubscription,
 }) => {
   return (
     <>
@@ -88,6 +98,11 @@ export const CheckoutStepView: React.FC<CheckoutStepViewProps> = ({
           selectedProducts={selectedProducts}
           treatmentName={treatmentName}
           pharmacyCoverages={pharmacyCoverages}
+          // Program props
+          programData={programData}
+          selectedProgramProducts={selectedProgramProducts}
+          onProgramProductToggle={onProgramProductToggle}
+          onCreateProgramSubscription={onCreateProgramSubscription}
         />
 
         {paymentStatus === 'succeeded' && (

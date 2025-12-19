@@ -72,6 +72,52 @@ export interface QuestionnaireData {
     [key: string]: any;
 }
 
+// Program-related types
+export interface ProgramProductWithPricing {
+    id: string;
+    name: string;
+    slug: string;
+    imageUrl?: string;
+    basePrice: number;
+    displayPrice: number;
+    categories?: string[];
+    tenantProduct?: {
+        id: string;
+        price: number;
+        isActive: boolean;
+    };
+}
+
+export interface NonMedicalService {
+    enabled: boolean;
+    price: number;
+}
+
+export interface ProgramNonMedicalServices {
+    patientPortal: NonMedicalService;
+    bmiCalculator: NonMedicalService;
+    proteinIntakeCalculator: NonMedicalService;
+    calorieDeficitCalculator: NonMedicalService;
+    easyShopping: NonMedicalService;
+}
+
+export interface ProgramData {
+    id: string;
+    name: string;
+    description?: string;
+    clinicId: string;
+    medicalTemplateId: string;
+    medicalTemplate?: {
+        id: string;
+        title: string;
+        description?: string;
+    };
+    isActive: boolean;
+    products: ProgramProductWithPricing[];
+    nonMedicalServices: ProgramNonMedicalServices;
+    nonMedicalServicesFee: number;
+}
+
 export interface QuestionnaireModalProps {
     isOpen: boolean;
     onClose: () => void;
@@ -88,6 +134,8 @@ export interface QuestionnaireModalProps {
     productStripeProductId?: string;
     tenantProductId?: string;
     tenantProductFormId?: string; // Unique ID for this specific form variant (used for analytics)
+    // Program data for program checkout flow
+    programData?: ProgramData;
 }
 
 export interface ThemePalette {
@@ -141,6 +189,11 @@ export interface CheckoutViewProps {
     selectedProducts: Record<string, number>;
     treatmentName: string;
     pharmacyCoverages?: PharmacyCoverage[];
+    // Program checkout props
+    programData?: ProgramData;
+    selectedProgramProducts?: Record<string, boolean>;
+    onProgramProductToggle?: (productId: string) => void;
+    onCreateProgramSubscription?: () => Promise<void>;
 }
 
 
