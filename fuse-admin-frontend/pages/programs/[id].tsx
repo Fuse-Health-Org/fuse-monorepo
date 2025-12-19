@@ -14,7 +14,6 @@ import {
     Package,
     DollarSign,
     Sparkles,
-    ExternalLink,
     Copy,
     Pill
 } from 'lucide-react'
@@ -174,12 +173,14 @@ export default function ProgramEditor() {
                 const allForms: EnabledForm[] = []
                 for (const fp of template.formProducts) {
                     if (!fp.product?.id) continue
+                    console.log(`🔄 Fetching forms for product: ${fp.product.name} (ID: ${fp.product.id})`)
                     try {
                         const res = await fetch(`${API_URL}/admin/tenant-product-forms?productId=${fp.product.id}`, {
                             headers: { 'Authorization': `Bearer ${token}` }
                         })
                         if (res.ok) {
                             const data = await res.json()
+                            console.log(`📥 Forms returned for ${fp.product.name}:`, data?.data)
                             if (Array.isArray(data?.data)) {
                                 allForms.push(...data.data.map((f: any) => ({
                                     id: f.id,
@@ -192,6 +193,7 @@ export default function ProgramEditor() {
                         console.error('Error fetching forms for product:', fp.product.id, err)
                     }
                 }
+                console.log('📋 All forms collected:', allForms)
                 setEnabledForms(allForms)
             }
             
@@ -312,32 +314,31 @@ export default function ProgramEditor() {
         }
     }
 
-    // Helper to build form URL for a product
-    const buildFormUrl = (formId: string, productSlug: string | undefined | null) => {
-        // Debug logging
-        console.log('buildFormUrl:', { formId, productSlug, clinicSlug, clinicCustomDomain })
-        
-        if (!formId || !productSlug || !clinicSlug) {
-            console.log('Missing required info:', { hasFormId: !!formId, hasProductSlug: !!productSlug, hasClinicSlug: !!clinicSlug })
-            return null
-        }
-        
+    // Build BOTH URLs for forms with custom domains (matching product page)
+    const buildFormUrls = (formId: string, productSlug: string | undefined | null) => {
+        if (!formId || !productSlug || !clinicSlug) return null
+
         const isLocalhost = process.env.NODE_ENV !== 'production'
         const protocol = isLocalhost ? 'http' : 'https'
-        
-        // Custom domain URL
-        if (clinicCustomDomain) {
-            return `${protocol}://${clinicCustomDomain}/my-products/${formId}/${productSlug}`
-        }
-        
-        // Subdomain URL
+
+        // Standard subdomain URL (always available)
         const isStaging = process.env.NEXT_PUBLIC_IS_STAGING === 'true'
         const baseDomain = isStaging ? 'fusehealthstaging.xyz' : 'fusehealth.com'
-        const baseUrl = isLocalhost
+        const subdomainBase = isLocalhost
             ? `http://${clinicSlug}.localhost:3000`
             : `https://${clinicSlug}.${baseDomain}`
-        
-        return `${baseUrl}/my-products/${formId}/${productSlug}`
+        const subdomainUrl = `${subdomainBase}/my-products/${formId}/${productSlug}`
+
+        // Custom domain URL (if configured)
+        let customDomainUrl = null
+        if (clinicCustomDomain) {
+            customDomainUrl = `${protocol}://${clinicCustomDomain}/my-products/${formId}/${productSlug}`
+        }
+
+        return {
+            subdomainUrl,
+            customDomainUrl
+        }
     }
 
     // Copy URL to clipboard
@@ -958,6 +959,11 @@ export default function ProgramEditor() {
                                         const product = fp.product!
                                         const productForms = enabledForms.filter(f => f.productId === product.id)
                                         
+                                        // Debug logging
+                                        console.log('🔍 Product:', { id: product.id, name: product.name, slug: product.slug })
+                                        console.log('📝 All enabled forms:', enabledForms.map(f => ({ id: f.id, productId: f.productId })))
+                                        console.log('✅ Matched forms for this product:', productForms.map(f => ({ id: f.id, productId: f.productId })))
+                                        
                                         return (
                                             <div key={fp.id} className="border border-border rounded-xl overflow-hidden">
                                                 {/* Product Header */}
@@ -987,51 +993,123 @@ export default function ProgramEditor() {
                                                     </div>
                                                 </div>
 
-                                                {/* Form Links */}
-                                                <div className="p-4">
-                                                    {productForms.length > 0 ? (
-                                                        <div className="space-y-3">
-                                                            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                                                                <FileText className="h-4 w-4" />
-                                                                Form Links ({productForms.length})
+                                                {/* Default Form - Short form (matching product page structure) */}
+                                                {productForms.length > 0 && (() => {
+                                                    // Find the DEFAULT form specifically (globalFormStructureId === 'default' or null/undefined)
+                                                    const defaultForm = productForms.find(f => 
+                                                        !f.globalFormStructureId || f.globalFormStructureId === 'default'
+                                                    ) || productForms[0] // Fallback to first if no default found
+                                                    const form = defaultForm
+                                                    console.log('🎯 Default form for', product.name, ':', form)
+                                                    const urls = buildFormUrls(form.id, product.slug)
+                                                    
+                                                    return (
+                                                        <div className="p-4">
+                                                            {/* Form Header with Flow Icons */}
+                                                            <div className="border-b border-border pb-4 mb-4">
+                                                                <div className="flex items-center justify-between gap-6">
+                                                                    {/* Left: Name and Type */}
+                                                                    <div className="flex-shrink-0">
+                                                                        <h5 className="text-sm font-semibold mb-1">
+                                                                            Default - Short form
+                                                                        </h5>
+                                                                        <p className="text-xs text-muted-foreground">
+                                                                            📦 Product-Specific Form
+                                                                        </p>
+                                                                    </div>
+
+                                                                    {/* Center: Form Flow Preview (Inline) */}
+                                                                    <div className="flex items-center gap-2 overflow-x-auto flex-1">
+                                                                        {[
+                                                                            { icon: '📦', label: 'Product Questions' },
+                                                                            { icon: '👤', label: 'Create Account' },
+                                                                            { icon: '💳', label: 'Payment & Checkout' }
+                                                                        ].map((section, idx, arr) => (
+                                                                            <div key={section.label} className="flex items-center gap-2 flex-shrink-0">
+                                                                                <div className="flex items-center gap-1.5">
+                                                                                    <div className="w-8 h-8 bg-card rounded-lg flex items-center justify-center text-lg border border-border">
+                                                                                        {section.icon}
+                                                                                    </div>
+                                                                                    <span className="text-[10px] font-medium text-muted-foreground max-w-[60px] leading-tight">
+                                                                                        {section.label}
+                                                                                    </span>
+                                                                                </div>
+                                                                                {idx < arr.length - 1 && (
+                                                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" className="text-muted-foreground/40 flex-shrink-0">
+                                                                                        <path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                                                                                    </svg>
+                                                                                )}
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
                                                             </div>
-                                                            {productForms.map((form, idx) => {
-                                                                const url = buildFormUrl(form.id, product.slug || '')
-                                                                return url ? (
-                                                                    <div key={form.id} className="flex items-center gap-2 bg-muted/50 rounded-lg p-3">
-                                                                        <div className="flex-1 font-mono text-xs text-muted-foreground truncate">
-                                                                            {url}
+
+                                                            {/* Form URLs */}
+                                                            {urls ? (
+                                                                <div className="bg-card border border-border rounded-lg p-3">
+                                                                    <div className="space-y-3">
+                                                                        {/* Standard Subdomain URL */}
+                                                                        <div>
+                                                                            <div className="text-xs font-medium text-muted-foreground mb-1">
+                                                                                Subdomain URL:
+                                                                            </div>
+                                                                            <div className="flex items-center gap-2">
+                                                                                <div className="text-xs truncate flex-1 font-mono bg-muted px-2 py-1 rounded">
+                                                                                    {urls.subdomainUrl}
+                                                                                </div>
+                                                                                <Button size="sm" variant="outline" onClick={() => window.open(urls.subdomainUrl, '_blank')}>
+                                                                                    Preview
+                                                                                </Button>
+                                                                                <Button 
+                                                                                    size="sm" 
+                                                                                    variant="outline" 
+                                                                                    onClick={() => handleCopyUrl(urls.subdomainUrl, `${product.id}-subdomain`)}
+                                                                                >
+                                                                                    {copiedUrl === `${product.id}-subdomain` ? 'Copied!' : 'Copy'}
+                                                                                </Button>
+                                                                            </div>
                                                                         </div>
-                                                                        <Button
-                                                                            size="sm"
-                                                                            variant="outline"
-                                                                            onClick={() => window.open(url, '_blank')}
-                                                                            className="flex-shrink-0"
-                                                                        >
-                                                                            <ExternalLink className="h-3 w-3 mr-1" />
-                                                                            Open
-                                                                        </Button>
-                                                                        <Button
-                                                                            size="sm"
-                                                                            variant="outline"
-                                                                            onClick={() => handleCopyUrl(url, product.id + '-' + idx)}
-                                                                            className="flex-shrink-0"
-                                                                        >
-                                                                            <Copy className="h-3 w-3 mr-1" />
-                                                                            {copiedUrl === product.id + '-' + idx ? 'Copied!' : 'Copy'}
-                                                                        </Button>
+
+                                                                        {/* Custom Domain URL (if configured) */}
+                                                                        {urls.customDomainUrl && (
+                                                                            <div>
+                                                                                <div className="text-xs font-medium text-muted-foreground mb-1">
+                                                                                    Custom Domain URL:
+                                                                                </div>
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <div className="text-xs truncate flex-1 font-mono bg-muted px-2 py-1 rounded">
+                                                                                        {urls.customDomainUrl}
+                                                                                    </div>
+                                                                                    <Button size="sm" variant="outline" onClick={() => urls.customDomainUrl && window.open(urls.customDomainUrl, '_blank')}>
+                                                                                        Preview
+                                                                                    </Button>
+                                                                                    <Button 
+                                                                                        size="sm" 
+                                                                                        variant="outline" 
+                                                                                        onClick={() => urls.customDomainUrl && handleCopyUrl(urls.customDomainUrl, `${product.id}-custom`)}
+                                                                                    >
+                                                                                        {copiedUrl === `${product.id}-custom` ? 'Copied!' : 'Copy'}
+                                                                                    </Button>
+                                                                                </div>
+                                                                            </div>
+                                                                        )}
                                                                     </div>
-                                                                ) : (
-                                                                    <div key={form.id} className="text-xs text-muted-foreground bg-amber-50 dark:bg-amber-950/20 p-2 rounded">
-                                                                        Form URL not available - Missing: 
-                                                                        {!product.slug && ' product slug'}
-                                                                        {!clinicSlug && ' clinic slug'}
-                                                                        {product.slug && clinicSlug && ' (unknown issue)'}
-                                                                    </div>
-                                                                )
-                                                            })}
+                                                                </div>
+                                                            ) : (
+                                                                <div className="text-xs text-muted-foreground bg-amber-50 dark:bg-amber-950/20 p-3 rounded">
+                                                                    Form URL not available - Missing: 
+                                                                    {!product.slug && ' product slug'}
+                                                                    {!clinicSlug && ' clinic slug'}
+                                                                </div>
+                                                            )}
                                                         </div>
-                                                    ) : (
+                                                    )
+                                                })()}
+
+                                                {/* No forms message */}
+                                                {productForms.length === 0 && (
+                                                    <div className="p-4">
                                                         <div className="text-sm text-muted-foreground flex items-center gap-2">
                                                             <FileText className="h-4 w-4" />
                                                             No forms enabled for this product yet. 
@@ -1044,8 +1122,8 @@ export default function ProgramEditor() {
                                                                 Configure in Products →
                                                             </a>
                                                         </div>
-                                                    )}
-                                                </div>
+                                                    </div>
+                                                )}
                                             </div>
                                         )
                                     })}
