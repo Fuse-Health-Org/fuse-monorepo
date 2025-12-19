@@ -3,6 +3,8 @@ import Program from '../models/Program';
 import Questionnaire from '../models/Questionnaire';
 import FormProducts from '../models/FormProducts';
 import Product from '../models/Product';
+import TenantProduct from '../models/TenantProduct';
+import TenantProductForm from '../models/TenantProductForm';
 import { authenticateJWT, getCurrentUser } from '../config/jwt';
 
 const router = Router();
@@ -33,7 +35,7 @@ router.get('/public/programs/:id', async (req: Request, res: Response) => {
                 {
                   model: Product,
                   as: 'product',
-                  attributes: ['id', 'name', 'slug', 'imageUrl', 'price'],
+                  attributes: ['id', 'name', 'slug', 'imageUrl', 'price', 'categories'],
                   required: false,
                 },
               ],
@@ -50,9 +52,66 @@ router.get('/public/programs/:id', async (req: Request, res: Response) => {
       });
     }
 
+    // Get the first product from the program's template
+    const formProducts = (program.medicalTemplate as any)?.formProducts || [];
+    const firstFormProduct = formProducts.find((fp: any) => fp.product);
+    const firstProduct = firstFormProduct?.product;
+
+    // If we have a first product, get its tenant product info for pricing
+    let tenantProductInfo: any = null;
+    let tenantProductFormInfo: any = null;
+
+    if (firstProduct?.id && program.clinicId) {
+      // Find TenantProduct for this product and clinic
+      const tenantProduct = await TenantProduct.findOne({
+        where: {
+          productId: firstProduct.id,
+          clinicId: program.clinicId,
+        },
+        attributes: ['id', 'productId', 'clinicId', 'isActive', 'stripeProductId', 'stripePriceId', 'price'],
+      });
+
+      if (tenantProduct) {
+        tenantProductInfo = {
+          id: tenantProduct.id,
+          productId: tenantProduct.productId,
+          isActive: tenantProduct.isActive,
+          stripeProductId: tenantProduct.stripeProductId,
+          stripePriceId: tenantProduct.stripePriceId,
+          price: tenantProduct.price,
+        };
+
+        // Also get the default tenant product form (for the form ID)
+        const tenantProductForm = await TenantProductForm.findOne({
+          where: {
+            productId: firstProduct.id,
+            clinicId: program.clinicId,
+          },
+          attributes: ['id', 'productId', 'globalFormStructureId'],
+          order: [['createdAt', 'ASC']], // Get first/oldest form
+        });
+
+        if (tenantProductForm) {
+          tenantProductFormInfo = {
+            id: tenantProductForm.id,
+            productId: tenantProductForm.productId,
+            globalFormStructureId: tenantProductForm.globalFormStructureId,
+          };
+        }
+      }
+    }
+
+    // Build response with tenant product info
+    const responseData = {
+      ...(program.toJSON ? program.toJSON() : program),
+      tenantProduct: tenantProductInfo,
+      tenantProductForm: tenantProductFormInfo,
+      firstProductCategory: firstProduct?.categories?.[0] || null,
+    };
+
     return res.json({
       success: true,
-      data: program,
+      data: responseData,
     });
   } catch (error) {
     console.error('❌ Error getting public program:', error);

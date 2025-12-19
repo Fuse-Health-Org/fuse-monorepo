@@ -22,6 +22,29 @@ interface PublicProduct {
     globalFormStructure?: any | null
 }
 
+interface ProgramProduct {
+    id: string
+    name: string
+    slug: string
+    price?: number
+    imageUrl?: string
+}
+
+interface TenantProductInfo {
+    id: string
+    productId: string
+    isActive: boolean
+    stripeProductId?: string
+    stripePriceId?: string
+    price?: number
+}
+
+interface TenantProductFormInfo {
+    id: string
+    productId: string
+    globalFormStructureId?: string
+}
+
 interface ProgramData {
     id: string
     name: string
@@ -29,7 +52,17 @@ interface ProgramData {
     medicalTemplate?: {
         id: string
         title: string
+        formProducts?: Array<{
+            id: string
+            productId: string
+            product?: ProgramProduct
+        }>
     }
+    // First product info for pricing
+    firstProduct?: ProgramProduct
+    firstProductCategory?: string
+    tenantProduct?: TenantProductInfo
+    tenantProductForm?: TenantProductFormInfo
 }
 
 export default function PublicProductPage() {
@@ -81,11 +114,24 @@ export default function PublicProductPage() {
                 return
             }
 
+            // Extract first product for pricing info
+            const formProducts = programData.medicalTemplate?.formProducts || []
+            const firstFormProduct = formProducts.find((fp: any) => fp.product)
+            const firstProduct = firstFormProduct?.product || null
+
+            console.log('[PublicProduct] Program products:', formProducts.length, 'First product:', firstProduct?.name)
+            console.log('[PublicProduct] TenantProduct:', programData.tenantProduct)
+            console.log('[PublicProduct] TenantProductForm:', programData.tenantProductForm)
+
             setProgram({
                 id: programData.id,
                 name: programData.name,
                 medicalTemplateId: programData.medicalTemplateId,
-                medicalTemplate: programData.medicalTemplate
+                medicalTemplate: programData.medicalTemplate,
+                firstProduct: firstProduct,
+                firstProductCategory: programData.firstProductCategory,
+                tenantProduct: programData.tenantProduct,
+                tenantProductForm: programData.tenantProductForm
             })
             setIsModalOpen(true)
         } catch (err) {
@@ -214,6 +260,12 @@ export default function PublicProductPage() {
                     onClose={handleModalClose}
                     questionnaireId={program.medicalTemplateId}
                     productName={program.name}
+                    productCategory={program.firstProductCategory || undefined}
+                    // Pass pricing data from tenant product
+                    productPrice={program.tenantProduct?.price || program.firstProduct?.price || undefined}
+                    productStripePriceId={program.tenantProduct?.stripePriceId || undefined}
+                    tenantProductId={program.tenantProduct?.id || undefined}
+                    tenantProductFormId={program.tenantProductForm?.id || undefined}
                 />
             )}
 
