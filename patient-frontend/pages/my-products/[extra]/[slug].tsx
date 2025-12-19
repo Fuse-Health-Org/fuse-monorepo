@@ -22,6 +22,16 @@ interface PublicProduct {
     globalFormStructure?: any | null
 }
 
+interface ProgramData {
+    id: string
+    name: string
+    medicalTemplateId: string
+    medicalTemplate?: {
+        id: string
+        title: string
+    }
+}
+
 export default function PublicProductPage() {
     console.log('PublicProductPage Edu')
     const router = useRouter()
@@ -30,16 +40,63 @@ export default function PublicProductPage() {
     const [status, setStatus] = useState<Status>('loading')
     const [error, setError] = useState<string | null>(null)
     const [product, setProduct] = useState<PublicProduct | null>(null)
+    const [program, setProgram] = useState<ProgramData | null>(null)
     const [isModalOpen, setIsModalOpen] = useState(false)
 
     useEffect(() => {
-        if (typeof slug === 'string') {
-            const expectedVariant = typeof extra === 'string' ? extra : null
-            console.log('[PublicProduct] route params', { extra, slug, expectedVariant })
-            loadProduct(slug, expectedVariant)
+        if (typeof slug === 'string' && typeof extra === 'string') {
+            // Check if this is a program flow (slug === 'program')
+            if (slug === 'program') {
+                console.log('[PublicProduct] Program flow detected, programId:', extra)
+                loadProgram(extra)
+            } else {
+                console.log('[PublicProduct] route params', { extra, slug })
+                loadProduct(slug, extra)
+            }
         }
     }, [slug, extra])
 
+    // Load program data
+    const loadProgram = async (programId: string) => {
+        setStatus('loading')
+        setError(null)
+
+        try {
+            const apiUrl = `/api/public/programs/${encodeURIComponent(programId)}`
+            console.log('[PublicProduct] fetching program', { apiUrl })
+            const res = await fetch(apiUrl)
+            const data = await res.json()
+            console.log('[PublicProduct] program response', { status: res.status, data })
+
+            if (!res.ok || !data?.success || !data?.data) {
+                setError(data?.message || 'This program is not currently available.')
+                setStatus('idle')
+                return
+            }
+
+            const programData = data.data
+            if (!programData.medicalTemplateId) {
+                setError('This program does not have a medical template configured.')
+                setStatus('idle')
+                return
+            }
+
+            setProgram({
+                id: programData.id,
+                name: programData.name,
+                medicalTemplateId: programData.medicalTemplateId,
+                medicalTemplate: programData.medicalTemplate
+            })
+            setIsModalOpen(true)
+        } catch (err) {
+            console.error('❌ Program load error:', err)
+            setError('We could not load this program. Please refresh the page or contact support.')
+        } finally {
+            setStatus('idle')
+        }
+    }
+
+    // Load product data (regular product flow)
     const loadProduct = async (productSlug: string, expectedVariant: string | null) => {
         setStatus('loading')
         setError(null)
@@ -121,16 +178,23 @@ export default function PublicProductPage() {
         window.location.href = window.location.origin + '/'
     }
 
+    // Determine page title
+    const pageTitle = program 
+        ? `${program.name} - Fuse` 
+        : product 
+            ? `${product.name} - Fuse` 
+            : 'Product Intake'
+
     return (
         <div className="min-h-screen bg-gray-50">
             <Head>
-                <title>{product ? `${product.name} - Fuse` : 'Product Intake'}</title>
+                <title>{pageTitle}</title>
                 <meta name="description" content="Complete your clinical intake" />
             </Head>
 
             {status === 'loading' && !error && (
                 <div className="flex items-center justify-center h-screen text-muted-foreground">
-                    Loading product details...
+                    {slug === 'program' ? 'Loading program details...' : 'Loading product details...'}
                 </div>
             )}
 
@@ -143,6 +207,17 @@ export default function PublicProductPage() {
                 </div>
             )}
 
+            {/* Program flow - uses medicalTemplateId as questionnaireId */}
+            {program && isModalOpen && program.medicalTemplateId && (
+                <QuestionnaireModal
+                    isOpen={isModalOpen}
+                    onClose={handleModalClose}
+                    questionnaireId={program.medicalTemplateId}
+                    productName={program.name}
+                />
+            )}
+
+            {/* Regular product flow */}
             {product && isModalOpen && product.questionnaireId && (
                 <QuestionnaireModal
                     isOpen={isModalOpen}

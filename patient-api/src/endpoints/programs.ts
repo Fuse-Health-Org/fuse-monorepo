@@ -1,9 +1,67 @@
 import { Router, Request, Response } from 'express';
 import Program from '../models/Program';
 import Questionnaire from '../models/Questionnaire';
+import FormProducts from '../models/FormProducts';
+import Product from '../models/Product';
 import { authenticateJWT, getCurrentUser } from '../config/jwt';
 
 const router = Router();
+
+/**
+ * PUBLIC: Get a program by ID with its medical template details
+ * Used by patient frontend to resolve program URLs
+ * GET /public/programs/:id
+ */
+router.get('/public/programs/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const program = await Program.findOne({
+      where: { id, isActive: true },
+      include: [
+        {
+          model: Questionnaire,
+          as: 'medicalTemplate',
+          attributes: ['id', 'title', 'description', 'formTemplateType'],
+          include: [
+            {
+              model: FormProducts,
+              as: 'formProducts',
+              attributes: ['id', 'productId'],
+              required: false,
+              include: [
+                {
+                  model: Product,
+                  as: 'product',
+                  attributes: ['id', 'name', 'slug', 'imageUrl', 'price'],
+                  required: false,
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    if (!program) {
+      return res.status(404).json({
+        success: false,
+        error: 'Program not found',
+      });
+    }
+
+    return res.json({
+      success: true,
+      data: program,
+    });
+  } catch (error) {
+    console.error('❌ Error getting public program:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to get program',
+    });
+  }
+});
 
 /**
  * Get all programs for the current clinic

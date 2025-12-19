@@ -26,15 +26,56 @@ export function useQuestionnaireData(
       setLoading(true);
       try {
         // If questionnaireId is provided (product-based), fetch questionnaire directly via public proxy
+        // Also supports Program IDs - if it's a program, we'll fetch the questionnaire from its medicalTemplate
         if (props.questionnaireId) {
+          let questionnaireData: any = null
+          let isProgramFlow = false
+
+          // First, try to fetch as a questionnaire
           const qRes = await fetch(`/api/public/questionnaires/${encodeURIComponent(props.questionnaireId)}`)
           const qData = await qRes.json().catch(() => null)
 
-          if (!qRes.ok || !qData?.success || !qData?.data) {
-            throw new Error(qData?.message || 'Failed to load questionnaire')
+          if (qRes.ok && qData?.success && qData?.data) {
+            // It's a regular questionnaire
+            questionnaireData = qData.data
+            console.log('📋 Loaded as questionnaire:', questionnaireData.id)
+          } else {
+            // Questionnaire not found - try to fetch as a Program
+            console.log('🔄 Questionnaire not found, checking if ID is a Program...')
+            const pRes = await fetch(`/api/public/programs/${encodeURIComponent(props.questionnaireId)}`)
+            const pData = await pRes.json().catch(() => null)
+
+            if (pRes.ok && pData?.success && pData?.data) {
+              // It's a Program! Get the questionnaire from its medicalTemplate
+              const program = pData.data
+              console.log('📦 Found Program:', program.name, 'with template:', program.medicalTemplateId)
+              isProgramFlow = true
+
+              if (!program.medicalTemplateId) {
+                throw new Error('Program has no medical template configured')
+              }
+
+              // Fetch the actual questionnaire from the program's medical template
+              const templateRes = await fetch(`/api/public/questionnaires/${encodeURIComponent(program.medicalTemplateId)}`)
+              const templateData = await templateRes.json().catch(() => null)
+
+              if (!templateRes.ok || !templateData?.success || !templateData?.data) {
+                throw new Error('Failed to load program medical template')
+              }
+
+              questionnaireData = templateData.data
+              // Store program info on the questionnaire for later use
+              questionnaireData._programId = program.id
+              questionnaireData._programName = program.name
+              console.log('✅ Loaded questionnaire from Program template:', questionnaireData.id)
+            } else {
+              throw new Error(qData?.message || 'Failed to load questionnaire or program')
+            }
           }
 
-          const questionnaireData = qData.data
+          if (!questionnaireData) {
+            throw new Error('Failed to load questionnaire data')
+          }
 
           // Debug: Log questionnaire data structure
           console.log('📋 Questionnaire data loaded:', {

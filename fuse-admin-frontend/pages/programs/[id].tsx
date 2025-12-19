@@ -120,25 +120,17 @@ export default function ProgramEditor() {
     // Load clinic info for form URLs
     useEffect(() => {
         const fetchClinic = async () => {
-            console.log('🏥 Fetching clinic info...', { token: !!token, clinicId: user?.clinicId })
-            if (!token || !user?.clinicId) {
-                console.log('⚠️ Missing token or clinicId')
-                return
-            }
+            if (!token || !user?.clinicId) return
             try {
                 const response = await fetch(`${API_URL}/clinic/${user.clinicId}`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 })
                 if (response.ok) {
                     const data = await response.json()
-                    console.log('🏥 Clinic data:', data)
                     if (data.success && data.data) {
                         setClinicSlug(data.data.slug)
                         setClinicCustomDomain(data.data.customDomain || null)
-                        console.log('✅ Clinic slug set:', data.data.slug)
                     }
-                } else {
-                    console.error('❌ Failed to fetch clinic:', response.status)
                 }
             } catch (err) {
                 console.error('Failed to load clinic:', err)
@@ -157,12 +149,6 @@ export default function ProgramEditor() {
 
         // Find template from loaded templates list
         const template = templates.find(t => t.id === medicalTemplateId)
-        console.log('📋 Selected template:', template)
-        console.log('📦 Products in template:', template?.formProducts?.map(fp => ({
-            id: fp.product?.id,
-            name: fp.product?.name,
-            slug: fp.product?.slug
-        })))
         if (template) {
             setSelectedTemplateDetails(template)
             
@@ -173,14 +159,12 @@ export default function ProgramEditor() {
                 const allForms: EnabledForm[] = []
                 for (const fp of template.formProducts) {
                     if (!fp.product?.id) continue
-                    console.log(`🔄 Fetching forms for product: ${fp.product.name} (ID: ${fp.product.id})`)
                     try {
                         const res = await fetch(`${API_URL}/admin/tenant-product-forms?productId=${fp.product.id}`, {
                             headers: { 'Authorization': `Bearer ${token}` }
                         })
                         if (res.ok) {
                             const data = await res.json()
-                            console.log(`📥 Forms returned for ${fp.product.name}:`, data?.data)
                             if (Array.isArray(data?.data)) {
                                 allForms.push(...data.data.map((f: any) => ({
                                     id: f.id,
@@ -193,7 +177,6 @@ export default function ProgramEditor() {
                         console.error('Error fetching forms for product:', fp.product.id, err)
                     }
                 }
-                console.log('📋 All forms collected:', allForms)
                 setEnabledForms(allForms)
             }
             
@@ -941,15 +924,139 @@ export default function ProgramEditor() {
                         </div>
                     )}
 
+                    {/* Edit Mode: Program Form Link - uses program ID */}
+                    {!isCreateMode && id && clinicSlug && (
+                        <div className="bg-card rounded-2xl shadow-sm border border-border p-6 mt-6">
+                            <div className="flex items-center gap-2 mb-2">
+                                <FileText className="h-5 w-5 text-green-500" />
+                                <h3 className="text-lg font-semibold">Program Form Link</h3>
+                            </div>
+                            <p className="text-sm text-muted-foreground mb-4">
+                                Share this link for customers to access all products in this program
+                            </p>
+
+                            {(() => {
+                                const isLocalhost = process.env.NODE_ENV !== 'production'
+                                const protocol = isLocalhost ? 'http' : 'https'
+                                const isStaging = process.env.NEXT_PUBLIC_IS_STAGING === 'true'
+                                const baseDomain = isStaging ? 'fusehealthstaging.xyz' : 'fusehealth.com'
+                                const subdomainBase = isLocalhost
+                                    ? `http://${clinicSlug}.localhost:3000`
+                                    : `https://${clinicSlug}.${baseDomain}`
+                                
+                                // Use program ID in the URL
+                                const programUrl = `${subdomainBase}/my-products/${id}/program`
+                                const customProgramUrl = clinicCustomDomain 
+                                    ? `${protocol}://${clinicCustomDomain}/my-products/${id}/program`
+                                    : null
+
+                                return (
+                                    <div className="border border-border rounded-xl overflow-hidden">
+                                        <div className="p-4">
+                                            {/* Form Header with Flow Icons */}
+                                            <div className="border-b border-border pb-4 mb-4">
+                                                <div className="flex items-center justify-between gap-6">
+                                                    <div className="flex-shrink-0">
+                                                        <h5 className="text-sm font-semibold mb-1">
+                                                            Program Default Form
+                                                        </h5>
+                                                        <p className="text-xs text-muted-foreground">
+                                                            🎯 Uses program's medical template
+                                                        </p>
+                                                    </div>
+
+                                                    <div className="flex items-center gap-2 overflow-x-auto flex-1">
+                                                        {[
+                                                            { icon: '📦', label: 'Product Questions' },
+                                                            { icon: '👤', label: 'Create Account' },
+                                                            { icon: '💳', label: 'Payment & Checkout' }
+                                                        ].map((section, idx, arr) => (
+                                                            <div key={section.label} className="flex items-center gap-2 flex-shrink-0">
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <div className="w-8 h-8 bg-card rounded-lg flex items-center justify-center text-lg border border-border">
+                                                                        {section.icon}
+                                                                    </div>
+                                                                    <span className="text-[10px] font-medium text-muted-foreground max-w-[60px] leading-tight">
+                                                                        {section.label}
+                                                                    </span>
+                                                                </div>
+                                                                {idx < arr.length - 1 && (
+                                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" className="text-muted-foreground/40 flex-shrink-0">
+                                                                        <path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                                                                    </svg>
+                                                                )}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Form URLs */}
+                                            <div className="bg-card border border-border rounded-lg p-3">
+                                                <div className="space-y-3">
+                                                    {/* Subdomain URL */}
+                                                    <div>
+                                                        <div className="text-xs font-medium text-muted-foreground mb-1">
+                                                            Subdomain URL:
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="text-xs truncate flex-1 font-mono bg-muted px-2 py-1 rounded">
+                                                                {programUrl}
+                                                            </div>
+                                                            <Button size="sm" variant="outline" onClick={() => window.open(programUrl, '_blank')}>
+                                                                Preview
+                                                            </Button>
+                                                            <Button 
+                                                                size="sm" 
+                                                                variant="outline" 
+                                                                onClick={() => handleCopyUrl(programUrl, 'program-subdomain')}
+                                                            >
+                                                                {copiedUrl === 'program-subdomain' ? 'Copied!' : 'Copy'}
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Custom Domain URL */}
+                                                    {customProgramUrl && (
+                                                        <div>
+                                                            <div className="text-xs font-medium text-muted-foreground mb-1">
+                                                                Custom Domain URL:
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="text-xs truncate flex-1 font-mono bg-muted px-2 py-1 rounded">
+                                                                    {customProgramUrl}
+                                                                </div>
+                                                                <Button size="sm" variant="outline" onClick={() => window.open(customProgramUrl, '_blank')}>
+                                                                    Preview
+                                                                </Button>
+                                                                <Button 
+                                                                    size="sm" 
+                                                                    variant="outline" 
+                                                                    onClick={() => handleCopyUrl(customProgramUrl, 'program-custom')}
+                                                                >
+                                                                    {copiedUrl === 'program-custom' ? 'Copied!' : 'Copy'}
+                                                                </Button>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )
+                            })()}
+                        </div>
+                    )}
+
                     {/* Edit Mode: Selected Template Products & Form Links */}
                     {!isCreateMode && selectedTemplateDetails && selectedTemplateDetails.formProducts && selectedTemplateDetails.formProducts.length > 0 && (
                         <div className="bg-card rounded-2xl shadow-sm border border-border p-6 mt-6">
                             <div className="flex items-center gap-2 mb-2">
                                 <Pill className="h-5 w-5 text-blue-500" />
-                                <h3 className="text-lg font-semibold">Program Products & Form Links</h3>
+                                <h3 className="text-lg font-semibold">Individual Product Form Links</h3>
                             </div>
                             <p className="text-sm text-muted-foreground mb-4">
-                                Products from template: <span className="font-medium text-foreground">{selectedTemplateDetails.title}</span>
+                                Direct links to individual products from template: <span className="font-medium text-foreground">{selectedTemplateDetails.title}</span>
                             </p>
 
                             <div className="space-y-4">
@@ -958,11 +1065,6 @@ export default function ProgramEditor() {
                                     .map((fp) => {
                                         const product = fp.product!
                                         const productForms = enabledForms.filter(f => f.productId === product.id)
-                                        
-                                        // Debug logging
-                                        console.log('🔍 Product:', { id: product.id, name: product.name, slug: product.slug })
-                                        console.log('📝 All enabled forms:', enabledForms.map(f => ({ id: f.id, productId: f.productId })))
-                                        console.log('✅ Matched forms for this product:', productForms.map(f => ({ id: f.id, productId: f.productId })))
                                         
                                         return (
                                             <div key={fp.id} className="border border-border rounded-xl overflow-hidden">
@@ -1000,7 +1102,6 @@ export default function ProgramEditor() {
                                                         !f.globalFormStructureId || f.globalFormStructureId === 'default'
                                                     ) || productForms[0] // Fallback to first if no default found
                                                     const form = defaultForm
-                                                    console.log('🎯 Default form for', product.name, ':', form)
                                                     const urls = buildFormUrls(form.id, product.slug)
                                                     
                                                     return (
