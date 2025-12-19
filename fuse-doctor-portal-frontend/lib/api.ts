@@ -44,11 +44,42 @@ export interface PendingOrder {
         description?: string;
         isCompound?: boolean;
     };
+    // Program information (for program-based orders)
+    programId?: string;
+    program?: {
+        id: string;
+        name: string;
+        description?: string;
+        hasPatientPortal?: boolean;
+        patientPortalPrice?: number;
+        hasBmiCalculator?: boolean;
+        bmiCalculatorPrice?: number;
+        hasProteinIntakeCalculator?: boolean;
+        proteinIntakeCalculatorPrice?: number;
+        hasCalorieDeficitCalculator?: boolean;
+        calorieDeficitCalculatorPrice?: number;
+        hasEasyShopping?: boolean;
+        easyShoppingPrice?: number;
+    };
     shippingAddress?: any;
     questionnaireAnswers?: Record<string, any>;
     mdCaseId?: string;
     mdPrescriptions?: any[];
     mdOfferings?: any[];
+    // Order items for multi-product orders
+    orderItems?: Array<{
+        id: string;
+        productId: string;
+        quantity: number;
+        unitPrice: number;
+        totalPrice: number;
+        placeholderSig?: string;
+        product?: {
+            id: string;
+            name: string;
+            imageUrl?: string;
+        };
+    }>;
 }
 
 export interface OrderStats {

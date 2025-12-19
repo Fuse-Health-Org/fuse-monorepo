@@ -3,6 +3,7 @@ import { Op } from "sequelize";
 import User from "../models/User";
 import UserRoles from "../models/UserRoles";
 import Order from "../models/Order";
+import OrderItem from "../models/OrderItem";
 import Clinic from "../models/Clinic";
 import TenantProduct from "../models/TenantProduct";
 import Product from "../models/Product";
@@ -12,6 +13,7 @@ import OrderService from "../services/order.service";
 import PharmacyProduct from "../models/PharmacyProduct";
 import PharmacyCoverage from "../models/PharmacyCoverage";
 import Pharmacy from "../models/Pharmacy";
+import Program from "../models/Program";
 import IronSailOrderService from "../services/pharmacy/ironsail-order";
 import {
   AuditService,
@@ -179,8 +181,11 @@ export function registerDoctorEndpoints(
 
         // Build where clause - show orders ready for doctor review
         const whereClause: any = {
-          // Only show orders with tenantProductId (orders for tenant products)
-          tenantProductId: { [Op.ne]: null },
+          // Show orders with tenantProductId OR programId (product or program orders)
+          [Op.or]: [
+            { tenantProductId: { [Op.ne]: null } },
+            { programId: { [Op.ne]: null } },
+          ],
           // Show: amount_capturable_updated (authorized payment awaiting approval), paid orders, and beyond
           status: status || {
             [Op.in]: [
@@ -279,6 +284,38 @@ export function registerDoctorEndpoints(
               as: "clinic",
               attributes: ["id", "name"],
             },
+            {
+              model: Program,
+              as: "program",
+              attributes: [
+                "id",
+                "name",
+                "description",
+                "hasPatientPortal",
+                "patientPortalPrice",
+                "hasBmiCalculator",
+                "bmiCalculatorPrice",
+                "hasProteinIntakeCalculator",
+                "proteinIntakeCalculatorPrice",
+                "hasCalorieDeficitCalculator",
+                "calorieDeficitCalculatorPrice",
+                "hasEasyShopping",
+                "easyShoppingPrice",
+              ],
+              required: false,
+            },
+            {
+              model: OrderItem,
+              as: "orderItems",
+              include: [
+                {
+                  model: Product,
+                  as: "product",
+                  attributes: ["id", "name", "imageUrl", "placeholderSig"],
+                },
+              ],
+              required: false,
+            },
           ],
           order: [["createdAt", "DESC"]],
           limit: Math.min(parseInt(limit), 200),
@@ -354,6 +391,42 @@ export function registerDoctorEndpoints(
                   name: order.clinic.name,
                 }
               : null,
+            // Program data for program-based orders
+            programId: order.programId,
+            program: order.program
+              ? {
+                  id: order.program.id,
+                  name: order.program.name,
+                  description: order.program.description,
+                  hasPatientPortal: order.program.hasPatientPortal,
+                  patientPortalPrice: order.program.patientPortalPrice,
+                  hasBmiCalculator: order.program.hasBmiCalculator,
+                  bmiCalculatorPrice: order.program.bmiCalculatorPrice,
+                  hasProteinIntakeCalculator: order.program.hasProteinIntakeCalculator,
+                  proteinIntakeCalculatorPrice: order.program.proteinIntakeCalculatorPrice,
+                  hasCalorieDeficitCalculator: order.program.hasCalorieDeficitCalculator,
+                  calorieDeficitCalculatorPrice: order.program.calorieDeficitCalculatorPrice,
+                  hasEasyShopping: order.program.hasEasyShopping,
+                  easyShoppingPrice: order.program.easyShoppingPrice,
+                }
+              : null,
+            // Order items for multi-product orders (programs)
+            orderItems: order.orderItems?.map((item: any) => ({
+              id: item.id,
+              productId: item.productId,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              totalPrice: item.totalPrice,
+              placeholderSig: item.placeholderSig,
+              product: item.product
+                ? {
+                    id: item.product.id,
+                    name: item.product.name,
+                    imageUrl: item.product.imageUrl,
+                    placeholderSig: item.product.placeholderSig,
+                  }
+                : null,
+            })) || [],
             shippingAddress: order.shippingAddress,
             questionnaireAnswers: order.questionnaireAnswers,
             mdCaseId: order.mdCaseId,
