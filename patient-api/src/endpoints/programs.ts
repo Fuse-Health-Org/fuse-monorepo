@@ -255,7 +255,7 @@ router.get('/programs/:id', authenticateJWT, async (req: Request, res: Response)
 /**
  * Create a new program
  * POST /programs
- * Body: { name, description?, medicalTemplateId?, isActive? }
+ * Body: { name, description?, medicalTemplateId?, isActive?, hasPatientPortal?, patientPortalPrice?, ... }
  */
 router.post('/programs', authenticateJWT, async (req: Request, res: Response) => {
   try {
@@ -275,7 +275,23 @@ router.post('/programs', authenticateJWT, async (req: Request, res: Response) =>
       });
     }
 
-    const { name, description, medicalTemplateId, isActive } = req.body;
+    const { 
+      name, 
+      description, 
+      medicalTemplateId, 
+      isActive,
+      // Non-medical services
+      hasPatientPortal,
+      patientPortalPrice,
+      hasBmiCalculator,
+      bmiCalculatorPrice,
+      hasProteinIntakeCalculator,
+      proteinIntakeCalculatorPrice,
+      hasCalorieDeficitCalculator,
+      calorieDeficitCalculatorPrice,
+      hasEasyShopping,
+      easyShoppingPrice,
+    } = req.body;
 
     if (!name) {
       return res.status(400).json({
@@ -301,6 +317,17 @@ router.post('/programs', authenticateJWT, async (req: Request, res: Response) =>
       clinicId,
       medicalTemplateId: medicalTemplateId || null,
       isActive: isActive !== undefined ? isActive : true,
+      // Non-medical services
+      hasPatientPortal: hasPatientPortal || false,
+      patientPortalPrice: patientPortalPrice || 0,
+      hasBmiCalculator: hasBmiCalculator || false,
+      bmiCalculatorPrice: bmiCalculatorPrice || 0,
+      hasProteinIntakeCalculator: hasProteinIntakeCalculator || false,
+      proteinIntakeCalculatorPrice: proteinIntakeCalculatorPrice || 0,
+      hasCalorieDeficitCalculator: hasCalorieDeficitCalculator || false,
+      calorieDeficitCalculatorPrice: calorieDeficitCalculatorPrice || 0,
+      hasEasyShopping: hasEasyShopping || false,
+      easyShoppingPrice: easyShoppingPrice || 0,
     });
 
     // Fetch with relationships
@@ -344,7 +371,23 @@ router.put('/programs/:id', authenticateJWT, async (req: Request, res: Response)
 
     const clinicId = (currentUser as any).clinicId;
     const { id } = req.params;
-    const { name, description, medicalTemplateId, isActive } = req.body;
+    const { 
+      name, 
+      description, 
+      medicalTemplateId, 
+      isActive,
+      // Non-medical services
+      hasPatientPortal,
+      patientPortalPrice,
+      hasBmiCalculator,
+      bmiCalculatorPrice,
+      hasProteinIntakeCalculator,
+      proteinIntakeCalculatorPrice,
+      hasCalorieDeficitCalculator,
+      calorieDeficitCalculatorPrice,
+      hasEasyShopping,
+      easyShoppingPrice,
+    } = req.body;
 
     const program = await Program.findOne({
       where: { id, clinicId },
@@ -373,6 +416,18 @@ router.put('/programs/:id', authenticateJWT, async (req: Request, res: Response)
     if (description !== undefined) program.description = description;
     if (medicalTemplateId !== undefined) program.medicalTemplateId = medicalTemplateId;
     if (isActive !== undefined) program.isActive = isActive;
+
+    // Update non-medical services
+    if (hasPatientPortal !== undefined) program.hasPatientPortal = hasPatientPortal;
+    if (patientPortalPrice !== undefined) program.patientPortalPrice = patientPortalPrice;
+    if (hasBmiCalculator !== undefined) program.hasBmiCalculator = hasBmiCalculator;
+    if (bmiCalculatorPrice !== undefined) program.bmiCalculatorPrice = bmiCalculatorPrice;
+    if (hasProteinIntakeCalculator !== undefined) program.hasProteinIntakeCalculator = hasProteinIntakeCalculator;
+    if (proteinIntakeCalculatorPrice !== undefined) program.proteinIntakeCalculatorPrice = proteinIntakeCalculatorPrice;
+    if (hasCalorieDeficitCalculator !== undefined) program.hasCalorieDeficitCalculator = hasCalorieDeficitCalculator;
+    if (calorieDeficitCalculatorPrice !== undefined) program.calorieDeficitCalculatorPrice = calorieDeficitCalculatorPrice;
+    if (hasEasyShopping !== undefined) program.hasEasyShopping = hasEasyShopping;
+    if (easyShoppingPrice !== undefined) program.easyShoppingPrice = easyShoppingPrice;
 
     await program.save();
 
