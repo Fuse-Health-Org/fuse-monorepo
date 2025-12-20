@@ -4,6 +4,7 @@ import { apiCall } from './api';
 export interface ClinicDomainInfo {
   hasClinicSubdomain: boolean;
   clinicSlug: string | null;
+  affiliateSlug?: string | null; // For affiliate detection (check.test.localhost -> affiliateSlug: "check")
   isDevelopment: boolean;
   isProduction: boolean;
 }
@@ -116,13 +117,22 @@ export async function extractClinicSlugFromDomain(): Promise<ClinicDomainInfo> {
         const data = await response.json();
         
         if (response.ok && data.success) {
-          // Validation passed - use the brand clinic slug
+          // Validation passed - use the brand clinic slug and return affiliate slug
           clinicSlug = data.data.brandClinic.slug;
           hasClinicSubdomain = true;
           console.log('✅ Affiliate access validated (dev):', { 
             affiliateSlug,
             brandSlug: data.data.brandClinic.slug,
           });
+          
+          // Return early with affiliate slug
+          return {
+            hasClinicSubdomain: true,
+            clinicSlug: data.data.brandClinic.slug,
+            affiliateSlug: affiliateSlug, // Include affiliate slug for product fetching
+            isDevelopment: true,
+            isProduction: false
+          };
         } else {
           // Validation failed - invalid affiliate or doesn't belong to this brand
           console.error('❌ Affiliate validation failed (dev):', data.message);
@@ -176,13 +186,22 @@ export async function extractClinicSlugFromDomain(): Promise<ClinicDomainInfo> {
         const data = await response.json();
         
         if (response.ok && data.success) {
-          // Validation passed - use the brand clinic slug
+          // Validation passed - use the brand clinic slug and return affiliate slug
           clinicSlug = data.data.brandClinic.slug;
           hasClinicSubdomain = true;
           console.log('✅ Affiliate access validated (prod fusehealth.com):', { 
             affiliateSlug,
             brandSlug: data.data.brandClinic.slug,
           });
+          
+          // Return early with affiliate slug
+          return {
+            hasClinicSubdomain: true,
+            clinicSlug: data.data.brandClinic.slug,
+            affiliateSlug: affiliateSlug, // Include affiliate slug for product fetching
+            isDevelopment: false,
+            isProduction: true
+          };
         } else {
           // Validation failed - invalid affiliate or doesn't belong to this brand
           console.error('❌ Affiliate validation failed (prod fusehealth.com):', data.message);

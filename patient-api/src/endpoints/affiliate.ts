@@ -1,6 +1,7 @@
 import { Express } from "express";
 import { Op, QueryTypes } from "sequelize";
 import axios from "axios";
+import multer from "multer";
 import User from "../models/User";
 import Order from "../models/Order";
 import OrderItem from "../models/OrderItem";
@@ -8,8 +9,35 @@ import Product from "../models/Product";
 import Clinic from "../models/Clinic";
 import CustomWebsite from "../models/CustomWebsite";
 import UserRoles from "../models/UserRoles";
+import AffiliateProductImage from "../models/AffiliateProductImage";
+import TenantProduct from "../models/TenantProduct";
 import { MailsSender } from "../services/mailsSender";
 import { sequelize } from "../config/database";
+import {
+  uploadToS3,
+  deleteFromS3,
+  isValidImageFile,
+  isValidFileSize,
+} from "../config/s3";
+
+// Configure multer for file uploads (store in memory)
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    if (isValidImageFile(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(
+        new Error(
+          "Invalid file type. Only JPEG, PNG, WebP images are allowed."
+        )
+      );
+    }
+  },
+});
 
 /**
  * Check if a product is medical (contains PHI) or non-medical
@@ -1527,6 +1555,316 @@ The Fuse Team`,
       res.status(500).json({
         success: false,
         message: "Failed to fetch affiliate",
+      });
+    }
+  });
+
+  // Get affiliate products (with custom images if set)
+  app.get("/affiliate/products", authenticateJWT, async (req, res) => {
+    try {
+      const currentUser = getCurrentUser(req);
+      if (!currentUser) {
+        return res.status(401).json({
+          success: false,
+          message: "Not authenticated",
+        });
+      }
+
+      const user = await User.findByPk(currentUser.id, {
+        include: [{ model: UserRoles, as: "userRoles", required: false }],
+      });
+
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found",
+        });
+      }
+
+      await user.getUserRoles();
+      if (!user.userRoles?.hasRole("affiliate")) {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied. Affiliate role required.",
+        });
+      }
+
+      // Get affiliate's clinic and parent clinic
+      if (!user.clinicId) {
+        return res.status(400).json({
+          success: false,
+          message: "Affiliate clinic not set. Please complete onboarding.",
+        });
+      }
+
+      const affiliateClinic = await Clinic.findByPk(user.clinicId);
+      if (!affiliateClinic?.affiliateOwnerClinicId) {
+        return res.status(400).json({
+          success: false,
+          message: "Affiliate parent clinic not found",
+        });
+      }
+
+      const parentClinicId = affiliateClinic.affiliateOwnerClinicId;
+
+      // Get all products from the parent clinic
+      const tenantProducts = await TenantProduct.findAll({
+        where: {
+          clinicId: parentClinicId,
+          isActive: true,
+        },
+        include: [
+          {
+            model: Product,
+            as: "product",
+            required: true,
+          },
+        ],
+      });
+
+      // Get affiliate's custom images
+      const customImages = await AffiliateProductImage.findAll({
+        where: {
+          affiliateId: user.id,
+        },
+      });
+
+      // Create a map of custom images by productId
+      const customImageMap = new Map();
+      customImages.forEach((img) => {
+        customImageMap.set(img.productId, {
+          customImageUrl: img.customImageUrl,
+          useCustomImage: img.useCustomImage,
+        });
+      });
+
+      // Merge products with custom images
+      const productsWithCustomImages = tenantProducts.map((tp) => {
+        const product = tp.product;
+        const customImg = customImageMap.get(product.id);
+
+        return {
+          id: product.id,
+          name: product.name,
+          price: tp.price || product.price,
+          originalImageUrl: product.imageUrl,
+          customImageUrl: customImg?.customImageUrl || null,
+          useCustomImage: customImg?.useCustomImage || false,
+          displayImageUrl: customImg?.useCustomImage && customImg?.customImageUrl
+            ? customImg.customImageUrl
+            : product.imageUrl,
+          category: null,
+          categories: [],
+          active: tp.isActive,
+        };
+      });
+
+      res.status(200).json({
+        success: true,
+        data: productsWithCustomImages,
+      });
+    } catch (error) {
+      console.error("❌ Error fetching affiliate products:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to fetch affiliate products",
+      });
+    }
+  });
+
+  // Upload affiliate product image
+  app.post("/affiliate/products/:productId/upload-image", authenticateJWT, upload.single("image"), async (req, res) => {
+    try {
+      const currentUser = getCurrentUser(req);
+      if (!currentUser) {
+        return res.status(401).json({
+          success: false,
+          message: "Not authenticated",
+        });
+      }
+
+      const user = await User.findByPk(currentUser.id, {
+        include: [{ model: UserRoles, as: "userRoles", required: false }],
+      });
+
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found",
+        });
+      }
+
+      await user.getUserRoles();
+      if (!user.userRoles?.hasRole("affiliate")) {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied. Affiliate role required.",
+        });
+      }
+
+      const { productId } = req.params;
+
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          message: "No file uploaded",
+        });
+      }
+
+      // Validate file size
+      if (!isValidFileSize(req.file.size)) {
+        return res.status(400).json({
+          success: false,
+          message: "File too large. Maximum size is 5MB.",
+        });
+      }
+
+      // Verify product exists
+      const product = await Product.findByPk(productId);
+      if (!product) {
+        return res.status(404).json({
+          success: false,
+          message: "Product not found",
+        });
+      }
+
+      // Check if affiliate already has a custom image for this product
+      const existingImage = await AffiliateProductImage.findOne({
+        where: {
+          affiliateId: user.id,
+          productId,
+        },
+      });
+
+      // Delete old image from S3 if it exists
+      if (existingImage?.customImageUrl) {
+        try {
+          await deleteFromS3(existingImage.customImageUrl);
+          console.log("🗑️ Old affiliate product image deleted from S3");
+        } catch (error) {
+          console.error("Warning: Failed to delete old affiliate product image from S3:", error);
+        }
+      }
+
+      // Upload new image to S3
+      const imageUrl = await uploadToS3(
+        req.file.buffer,
+        req.file.originalname,
+        req.file.mimetype,
+        "affiliate-product-images"
+      );
+
+      // Upsert affiliate product image
+      const [affiliateProductImage, created] = await AffiliateProductImage.upsert({
+        affiliateId: user.id,
+        productId,
+        customImageUrl: imageUrl,
+        useCustomImage: true,
+      });
+
+      console.log("✅ [Affiliate Product Image] Uploaded:", {
+        affiliateId: user.id,
+        productId,
+        imageUrl,
+        created,
+      });
+
+      res.status(200).json({
+        success: true,
+        message: created
+          ? "Product image uploaded successfully"
+          : "Product image updated successfully",
+        data: {
+          customImageUrl: affiliateProductImage.customImageUrl,
+          useCustomImage: affiliateProductImage.useCustomImage,
+        },
+      });
+    } catch (error) {
+      console.error("❌ Error updating affiliate product image:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to update product image",
+      });
+    }
+  });
+
+  // Toggle between custom and original image
+  app.put("/affiliate/products/:productId/toggle-image", authenticateJWT, async (req, res) => {
+    try {
+      const currentUser = getCurrentUser(req);
+      if (!currentUser) {
+        return res.status(401).json({
+          success: false,
+          message: "Not authenticated",
+        });
+      }
+
+      const user = await User.findByPk(currentUser.id, {
+        include: [{ model: UserRoles, as: "userRoles", required: false }],
+      });
+
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found",
+        });
+      }
+
+      await user.getUserRoles();
+      if (!user.userRoles?.hasRole("affiliate")) {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied. Affiliate role required.",
+        });
+      }
+
+      const { productId } = req.params;
+      const { useCustomImage } = req.body;
+
+      if (useCustomImage === undefined) {
+        return res.status(400).json({
+          success: false,
+          message: "useCustomImage is required",
+        });
+      }
+
+      // Find existing affiliate product image
+      const affiliateProductImage = await AffiliateProductImage.findOne({
+        where: {
+          affiliateId: user.id,
+          productId,
+        },
+      });
+
+      if (!affiliateProductImage) {
+        return res.status(404).json({
+          success: false,
+          message: "No custom image found for this product. Please upload one first.",
+        });
+      }
+
+      // Update the toggle
+      affiliateProductImage.useCustomImage = useCustomImage;
+      await affiliateProductImage.save();
+
+      console.log("✅ [Affiliate Product Image] Toggled:", {
+        affiliateId: user.id,
+        productId,
+        useCustomImage,
+      });
+
+      res.status(200).json({
+        success: true,
+        message: `Now using ${useCustomImage ? "custom" : "original"} image`,
+        data: {
+          useCustomImage: affiliateProductImage.useCustomImage,
+        },
+      });
+    } catch (error) {
+      console.error("❌ Error toggling affiliate product image:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to toggle product image",
       });
     }
   });

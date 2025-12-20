@@ -116,6 +116,7 @@ import BrandTreatment from "./models/BrandTreatment";
 import Questionnaire from "./models/Questionnaire";
 import QuestionnaireCustomization from "./models/QuestionnaireCustomization";
 import CustomWebsite from "./models/CustomWebsite";
+import AffiliateProductImage from "./models/AffiliateProductImage";
 import TenantProductService from "./services/tenantProduct.service";
 import QuestionnaireStep from "./models/QuestionnaireStep";
 import DashboardService from "./services/dashboard.service";
