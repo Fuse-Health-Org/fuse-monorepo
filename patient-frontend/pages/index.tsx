@@ -130,9 +130,16 @@ export default function LandingPage() {
     const loadProducts = async () => {
       try {
         const domainInfo = await extractClinicSlugFromDomain();
-        const endpoint = domainInfo.hasClinicSubdomain && domainInfo.clinicSlug
+        
+        // Build endpoint with affiliate slug if present
+        let endpoint = domainInfo.hasClinicSubdomain && domainInfo.clinicSlug
           ? `/public/products/${domainInfo.clinicSlug}`
           : `/public/products`;
+        
+        // Add affiliateSlug as query parameter if present
+        if (domainInfo.affiliateSlug) {
+          endpoint += `?affiliateSlug=${encodeURIComponent(domainInfo.affiliateSlug)}`;
+        }
 
         console.log('🛍️ Fetching products from:', endpoint);
         const result = await apiCall(endpoint);

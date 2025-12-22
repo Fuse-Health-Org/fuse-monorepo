@@ -18,7 +18,7 @@ export function useQuestionnaireModal(
   domainClinic: any,
   isLoadingClinic: boolean
 ) {
-  const { isOpen, onClose, questionnaireId, tenantProductId, tenantProductFormId, productName } = props;
+  const { isOpen, onClose, questionnaireId, tenantProductId, tenantProductFormId, productName, programData } = props;
 
   // Data loading
   const { questionnaire, loading, setQuestionnaire } = useQuestionnaireData(
@@ -39,6 +39,8 @@ export function useQuestionnaireModal(
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [selectedProducts, setSelectedProducts] = useState<Record<string, number>>({});
+  // Program-specific state
+  const [selectedProgramProducts, setSelectedProgramProducts] = useState<Record<string, boolean>>({});
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
@@ -53,6 +55,33 @@ export function useQuestionnaireModal(
   const [checkoutPaymentInfo, setCheckoutPaymentInfo] = useState({
     cardNumber: "", expiryDate: "", securityCode: "", country: "brazil"
   });
+
+  // Affiliate tracking: Extract affiliate slug from URL
+  const [affiliateSlug, setAffiliateSlug] = useState<string | null>(null);
+  
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const hostname = window.location.hostname;
+      const parts = hostname.split('.');
+      
+      // Check for affiliate subdomain pattern
+      if (hostname.includes('.localhost')) {
+        const beforeLocalhost = hostname.split('.localhost')[0];
+        const subdomainParts = beforeLocalhost.split('.');
+        if (subdomainParts.length >= 2) {
+          // affiliate.brand.localhost -> affiliateSlug = first part
+          setAffiliateSlug(subdomainParts[0]);
+          console.log('👤 Detected affiliate slug (dev):', subdomainParts[0]);
+        }
+      } else if (hostname.endsWith('.fusehealth.com') || hostname.endsWith('.fuse.health') || hostname.endsWith('.fusehealthstaging.xyz')) {
+        if (parts.length >= 4) {
+          // affiliate.brand.fusehealth.com -> affiliateSlug = first part
+          setAffiliateSlug(parts[0]);
+          console.log('👤 Detected affiliate slug (prod):', parts[0]);
+        }
+      }
+    }
+  }, []);
 
   // Auth state
   const [isSignInMode, setIsSignInMode] = useState(false);
@@ -184,7 +213,7 @@ export function useQuestionnaireModal(
 
   const { trackConversion, resetTrackingFlags } = useQuestionnaireAnalytics(
     isOpen, questionnaireId, tenantProductFormId, tenantProductId, domainClinic, productName,
-    currentStepIndex, getCurrentStage, questionnaire
+    currentStepIndex, getCurrentStage, questionnaire, affiliateSlug
   );
 
   // Plans and theme
@@ -523,6 +552,11 @@ export function useQuestionnaireModal(
         clinicName: domainClinic?.name
       };
       if (isClinicMOR) requestBody.useOnBehalfOf = true;
+      // Include affiliate slug for tracking
+      if (affiliateSlug) {
+        requestBody.affiliateSlug = affiliateSlug;
+        console.log('🎯 Including affiliate slug in payment request:', affiliateSlug);
+      }
       const result = await apiCall('/payments/product/sub', { method: 'POST', body: JSON.stringify(requestBody) });
       if (result.success && result.data) {
         const subscriptionData = result.data.data || result.data;
@@ -540,7 +574,7 @@ export function useQuestionnaireModal(
       setPaymentStatus('failed');
       return null;
     }
-  }, [plans, answers, domainClinic, tenantProductId, shippingInfo, buildQuestionnaireAnswers]);
+  }, [plans, answers, domainClinic, tenantProductId, shippingInfo, affiliateSlug, buildQuestionnaireAnswers]);
 
   const handlePlanSelection = useCallback(async (planId: string) => {
     setSelectedPlan(planId);
@@ -675,6 +709,71 @@ export function useQuestionnaireModal(
     setSelectedProducts(prev => ({ ...prev, [productId]: quantity }));
   }, []);
 
+  // Program product toggle
+  const handleProgramProductToggle = useCallback((productId: string) => {
+    setSelectedProgramProducts(prev => ({ ...prev, [productId]: !prev[productId] }));
+  }, []);
+
+  // Create program subscription with dynamic pricing
+  const createProgramSubscription = useCallback(async () => {
+    if (!programData) return null;
+    
+    try {
+      setPaymentStatus('processing');
+      
+      // Calculate total from selected products + non-medical services fee
+      const selectedProductsList = programData.products.filter(p => selectedProgramProducts[p.id]);
+      const productsTotal = selectedProductsList.reduce((sum, p) => sum + p.displayPrice, 0);
+      const totalAmount = productsTotal + programData.nonMedicalServicesFee;
+      
+      const userDetails = {
+        firstName: answers['firstName'],
+        lastName: answers['lastName'],
+        email: answers['email'],
+        phoneNumber: answers['mobile']
+      };
+      const questionnaireAnswersData = buildQuestionnaireAnswers(answers);
+      
+      const requestBody = {
+        programId: programData.id,
+        selectedProductIds: selectedProductsList.map(p => p.id),
+        totalAmount,
+        productsTotal,
+        nonMedicalServicesFee: programData.nonMedicalServicesFee,
+        userDetails,
+        questionnaireAnswers: questionnaireAnswersData.structured,
+        shippingInfo,
+        clinicId: programData.clinicId,
+        clinicName: domainClinic?.name,
+        isProgramSubscription: true,
+      };
+      
+      console.log('🚀 Creating program subscription:', requestBody);
+      
+      const result = await apiCall('/payments/program/sub', { 
+        method: 'POST', 
+        body: JSON.stringify(requestBody) 
+      });
+      
+      if (result.success && result.data) {
+        const subscriptionData = result.data.data || result.data;
+        if (subscriptionData.clientSecret) {
+          setClientSecret(subscriptionData.clientSecret);
+          setPaymentIntentId(subscriptionData.paymentIntentId || subscriptionData.subscriptionId || subscriptionData.id);
+          if (subscriptionData.orderId) setOrderId(subscriptionData.orderId);
+          setPaymentStatus('idle');
+          return subscriptionData.clientSecret;
+        }
+      }
+      setPaymentStatus('failed');
+      return null;
+    } catch (error) {
+      console.error('❌ Program subscription error:', error);
+      setPaymentStatus('failed');
+      return null;
+    }
+  }, [programData, selectedProgramProducts, answers, shippingInfo, domainClinic, buildQuestionnaireAnswers]);
+
   // Step initialization
   useEffect(() => {
     if (questionnaire && isOpen) {
@@ -788,6 +887,11 @@ export function useQuestionnaireModal(
     handleSignIn, handleGoogleSignIn, createUserAccount, emailVerificationHandlers,
     handlePlanSelection, createSubscriptionForPlan, handlePaymentSuccess, handlePaymentError,
     handleNext, handlePrevious, handleSubmit,
-    buildQuestionnaireAnswers
+    buildQuestionnaireAnswers,
+    // Program-related
+    programData,
+    selectedProgramProducts,
+    handleProgramProductToggle,
+    createProgramSubscription,
   };
 }

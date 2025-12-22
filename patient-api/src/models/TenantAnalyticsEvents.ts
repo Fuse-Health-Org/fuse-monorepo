@@ -47,6 +47,13 @@ export default class TenantAnalyticsEvents extends Entity {
   declare dropOffStage?: 'product' | 'payment' | 'account';
 
   @Column({
+    type: DataType.ENUM('brand', 'affiliate'),
+    allowNull: false,
+    defaultValue: 'brand',
+  })
+  declare sourceType: 'brand' | 'affiliate';
+
+  @Column({
     type: DataType.JSONB,
     allowNull: true,
   })

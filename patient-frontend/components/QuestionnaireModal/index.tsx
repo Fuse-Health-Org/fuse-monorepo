@@ -304,6 +304,11 @@ export const QuestionnaireModal: React.FC<QuestionnaireModalProps> = (props) => 
                         treatmentName={props.treatmentName ?? props.productName ?? ''}
                         pharmacyCoverages={modal.pharmacyCoverages}
                         onNext={modal.handleNext}
+                        // Program props
+                        programData={modal.programData}
+                        selectedProgramProducts={modal.selectedProgramProducts}
+                        onProgramProductToggle={modal.handleProgramProductToggle}
+                        onCreateProgramSubscription={modal.createProgramSubscription}
                       />
                     ) : modal.isProductSelectionStep() ? (
                       <ProductSelectionStepView

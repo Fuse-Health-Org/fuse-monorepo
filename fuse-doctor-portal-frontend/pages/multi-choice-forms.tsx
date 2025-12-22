@@ -136,8 +136,17 @@ export default function MultiChoiceForms() {
       )
     }
 
-    // Sort
+    // Sort - templates with more products always appear first
     filtered.sort((a, b) => {
+      // First, sort by number of assigned products (descending)
+      const aProductCount = getAssignedProducts(a.id).length
+      const bProductCount = getAssignedProducts(b.id).length
+      
+      if (aProductCount !== bProductCount) {
+        return bProductCount - aProductCount
+      }
+
+      // Then apply the selected sort option for templates with same product count
       const titleA = a.title || ""
       const titleB = b.title || ""
 
@@ -152,7 +161,7 @@ export default function MultiChoiceForms() {
     })
 
     return filtered
-  }, [productFormTemplates, searchQuery, selectedSort])
+  }, [productFormTemplates, searchQuery, selectedSort, getAssignedProducts])
 
   return (
     <div className="flex h-screen bg-background">

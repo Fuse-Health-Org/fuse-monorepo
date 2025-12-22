@@ -267,7 +267,10 @@ export function OrderDetailModal({ order, isOpen, onClose, onApprove, onCancel, 
 
                     {/* Pharmacy Coverage */}
                     <section>
-                        <h3 className="text-lg font-semibold mb-3">Pharmacy Coverage</h3>
+                        <h3 className="text-lg font-semibold mb-3">
+                            Pharmacy Coverage
+                            {order.program && <span className="ml-2 text-sm font-normal text-purple-600">(Program Order)</span>}
+                        </h3>
                         {loadingCoverage ? (
                             <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
                                 <p className="text-blue-800">Checking pharmacy coverage...</p>
@@ -277,18 +280,26 @@ export function OrderDetailModal({ order, isOpen, onClose, onApprove, onCancel, 
                                 <p className="text-red-800 font-semibold mb-2">⚠️ No Pharmacy Coverage</p>
                                 <p className="text-red-700 text-sm">{coverageError}</p>
                                 <p className="text-red-600 text-xs mt-2">
-                                    Please ensure the product has pharmacy coverage configured for the patient's state before approving this order.
+                                    Please ensure {order.program ? 'all products in this program have' : 'the product has'} pharmacy coverage configured for the patient's state before approving this order.
                                 </p>
                             </div>
                         ) : pharmacyCoverages.length > 0 ? (
                             <div className="space-y-4">
                                 {pharmacyCoverages.map((pharmacyCoverage, index) => (
                                     <div key={index} className="bg-green-50 border border-green-200 p-4 rounded-lg">
-                                        <div className="flex items-center mb-2">
-                                            <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-                                            <p className="text-green-800 font-semibold">
-                                                Coverage Available {pharmacyCoverages.length > 1 ? `(${index + 1}/${pharmacyCoverages.length})` : ''}
-                                            </p>
+                                        <div className="flex items-center justify-between mb-2">
+                                            <div className="flex items-center">
+                                                <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                                                <p className="text-green-800 font-semibold">
+                                                    Coverage Available {pharmacyCoverages.length > 1 ? `(${index + 1}/${pharmacyCoverages.length})` : ''}
+                                                </p>
+                                            </div>
+                                            {/* Show which product this coverage is for (useful for programs) */}
+                                            {pharmacyCoverage.productName && (
+                                                <span className="text-xs bg-green-200 text-green-800 px-2 py-1 rounded">
+                                                    {pharmacyCoverage.productName}
+                                                </span>
+                                            )}
                                         </div>
                                         <div className="space-y-2 text-sm">
                                             {pharmacyCoverage.coverage.customName && (
@@ -344,8 +355,100 @@ export function OrderDetailModal({ order, isOpen, onClose, onApprove, onCancel, 
                         ) : null}
                     </section>
 
+                    {/* Program Information (for program-based orders) */}
+                    {order.program && (
+                        <section>
+                            <h3 className="text-lg font-semibold mb-3">
+                                <span className="inline-flex items-center gap-2">
+                                    <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded">Program Order</span>
+                                    {order.program.name}
+                                </span>
+                            </h3>
+                            <div className="bg-purple-50 border border-purple-200 p-4 rounded-lg">
+                                {order.program.description && (
+                                    <p className="text-sm text-gray-700 mb-4">{order.program.description}</p>
+                                )}
+
+                                {/* Order Items (Products in Program) */}
+                                {order.orderItems && order.orderItems.length > 0 && (
+                                    <div className="mb-4">
+                                        <h4 className="font-medium text-gray-900 mb-2">Products in Order</h4>
+                                        <div className="space-y-2">
+                                            {order.orderItems.map((item, idx) => (
+                                                <div key={idx} className="flex items-center justify-between bg-white p-3 rounded border border-purple-100">
+                                                    <div className="flex items-center gap-3">
+                                                        {item.product?.imageUrl && (
+                                                            <img
+                                                                src={item.product.imageUrl}
+                                                                alt={item.product?.name || 'Product'}
+                                                                className="w-10 h-10 rounded object-cover"
+                                                            />
+                                                        )}
+                                                        <div>
+                                                            <p className="font-medium text-gray-900">
+                                                                {item.product?.name || 'Product'}
+                                                            </p>
+                                                            {item.placeholderSig && (
+                                                                <p className="text-xs text-gray-600">SIG: {item.placeholderSig}</p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <p className="font-medium text-gray-900">${Number(item.unitPrice).toFixed(2)}</p>
+                                                        <p className="text-xs text-gray-500">Qty: {item.quantity}</p>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Non-Medical Services */}
+                                {(order.program.hasPatientPortal || order.program.hasBmiCalculator || 
+                                  order.program.hasProteinIntakeCalculator || order.program.hasCalorieDeficitCalculator || 
+                                  order.program.hasEasyShopping) && (
+                                    <div>
+                                        <h4 className="font-medium text-gray-900 mb-2">Non-Medical Services Included</h4>
+                                        <div className="space-y-1 text-sm">
+                                            {order.program.hasPatientPortal && (
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-700">✓ Patient Portal</span>
+                                                    <span className="font-medium">${Number(order.program.patientPortalPrice || 0).toFixed(2)}</span>
+                                                </div>
+                                            )}
+                                            {order.program.hasBmiCalculator && (
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-700">✓ BMI Calculator</span>
+                                                    <span className="font-medium">${Number(order.program.bmiCalculatorPrice || 0).toFixed(2)}</span>
+                                                </div>
+                                            )}
+                                            {order.program.hasProteinIntakeCalculator && (
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-700">✓ Protein Intake Calculator</span>
+                                                    <span className="font-medium">${Number(order.program.proteinIntakeCalculatorPrice || 0).toFixed(2)}</span>
+                                                </div>
+                                            )}
+                                            {order.program.hasCalorieDeficitCalculator && (
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-700">✓ Calorie Deficit Calculator</span>
+                                                    <span className="font-medium">${Number(order.program.calorieDeficitCalculatorPrice || 0).toFixed(2)}</span>
+                                                </div>
+                                            )}
+                                            {order.program.hasEasyShopping && (
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-700">✓ Easy Shopping</span>
+                                                    <span className="font-medium">${Number(order.program.easyShoppingPrice || 0).toFixed(2)}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </section>
+                    )}
+
                     {/* Treatment Information */}
-                    {order.treatment && (
+                    {order.treatment && !order.program && (
                         <section>
                             <h3 className="text-lg font-semibold mb-3">Treatment Information</h3>
                             <div className="bg-gray-50 p-4 rounded-lg">

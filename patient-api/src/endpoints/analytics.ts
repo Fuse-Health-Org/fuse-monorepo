@@ -8,6 +8,9 @@ import GlobalFormStructure from "../models/GlobalFormStructure";
 import { authenticateJWT, getCurrentUser } from "../config/jwt";
 import { Op } from "sequelize";
 import AnalyticsService from "../services/analytics.service";
+import Order from "../models/Order";
+import OrderItem from "../models/OrderItem";
+import User from "../models/User";
 
 const router = Router();
 
@@ -26,6 +29,7 @@ router.post("/analytics/track", async (req: Request, res: Response) => {
       sessionId,
       dropOffStage,
       metadata,
+      sourceType = 'brand', // Default to 'brand' if not specified
     } = req.body;
 
     if (!userId || !productId || !formId || !eventType) {
@@ -74,19 +78,65 @@ router.post("/analytics/track", async (req: Request, res: Response) => {
       });
     }
 
-    const analyticsEvent = await TenantAnalyticsEvents.create({
+    // Validate sourceType
+    if (sourceType && !["brand", "affiliate"].includes(sourceType)) {
+      if (process.env.NODE_ENV === "development") {
+        console.log("❌ [Analytics API] Invalid sourceType");
+      }
+      return res.status(400).json({
+        success: false,
+        error: "sourceType must be either 'brand' or 'affiliate'",
+      });
+    }
+
+    console.log("📊 [Analytics API] Creating event with data:", {
       userId,
       productId,
       formId,
       eventType,
       sessionId,
-      dropOffStage: eventType === "dropoff" ? dropOffStage : null,
+      sourceType: sourceType || 'brand',
       metadata,
     });
 
-    if (process.env.NODE_ENV === "development") {
-      console.log("✅ [Analytics API] Analytics event created");
+    // If this is an affiliate event, find the affiliate user by slug
+    let finalUserId = userId;
+    if (sourceType === 'affiliate' && metadata?.affiliateSlug) {
+      console.log("🔍 [Analytics API] Looking for affiliate user with slug:", metadata.affiliateSlug);
+      
+      const affiliateUser = await User.findOne({
+        where: { website: metadata.affiliateSlug },
+      });
+
+      if (affiliateUser) {
+        finalUserId = affiliateUser.id;
+        console.log("✅ [Analytics API] Found affiliate user:", {
+          affiliateSlug: metadata.affiliateSlug,
+          affiliateUserId: finalUserId,
+          originalUserId: userId,
+        });
+      } else {
+        console.warn("⚠️ [Analytics API] Affiliate user not found for slug:", metadata.affiliateSlug);
+      }
     }
+
+    const analyticsEvent = await TenantAnalyticsEvents.create({
+      userId: finalUserId,  // Use affiliate userId if found
+      productId,
+      formId,
+      eventType,
+      sessionId,
+      dropOffStage: eventType === "dropoff" ? dropOffStage : null,
+      sourceType: sourceType || 'brand',
+      metadata,
+    });
+
+    console.log("✅ [Analytics API] Analytics event created successfully:", {
+      id: analyticsEvent.id,
+      eventType: analyticsEvent.eventType,
+      sourceType: analyticsEvent.sourceType,
+      userId: analyticsEvent.userId,
+    });
 
     return res.json({
       success: true,
@@ -703,6 +753,479 @@ router.get(
       return res.status(500).json({
         success: false,
         error: "Failed to check aggregation status",
+      });
+    }
+  }
+);
+
+// ============= AFFILIATE ANALYTICS ENDPOINTS =============
+
+// Get analytics overview for affiliate portal - shows Orders with affiliateId
+router.get(
+  "/analytics/affiliate/overview",
+  authenticateJWT,
+  async (req: Request, res: Response) => {
+    try {
+      const timeRange = (req.query.timeRange as string) || "30d";
+      const currentUser = getCurrentUser(req);
+      const userId = currentUser?.id;
+
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          error: "Unauthorized",
+        });
+      }
+
+      const endDate = new Date();
+      const startDate = new Date();
+
+      switch (timeRange) {
+        case "1d":
+          startDate.setDate(endDate.getDate() - 1);
+          break;
+        case "7d":
+          startDate.setDate(endDate.getDate() - 7);
+          break;
+        case "30d":
+          startDate.setDate(endDate.getDate() - 30);
+          break;
+        case "90d":
+          startDate.setDate(endDate.getDate() - 90);
+          break;
+        case "180d":
+          startDate.setDate(endDate.getDate() - 180);
+          break;
+        case "365d":
+          startDate.setFullYear(endDate.getFullYear() - 1);
+          break;
+        default:
+          startDate.setDate(endDate.getDate() - 30);
+      }
+
+      console.log("🔍 [AFFILIATE ANALYTICS] Searching for analytics and orders with:", {
+        affiliateId: userId,
+        startDate,
+        endDate,
+      });
+
+      // Get analytics events (views and conversions)
+      const analyticsEvents = await TenantAnalyticsEvents.findAll({
+        where: {
+          userId,
+          sourceType: 'affiliate',
+          createdAt: {
+            [Op.gte]: startDate,
+            [Op.lte]: endDate,
+          },
+        },
+      });
+
+      // Calculate views and conversions
+      const totalViews = analyticsEvents.filter(e => e.eventType === 'view').length;
+      const totalConversions = analyticsEvents.filter(e => e.eventType === 'conversion').length;
+      const conversionRate = totalViews > 0 ? (totalConversions / totalViews) * 100 : 0;
+
+      console.log("📊 [AFFILIATE ANALYTICS] Analytics stats:", {
+        totalViews,
+        totalConversions,
+        conversionRate: `${conversionRate.toFixed(2)}%`,
+      });
+
+      // Get all orders where affiliateId matches the current user
+      const orders = await Order.findAll({
+        where: {
+          affiliateId: userId,
+          createdAt: {
+            [Op.gte]: startDate,
+            [Op.lte]: endDate,
+          },
+        },
+        include: [
+          {
+            model: User,
+            as: "user",
+            attributes: ["id", "email", "firstName", "lastName"],
+          },
+          {
+            model: OrderItem,
+            as: "orderItems",
+            include: [
+              {
+                model: Product,
+                as: "product",
+                attributes: ["id", "name"],
+              },
+            ],
+          },
+          {
+            model: TenantProduct,
+            as: "tenantProduct",
+            attributes: ["id"],
+            include: [
+              {
+                model: Product,
+                attributes: ["id", "name"],
+              },
+            ],
+          },
+        ],
+        order: [["createdAt", "DESC"]],
+      });
+
+      console.log(`✅ [AFFILIATE ANALYTICS] Found ${orders.length} orders:`, orders.map(o => ({
+        id: o.id,
+        orderNumber: o.orderNumber,
+        status: o.status,
+        totalAmount: o.totalAmount,
+        createdAt: o.createdAt,
+        customerEmail: o.user?.email,
+      })));
+
+      console.log("📊 [AFFILIATE ANALYTICS] Order status breakdown:", {
+        total: orders.length,
+        paid: orders.filter(o => o.status === "paid").length,
+        pending: orders.filter(o => o.status === "pending").length,
+        amount_capturable: orders.filter(o => o.status === "amount_capturable_updated").length,
+        other: orders.filter(o => !["paid", "pending", "amount_capturable_updated"].includes(o.status)).length,
+      });
+
+      // Format orders for the response
+      const formattedOrders = orders.map((order) => {
+        const orderData = order.toJSON() as any;
+        const productName = 
+          orderData.tenantProduct?.product?.name || 
+          orderData.orderItems?.[0]?.product?.name || 
+          "Unknown Product";
+
+        return {
+          orderId: orderData.id,
+          orderNumber: orderData.orderNumber,
+          status: orderData.status,
+          totalAmount: orderData.totalAmount,
+          productName,
+          productId: orderData.tenantProductId || null, // Include tenantProductId for product details
+          customerEmail: orderData.user?.email || "N/A",
+          customerName: orderData.user?.firstName && orderData.user?.lastName 
+            ? `${orderData.user.firstName} ${orderData.user.lastName}` 
+            : "N/A",
+          createdAt: orderData.createdAt,
+        };
+      });
+
+      // Calculate summary stats
+      const totalOrders = orders.length;
+      const paidOrders = orders.filter(o => o.status === "paid");
+      const totalSales = paidOrders.reduce((sum, o) => {
+        const amount = Number(o.totalAmount) || 0;
+        return sum + amount;
+      }, 0);
+      
+      console.log("💰 [AFFILIATE ANALYTICS] Paid orders for revenue calculation:", 
+        paidOrders.map(o => ({
+          orderNumber: o.orderNumber,
+          status: o.status,
+          totalAmount: o.totalAmount,
+          totalAmountType: typeof o.totalAmount,
+        }))
+      );
+      
+      // Calculate affiliate revenue as percentage of total sales
+      const affiliateRevenuePercentage = parseFloat(process.env.AFFILIATE_REVENUE_PERCENTAGE || "1") / 100;
+      const totalRevenue = totalSales * affiliateRevenuePercentage;
+
+      console.log("💰 [AFFILIATE ANALYTICS] Revenue calculation:", {
+        totalOrders: orders.length,
+        paidOrders: paidOrders.length,
+        totalSales: `$${Number(totalSales).toFixed(2)}`,
+        totalSalesType: typeof totalSales,
+        affiliatePercentage: `${(affiliateRevenuePercentage * 100).toFixed(2)}%`,
+        affiliateRevenue: `$${Number(totalRevenue).toFixed(2)}`,
+      });
+
+      return res.json({
+        success: true,
+        data: {
+          timeRange,
+          startDate: startDate.toISOString(),
+          endDate: endDate.toISOString(),
+          summary: {
+            totalViews,
+            totalConversions,
+            conversionRate,
+            totalOrders,
+            paidOrders,
+            totalRevenue,
+          },
+          orders: formattedOrders,
+        },
+      });
+    } catch (error) {
+      console.error("❌ [Affiliate Analytics] Error fetching orders:", error);
+      return res.status(500).json({
+        success: false,
+        error: "Failed to fetch affiliate analytics",
+      });
+    }
+  }
+);
+
+// Get analytics for a specific product (filtered by sourceType='affiliate')
+router.get(
+  "/analytics/affiliate/products/:productId",
+  authenticateJWT,
+  async (req: Request, res: Response) => {
+    try {
+      const { productId } = req.params;
+      const timeRange = (req.query.timeRange as string) || "30d";
+      const currentUser = getCurrentUser(req);
+      const userId = currentUser?.id;
+
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          error: "Unauthorized",
+        });
+      }
+
+      await AnalyticsService.ensureDataAggregated();
+
+      // Verify the tenant product belongs to the user
+      const tenantProduct = await TenantProduct.findOne({
+        where: {
+          id: productId,
+        },
+        include: [
+          {
+            model: Product,
+            required: true,
+          },
+        ],
+      });
+
+      if (!tenantProduct) {
+        return res.status(404).json({
+          success: false,
+          error: "Product not found",
+        });
+      }
+
+      const endDate = new Date();
+      const startDate = new Date();
+
+      switch (timeRange) {
+        case "1d":
+          startDate.setDate(endDate.getDate() - 1);
+          break;
+        case "7d":
+          startDate.setDate(endDate.getDate() - 7);
+          break;
+        case "30d":
+          startDate.setDate(endDate.getDate() - 30);
+          break;
+        case "90d":
+          startDate.setDate(endDate.getDate() - 90);
+          break;
+        case "180d":
+          startDate.setDate(endDate.getDate() - 180);
+          break;
+        case "365d":
+          startDate.setFullYear(endDate.getFullYear() - 1);
+          break;
+        default:
+          startDate.setDate(endDate.getDate() - 30);
+      }
+
+      // Filter by sourceType='affiliate'
+      const analytics = await TenantAnalyticsEvents.findAll({
+        where: {
+          userId,
+          productId,
+          sourceType: 'affiliate',
+          createdAt: {
+            [Op.gte]: startDate,
+            [Op.lte]: endDate,
+          },
+        },
+        order: [["createdAt", "ASC"]],
+      });
+
+      // Get unique form IDs
+      const formIds = [...new Set(analytics.map((event) => event.formId))];
+
+      // Fetch all form details in one query
+      const forms = await TenantProductForm.findAll({
+        where: {
+          id: {
+            [Op.in]: formIds,
+          },
+        },
+        include: [
+          {
+            model: GlobalFormStructure,
+            as: "globalFormStructure",
+            attributes: ["structureId", "name"],
+          },
+        ],
+      });
+
+      // Create a map of formId -> form details
+      const formDetailsMap = new Map(
+        forms.map((form) => [
+          form.id,
+          {
+            structureName:
+              form.globalFormStructure?.name || "Unknown Structure",
+            structureId: form.globalFormStructureId || "unknown",
+          },
+        ])
+      );
+
+      // Group analytics by form and event type
+      const formAnalytics: Record<
+        string,
+        {
+          views: number;
+          conversions: number;
+          productDropOffs: number;
+          paymentDropOffs: number;
+          accountDropOffs: number;
+          formUrl: string;
+        }
+      > = {};
+
+      // Process analytics events
+      analytics.forEach((event) => {
+        const eventData = event.toJSON();
+        const formId = eventData.formId;
+
+        if (!formAnalytics[formId]) {
+          const formDetails = formDetailsMap.get(formId);
+          const productName = eventData.metadata?.productName || "";
+
+          const formLabel = formDetails
+            ? `${productName} - ${formDetails.structureName} (Affiliate)`
+            : productName
+              ? `${productName} Form (${formId.slice(0, 8)}...) (Affiliate)`
+              : `Affiliate Form ${formId.slice(0, 8)}...`;
+
+          formAnalytics[formId] = {
+            views: 0,
+            conversions: 0,
+            productDropOffs: 0,
+            paymentDropOffs: 0,
+            accountDropOffs: 0,
+            formUrl: formLabel,
+          };
+        }
+
+        if (eventData.eventType === "view") {
+          formAnalytics[formId].views++;
+        } else if (eventData.eventType === "conversion") {
+          formAnalytics[formId].conversions++;
+        } else if (eventData.eventType === "dropoff") {
+          if (eventData.dropOffStage === "product") {
+            formAnalytics[formId].productDropOffs++;
+          } else if (eventData.dropOffStage === "payment") {
+            formAnalytics[formId].paymentDropOffs++;
+          } else if (eventData.dropOffStage === "account") {
+            formAnalytics[formId].accountDropOffs++;
+          }
+        }
+      });
+
+      const formAnalyticsWithRates = Object.entries(formAnalytics).map(
+        ([formId, data]) => {
+          const totalDropOffs =
+            data.productDropOffs + data.paymentDropOffs + data.accountDropOffs;
+
+          return {
+            formId,
+            views: data.views,
+            conversions: data.conversions,
+            conversionRate:
+              data.views > 0 ? (data.conversions / data.views) * 100 : 0,
+            formUrl: data.formUrl,
+            dropOffs: {
+              product: data.productDropOffs,
+              payment: data.paymentDropOffs,
+              account: data.accountDropOffs,
+              total: totalDropOffs,
+            },
+            dropOffRates: {
+              product:
+                data.views > 0 ? (data.productDropOffs / data.views) * 100 : 0,
+              payment:
+                data.views > 0 ? (data.paymentDropOffs / data.views) * 100 : 0,
+              account:
+                data.views > 0 ? (data.accountDropOffs / data.views) * 100 : 0,
+            },
+          };
+        }
+      );
+
+      const totalViews = Object.values(formAnalytics).reduce(
+        (sum, data) => sum + data.views,
+        0
+      );
+      const totalConversions = Object.values(formAnalytics).reduce(
+        (sum, data) => sum + data.conversions,
+        0
+      );
+      const totalProductDropOffs = Object.values(formAnalytics).reduce(
+        (sum, data) => sum + data.productDropOffs,
+        0
+      );
+      const totalPaymentDropOffs = Object.values(formAnalytics).reduce(
+        (sum, data) => sum + data.paymentDropOffs,
+        0
+      );
+      const totalAccountDropOffs = Object.values(formAnalytics).reduce(
+        (sum, data) => sum + data.accountDropOffs,
+        0
+      );
+      const overallConversionRate =
+        totalViews > 0 ? (totalConversions / totalViews) * 100 : 0;
+
+      return res.json({
+        success: true,
+        data: {
+          productId,
+          timeRange,
+          startDate: startDate.toISOString(),
+          endDate: endDate.toISOString(),
+          summary: {
+            totalViews,
+            totalConversions,
+            overallConversionRate,
+            dropOffs: {
+              product: totalProductDropOffs,
+              payment: totalPaymentDropOffs,
+              account: totalAccountDropOffs,
+              total:
+                totalProductDropOffs +
+                totalPaymentDropOffs +
+                totalAccountDropOffs,
+            },
+            dropOffRates: {
+              product:
+                totalViews > 0 ? (totalProductDropOffs / totalViews) * 100 : 0,
+              payment:
+                totalViews > 0 ? (totalPaymentDropOffs / totalViews) * 100 : 0,
+              account:
+                totalViews > 0 ? (totalAccountDropOffs / totalViews) * 100 : 0,
+            },
+          },
+          forms: formAnalyticsWithRates,
+        },
+      });
+    } catch (error) {
+      if (process.env.NODE_ENV === "development") {
+        console.error("Error fetching affiliate product analytics");
+      }
+      return res.status(500).json({
+        success: false,
+        error: "Failed to fetch affiliate product analytics",
       });
     }
   }

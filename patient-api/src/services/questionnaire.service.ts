@@ -6,6 +6,7 @@ import Treatment from "../models/Treatment";
 import User from "../models/User";
 import Clinic from "../models/Clinic";
 import Product from "../models/Product";
+import FormProducts from "../models/FormProducts";
 import { Op, Transaction } from "sequelize";
 import {
   CreateQuestionnaireInput,
@@ -103,6 +104,20 @@ class QuestionnaireService {
           as: "user",
           attributes: ["id", "email", "firstName", "lastName"],
           required: false,
+        },
+        {
+          model: FormProducts,
+          as: "formProducts",
+          attributes: ["id", "productId"],
+          required: false,
+          include: [
+            {
+              model: Product,
+              as: "product",
+              attributes: ["id", "name", "imageUrl", "price", "placeholderSig", "pharmacyWholesaleCost", "slug"],
+              required: false,
+            },
+          ],
         },
       ],
       order: [["updatedAt", "DESC"]],

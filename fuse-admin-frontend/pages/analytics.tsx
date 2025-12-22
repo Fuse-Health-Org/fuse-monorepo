@@ -12,6 +12,7 @@ import {
   Percent,
   ChevronRight,
   Loader2,
+  Heart,
 } from 'lucide-react'
 
 interface ProductAnalytics {
@@ -451,6 +452,30 @@ export default function Analytics() {
                 </CardContent>
               </Card>
             )}
+
+            {/* Likes Section */}
+            <Card className="mb-8">
+              <CardHeader>
+                <CardTitle>Product Likes</CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Total likes from customers viewing this product
+                </p>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <Heart className="h-6 w-6 text-red-500" />
+                    <div>
+                      <div className="text-2xl font-bold">0</div>
+                      <div className="text-xs text-muted-foreground">Total Likes</div>
+                    </div>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    (Likes tracking coming soon)
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
             {/* Forms Performance */}
             <Card>

@@ -3,6 +3,7 @@ import { Op } from "sequelize";
 import User from "../models/User";
 import UserRoles from "../models/UserRoles";
 import Order from "../models/Order";
+import OrderItem from "../models/OrderItem";
 import Clinic from "../models/Clinic";
 import TenantProduct from "../models/TenantProduct";
 import Product from "../models/Product";
@@ -12,6 +13,7 @@ import OrderService from "../services/order.service";
 import PharmacyProduct from "../models/PharmacyProduct";
 import PharmacyCoverage from "../models/PharmacyCoverage";
 import Pharmacy from "../models/Pharmacy";
+import Program from "../models/Program";
 import IronSailOrderService from "../services/pharmacy/ironsail-order";
 import {
   AuditService,
@@ -179,8 +181,11 @@ export function registerDoctorEndpoints(
 
         // Build where clause - show orders ready for doctor review
         const whereClause: any = {
-          // Only show orders with tenantProductId (orders for tenant products)
-          tenantProductId: { [Op.ne]: null },
+          // Show orders with tenantProductId OR programId (product or program orders)
+          [Op.or]: [
+            { tenantProductId: { [Op.ne]: null } },
+            { programId: { [Op.ne]: null } },
+          ],
           // Show: amount_capturable_updated (authorized payment awaiting approval), paid orders, and beyond
           status: status || {
             [Op.in]: [
@@ -279,6 +284,38 @@ export function registerDoctorEndpoints(
               as: "clinic",
               attributes: ["id", "name"],
             },
+            {
+              model: Program,
+              as: "program",
+              attributes: [
+                "id",
+                "name",
+                "description",
+                "hasPatientPortal",
+                "patientPortalPrice",
+                "hasBmiCalculator",
+                "bmiCalculatorPrice",
+                "hasProteinIntakeCalculator",
+                "proteinIntakeCalculatorPrice",
+                "hasCalorieDeficitCalculator",
+                "calorieDeficitCalculatorPrice",
+                "hasEasyShopping",
+                "easyShoppingPrice",
+              ],
+              required: false,
+            },
+            {
+              model: OrderItem,
+              as: "orderItems",
+              include: [
+                {
+                  model: Product,
+                  as: "product",
+                  attributes: ["id", "name", "imageUrl", "placeholderSig"],
+                },
+              ],
+              required: false,
+            },
           ],
           order: [["createdAt", "DESC"]],
           limit: Math.min(parseInt(limit), 200),
@@ -354,6 +391,42 @@ export function registerDoctorEndpoints(
                   name: order.clinic.name,
                 }
               : null,
+            // Program data for program-based orders
+            programId: order.programId,
+            program: order.program
+              ? {
+                  id: order.program.id,
+                  name: order.program.name,
+                  description: order.program.description,
+                  hasPatientPortal: order.program.hasPatientPortal,
+                  patientPortalPrice: order.program.patientPortalPrice,
+                  hasBmiCalculator: order.program.hasBmiCalculator,
+                  bmiCalculatorPrice: order.program.bmiCalculatorPrice,
+                  hasProteinIntakeCalculator: order.program.hasProteinIntakeCalculator,
+                  proteinIntakeCalculatorPrice: order.program.proteinIntakeCalculatorPrice,
+                  hasCalorieDeficitCalculator: order.program.hasCalorieDeficitCalculator,
+                  calorieDeficitCalculatorPrice: order.program.calorieDeficitCalculatorPrice,
+                  hasEasyShopping: order.program.hasEasyShopping,
+                  easyShoppingPrice: order.program.easyShoppingPrice,
+                }
+              : null,
+            // Order items for multi-product orders (programs)
+            orderItems: order.orderItems?.map((item: any) => ({
+              id: item.id,
+              productId: item.productId,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              totalPrice: item.totalPrice,
+              placeholderSig: item.placeholderSig,
+              product: item.product
+                ? {
+                    id: item.product.id,
+                    name: item.product.name,
+                    imageUrl: item.product.imageUrl,
+                    placeholderSig: item.product.placeholderSig,
+                  }
+                : null,
+            })) || [],
             shippingAddress: order.shippingAddress,
             questionnaireAnswers: order.questionnaireAnswers,
             mdCaseId: order.mdCaseId,
@@ -614,7 +687,7 @@ export function registerDoctorEndpoints(
 
         const { orderId } = req.params;
 
-        // Fetch order with product and patient state
+        // Fetch order with product and patient state (including program order items)
         const order = await Order.findOne({
           where: { id: orderId },
           include: [
@@ -640,6 +713,24 @@ export function registerDoctorEndpoints(
                 },
               ],
             },
+            {
+              model: OrderItem,
+              as: "orderItems",
+              required: false,
+              include: [
+                {
+                  model: Product,
+                  as: "product",
+                  attributes: ["id", "name", "placeholderSig"],
+                },
+              ],
+            },
+            {
+              model: Program,
+              as: "program",
+              required: false,
+              attributes: ["id", "name"],
+            },
           ],
         });
 
@@ -651,7 +742,9 @@ export function registerDoctorEndpoints(
 
         // Determine patient's state (prefer shipping address)
         const patientState = order.shippingAddress?.state || order.user?.state;
-        const productId = order.tenantProduct?.product?.id;
+        
+        // Check if this is a program order (has orderItems) or regular product order
+        const isProgramOrder = order.programId && order.orderItems && order.orderItems.length > 0;
 
         if (!patientState) {
           return res.json({
@@ -661,18 +754,30 @@ export function registerDoctorEndpoints(
           });
         }
 
-        if (!productId) {
+        // For program orders, get all product IDs from order items
+        // For regular orders, get product ID from tenantProduct
+        let productIds: string[] = [];
+        
+        if (isProgramOrder) {
+          productIds = order.orderItems
+            .filter((item: any) => item.product?.id)
+            .map((item: any) => item.product.id);
+        } else if (order.tenantProduct?.product?.id) {
+          productIds = [order.tenantProduct.product.id];
+        }
+
+        if (productIds.length === 0) {
           return res.json({
             success: false,
             hasCoverage: false,
-            error: "Product not found for order",
+            error: "No products found for order",
           });
         }
 
-        // Find ALL pharmacy coverages for this product in the patient's state
+        // Find ALL pharmacy coverages for all products in the patient's state
         const coverages = await PharmacyProduct.findAll({
           where: {
-            productId,
+            productId: { [Op.in]: productIds },
             state: patientState,
           },
           include: [
@@ -685,6 +790,11 @@ export function registerDoctorEndpoints(
               model: PharmacyCoverage,
               as: "pharmacyCoverage",
             },
+            {
+              model: Product,
+              as: "product",
+              attributes: ["id", "name", "placeholderSig"],
+            },
           ],
         });
 
@@ -692,32 +802,49 @@ export function registerDoctorEndpoints(
         const activeCoverages = coverages.filter((c) => c.pharmacy?.isActive);
 
         if (activeCoverages.length === 0) {
+          const productNames = isProgramOrder
+            ? order.orderItems.map((item: any) => item.product?.name).filter(Boolean).join(", ")
+            : order.tenantProduct?.product?.name || "this product";
+          
           return res.json({
             success: false,
             hasCoverage: false,
-            error: `No active pharmacy coverage for ${order.tenantProduct?.product?.name || "this product"} in ${patientState}`,
+            error: `No active pharmacy coverage for ${productNames} in ${patientState}`,
             data: {
-              productId,
-              productName: order.tenantProduct?.product?.name,
+              productIds,
               state: patientState,
+              isProgramOrder,
             },
           });
         }
 
         // Map all coverages to response format
         const coverageData = activeCoverages.map((coverage) => {
-          // Use SIG from product placeholder first, then pharmacy coverage, then fallback to order notes or default
+          // For program orders, find the matching order item to get the SIG
+          let productSig: string | null | undefined = null;
+          if (isProgramOrder) {
+            const matchingItem = order.orderItems.find(
+              (item: any) => item.product?.id === coverage.productId
+            );
+            productSig = matchingItem?.product?.placeholderSig || matchingItem?.placeholderSig || null;
+          } else {
+            productSig = order.tenantProduct?.product?.placeholderSig || null;
+          }
+
+          // Use SIG from product placeholder first, then pharmacy coverage, then fallback
           const sig =
-            order.tenantProduct?.product?.placeholderSig ||
+            productSig ||
             coverage.pharmacyCoverage?.customSig ||
             coverage.sig ||
             order.doctorNotes ||
-            order.notes ||
+            (order as any).notes ||
             "Take as directed by your healthcare provider";
 
           return {
             id: coverage.id,
             pharmacyCoverageId: coverage.pharmacyCoverageId,
+            productId: coverage.productId,
+            productName: (coverage as any).product?.name,
             pharmacy: {
               id: coverage.pharmacy.id,
               name: coverage.pharmacy.name,
@@ -738,7 +865,7 @@ export function registerDoctorEndpoints(
         });
 
         console.log(
-          `📋 Found ${coverageData.length} pharmacy coverage record(s) for requested order`
+          `📋 Found ${coverageData.length} pharmacy coverage record(s) for ${isProgramOrder ? 'program' : 'product'} order`
         );
 
         // HIPAA Audit: Log PHI access (viewing patient pharmacy coverage)
@@ -754,10 +881,8 @@ export function registerDoctorEndpoints(
           hasCoverage: true,
           data: {
             coverages: coverageData,
-            product: {
-              id: productId,
-              name: order.tenantProduct?.product?.name,
-            },
+            productIds,
+            isProgramOrder,
             patientState,
           },
         });

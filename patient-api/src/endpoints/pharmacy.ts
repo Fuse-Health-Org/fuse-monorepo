@@ -1,11 +1,19 @@
 import { Express } from "express";
 import User from "../models/User";
+import UserRoles from "../models/UserRoles";
 import Pharmacy from "../models/Pharmacy";
 import PharmacyProduct from "../models/PharmacyProduct";
 import PharmacyCoverage from "../models/PharmacyCoverage";
 import Product from "../models/Product";
 import { PharmacyIntegrationService } from "../services/pharmacyIntegration";
 import { IronSailService } from "../services/pharmacyIntegration/ironsail.service";
+
+// Helper function to check if user has any of the required roles using UserRoles table
+async function userHasAnyRole(userId: string, roles: Array<'patient' | 'doctor' | 'admin' | 'brand' | 'superAdmin' | 'affiliate'>): Promise<boolean> {
+  const userRoles = await UserRoles.findOne({ where: { userId } });
+  if (!userRoles) return false;
+  return userRoles.hasAnyRole(roles);
+}
 
 export function registerPharmacyEndpoints(
   app: Express,
@@ -28,7 +36,13 @@ export function registerPharmacyEndpoints(
         }
 
         const user = await User.findByPk(currentUser.id);
-        if (!user || user.role !== "admin") {
+        if (!user) {
+          return res.status(403).json({ success: false, message: "Forbidden" });
+        }
+        
+        // Check if user has admin or brand role using UserRoles table
+        const hasAccess = await userHasAnyRole(user.id, ['admin', 'brand']);
+        if (!hasAccess) {
           return res.status(403).json({ success: false, message: "Forbidden" });
         }
 
@@ -87,7 +101,13 @@ export function registerPharmacyEndpoints(
         }
 
         const user = await User.findByPk(currentUser.id);
-        if (!user || user.role !== "admin") {
+        if (!user) {
+          return res.status(403).json({ success: false, message: "Forbidden" });
+        }
+        
+        // Check if user has admin or brand role using UserRoles table
+        const hasAccess = await userHasAnyRole(user.id, ['admin', 'brand']);
+        if (!hasAccess) {
           return res.status(403).json({ success: false, message: "Forbidden" });
         }
 
@@ -140,7 +160,13 @@ export function registerPharmacyEndpoints(
         }
 
         const user = await User.findByPk(currentUser.id);
-        if (!user || user.role !== "admin") {
+        if (!user) {
+          return res.status(403).json({ success: false, message: "Forbidden" });
+        }
+        
+        // Check if user has admin or brand role using UserRoles table
+        const hasAccess = await userHasAnyRole(user.id, ['admin', 'brand']);
+        if (!hasAccess) {
           return res.status(403).json({ success: false, message: "Forbidden" });
         }
 
@@ -200,7 +226,13 @@ export function registerPharmacyEndpoints(
       }
 
       const user = await User.findByPk(currentUser.id);
-      if (!user || user.role !== "admin") {
+      if (!user) {
+        return res.status(403).json({ success: false, message: "Forbidden" });
+      }
+      
+      // Check if user has admin or brand role using UserRoles table
+      const hasAccess = await userHasAnyRole(user.id, ['admin', 'brand']);
+      if (!hasAccess) {
         return res.status(403).json({ success: false, message: "Forbidden" });
       }
 
@@ -235,7 +267,13 @@ export function registerPharmacyEndpoints(
         }
 
         const user = await User.findByPk(currentUser.id);
-        if (!user || user.role !== "admin") {
+        if (!user) {
+          return res.status(403).json({ success: false, message: "Forbidden" });
+        }
+        
+        // Check if user has admin or brand role using UserRoles table
+        const hasAccess = await userHasAnyRole(user.id, ['admin', 'brand']);
+        if (!hasAccess) {
           return res.status(403).json({ success: false, message: "Forbidden" });
         }
 
@@ -291,7 +329,13 @@ export function registerPharmacyEndpoints(
         }
 
         const user = await User.findByPk(currentUser.id);
-        if (!user || user.role !== "admin") {
+        if (!user) {
+          return res.status(403).json({ success: false, message: "Forbidden" });
+        }
+        
+        // Check if user has admin or brand role using UserRoles table
+        const hasAccess = await userHasAnyRole(user.id, ['admin', 'brand']);
+        if (!hasAccess) {
           return res.status(403).json({ success: false, message: "Forbidden" });
         }
 
@@ -499,7 +543,13 @@ export function registerPharmacyEndpoints(
       }
 
       const user = await User.findByPk(currentUser.id);
-      if (!user || user.role !== "admin") {
+      if (!user) {
+        return res.status(403).json({ success: false, message: "Forbidden" });
+      }
+      
+      // Check if user has admin or brand role using UserRoles table
+      const hasAccess = await userHasAnyRole(user.id, ['admin', 'brand']);
+      if (!hasAccess) {
         return res.status(403).json({ success: false, message: "Forbidden" });
       }
 
@@ -547,7 +597,13 @@ export function registerPharmacyEndpoints(
       }
 
       const user = await User.findByPk(currentUser.id);
-      if (!user || user.role !== "admin") {
+      if (!user) {
+        return res.status(403).json({ success: false, message: "Forbidden" });
+      }
+      
+      // Check if user has admin or brand role using UserRoles table
+      const hasAccess = await userHasAnyRole(user.id, ['admin', 'brand']);
+      if (!hasAccess) {
         return res.status(403).json({ success: false, message: "Forbidden" });
       }
 
@@ -610,7 +666,13 @@ export function registerPharmacyEndpoints(
         }
 
         const user = await User.findByPk(currentUser.id);
-        if (!user || user.role !== "admin") {
+        if (!user) {
+          return res.status(403).json({ success: false, message: "Forbidden" });
+        }
+        
+        // Check if user has admin or brand role using UserRoles table
+        const hasAccess = await userHasAnyRole(user.id, ['admin', 'brand']);
+        if (!hasAccess) {
           return res.status(403).json({ success: false, message: "Forbidden" });
         }
 
@@ -670,7 +732,13 @@ export function registerPharmacyEndpoints(
         }
 
         const user = await User.findByPk(currentUser.id);
-        if (!user || user.role !== "admin") {
+        if (!user) {
+          return res.status(403).json({ success: false, message: "Forbidden" });
+        }
+        
+        // Check if user has admin or brand role using UserRoles table
+        const hasAccess = await userHasAnyRole(user.id, ['admin', 'brand']);
+        if (!hasAccess) {
           return res.status(403).json({ success: false, message: "Forbidden" });
         }
 
@@ -769,7 +837,13 @@ export function registerPharmacyEndpoints(
         }
 
         const user = await User.findByPk(currentUser.id);
-        if (!user || user.role !== "admin") {
+        if (!user) {
+          return res.status(403).json({ success: false, message: "Forbidden" });
+        }
+        
+        // Check if user has admin or brand role using UserRoles table
+        const hasAccess = await userHasAnyRole(user.id, ['admin', 'brand']);
+        if (!hasAccess) {
           return res.status(403).json({ success: false, message: "Forbidden" });
         }
 

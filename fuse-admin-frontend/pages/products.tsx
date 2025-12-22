@@ -17,7 +17,8 @@ import {
     X,
     Loader2,
     Check,
-    Edit
+    Edit,
+    Star
 } from 'lucide-react'
 
 interface Product {
@@ -79,9 +80,11 @@ interface SubscriptionInfo {
 export default function Products() {
     const [products, setProducts] = useState<Product[]>([])
     const [allProducts, setAllProducts] = useState<Product[]>([])
-    const [activeTab, setActiveTab] = useState<'my' | 'select'>(() => {
+    const [activeTab, setActiveTab] = useState<'my' | 'select' | 'favorites'>(() => {
         const tab = (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('tab') : null)
-        return tab === 'select' ? 'select' : 'my'
+        if (tab === 'select') return 'select'
+        if (tab === 'favorites') return 'favorites'
+        return 'my'
     })
     const [, setAssignments] = useState<Array<{ productId: string; questionnaireId: string }>>([])
     const [loading, setLoading] = useState(false)
@@ -100,6 +103,98 @@ export default function Products() {
     const [, setClinicName] = useState<string>("")
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
     const [retryLoading, setRetryLoading] = useState<boolean>(false)
+    const [favoriteProductIds, setFavoriteProductIds] = useState<Set<string>>(new Set())
+
+    // Fetch favorites from API on mount
+    const fetchFavorites = useCallback(async () => {
+        if (!token) return
+
+        try {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/favorites/ids`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+            if (res.ok) {
+                const data = await res.json()
+                if (data.success && Array.isArray(data.data)) {
+                    setFavoriteProductIds(new Set(data.data))
+                    // Also update localStorage for quick access
+                    if (typeof window !== 'undefined') {
+                        localStorage.setItem('productFavorites', JSON.stringify(data.data))
+                    }
+                }
+            }
+        } catch (e) {
+            console.error('Failed to fetch favorites from API:', e)
+            // Fallback to localStorage
+            if (typeof window !== 'undefined') {
+                const storedFavorites = localStorage.getItem('productFavorites')
+                if (storedFavorites) {
+                    try {
+                        const parsed = JSON.parse(storedFavorites)
+                        if (Array.isArray(parsed)) {
+                            setFavoriteProductIds(new Set(parsed))
+                        }
+                    } catch (parseError) {
+                        console.error('Failed to parse favorites from localStorage:', parseError)
+                    }
+                }
+            }
+        }
+    }, [token])
+
+    // Load favorites on mount
+    useEffect(() => {
+        fetchFavorites()
+    }, [fetchFavorites])
+
+    // Toggle favorite and sync with API
+    const toggleFavorite = async (productId: string) => {
+        // Optimistic update
+        setFavoriteProductIds(prev => {
+            const newFavorites = new Set(prev)
+            if (newFavorites.has(productId)) {
+                newFavorites.delete(productId)
+            } else {
+                newFavorites.add(productId)
+            }
+            // Update localStorage immediately for fast UI
+            if (typeof window !== 'undefined') {
+                localStorage.setItem('productFavorites', JSON.stringify(Array.from(newFavorites)))
+            }
+            return newFavorites
+        })
+
+        // Sync with API
+        try {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/favorites/toggle`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ productId })
+            })
+
+            if (!res.ok) {
+                console.error('Failed to sync favorite with API')
+                // Revert on failure
+                setFavoriteProductIds(prev => {
+                    const reverted = new Set(prev)
+                    if (reverted.has(productId)) {
+                        reverted.delete(productId)
+                    } else {
+                        reverted.add(productId)
+                    }
+                    if (typeof window !== 'undefined') {
+                        localStorage.setItem('productFavorites', JSON.stringify(Array.from(reverted)))
+                    }
+                    return reverted
+                })
+            }
+        } catch (e) {
+            console.error('Error syncing favorite with API:', e)
+        }
+    }
 
     // Cast user to include clinicId property
     const userWithClinic = user as any
@@ -166,7 +261,7 @@ export default function Products() {
 
             clearTimeout(timeoutId)
             console.log('✅ Loaded products (combined):', combined.length)
-            
+
             // Fetch pharmacy coverages for each product
             const productsWithCoverages = await Promise.all(
                 combined.map(async (product) => {
@@ -186,7 +281,7 @@ export default function Products() {
                     return product
                 })
             )
-            
+
             setAllProducts(productsWithCoverages)
         } catch (err: any) {
             console.error('❌ Failed to load products:', err)
@@ -279,8 +374,8 @@ export default function Products() {
     // React to query param changes to set the tab (e.g., after enabling redirect)
     useEffect(() => {
         const tab = router.query.tab
-        if (tab === 'select' || tab === 'my') {
-            setActiveTab(tab as 'my' | 'select')
+        if (tab === 'select' || tab === 'my' || tab === 'favorites') {
+            setActiveTab(tab as 'my' | 'select' | 'favorites')
         }
     }, [router.query.tab])
 
@@ -677,7 +772,11 @@ export default function Products() {
         setShowSaved(false)
     }
 
-    const visibleProducts = activeTab === 'my' ? products : allProducts
+    const visibleProducts = activeTab === 'my'
+        ? products
+        : activeTab === 'favorites'
+            ? allProducts.filter(p => favoriteProductIds.has(p.id))
+            : allProducts
 
     // Apply category filter (case-insensitive)
     const filteredProducts = selectedCategory
@@ -898,6 +997,19 @@ export default function Products() {
                             >
                                 Select Products
                             </button>
+                            <button
+                                id="favorites-btn"
+                                className={`pb-3 border-b-2 transition-colors text-sm font-medium flex items-center gap-1.5 ${activeTab === 'favorites' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+                                onClick={() => setActiveTab('favorites')}
+                            >
+                                <Star className={`h-3.5 w-3.5 ${activeTab === 'favorites' ? 'fill-primary' : ''}`} />
+                                Favorites
+                                {favoriteProductIds.size > 0 && (
+                                    <span className="ml-1 px-1.5 py-0.5 text-xs rounded-full bg-muted">
+                                        {favoriteProductIds.size}
+                                    </span>
+                                )}
+                            </button>
                         </div>
                     </div>
 
@@ -1032,6 +1144,23 @@ export default function Products() {
                                             onClick={() => !quickEditMode && router.push(product.brandId ? `/custom-products/${product.id}` : `/products/${product.id}`)}
                                         >
                                             <div className="flex items-center gap-4 flex-1 min-w-0">
+                                                {/* Favorite Star */}
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        toggleFavorite(product.id);
+                                                    }}
+                                                    className="flex-shrink-0 p-1 rounded-full hover:bg-amber-50 transition-colors"
+                                                    title={favoriteProductIds.has(product.id) ? 'Remove from favorites' : 'Add to favorites'}
+                                                >
+                                                    <Star
+                                                        className={`h-4 w-4 transition-colors ${favoriteProductIds.has(product.id)
+                                                            ? 'fill-amber-400 text-amber-400'
+                                                            : 'text-gray-300 hover:text-amber-400'
+                                                            }`}
+                                                    />
+                                                </button>
+
                                                 {/* Avatar/Image */}
                                                 <div className="flex-shrink-0">
                                                     {product.imageUrl ? (
@@ -1099,7 +1228,7 @@ export default function Products() {
 
                                                 {/* Clinic Retail Price */}
                                                 <div className="flex-shrink-0 w-28" onClick={(e) => quickEditMode && e.stopPropagation()}>
-                                                    <div className="text-xs text-muted-foreground mb-0.5">Your Price</div>
+                                                    <div className="text-xs text-muted-foreground mb-0.5">Non-Medical Service Fee</div>
                                                     {(() => {
                                                         const tenantProduct = tenantProducts.find(tp => tp.productId === product.id)
 
@@ -1233,16 +1362,34 @@ export default function Products() {
                         <div className="bg-card rounded-lg border border-border p-16 text-center">
                             <div className="flex flex-col items-center gap-4">
                                 <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
-                                    <Package className="h-6 w-6 text-muted-foreground" />
+                                    {activeTab === 'favorites' ? (
+                                        <Star className="h-6 w-6 text-muted-foreground" />
+                                    ) : (
+                                        <Package className="h-6 w-6 text-muted-foreground" />
+                                    )}
                                 </div>
                                 <div>
-                                    <h3 className="text-base font-medium mb-1">No products found</h3>
+                                    <h3 className="text-base font-medium mb-1">
+                                        {activeTab === 'favorites' ? 'No favorites yet' : 'No products found'}
+                                    </h3>
                                     <p className="text-sm text-muted-foreground mb-4">
                                         {activeTab === 'my'
                                             ? 'Enable products from the "Select Products" tab to get started.'
-                                            : 'No products available. Contact your administrator.'}
+                                            : activeTab === 'favorites'
+                                                ? 'Click the star icon on any product to add it to your favorites.'
+                                                : 'No products available. Contact your administrator.'}
                                     </p>
                                     {activeTab === 'my' && (
+                                        <Button
+                                            size="sm"
+                                            className="h-9 px-4 text-sm font-medium"
+                                            onClick={() => setActiveTab('select')}
+                                        >
+                                            <Package className="h-4 w-4 mr-1.5" />
+                                            Browse Products
+                                        </Button>
+                                    )}
+                                    {activeTab === 'favorites' && (
                                         <Button
                                             size="sm"
                                             className="h-9 px-4 text-sm font-medium"

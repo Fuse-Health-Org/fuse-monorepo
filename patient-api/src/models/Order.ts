@@ -13,6 +13,7 @@ import Sale from './Sale';
 import TreatmentPlan, { BillingInterval } from './TreatmentPlan';
 import Physician from './Physician';
 import TenantProduct from './TenantProduct';
+import Program from './Program';
 
 export enum OrderStatus {
   PENDING = 'pending',
@@ -254,6 +255,16 @@ export default class Order extends Entity {
 
   @BelongsTo(() => TenantProduct)
   declare tenantProduct?: TenantProduct;
+
+  @ForeignKey(() => Program)
+  @Column({
+    type: DataType.UUID,
+    allowNull: true,
+  })
+  declare programId?: string;
+
+  @BelongsTo(() => Program)
+  declare program?: Program;
 
   @ForeignKey(() => User)
   @Column({
