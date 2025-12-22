@@ -1,417 +1,322 @@
-import React, { useState, useEffect } from "react";
-import { Card, CardBody, CardHeader, Button, Spinner } from "@heroui/react";
-import { Icon } from "@iconify/react";
-import { apiCall } from "../lib/api";
+import { useState, useEffect } from 'react'
+import { Spinner, Card, CardBody, Button } from "@heroui/react"
+import { apiCall } from "../lib/api"
+import { AnalyticsSummaryCards } from "./analytics/AnalyticsSummaryCards"
+import { ProductPerformanceCard } from "./analytics/ProductPerformanceCard"
+import { ProductDetailView } from "./analytics/ProductDetailView"
 
-interface AnalyticsData {
-  recordCount: number;
-  analytics: {
-    totalRevenue: number;
-    orderCount: number;
-    avgOrderValue: number;
-    timeRange: {
-      start: string;
-      end: string;
-    };
-    categoryData: {
-      category: string;
-      orderCount: number;
-      revenue: number;
-      avgOrderValue: number;
-    } | null;
-    timeSeries: Array<{
-      date: string;
-      revenue: number;
-      orders: number;
-    }>;
-  } | null;
-  message?: string;
+interface AffiliateOrder {
+  orderId: string
+  orderNumber: string
+  status: string
+  totalAmount: number
+  productName: string
+  productId: string | null
+  customerEmail: string
+  customerName: string
+  createdAt: string
 }
 
-export function AffiliateAnalytics() {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [data, setData] = useState<AnalyticsData | null>(null);
-  const [startDate, setStartDate] = useState<string>(
-    new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]
-  );
-  const [endDate, setEndDate] = useState<string>(
-    new Date().toISOString().split("T")[0]
-  );
+interface ProductStats {
+  productId: string
+  productName: string
+  orders: number
+  revenue: number
+  customers: number
+}
 
-  const fetchAnalytics = async () => {
-    setLoading(true);
-    setError(null);
+interface AnalyticsOverview {
+  timeRange: string
+  startDate: string
+  endDate: string
+  summary: {
+    totalViews: number
+    totalConversions: number
+    conversionRate: number
+    totalOrders: number
+    paidOrders: number
+    totalRevenue: number
+  }
+  orders: AffiliateOrder[]
+}
 
-    try {
-      const response = await apiCall(`/affiliate/analytics?startDate=${startDate}&endDate=${endDate}`, {
-        method: "GET",
-      });
+interface FormAnalytics {
+  formId: string
+  views: number
+  conversions: number
+  conversionRate: number
+  formUrl: string
+  dropOffs?: {
+    product: number
+    payment: number
+    account: number
+    total: number
+  }
+  dropOffRates?: {
+    product: number
+    payment: number
+    account: number
+  }
+}
 
-      if (response.success) {
-        // Handle potential nested data structure
-        // Backend returns: { success: true, data: { recordCount, analytics } }
-        // apiCall wraps it: { success: true, data: { success: true, data: {...} } }
-        let analyticsData = response.data;
-
-        // Unwrap if double nested
-        if (analyticsData?.data && typeof analyticsData.data === "object") {
-          analyticsData = analyticsData.data;
-        }
-
-        console.log("📊 Analytics response:", {
-          response,
-          responseData: response.data,
-          analyticsData,
-          recordCount: analyticsData?.recordCount,
-          hasAnalytics: !!analyticsData?.analytics,
-          analyticsKeys: analyticsData ? Object.keys(analyticsData) : [],
-        });
-        setData(analyticsData);
-      } else {
-        setError(
-          response.error || "Failed to fetch analytics"
-        );
-      }
-    } catch (err: any) {
-      setError(err.message || "An error occurred");
-    } finally {
-      setLoading(false);
+interface ProductDetailAnalytics {
+  productId: string
+  timeRange: string
+  startDate: string
+  endDate: string
+  summary: {
+    totalViews: number
+    totalConversions: number
+    overallConversionRate: number
+    dropOffs?: {
+      product: number
+      payment: number
+      account: number
+      total: number
     }
-  };
+    dropOffRates?: {
+      product: number
+      payment: number
+      account: number
+    }
+  }
+  forms: FormAnalytics[]
+}
+
+const TIME_RANGES = [
+  { value: '1d', label: 'Last 24 Hours' },
+  { value: '7d', label: 'Last 7 Days' },
+  { value: '30d', label: 'Last 30 Days' },
+  { value: '90d', label: 'Last 3 Months' },
+  { value: '180d', label: 'Last 6 Months' },
+  { value: '365d', label: 'Last Year' },
+]
+
+
+export function AffiliateAnalytics() {
+  const [overview, setOverview] = useState<AnalyticsOverview | null>(null)
+  const [selectedProduct, setSelectedProduct] = useState<ProductDetailAnalytics | null>(null)
+  const [timeRange, setTimeRange] = useState<string>('30d')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    fetchAnalytics();
-  }, [startDate, endDate]);
+    if (!selectedProduct) {
+      fetchOverview()
+    }
+  }, [timeRange, selectedProduct])
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Spinner size="lg" />
-      </div>
-    );
+  const fetchOverview = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      console.log('📊 [FRONTEND] Fetching affiliate analytics...')
+      const response = await apiCall(
+        `/analytics/affiliate/overview?timeRange=${timeRange}`,
+        { method: 'GET' }
+      )
+
+      console.log('📊 [FRONTEND] Full response:', JSON.stringify(response, null, 2))
+
+      if (response.success && response.data) {
+        // The response structure might be nested - extract the actual data
+        const data = response.data.data || response.data
+        
+        console.log('📊 [FRONTEND] Extracted data:', {
+          summary: data.summary,
+          ordersLength: data.orders?.length,
+          orders: data.orders
+        })
+
+        // Ensure the data structure is correct
+        const analyticsData = {
+          timeRange: data.timeRange || timeRange,
+          startDate: data.startDate || '',
+          endDate: data.endDate || '',
+          summary: {
+            totalViews: data.summary?.totalViews || 0,
+            totalConversions: data.summary?.totalConversions || 0,
+            conversionRate: data.summary?.conversionRate || 0,
+            totalOrders: data.summary?.totalOrders || 0,
+            paidOrders: data.summary?.paidOrders || 0,
+            totalRevenue: data.summary?.totalRevenue || 0,
+          },
+          orders: data.orders || [],
+        }
+        
+        console.log('📊 [FRONTEND] Final analyticsData:', analyticsData)
+        setOverview(analyticsData)
+      } else {
+        setError(response.error || 'Failed to fetch analytics')
+      }
+    } catch (err: any) {
+      console.error('❌ [FRONTEND] Error fetching analytics:', err)
+      setError(err.message || 'Failed to fetch analytics')
+    } finally {
+      setLoading(false)
+    }
   }
 
-  if (error) {
-    return (
-      <Card>
-        <CardBody>
-          <div className="text-center py-8">
-            <Icon
-              icon="lucide:alert-circle"
-              className="text-4xl text-danger mx-auto mb-4"
-            />
-            <p className="text-danger">{error}</p>
-            <Button
-              color="primary"
-              variant="flat"
-              onPress={fetchAnalytics}
-              className="mt-4"
-            >
-              Retry
-            </Button>
-          </div>
-        </CardBody>
-      </Card>
-    );
+  const fetchProductDetails = async (productId: string) => {
+    setLoading(true)
+    setError(null)
+    try {
+      console.log('📊 [FRONTEND] Fetching product details for:', productId)
+      const response = await apiCall(
+        `/analytics/affiliate/products/${productId}?timeRange=${timeRange}`,
+        { method: 'GET' }
+      )
+
+      console.log('📊 [FRONTEND] Product details response:', response)
+
+      if (response.success && response.data) {
+        // Extract the actual data (might be nested)
+        const productData = response.data.data || response.data
+        console.log('📊 [FRONTEND] Setting selected product:', productData)
+        setSelectedProduct(productData)
+      } else {
+        setError(response.error || 'Failed to fetch product analytics')
+      }
+    } catch (err: any) {
+      console.error('❌ [FRONTEND] Error fetching product analytics:', err)
+      setError(err.message || 'Failed to fetch product analytics')
+    } finally {
+      setLoading(false)
+    }
   }
 
-  // Check if there's insufficient data
-  const MIN_RECORDS_REQUIRED = 10;
-  const currentRecordCount = data?.recordCount ?? 0;
-  const hasInsufficientData =
-    !data || !data.analytics || currentRecordCount < MIN_RECORDS_REQUIRED;
-  const recordsNeeded = Math.max(0, MIN_RECORDS_REQUIRED - currentRecordCount);
-
-  if (hasInsufficientData) {
-    return (
-      <div className="space-y-6">
-        {/* Insufficient Data Card */}
-        <Card>
-          <CardBody>
-            <div className="text-center py-8">
-              <Icon
-                icon="lucide:info"
-                className="text-4xl text-primary mx-auto mb-4"
-              />
-              <p className="text-lg font-semibold mb-6">Insufficient Data</p>
-
-              <div className="space-y-6 max-w-[300px] mx-auto">
-                {/* Current Orders Card - Inside */}
-                <Card className="bg-content1">
-                  <CardBody>
-                    <div className="flex flex-col items-center justify-center gap-3 py-4">
-                      <div className="flex items-center justify-center gap-3">
-                        <Icon
-                          icon="lucide:package"
-                          className="text-3xl text-muted-foreground"
-                        />
-                        <p className="text-2xl font-bold">
-                          {currentRecordCount}
-                        </p>
-                      </div>
-                      <div className="flex">
-                        <p className="text-sm text-muted-foreground">
-                          Current orders
-                        </p>
-                      </div>
-                    </div>
-                  </CardBody>
-                </Card>
-
-                <div className="space-y-2">
-                  <p className="text-sm text-foreground">
-                    <span className="font-semibold text-2xl text-primary">
-                      {recordsNeeded}
-                    </span>{" "}
-                    {recordsNeeded === 1 ? "order" : "orders"} remaining
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    Minimum {MIN_RECORDS_REQUIRED} orders required to display
-                    analytics.
-                  </p>
-                </div>
-
-                {/* Progress bar */}
-                <div className="mt-6">
-                  <div className="w-full bg-content3 rounded-full h-2">
-                    <div
-                      className="bg-primary h-2 rounded-full transition-all duration-500"
-                      style={{
-                        width: `${Math.min(100, (currentRecordCount / MIN_RECORDS_REQUIRED) * 100)}%`,
-                      }}
-                    />
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-2 text-center">
-                    {currentRecordCount} / {MIN_RECORDS_REQUIRED} orders
-                  </p>
-                </div>
-              </div>
-
-              {data?.message && (
-                <p className="text-sm text-muted-foreground mt-4">
-                  {data.message}
-                </p>
-              )}
-            </div>
-          </CardBody>
-        </Card>
-
-        {/* Date Range Selector - still show even with insufficient data */}
-        <Card>
-          <CardHeader>
-            <h2 className="text-xl font-semibold">Date Range</h2>
-          </CardHeader>
-          <CardBody>
-            <div className="flex gap-4 items-end">
-              <div className="flex-1">
-                <label className="block text-sm font-medium mb-2">
-                  Start Date
-                </label>
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-content3 rounded-lg bg-background"
-                />
-              </div>
-              <div className="flex-1">
-                <label className="block text-sm font-medium mb-2">
-                  End Date
-                </label>
-                <input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-content3 rounded-lg bg-background"
-                />
-              </div>
-              <Button color="primary" onPress={fetchAnalytics}>
-                Update
-              </Button>
-            </div>
-          </CardBody>
-        </Card>
-      </div>
-    );
+  const handleProductClick = (productId: string) => {
+    fetchProductDetails(productId)
   }
 
-  const analytics = data.analytics!;
+  const handleBackToOverview = () => {
+    setSelectedProduct(null)
+  }
+
+  const getProductStats = (orders: AffiliateOrder[]): ProductStats[] => {
+    const productMap = new Map<string, ProductStats>()
+    // Affiliate gets 1% commission (can be configured via env var in backend)
+    const affiliateRevenuePercentage = 0.01;
+
+    orders.forEach((order) => {
+      const productName = order.productName || 'Unknown Product'
+      const productId = order.productId || order.orderId // Fallback to orderId if no productId
+      
+      console.log('🔍 [FRONTEND] Processing order:', {
+        productName,
+        productId: order.productId,
+        orderId: order.orderId,
+        usingProductId: productId,
+      })
+      
+      if (!productMap.has(productName)) {
+        productMap.set(productName, {
+          productId,
+          productName,
+          orders: 0,
+          revenue: 0,
+          customers: 0,
+        })
+      }
+
+      const stats = productMap.get(productName)!
+      stats.orders += 1
+      if (order.status === 'paid') {
+        // Calculate affiliate commission (1% of total sale)
+        stats.revenue += order.totalAmount * affiliateRevenuePercentage
+      }
+    })
+
+    // Count unique customers per product
+    orders.forEach((order) => {
+      const productName = order.productName || 'Unknown Product'
+      const stats = productMap.get(productName)!
+      // Simple approach: count unique emails (in real scenario you'd track this better)
+      const productOrders = orders.filter(o => (o.productName || 'Unknown Product') === productName)
+      const uniqueCustomers = new Set(productOrders.map(o => o.customerEmail)).size
+      stats.customers = uniqueCustomers
+    })
+
+    return Array.from(productMap.values()).sort((a, b) => b.orders - a.orders)
+  }
 
   return (
-    <div className="space-y-6">
-      {/* Date Range Selector */}
-      <Card>
-        <CardHeader>
-          <h2 className="text-xl font-semibold">Date Range</h2>
-        </CardHeader>
-        <CardBody>
-          <div className="flex gap-4 items-end">
-            <div className="flex-1">
-              <label className="block text-sm font-medium mb-2">
-                Start Date
-              </label>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="w-full px-3 py-2 border border-content3 rounded-lg bg-background"
-              />
-            </div>
-            <div className="flex-1">
-              <label className="block text-sm font-medium mb-2">End Date</label>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="w-full px-3 py-2 border border-content3 rounded-lg bg-background"
-              />
-            </div>
-            <Button color="primary" onPress={fetchAnalytics}>
-              Update
+    <div className="p-8">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center gap-4">
+          {selectedProduct && (
+            <Button
+              variant="flat"
+              onClick={handleBackToOverview}
+              className="flex items-center gap-2"
+            >
+              ← Back to Overview
             </Button>
+          )}
+          <div>
+            <h1 className="text-3xl font-bold">
+              {selectedProduct ? 'Product Analytics' : 'Analytics Overview'}
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              {selectedProduct
+                ? 'View detailed analytics for this product'
+                : 'Track your product performance and conversions'}
+            </p>
           </div>
-        </CardBody>
-      </Card>
-
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardBody>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Total Revenue</p>
-                <p className="text-2xl font-bold">
-                  $
-                  {analytics.totalRevenue.toLocaleString("en-US", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </p>
-              </div>
-              <Icon
-                icon="lucide:dollar-sign"
-                className="text-3xl text-primary"
-              />
-            </div>
-          </CardBody>
-        </Card>
-
-        <Card>
-          <CardBody>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Total Orders</p>
-                <p className="text-2xl font-bold">{analytics.orderCount}</p>
-              </div>
-              <Icon
-                icon="lucide:shopping-cart"
-                className="text-3xl text-primary"
-              />
-            </div>
-          </CardBody>
-        </Card>
-
-        <Card>
-          <CardBody>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Avg Order Value</p>
-                <p className="text-2xl font-bold">
-                  $
-                  {analytics.avgOrderValue.toLocaleString("en-US", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </p>
-              </div>
-              <Icon
-                icon="lucide:trending-up"
-                className="text-3xl text-primary"
-              />
-            </div>
-          </CardBody>
-        </Card>
+        </div>
+        <div className="flex items-center gap-2">
+          <select
+            value={timeRange}
+            onChange={(e) => setTimeRange(e.target.value)}
+            className="px-4 py-2 border rounded-md bg-background"
+          >
+            {TIME_RANGES.map((range) => (
+              <option key={range.value} value={range.value}>
+                {range.label}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
-      {/* Time Series Chart */}
-      {analytics.timeSeries && analytics.timeSeries.length > 0 && (
-        <Card>
-          <CardHeader>
-            <h2 className="text-xl font-semibold">Revenue Over Time</h2>
-          </CardHeader>
+      {error && (
+        <Card className="mb-6 border-danger">
           <CardBody>
-            <div className="space-y-2">
-              {analytics.timeSeries.map((point) => (
-                <div
-                  key={point.date}
-                  className="flex items-center justify-between p-3 bg-content1 rounded-lg"
-                >
-                  <span className="font-medium">
-                    {new Date(point.date).toLocaleDateString()}
-                  </span>
-                  <div className="flex items-center gap-4">
-                    <span className="text-sm text-muted-foreground">
-                      {point.orders} orders
-                    </span>
-                    <span className="font-semibold">
-                      $
-                      {point.revenue.toLocaleString("en-US", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <p className="text-danger">{error}</p>
           </CardBody>
         </Card>
       )}
 
-      {/* Category Data */}
-      {analytics.categoryData && (
-        <Card>
-          <CardHeader>
-            <h2 className="text-xl font-semibold">
-              Category: {analytics.categoryData.category}
-            </h2>
-          </CardHeader>
-          <CardBody>
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <p className="text-sm text-muted-foreground">Orders</p>
-                <p className="text-xl font-bold">
-                  {analytics.categoryData.orderCount}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Revenue</p>
-                <p className="text-xl font-bold">
-                  $
-                  {analytics.categoryData.revenue.toLocaleString("en-US", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Avg Order</p>
-                <p className="text-xl font-bold">
-                  $
-                  {analytics.categoryData.avgOrderValue.toLocaleString(
-                    "en-US",
-                    {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    }
-                  )}
-                </p>
-              </div>
-            </div>
-          </CardBody>
-        </Card>
+      {loading && !overview && !selectedProduct && (
+        <div className="flex items-center justify-center py-12">
+          <Spinner size="lg" />
+        </div>
+      )}
+
+      {!selectedProduct && overview && overview.summary && (
+        <>
+          <AnalyticsSummaryCards
+            totalViews={overview.summary.totalViews || 0}
+            totalConversions={overview.summary.totalConversions || 0}
+            conversionRate={overview.summary.conversionRate || 0}
+            totalOrders={overview.summary.totalOrders || 0}
+            totalRevenue={overview.summary.totalRevenue || 0}
+          />
+
+          <ProductPerformanceCard 
+            productStats={overview.orders ? getProductStats(overview.orders) : []}
+            onProductClick={handleProductClick}
+          />
+        </>
+      )}
+
+      {selectedProduct && (
+        <ProductDetailView
+          productDetails={selectedProduct}
+          onBack={handleBackToOverview}
+        />
       )}
     </div>
-  );
+  )
 }

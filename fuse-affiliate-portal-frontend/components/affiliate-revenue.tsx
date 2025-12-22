@@ -88,11 +88,16 @@ export function AffiliateRevenue() {
   }
 
   // Check if there's insufficient data
-  const hasInsufficientData = !data || 
-    !data.totalRevenue || 
-    data.totalRevenue === 0 ||
-    !data.orderCount ||
-    data.orderCount === 0;
+  const isDevelopment = process.env.NODE_ENV === 'development';
+  
+  // In development, skip minimum requirements and show data even with 0 values
+  const hasInsufficientData = isDevelopment 
+    ? false 
+    : (!data || 
+       !data.totalRevenue || 
+       data.totalRevenue === 0 ||
+       !data.orderCount ||
+       data.orderCount === 0);
 
   if (hasInsufficientData) {
     const currentOrderCount = data?.orderCount ?? 0;
@@ -135,11 +140,11 @@ export function AffiliateRevenue() {
     );
   }
 
-  // Safe defaults for all numeric values
-  const totalRevenue = data.totalRevenue ?? 0;
-  const orderCount = data.orderCount ?? 0;
-  const affiliatePercentage = data.affiliatePercentage ?? 10;
-  const affiliateEarnings = data.affiliateEarnings ?? 0;
+  // Safe defaults for all numeric values (in development, show 0 values if no data)
+  const totalRevenue = data?.totalRevenue ?? 0;
+  const orderCount = data?.orderCount ?? 0;
+  const affiliatePercentage = data?.affiliatePercentage ?? 10;
+  const affiliateEarnings = data?.affiliateEarnings ?? 0;
 
   return (
     <div className="space-y-6">

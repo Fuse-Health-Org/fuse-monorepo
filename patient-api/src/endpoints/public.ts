@@ -6,6 +6,8 @@ import PharmacyCoverage from "../models/PharmacyCoverage";
 import Pharmacy from "../models/Pharmacy";
 import Questionnaire from "../models/Questionnaire";
 import TenantProductForm from "../models/TenantProductForm";
+import User from "../models/User";
+import AffiliateProductImage from "../models/AffiliateProductImage";
 
 /**
  * Public endpoints that don't require authentication
@@ -27,6 +29,34 @@ export function registerPublicEndpoints(app: Express) {
             order: [['createdAt', 'DESC']]
         });
 
+        // Check if this is an affiliate clinic
+        const clinic = await Clinic.findByPk(clinicId);
+        let affiliateUser: User | null = null;
+        
+        if (clinic?.affiliateOwnerClinicId) {
+            // This is an affiliate clinic, find the affiliate user
+            affiliateUser = await User.findOne({
+                where: { clinicId: clinic.id }
+            });
+        }
+
+        // If we have an affiliate user, get their custom images
+        let customImages: AffiliateProductImage[] = [];
+        if (affiliateUser) {
+            customImages = await AffiliateProductImage.findAll({
+                where: { affiliateId: affiliateUser.id }
+            });
+        }
+
+        // Create a map of custom images by productId
+        const customImageMap = new Map();
+        customImages.forEach((img) => {
+            customImageMap.set(img.productId, {
+                customImageUrl: img.customImageUrl,
+                useCustomImage: img.useCustomImage,
+            });
+        });
+
         // For each product, get the first TenantProductForm (the form ID used in URLs)
         const results = await Promise.all(tenantProducts.map(async (tp: any) => {
             // Get the first TenantProductForm for this product and clinic (sorted by createdAt ascending)
@@ -36,12 +66,21 @@ export function registerPublicEndpoints(app: Express) {
                 attributes: ['id'],
             });
 
+            // Check if affiliate has custom image for this product
+            const customImg = customImageMap.get(tp.product.id);
+            let imageUrl = tp.product.imageUrl;
+            
+            // If affiliate has custom image and wants to use it, use that instead
+            if (customImg?.useCustomImage && customImg?.customImageUrl) {
+                imageUrl = customImg.customImageUrl;
+            }
+
             return {
                 id: tp.product.id,
                 tenantProductId: tp.id, // TenantProduct ID - used for likes
                 name: tp.product.name,
                 description: tp.product.description,
-                imageUrl: tp.product.imageUrl,
+                imageUrl: imageUrl,
                 categories: tp.product.categories || [],
                 price: tp.price || tp.product.price,
                 wholesalePrice: tp.product.price,
@@ -57,6 +96,7 @@ export function registerPublicEndpoints(app: Express) {
     app.get("/public/products/:clinicSlug", async (req, res) => {
         try {
             const { clinicSlug } = req.params;
+            const { affiliateSlug } = req.query; // Check if there's an affiliate slug in query
 
             const clinic = await Clinic.findOne({
                 where: { slug: clinicSlug }
@@ -69,7 +109,81 @@ export function registerPublicEndpoints(app: Express) {
                 });
             }
 
-            const products = await fetchProductsForClinic(clinic.id);
+            // Get products for this clinic
+            const tenantProducts = await TenantProduct.findAll({
+                where: { clinicId: clinic.id },
+                include: [{
+                    model: Product,
+                    as: "product",
+                    where: { isActive: true },
+                    required: true,
+                    attributes: ['id', 'name', 'description', 'imageUrl', 'categories', 'price', 'slug'],
+                }],
+                limit: 50,
+                order: [['createdAt', 'DESC']]
+            });
+
+            // If there's an affiliate slug, get their custom images
+            let customImages: AffiliateProductImage[] = [];
+            if (affiliateSlug && typeof affiliateSlug === 'string') {
+                // Find affiliate clinic by slug
+                const affiliateClinic = await Clinic.findOne({
+                    where: { slug: affiliateSlug }
+                });
+
+                if (affiliateClinic) {
+                    // Find affiliate user
+                    const affiliateUser = await User.findOne({
+                        where: { clinicId: affiliateClinic.id }
+                    });
+
+                    if (affiliateUser) {
+                        customImages = await AffiliateProductImage.findAll({
+                            where: { affiliateId: affiliateUser.id }
+                        });
+                    }
+                }
+            }
+
+            // Create a map of custom images by productId
+            const customImageMap = new Map();
+            customImages.forEach((img) => {
+                customImageMap.set(img.productId, {
+                    customImageUrl: img.customImageUrl,
+                    useCustomImage: img.useCustomImage,
+                });
+            });
+
+            // For each product, get the first TenantProductForm (the form ID used in URLs)
+            const products = await Promise.all(tenantProducts.map(async (tp: any) => {
+                const firstForm = await TenantProductForm.findOne({
+                    where: { productId: tp.product.id, clinicId: clinic.id },
+                    order: [['createdAt', 'ASC']],
+                    attributes: ['id'],
+                });
+
+                // Check if affiliate has custom image for this product
+                const customImg = customImageMap.get(tp.product.id);
+                let imageUrl = tp.product.imageUrl;
+                
+                // If affiliate has custom image and wants to use it, use that instead
+                if (customImg?.useCustomImage && customImg?.customImageUrl) {
+                    imageUrl = customImg.customImageUrl;
+                }
+
+                return {
+                    id: tp.product.id,
+                    tenantProductId: tp.id,
+                    name: tp.product.name,
+                    description: tp.product.description,
+                    imageUrl: imageUrl,
+                    categories: tp.product.categories || [],
+                    price: tp.price || tp.product.price,
+                    wholesalePrice: tp.product.price,
+                    slug: tp.product.slug,
+                    formId: firstForm?.id || null,
+                };
+            }));
 
             res.status(200).json({
                 success: true,
@@ -187,6 +301,34 @@ export function registerPublicEndpoints(app: Express) {
             (tp: any) => tp.product.pharmacyCoverages && tp.product.pharmacyCoverages.length > 1
         );
 
+        // Check if this is an affiliate clinic
+        const clinic = await Clinic.findByPk(clinicId);
+        let affiliateUser: User | null = null;
+        
+        if (clinic?.affiliateOwnerClinicId) {
+            // This is an affiliate clinic, find the affiliate user
+            affiliateUser = await User.findOne({
+                where: { clinicId: clinic.id }
+            });
+        }
+
+        // If we have an affiliate user, get their custom images
+        let customImages: AffiliateProductImage[] = [];
+        if (affiliateUser) {
+            customImages = await AffiliateProductImage.findAll({
+                where: { affiliateId: affiliateUser.id }
+            });
+        }
+
+        // Create a map of custom images by productId
+        const customImageMap = new Map();
+        customImages.forEach((img) => {
+            customImageMap.set(img.productId, {
+                customImageUrl: img.customImageUrl,
+                useCustomImage: img.useCustomImage,
+            });
+        });
+
         // For each bundle, get the first TenantProductForm (the form ID used in URLs)
         const bundles = await Promise.all(bundleProducts.map(async (tp: any) => {
             const firstForm = await TenantProductForm.findOne({
@@ -195,11 +337,20 @@ export function registerPublicEndpoints(app: Express) {
                 attributes: ['id'],
             });
 
+            // Check if affiliate has custom image for this product
+            const customImg = customImageMap.get(tp.product.id);
+            let imageUrl = tp.product.imageUrl;
+            
+            // If affiliate has custom image and wants to use it, use that instead
+            if (customImg?.useCustomImage && customImg?.customImageUrl) {
+                imageUrl = customImg.customImageUrl;
+            }
+
             return {
                 id: tp.product.id,
                 name: tp.product.name,
                 description: tp.product.description,
-                imageUrl: tp.product.imageUrl,
+                imageUrl: imageUrl,
                 categories: tp.product.categories || [],
                 price: tp.price || tp.product.price,
                 wholesalePrice: tp.product.price,

@@ -48,6 +48,7 @@ import SequenceRun from '../models/SequenceRun';
 import Tag from '../models/Tag';
 import UserTag from '../models/UserTag';
 import { GlobalFees } from '../models/GlobalFees';
+import AffiliateProductImage from '../models/AffiliateProductImage';
 import UserRoles from '../models/UserRoles';
 import SupportTicket from '../models/SupportTicket';
 import TicketMessage from '../models/TicketMessage';
@@ -143,7 +144,7 @@ export const sequelize = new Sequelize(databaseUrl, {
     TenantProductForm, FormProducts, GlobalFormStructure, Sale, DoctorPatientChats, Pharmacy, PharmacyCoverage, PharmacyProduct,
     TenantCustomFeatures, TierConfiguration, TenantAnalyticsEvents, FormAnalyticsDaily,
     MessageTemplate, Sequence, SequenceRun, Tag, UserTag, GlobalFees, UserRoles,
-    SupportTicket, TicketMessage, AuditLog, MfaToken, CustomWebsite, Like, BrandFavoritedProduct, Program
+    SupportTicket, TicketMessage, AuditLog, MfaToken, CustomWebsite, Like, BrandFavoritedProduct, Program, AffiliateProductImage
   ],
 });
 

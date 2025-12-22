@@ -1,6 +1,7 @@
 import { Express } from "express";
 import { Op, QueryTypes } from "sequelize";
 import axios from "axios";
+import multer from "multer";
 import User from "../models/User";
 import Order from "../models/Order";
 import OrderItem from "../models/OrderItem";
@@ -8,8 +9,35 @@ import Product from "../models/Product";
 import Clinic from "../models/Clinic";
 import CustomWebsite from "../models/CustomWebsite";
 import UserRoles from "../models/UserRoles";
+import AffiliateProductImage from "../models/AffiliateProductImage";
+import TenantProduct from "../models/TenantProduct";
 import { MailsSender } from "../services/mailsSender";
 import { sequelize } from "../config/database";
+import {
+  uploadToS3,
+  deleteFromS3,
+  isValidImageFile,
+  isValidFileSize,
+} from "../config/s3";
+
+// Configure multer for file uploads (store in memory)
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    if (isValidImageFile(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(
+        new Error(
+          "Invalid file type. Only JPEG, PNG, WebP images are allowed."
+        )
+      );
+    }
+  },
+});
 
 /**
  * Check if a product is medical (contains PHI) or non-medical
@@ -285,6 +313,13 @@ export function registerAffiliateEndpoints(
 
       const clinicId = affiliateClinic.affiliateOwnerClinicId;
 
+      console.log("🔍 [AFFILIATE REVENUE] Searching for orders with:", {
+        affiliateId: user.id,
+        affiliateEmail: user.email,
+        clinicId,
+        status: "paid",
+      });
+
       // Get all paid orders for this affiliate (non-medical only)
       const orders = await Order.findAll({
         where: {
@@ -307,6 +342,14 @@ export function registerAffiliateEndpoints(
         ],
       });
 
+      console.log(`🔍 [AFFILIATE REVENUE] Found ${orders.length} orders:`, orders.map(o => ({
+        id: o.id,
+        orderNumber: o.orderNumber,
+        totalAmount: o.totalAmount,
+        status: o.status,
+        createdAt: o.createdAt,
+      })));
+
       // Filter to only non-medical products
       const nonMedicalOrders = orders.filter((order) => {
         return order.orderItems?.some((item) => {
@@ -315,6 +358,8 @@ export function registerAffiliateEndpoints(
           return !isMedicalProduct(product);
         });
       });
+
+      console.log(`🔍 [AFFILIATE REVENUE] After filtering non-medical: ${nonMedicalOrders.length} orders`);
 
       const totalRevenue = nonMedicalOrders.reduce(
         (sum, order) => sum + Number(order.totalAmount || 0),
@@ -691,6 +736,7 @@ export function registerAffiliateEndpoints(
       });
 
       // Create affiliate user with temporary password linked to their new clinic
+      // IMPORTANT: Set website to placeholderSlug for affiliate tracking
       const affiliateUser = await User.createUser({
         firstName: emailPrefix,
         lastName: "-", // Placeholder to satisfy validation (len >= 1), will be cleared via raw SQL
@@ -698,6 +744,7 @@ export function registerAffiliateEndpoints(
         password: tempPassword, // This will be hashed and stored in passwordHash
         role: "affiliate",
         clinicId: affiliateClinic.id, // Link to affiliate's new clinic
+        website: placeholderSlug, // Set website to match clinic slug for tracking
       });
 
       // Clear lastName after creation using raw SQL to bypass Sequelize validation
@@ -973,10 +1020,17 @@ The Fuse Team`,
           isActive: true, // Activate the clinic after setup
         });
 
-        console.log("✅ [Affiliate Setup] Updated clinic:", {
+        // IMPORTANT: Sync User.website with Clinic.slug for affiliate tracking
+        // The order tracking system uses User.website to detect affiliate from URL
+        await user.update({
+          website: slug.trim(),
+        });
+
+        console.log("✅ [Affiliate Setup] Updated clinic and user:", {
           clinicId: user.clinic.id,
           name: clinicName.trim(),
           slug: slug.trim(),
+          userWebsite: slug.trim(),
         });
 
         res.status(200).json({
@@ -1155,6 +1209,18 @@ The Fuse Team`,
 
       await user.clinic.save();
 
+      // IMPORTANT: Keep User.website in sync with Clinic.slug for affiliate tracking
+      // The order tracking system uses User.website to detect affiliate from URL
+      if (user.website !== user.clinic.slug) {
+        await user.update({
+          website: user.clinic.slug,
+        });
+        console.log("✅ [Affiliate Clinic] Synced User.website with Clinic.slug:", {
+          userId: user.id,
+          website: user.clinic.slug,
+        });
+      }
+
       // Update or create CustomWebsite
       let customWebsite = await CustomWebsite.findOne({
         where: { clinicId: user.clinic.id },
@@ -1219,6 +1285,220 @@ The Fuse Team`,
     }
   });
 
+  // Admin endpoint: Sync all affiliate User.website with their Clinic.slug
+  app.post("/admin/affiliates/sync-websites", authenticateJWT, async (req, res) => {
+    try {
+      const currentUser = getCurrentUser(req);
+      if (!currentUser) {
+        return res.status(401).json({
+          success: false,
+          message: "Not authenticated",
+        });
+      }
+
+      // Only allow brand users or admins to sync
+      const user = await User.findByPk(currentUser.id, {
+        include: [{ model: UserRoles, as: "userRoles", required: false }],
+      });
+
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found",
+        });
+      }
+
+      await user.getUserRoles();
+      if (!user.userRoles?.hasAnyRole(["brand", "admin", "superAdmin"])) {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied. Only brand users and admins can sync affiliates.",
+        });
+      }
+
+      // Get all affiliate users with their clinics
+      const affiliates = await User.findAll({
+        include: [
+          { 
+            model: UserRoles, 
+            as: "userRoles", 
+            required: true,
+            where: {
+              affiliate: true,
+            },
+          },
+          {
+            model: Clinic,
+            as: "clinic",
+            required: true,
+          },
+        ],
+      });
+
+      let syncedCount = 0;
+      const syncedAffiliates: Array<{
+        id: string;
+        email: string;
+        oldWebsite: string | null;
+        newWebsite: string;
+      }> = [];
+
+      for (const affiliate of affiliates) {
+        if (affiliate.clinic && affiliate.clinic.slug) {
+          // Only update if website is different from clinic slug
+          if (affiliate.website !== affiliate.clinic.slug) {
+            await affiliate.update({
+              website: affiliate.clinic.slug,
+            });
+            syncedCount++;
+            syncedAffiliates.push({
+              id: affiliate.id,
+              email: affiliate.email,
+              oldWebsite: affiliate.website || null,
+              newWebsite: affiliate.clinic.slug,
+            });
+            console.log(`✅ Synced affiliate ${affiliate.email}: website = '${affiliate.clinic.slug}'`);
+          }
+        }
+      }
+
+      res.status(200).json({
+        success: true,
+        message: `Synced ${syncedCount} affiliate(s)`,
+        data: {
+          totalAffiliates: affiliates.length,
+          syncedCount,
+          syncedAffiliates,
+        },
+      });
+    } catch (error) {
+      console.error("❌ Error syncing affiliate websites:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to sync affiliate websites",
+      });
+    }
+  });
+
+  // Public endpoint: Validate affiliate + brand relationship
+  // This prevents unauthorized access by validating that the affiliate belongs to the brand
+  app.post("/public/affiliate/validate-access", async (req, res) => {
+    try {
+      const { affiliateSlug, brandSlug } = req.body;
+
+      console.log("🔐 Validating affiliate access:", { affiliateSlug, brandSlug });
+
+      if (!affiliateSlug || typeof affiliateSlug !== "string") {
+        return res.status(400).json({
+          success: false,
+          message: "Affiliate slug is required",
+        });
+      }
+
+      if (!brandSlug || typeof brandSlug !== "string") {
+        return res.status(400).json({
+          success: false,
+          message: "Brand slug is required",
+        });
+      }
+
+      // Step 1: Find the affiliate by website (slug)
+      const affiliate = await User.findOne({
+        where: {
+          website: affiliateSlug.trim(),
+        },
+        include: [
+          {
+            model: UserRoles,
+            as: "userRoles",
+            required: true,
+          },
+          {
+            model: Clinic,
+            as: "clinic",
+            required: true,
+          },
+        ],
+      });
+
+      if (!affiliate) {
+        console.log("❌ Affiliate not found:", affiliateSlug);
+        return res.status(403).json({
+          success: false,
+          message: "Invalid affiliate",
+        });
+      }
+
+      await affiliate.getUserRoles();
+
+      if (!affiliate.userRoles?.hasRole("affiliate")) {
+        console.log("❌ User is not an affiliate:", affiliateSlug);
+        return res.status(403).json({
+          success: false,
+          message: "Invalid affiliate",
+        });
+      }
+
+      // Step 2: Get the parent clinic (brand) that this affiliate belongs to
+      if (!affiliate.clinic?.affiliateOwnerClinicId) {
+        console.log("❌ Affiliate has no parent clinic:", affiliateSlug);
+        return res.status(403).json({
+          success: false,
+          message: "Invalid affiliate configuration",
+        });
+      }
+
+      const parentClinic = await Clinic.findByPk(affiliate.clinic.affiliateOwnerClinicId);
+
+      if (!parentClinic) {
+        console.log("❌ Parent clinic not found:", affiliate.clinic.affiliateOwnerClinicId);
+        return res.status(403).json({
+          success: false,
+          message: "Invalid affiliate configuration",
+        });
+      }
+
+      // Step 3: Verify that the parent clinic slug matches the brand slug in URL
+      if (parentClinic.slug !== brandSlug.trim()) {
+        console.log("❌ Brand slug mismatch:", {
+          expected: parentClinic.slug,
+          provided: brandSlug,
+        });
+        return res.status(403).json({
+          success: false,
+          message: "Affiliate does not belong to this brand",
+        });
+      }
+
+      // Step 4: All validations passed - return the parent clinic info
+      console.log("✅ Affiliate access validated:", {
+        affiliateSlug,
+        brandSlug,
+        affiliateId: affiliate.id,
+        parentClinicId: parentClinic.id,
+      });
+
+      res.status(200).json({
+        success: true,
+        data: {
+          affiliateId: affiliate.id,
+          affiliateSlug: affiliate.website,
+          brandClinic: {
+            id: parentClinic.id,
+            slug: parentClinic.slug,
+            name: parentClinic.name,
+          },
+        },
+      });
+    } catch (error) {
+      console.error("❌ Error validating affiliate access:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to validate affiliate access",
+      });
+    }
+  });
+
   // Public endpoint: Get affiliate by slug (website)
   app.get("/public/affiliate/by-slug/:slug", async (req, res) => {
     try {
@@ -1275,6 +1555,316 @@ The Fuse Team`,
       res.status(500).json({
         success: false,
         message: "Failed to fetch affiliate",
+      });
+    }
+  });
+
+  // Get affiliate products (with custom images if set)
+  app.get("/affiliate/products", authenticateJWT, async (req, res) => {
+    try {
+      const currentUser = getCurrentUser(req);
+      if (!currentUser) {
+        return res.status(401).json({
+          success: false,
+          message: "Not authenticated",
+        });
+      }
+
+      const user = await User.findByPk(currentUser.id, {
+        include: [{ model: UserRoles, as: "userRoles", required: false }],
+      });
+
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found",
+        });
+      }
+
+      await user.getUserRoles();
+      if (!user.userRoles?.hasRole("affiliate")) {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied. Affiliate role required.",
+        });
+      }
+
+      // Get affiliate's clinic and parent clinic
+      if (!user.clinicId) {
+        return res.status(400).json({
+          success: false,
+          message: "Affiliate clinic not set. Please complete onboarding.",
+        });
+      }
+
+      const affiliateClinic = await Clinic.findByPk(user.clinicId);
+      if (!affiliateClinic?.affiliateOwnerClinicId) {
+        return res.status(400).json({
+          success: false,
+          message: "Affiliate parent clinic not found",
+        });
+      }
+
+      const parentClinicId = affiliateClinic.affiliateOwnerClinicId;
+
+      // Get all products from the parent clinic
+      const tenantProducts = await TenantProduct.findAll({
+        where: {
+          clinicId: parentClinicId,
+          isActive: true,
+        },
+        include: [
+          {
+            model: Product,
+            as: "product",
+            required: true,
+          },
+        ],
+      });
+
+      // Get affiliate's custom images
+      const customImages = await AffiliateProductImage.findAll({
+        where: {
+          affiliateId: user.id,
+        },
+      });
+
+      // Create a map of custom images by productId
+      const customImageMap = new Map();
+      customImages.forEach((img) => {
+        customImageMap.set(img.productId, {
+          customImageUrl: img.customImageUrl,
+          useCustomImage: img.useCustomImage,
+        });
+      });
+
+      // Merge products with custom images
+      const productsWithCustomImages = tenantProducts.map((tp) => {
+        const product = tp.product;
+        const customImg = customImageMap.get(product.id);
+
+        return {
+          id: product.id,
+          name: product.name,
+          price: tp.price || product.price,
+          originalImageUrl: product.imageUrl,
+          customImageUrl: customImg?.customImageUrl || null,
+          useCustomImage: customImg?.useCustomImage || false,
+          displayImageUrl: customImg?.useCustomImage && customImg?.customImageUrl
+            ? customImg.customImageUrl
+            : product.imageUrl,
+          category: null,
+          categories: [],
+          active: tp.isActive,
+        };
+      });
+
+      res.status(200).json({
+        success: true,
+        data: productsWithCustomImages,
+      });
+    } catch (error) {
+      console.error("❌ Error fetching affiliate products:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to fetch affiliate products",
+      });
+    }
+  });
+
+  // Upload affiliate product image
+  app.post("/affiliate/products/:productId/upload-image", authenticateJWT, upload.single("image"), async (req, res) => {
+    try {
+      const currentUser = getCurrentUser(req);
+      if (!currentUser) {
+        return res.status(401).json({
+          success: false,
+          message: "Not authenticated",
+        });
+      }
+
+      const user = await User.findByPk(currentUser.id, {
+        include: [{ model: UserRoles, as: "userRoles", required: false }],
+      });
+
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found",
+        });
+      }
+
+      await user.getUserRoles();
+      if (!user.userRoles?.hasRole("affiliate")) {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied. Affiliate role required.",
+        });
+      }
+
+      const { productId } = req.params;
+
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          message: "No file uploaded",
+        });
+      }
+
+      // Validate file size
+      if (!isValidFileSize(req.file.size)) {
+        return res.status(400).json({
+          success: false,
+          message: "File too large. Maximum size is 5MB.",
+        });
+      }
+
+      // Verify product exists
+      const product = await Product.findByPk(productId);
+      if (!product) {
+        return res.status(404).json({
+          success: false,
+          message: "Product not found",
+        });
+      }
+
+      // Check if affiliate already has a custom image for this product
+      const existingImage = await AffiliateProductImage.findOne({
+        where: {
+          affiliateId: user.id,
+          productId,
+        },
+      });
+
+      // Delete old image from S3 if it exists
+      if (existingImage?.customImageUrl) {
+        try {
+          await deleteFromS3(existingImage.customImageUrl);
+          console.log("🗑️ Old affiliate product image deleted from S3");
+        } catch (error) {
+          console.error("Warning: Failed to delete old affiliate product image from S3:", error);
+        }
+      }
+
+      // Upload new image to S3
+      const imageUrl = await uploadToS3(
+        req.file.buffer,
+        req.file.originalname,
+        req.file.mimetype,
+        "affiliate-product-images"
+      );
+
+      // Upsert affiliate product image
+      const [affiliateProductImage, created] = await AffiliateProductImage.upsert({
+        affiliateId: user.id,
+        productId,
+        customImageUrl: imageUrl,
+        useCustomImage: true,
+      });
+
+      console.log("✅ [Affiliate Product Image] Uploaded:", {
+        affiliateId: user.id,
+        productId,
+        imageUrl,
+        created,
+      });
+
+      res.status(200).json({
+        success: true,
+        message: created
+          ? "Product image uploaded successfully"
+          : "Product image updated successfully",
+        data: {
+          customImageUrl: affiliateProductImage.customImageUrl,
+          useCustomImage: affiliateProductImage.useCustomImage,
+        },
+      });
+    } catch (error) {
+      console.error("❌ Error updating affiliate product image:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to update product image",
+      });
+    }
+  });
+
+  // Toggle between custom and original image
+  app.put("/affiliate/products/:productId/toggle-image", authenticateJWT, async (req, res) => {
+    try {
+      const currentUser = getCurrentUser(req);
+      if (!currentUser) {
+        return res.status(401).json({
+          success: false,
+          message: "Not authenticated",
+        });
+      }
+
+      const user = await User.findByPk(currentUser.id, {
+        include: [{ model: UserRoles, as: "userRoles", required: false }],
+      });
+
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found",
+        });
+      }
+
+      await user.getUserRoles();
+      if (!user.userRoles?.hasRole("affiliate")) {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied. Affiliate role required.",
+        });
+      }
+
+      const { productId } = req.params;
+      const { useCustomImage } = req.body;
+
+      if (useCustomImage === undefined) {
+        return res.status(400).json({
+          success: false,
+          message: "useCustomImage is required",
+        });
+      }
+
+      // Find existing affiliate product image
+      const affiliateProductImage = await AffiliateProductImage.findOne({
+        where: {
+          affiliateId: user.id,
+          productId,
+        },
+      });
+
+      if (!affiliateProductImage) {
+        return res.status(404).json({
+          success: false,
+          message: "No custom image found for this product. Please upload one first.",
+        });
+      }
+
+      // Update the toggle
+      affiliateProductImage.useCustomImage = useCustomImage;
+      await affiliateProductImage.save();
+
+      console.log("✅ [Affiliate Product Image] Toggled:", {
+        affiliateId: user.id,
+        productId,
+        useCustomImage,
+      });
+
+      res.status(200).json({
+        success: true,
+        message: `Now using ${useCustomImage ? "custom" : "original"} image`,
+        data: {
+          useCustomImage: affiliateProductImage.useCustomImage,
+        },
+      });
+    } catch (error) {
+      console.error("❌ Error toggling affiliate product image:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to toggle product image",
       });
     }
   });
