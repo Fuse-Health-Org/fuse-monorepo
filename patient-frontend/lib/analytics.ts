@@ -152,6 +152,8 @@ export const trackFormDropOff = async (params: {
   clinicName?: string;
   productName?: string;
   useBeacon?: boolean;
+  sourceType?: 'brand' | 'affiliate'; // Added
+  affiliateSlug?: string; // Added
 }): Promise<void> => {
   try {
     const eventKey = `${params.userId}:${params.productId}:${params.formId}:dropoff:${params.dropOffStage}`;
@@ -167,10 +169,12 @@ export const trackFormDropOff = async (params: {
       eventType: "dropoff" as const,
       dropOffStage: params.dropOffStage,
       sessionId: generateSessionId(),
+      sourceType: params.affiliateSlug ? 'affiliate' : (params.sourceType || 'brand'), // Set sourceType
       metadata: {
         clinicId: params.clinicId,
         clinicName: params.clinicName,
         productName: params.productName || "Unknown Product",
+        affiliateSlug: params.affiliateSlug, // Added
         timestamp: new Date().toISOString(),
       },
     };
