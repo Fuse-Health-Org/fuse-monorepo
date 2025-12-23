@@ -118,6 +118,8 @@ export function useQuestionnaireAnalytics(
             formId: tenantProductFormId,
             stage,
             useBeacon,
+            sourceType: affiliateSlug ? 'affiliate' : 'brand',
+            affiliateSlug,
           });
 
           hasTrackedDropOffRef.current = true;
@@ -131,6 +133,8 @@ export function useQuestionnaireAnalytics(
             clinicName: domainClinic.name,
             productName: productName || undefined,
             useBeacon,
+            sourceType: affiliateSlug ? 'affiliate' : 'brand',
+            affiliateSlug: affiliateSlug || undefined,
           });
         }
       }
@@ -165,6 +169,8 @@ export function useQuestionnaireAnalytics(
           productId: tenantProductId,
           formId: tenantProductFormId,
           stage,
+          sourceType: affiliateSlug ? 'affiliate' : 'brand',
+          affiliateSlug,
         });
 
         hasTrackedDropOffRef.current = true;
@@ -178,6 +184,8 @@ export function useQuestionnaireAnalytics(
           clinicName: domainClinic.name,
           productName: productName || undefined,
           useBeacon: false, // Use regular fetch for explicit closes
+          sourceType: affiliateSlug ? 'affiliate' : 'brand',
+          affiliateSlug: affiliateSlug || undefined,
         });
       }
     }

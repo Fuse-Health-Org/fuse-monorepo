@@ -207,9 +207,31 @@ export function useQuestionnaireModal(
   const getCurrentStage = useCallback((): 'product' | 'payment' | 'account' => {
     if (isCheckoutStep()) return 'payment';
     const currentStep = getCurrentQuestionnaireStep();
-    if (currentStep?.category === 'user_profile') return 'account';
+    
+    console.log('📊 [getCurrentStage] Current step analysis:', {
+      currentStepIndex,
+      currentStep: currentStep ? {
+        title: currentStep.title,
+        category: currentStep.category,
+        stepOrder: currentStep.stepOrder
+      } : null,
+      isCheckoutStep: isCheckoutStep(),
+      isSignedIn: accountCreated || userId,
+    });
+    
+    // Only consider "account" stage if the step title indicates account creation
+    // (e.g., "Create Your Account", not "Location Verification")
+    const isSignedIn = accountCreated || userId;
+    if (!isSignedIn && currentStep?.category === 'user_profile') {
+      const stepTitle = currentStep.title?.toLowerCase() || '';
+      // Check if it's actually an account creation step
+      if (stepTitle.includes('create') && stepTitle.includes('account')) {
+        return 'account';
+      }
+    }
+    
     return 'product';
-  }, [isCheckoutStep, getCurrentQuestionnaireStep]);
+  }, [isCheckoutStep, getCurrentQuestionnaireStep, currentStepIndex, accountCreated, userId]);
 
   const { trackConversion, resetTrackingFlags } = useQuestionnaireAnalytics(
     isOpen, questionnaireId, tenantProductFormId, tenantProductId, domainClinic, productName,
