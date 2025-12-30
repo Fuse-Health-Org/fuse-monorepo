@@ -59,6 +59,8 @@ export default function PortalPage() {
   })
   const [isTogglingActive, setIsTogglingActive] = useState(false)
   const [clinicSlug, setClinicSlug] = useState<string | null>(null)
+  const [customDomain, setCustomDomain] = useState<string | null>(null)
+  const [isCustomDomain, setIsCustomDomain] = useState(false)
 
   // Check if user has access to Portal based on their subscription plan
   const hasPortalAccess = subscription?.plan?.type && PORTAL_ALLOWED_PLAN_TYPES.includes(subscription.plan.type)
@@ -74,22 +76,28 @@ export default function PortalPage() {
   useEffect(() => {
     if (hasPortalAccess) {
       loadSettings()
-      // Fetch clinic slug
-      const fetchClinicSlug = async () => {
+      // Fetch clinic slug and custom domain info
+      const fetchClinicData = async () => {
         if (!user?.clinicId) return
         try {
           const response = await authenticatedFetch(`${API_URL}/clinic/${user.clinicId}`)
           if (response.ok) {
             const data = await response.json()
-            if (data.success && data.data?.slug) {
-              setClinicSlug(data.data.slug)
+            if (data.success && data.data) {
+              if (data.data.slug) {
+                setClinicSlug(data.data.slug)
+              }
+              if (data.data.isCustomDomain && data.data.customDomain) {
+                setIsCustomDomain(true)
+                setCustomDomain(data.data.customDomain)
+              }
             }
           }
         } catch (error) {
           console.error("Error fetching clinic:", error)
         }
       }
-      fetchClinicSlug()
+      fetchClinicData()
     }
   }, [hasPortalAccess, user?.clinicId])
 
@@ -699,7 +707,9 @@ export default function PortalPage() {
                       <p className="text-sm font-mono text-muted-foreground truncate">
                         {typeof window !== 'undefined' && window.location.hostname.includes('localhost')
                           ? `http://${clinicSlug}.localhost:3000`
-                          : `https://${clinicSlug}.yourdomain.com`}
+                          : isCustomDomain && customDomain
+                            ? `https://${customDomain}`
+                            : `https://${clinicSlug}.yourdomain.com`}
                       </p>
                       {typeof window !== 'undefined' && window.location.hostname.includes('localhost') && (
                         <p className="text-xs text-blue-600 mt-1">
@@ -710,7 +720,15 @@ export default function PortalPage() {
                   </div>
                   <Button
                     variant="outline"
-                    onClick={() => window.open(`http://${clinicSlug}.localhost:3000`, '_blank')}
+                    onClick={() => {
+                      const isLocal = typeof window !== 'undefined' && window.location.hostname.includes('localhost')
+                      const url = isLocal
+                        ? `http://${clinicSlug}.localhost:3000`
+                        : isCustomDomain && customDomain
+                          ? `https://${customDomain}`
+                          : `https://${clinicSlug}.yourdomain.com`
+                      window.open(url, '_blank')
+                    }}
                   >
                     <ExternalLink className="w-4 h-4 mr-2" />
                     Preview
