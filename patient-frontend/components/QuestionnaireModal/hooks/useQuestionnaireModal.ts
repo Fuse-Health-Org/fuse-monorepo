@@ -56,45 +56,29 @@ export function useQuestionnaireModal(
     cardNumber: "", expiryDate: "", securityCode: "", country: "brazil"
   });
 
-  // Affiliate tracking: Extract affiliate slug from URL or sessionStorage
+  // Affiliate tracking: Derive affiliate slug from URL using extractClinicSlugFromDomain
   const [affiliateSlug, setAffiliateSlug] = useState<string | null>(null);
   
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const hostname = window.location.hostname;
-      const parts = hostname.split('.');
-      let detectedSlug: string | null = null;
+    const detectAffiliateSlug = async () => {
+      if (typeof window === 'undefined') return;
       
-      // Check for affiliate subdomain pattern
-      if (hostname.includes('.localhost')) {
-        const beforeLocalhost = hostname.split('.localhost')[0];
-        const subdomainParts = beforeLocalhost.split('.');
-        if (subdomainParts.length >= 2) {
-          // affiliate.brand.localhost -> affiliateSlug = first part
-          detectedSlug = subdomainParts[0];
-          console.log('👤 Detected affiliate slug from URL (dev):', detectedSlug);
+      try {
+        // Import dynamically to avoid circular dependency
+        const { extractClinicSlugFromDomain } = await import('../../../lib/clinic-utils');
+        const domainInfo = await extractClinicSlugFromDomain();
+        
+        // Use affiliateSlug from domain detection (works for subdomains AND custom domains)
+        if (domainInfo.affiliateSlug) {
+          setAffiliateSlug(domainInfo.affiliateSlug);
+          console.log('👤 Detected affiliate slug from domain:', domainInfo.affiliateSlug);
         }
-      } else if (hostname.endsWith('.fusehealth.com') || hostname.endsWith('.fuse.health') || hostname.endsWith('.fusehealthstaging.xyz')) {
-        if (parts.length >= 4) {
-          // affiliate.brand.fusehealth.com -> affiliateSlug = first part
-          detectedSlug = parts[0];
-          console.log('👤 Detected affiliate slug from URL (prod):', detectedSlug);
-        }
+      } catch (error) {
+        console.error('❌ Error detecting affiliate slug:', error);
       }
-      
-      // If not detected from URL, try sessionStorage (for custom domain affiliates)
-      if (!detectedSlug && typeof sessionStorage !== 'undefined') {
-        const storedSlug = sessionStorage.getItem('affiliateSlug');
-        if (storedSlug) {
-          detectedSlug = storedSlug;
-          console.log('👤 Detected affiliate slug from sessionStorage:', detectedSlug);
-        }
-      }
-      
-      if (detectedSlug) {
-        setAffiliateSlug(detectedSlug);
-      }
-    }
+    };
+    
+    detectAffiliateSlug();
   }, []);
 
   // Auth state

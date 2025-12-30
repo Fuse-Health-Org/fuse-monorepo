@@ -75,12 +75,6 @@ export async function extractClinicSlugFromDomain(): Promise<ClinicDomainInfo> {
             hostname 
           });
 
-          // Store affiliate slug in sessionStorage for order tracking
-          if (typeof sessionStorage !== 'undefined') {
-            sessionStorage.setItem('affiliateSlug', affiliateSlug);
-            console.log('💾 Stored affiliateSlug in sessionStorage:', affiliateSlug);
-          }
-
           // Return parent clinic slug to load products from parent brand
           return {
             hasClinicSubdomain: true,
@@ -157,12 +151,6 @@ export async function extractClinicSlugFromDomain(): Promise<ClinicDomainInfo> {
             brandSlug: data.data.brandClinic.slug,
           });
           
-          // Store affiliate slug in sessionStorage for order tracking
-          if (typeof sessionStorage !== 'undefined') {
-            sessionStorage.setItem('affiliateSlug', affiliateSlug);
-            console.log('💾 Stored affiliateSlug in sessionStorage:', affiliateSlug);
-          }
-          
           // Return early with affiliate slug
           return {
             hasClinicSubdomain: true,
@@ -231,12 +219,6 @@ export async function extractClinicSlugFromDomain(): Promise<ClinicDomainInfo> {
             affiliateSlug,
             brandSlug: data.data.brandClinic.slug,
           });
-          
-          // Store affiliate slug in sessionStorage for order tracking
-          if (typeof sessionStorage !== 'undefined') {
-            sessionStorage.setItem('affiliateSlug', affiliateSlug);
-            console.log('💾 Stored affiliateSlug in sessionStorage:', affiliateSlug);
-          }
           
           // Return early with affiliate slug
           return {
