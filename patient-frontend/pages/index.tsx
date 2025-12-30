@@ -71,9 +71,11 @@ export default function LandingPage() {
         let websiteData: CustomWebsite | null = null;
 
         // Try to load custom website if we have a clinic slug
-        if (domainInfo.hasClinicSubdomain && domainInfo.clinicSlug) {
-          console.log('🌐 Fetching custom website for slug:', domainInfo.clinicSlug);
-          const result = await apiCall(`/custom-website/by-slug/${domainInfo.clinicSlug}`);
+        // For affiliates, fetch the affiliate's custom website (affiliateSlug), not the brand's (clinicSlug)
+        const slugToFetch = domainInfo.affiliateSlug || domainInfo.clinicSlug;
+        if (domainInfo.hasClinicSubdomain && slugToFetch) {
+          console.log('🌐 Fetching custom website for slug:', slugToFetch, domainInfo.affiliateSlug ? '(affiliate)' : '(brand)');
+          const result = await apiCall(`/custom-website/by-slug/${slugToFetch}`);
           console.log('✅ Custom website data:', result);
 
           // Extract clinic info from response (check both nested and top-level locations)
@@ -130,12 +132,12 @@ export default function LandingPage() {
     const loadProducts = async () => {
       try {
         const domainInfo = await extractClinicSlugFromDomain();
-        
+
         // Build endpoint with affiliate slug if present
         let endpoint = domainInfo.hasClinicSubdomain && domainInfo.clinicSlug
           ? `/public/products/${domainInfo.clinicSlug}`
           : `/public/products`;
-        
+
         // Add affiliateSlug as query parameter if present
         if (domainInfo.affiliateSlug) {
           endpoint += `?affiliateSlug=${encodeURIComponent(domainInfo.affiliateSlug)}`;
