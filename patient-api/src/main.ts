@@ -13215,12 +13215,21 @@ app.post("/clinic/by-custom-domain", async (req, res) => {
     console.log(`🔍 Looking for clinic with custom domain: ${baseDomain}`);
 
     // Search for clinic with matching customDomain
+    // Include parent clinic info if this is an affiliate
     const clinic = await Clinic.findOne({
       where: {
         customDomain: baseDomain,
         isCustomDomain: true,
       },
-      attributes: ["id", "slug", "name", "logo", "customDomain"],
+      attributes: ["id", "slug", "name", "logo", "customDomain", "affiliateOwnerClinicId"],
+      include: [
+        {
+          model: Clinic,
+          as: 'affiliateOwnerClinic', // Parent brand clinic
+          attributes: ["id", "slug", "name", "customDomain", "isCustomDomain"],
+          required: false, // Left join - parent may not exist
+        }
+      ]
     });
 
     if (!clinic) {
@@ -13231,11 +13240,25 @@ app.post("/clinic/by-custom-domain", async (req, res) => {
       });
     }
 
-    console.log(`✅ Found clinic: ${clinic.name} with slug: ${clinic.slug}`);
+    const isAffiliate = !!clinic.affiliateOwnerClinicId;
+    const parentClinic = clinic.affiliateOwnerClinic || null;
+
+    console.log(`✅ Found clinic: ${clinic.name} with slug: ${clinic.slug}`, {
+      isAffiliate,
+      parentClinicSlug: parentClinic?.slug || null
+    });
 
     res.json({
       success: true,
       slug: clinic.slug,
+      isAffiliate,
+      parentClinic: parentClinic ? {
+        id: parentClinic.id,
+        name: parentClinic.name,
+        slug: parentClinic.slug,
+        customDomain: parentClinic.customDomain,
+        isCustomDomain: parentClinic.isCustomDomain,
+      } : null,
       clinic: {
         id: clinic.id,
         name: clinic.name,

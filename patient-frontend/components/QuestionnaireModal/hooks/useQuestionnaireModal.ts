@@ -56,13 +56,14 @@ export function useQuestionnaireModal(
     cardNumber: "", expiryDate: "", securityCode: "", country: "brazil"
   });
 
-  // Affiliate tracking: Extract affiliate slug from URL
+  // Affiliate tracking: Extract affiliate slug from URL or sessionStorage
   const [affiliateSlug, setAffiliateSlug] = useState<string | null>(null);
   
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const hostname = window.location.hostname;
       const parts = hostname.split('.');
+      let detectedSlug: string | null = null;
       
       // Check for affiliate subdomain pattern
       if (hostname.includes('.localhost')) {
@@ -70,15 +71,28 @@ export function useQuestionnaireModal(
         const subdomainParts = beforeLocalhost.split('.');
         if (subdomainParts.length >= 2) {
           // affiliate.brand.localhost -> affiliateSlug = first part
-          setAffiliateSlug(subdomainParts[0]);
-          console.log('👤 Detected affiliate slug (dev):', subdomainParts[0]);
+          detectedSlug = subdomainParts[0];
+          console.log('👤 Detected affiliate slug from URL (dev):', detectedSlug);
         }
       } else if (hostname.endsWith('.fusehealth.com') || hostname.endsWith('.fuse.health') || hostname.endsWith('.fusehealthstaging.xyz')) {
         if (parts.length >= 4) {
           // affiliate.brand.fusehealth.com -> affiliateSlug = first part
-          setAffiliateSlug(parts[0]);
-          console.log('👤 Detected affiliate slug (prod):', parts[0]);
+          detectedSlug = parts[0];
+          console.log('👤 Detected affiliate slug from URL (prod):', detectedSlug);
         }
+      }
+      
+      // If not detected from URL, try sessionStorage (for custom domain affiliates)
+      if (!detectedSlug && typeof sessionStorage !== 'undefined') {
+        const storedSlug = sessionStorage.getItem('affiliateSlug');
+        if (storedSlug) {
+          detectedSlug = storedSlug;
+          console.log('👤 Detected affiliate slug from sessionStorage:', detectedSlug);
+        }
+      }
+      
+      if (detectedSlug) {
+        setAffiliateSlug(detectedSlug);
       }
     }
   }, []);
