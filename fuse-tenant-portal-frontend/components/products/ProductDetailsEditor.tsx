@@ -196,58 +196,6 @@ export function ProductDetailsEditor({ product, onUpdate }: ProductDetailsEditor
         setFormData({ ...formData, slug: newSlug })
     }
 
-    // Handle image upload
-    const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0]
-        if (!file) return
-
-        // Validate file type
-        if (!file.type.startsWith('image/')) {
-            setError('Please upload an image file')
-            return
-        }
-
-        // Validate file size (5MB max)
-        if (file.size > 5 * 1024 * 1024) {
-            setError('Image size must be less than 5MB')
-            return
-        }
-
-        setError(null)
-        setUploadingImage(true)
-
-        try {
-            const formData = new FormData()
-            formData.append('image', file)
-
-            const response = await fetch(`${baseUrl}/products/${product.id}/upload-image`, {
-                method: 'POST',
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                },
-                body: formData,
-            })
-
-            const data = await response.json()
-
-            if (!response.ok) {
-                throw new Error(data.message || 'Failed to upload image')
-            }
-
-            setImagePreview(data.data.imageUrl)
-            // Trigger parent update to refresh product data
-            await onUpdate({ imageUrl: data.data.imageUrl })
-        } catch (error: any) {
-            console.error('Failed to upload image:', error)
-            setError(error.message || 'Failed to upload image. Please try again.')
-        } finally {
-            setUploadingImage(false)
-            if (fileInputRef.current) {
-                fileInputRef.current.value = ''
-            }
-        }
-    }
-
     const handleSave = async () => {
         setError(null)
 
@@ -383,79 +331,6 @@ export function ProductDetailsEditor({ product, onUpdate }: ProductDetailsEditor
                         <span>{error}</span>
                     </div>
                 )}
-
-                {/* Product Image Section */}
-                <div className="border-b border-[#E5E7EB] pb-5">
-                    <label className="text-sm font-medium text-[#4B5563] mb-3 block">Product Image</label>
-                    <div className="flex items-start gap-4">
-                        {/* Image Preview */}
-                        <div className="relative">
-                            <div className="w-32 h-32 rounded-xl border-2 border-[#E5E7EB] bg-[#F9FAFB] overflow-hidden flex items-center justify-center">
-                                {imagePreview ? (
-                                    <img 
-                                        src={imagePreview} 
-                                        alt={product.name} 
-                                        className="w-full h-full object-cover"
-                                    />
-                                ) : (
-                                    <ImageIcon className="h-12 w-12 text-[#D1D5DB]" />
-                                )}
-                            </div>
-                            {imagePreview && editing && (
-                                <button
-                                    type="button"
-                                    onClick={handleRemoveImage}
-                                    disabled={uploadingImage}
-                                    className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center shadow-lg transition-all disabled:opacity-50"
-                                    title="Remove image"
-                                >
-                                    <X className="h-4 w-4" />
-                                </button>
-                            )}
-                        </div>
-
-                        {/* Upload Controls */}
-                        {editing && (
-                            <div className="flex-1">
-                                <input
-                                    ref={fileInputRef}
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={handleImageUpload}
-                                    className="hidden"
-                                    disabled={uploadingImage}
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => fileInputRef.current?.click()}
-                                    disabled={uploadingImage}
-                                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#E5E7EB] bg-white hover:bg-[#F9FAFB] text-[#4B5563] transition-all text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    {uploadingImage ? (
-                                        <>
-                                            <Loader2 className="h-4 w-4 animate-spin" />
-                                            Uploading...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Upload className="h-4 w-4" />
-                                            {imagePreview ? 'Change Image' : 'Upload Image'}
-                                        </>
-                                    )}
-                                </button>
-                                <p className="text-xs text-[#9CA3AF] mt-2">
-                                    Maximum size: 5MB. Supported formats: JPG, PNG, GIF, WebP
-                                </p>
-                            </div>
-                        )}
-
-                        {!editing && !imagePreview && (
-                            <div className="flex-1">
-                                <p className="text-[#6B7280] text-sm">No image uploaded</p>
-                            </div>
-                        )}
-                    </div>
-                </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     {/* Product Name */}
