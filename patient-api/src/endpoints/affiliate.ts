@@ -780,7 +780,13 @@ export function registerAffiliateEndpoints(
       // Determine the best affiliate portal URL
       let affiliatePortalUrl: string;
 
-      if (process.env.NODE_ENV === "production") {
+      // Determine base domain based on environment (staging or production)
+      const isStaging = process.env.STAGING === "true" || 
+                        process.env.NODE_ENV === "staging" ||
+                        frontendOrigin?.includes("fusehealthstaging.xyz");
+      const baseDomain = isStaging ? "fusehealthstaging.xyz" : "fusehealth.com";
+
+      if (process.env.NODE_ENV === "production" || isStaging) {
         // Check if parent clinic has custom domain configured
         if (parentClinic.isCustomDomain && parentClinic.customDomain) {
           // Try the main admin URL: admin.{customDomain without 'app.' prefix}
@@ -798,12 +804,12 @@ export function registerAffiliateEndpoints(
             console.log(`✅ [Affiliate Invite] Using main admin URL: ${mainAdminUrl}`);
           } catch (error: any) {
             // If request fails (DNS not configured, timeout, etc.), use fallback
-            affiliatePortalUrl = `https://admin.${parentClinic.slug}.fusehealth.com`;
+            affiliatePortalUrl = `https://admin.${parentClinic.slug}.${baseDomain}`;
             console.log(`⚠️ [Affiliate Invite] Main URL not accessible (${error.message}), using fallback: ${affiliatePortalUrl}`);
           }
         } else {
           // No custom domain, use fallback URL format
-          affiliatePortalUrl = `https://admin.${parentClinic.slug}.fusehealth.com`;
+          affiliatePortalUrl = `https://admin.${parentClinic.slug}.${baseDomain}`;
           console.log(`ℹ️ [Affiliate Invite] No custom domain configured, using fallback: ${affiliatePortalUrl}`);
         }
       } else {
