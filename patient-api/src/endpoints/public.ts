@@ -109,16 +109,17 @@ export function registerPublicEndpoints(app: Express) {
                 });
             }
 
-            // If this is an affiliate clinic, use the parent clinic's products
-            let clinicIdToUse = clinic.id;
-            if (clinic.affiliateOwnerClinicId) {
-                console.log(`🔗 Affiliate clinic detected (${clinic.slug}), using parent clinic's products`);
-                clinicIdToUse = clinic.affiliateOwnerClinicId;
+            // Get products for this clinic
+            // Note: Frontend already sends parent slug for affiliates, so we use clinic.id directly
+            // In staging/dev, show all products; in production, only show active ones
+            const isProduction = process.env.NODE_ENV === "production" && process.env.STAGING !== "true";
+            const whereClause: any = { clinicId: clinic.id };
+            if (isProduction) {
+                whereClause.isActive = true;  // Only include tenant products that are enabled
             }
-
-            // Get products for this clinic (or parent clinic if affiliate)
+            
             const tenantProducts = await TenantProduct.findAll({
-                where: { clinicId: clinicIdToUse },
+                where: whereClause,
                 include: [{
                     model: Product,
                     as: "product",
@@ -164,7 +165,7 @@ export function registerPublicEndpoints(app: Express) {
             // For each product, get the first TenantProductForm (the form ID used in URLs)
             const products = await Promise.all(tenantProducts.map(async (tp: any) => {
                 const firstForm = await TenantProductForm.findOne({
-                    where: { productId: tp.product.id, clinicId: clinicIdToUse },
+                    where: { productId: tp.product.id, clinicId: clinic.id },
                     order: [['createdAt', 'ASC']],
                     attributes: ['id'],
                 });

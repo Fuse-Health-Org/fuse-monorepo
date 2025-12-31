@@ -219,9 +219,62 @@ export async function extractClinicSlugFromDomain(): Promise<ClinicDomainInfo> {
       hasClinicSubdomain = true;
     }
   } else if (hostname.endsWith('.fusehealthstaging.xyz') && parts.length >= 3 && parts[0] !== 'app' && parts[0] !== 'www') {
-    // Staging clinic subdomain: <clinic>.fusehealthstaging.xyz
-    clinicSlug = parts[0];
-    hasClinicSubdomain = true;
+    // Staging clinic subdomain: <clinic>.fusehealthstaging.xyz OR affiliate subdomain: <affiliate>.<brand>.fusehealthstaging.xyz
+    if (parts.length === 4) {
+      // Affiliate subdomain: admin.checkhealth.fusehealthstaging.xyz
+      // parts[0] = affiliate slug, parts[1] = brand slug
+      const affiliateSlug = parts[0];
+      const brandSlug = parts[1];
+      
+      console.log('👤 Detected affiliate subdomain (staging):', { 
+        affiliateSlug, 
+        brandSlug
+      });
+      
+      // SECURITY: Validate that this affiliate really belongs to this brand
+      try {
+        const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+        const response = await fetch(`${API_BASE}/public/affiliate/validate-access`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ affiliateSlug, brandSlug }),
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+          // Validation passed - use the brand clinic slug and return affiliate slug
+          clinicSlug = data.data.brandClinic.slug;
+          hasClinicSubdomain = true;
+          console.log('✅ Affiliate access validated (staging):', { 
+            affiliateSlug,
+            brandSlug: data.data.brandClinic.slug,
+          });
+          
+          // Return early with affiliate slug
+          return {
+            hasClinicSubdomain: true,
+            clinicSlug: data.data.brandClinic.slug,
+            affiliateSlug: affiliateSlug, // Include affiliate slug for product fetching
+            isDevelopment: false,
+            isProduction: false
+          };
+        } else {
+          // Validation failed - invalid affiliate or doesn't belong to this brand
+          console.error('❌ Affiliate validation failed (staging):', data.message);
+          clinicSlug = null;
+          hasClinicSubdomain = false;
+        }
+      } catch (error) {
+        console.error('❌ Error validating affiliate (staging):', error);
+        clinicSlug = null;
+        hasClinicSubdomain = false;
+      }
+    } else if (parts.length === 3) {
+      // Regular clinic subdomain: checkhealth.fusehealthstaging.xyz -> slug: "checkhealth"
+      clinicSlug = parts[0];
+      hasClinicSubdomain = true;
+    }
   }
 
   // Special case: limitless.health should act as the normal website (no clinic)
