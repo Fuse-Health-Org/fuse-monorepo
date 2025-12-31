@@ -269,9 +269,20 @@ export function AffiliateBranding() {
     ? `${settings.clinicSlug}.${settings.parentClinicCustomDomain.replace(/^app\./, '')}`
     : '';
 
+  // Determine the correct domain based on environment
+  const getBaseDomain = () => {
+    // Check if we're in staging based on API_URL
+    if (API_URL.includes('fusehealthstaging.xyz')) {
+      return 'fusehealthstaging.xyz';
+    }
+    return 'fusehealth.com';
+  };
+
+  const baseDomain = getBaseDomain();
+
   // Fallback portal URL using parent clinic slug
   const fallbackPortalUrl = settings.clinicSlug && settings.parentClinicSlug
-    ? `${settings.clinicSlug}.${settings.parentClinicSlug}.fusehealth.com`
+    ? `${settings.clinicSlug}.${settings.parentClinicSlug}.${baseDomain}`
     : '';
 
   // Admin portal URLs
@@ -280,7 +291,7 @@ export function AffiliateBranding() {
     : '';
 
   const fallbackAdminPortalUrl = settings.parentClinicSlug
-    ? `admin.${settings.parentClinicSlug}.fusehealth.com`
+    ? `admin.${settings.parentClinicSlug}.${baseDomain}`
     : '';
 
   const handlePreviewMain = () => {

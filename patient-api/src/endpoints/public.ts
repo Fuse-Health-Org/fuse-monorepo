@@ -110,8 +110,16 @@ export function registerPublicEndpoints(app: Express) {
             }
 
             // Get products for this clinic
+            // Note: Frontend already sends parent slug for affiliates, so we use clinic.id directly
+            // In staging/dev, show all products; in production, only show active ones
+            const isProduction = process.env.NODE_ENV === "production" && process.env.STAGING !== "true";
+            const whereClause: any = { clinicId: clinic.id };
+            if (isProduction) {
+                whereClause.isActive = true;  // Only include tenant products that are enabled
+            }
+            
             const tenantProducts = await TenantProduct.findAll({
-                where: { clinicId: clinic.id },
+                where: whereClause,
                 include: [{
                     model: Product,
                     as: "product",

@@ -166,8 +166,9 @@ export function registerAffiliateEndpoints(
         });
       });
 
-      // HIPAA Compliance: Only return data if there are more than 10 records
-      if (nonMedicalOrders.length <= 10) {
+      // HIPAA Compliance: Only return data if there are more than 10 records (production only)
+      const isProduction = process.env.NODE_ENV === "production" && process.env.STAGING !== "true";
+      if (isProduction && nonMedicalOrders.length <= 10) {
         return res.status(200).json({
           success: true,
           data: {
@@ -704,15 +705,180 @@ export function registerAffiliateEndpoints(
       }
 
       // Check if user already exists
-      const existingUser = await User.findOne({ where: { email: email.toLowerCase().trim() } });
+      const existingUser = await User.findOne({ 
+        where: { email: email.toLowerCase().trim() },
+        include: [
+          { model: UserRoles, as: "userRoles", required: false },
+          { model: Clinic, as: "clinic", required: false },
+        ],
+      });
+      
       if (existingUser) {
         await existingUser.getUserRoles();
+        
+        // Check if it's an existing affiliate
         if (existingUser.userRoles?.hasRole("affiliate")) {
+          // Check if this affiliate was previously removed (no parent clinic)
+          if (existingUser.clinic && !existingUser.clinic.affiliateOwnerClinicId) {
+            // Re-invite the removed affiliate: update parent clinic and resend email
+            console.log("🔄 [Affiliate Invite] Re-inviting previously removed affiliate:", {
+              userId: existingUser.id,
+              email: existingUser.email,
+            });
+
+            // Update the affiliate's clinic to link to the new parent
+            await existingUser.clinic.update({
+              affiliateOwnerClinicId: parentClinic.id,
+              isActive: true, // Reactivate the clinic
+            });
+
+            // Generate new temporary password
+            const tempPassword = Math.random().toString(36).slice(-12) + "Aa1!";
+            const tempPasswordHash = await User.hashPassword(tempPassword);
+            
+            // Update user with new temporary password
+            await existingUser.update({
+              temporaryPasswordHash: tempPasswordHash,
+              activated: true,
+            });
+
+            // Get frontend origin for affiliate portal
+            const frontendOrigin = req.get("origin") || req.get("referer")?.split("/").slice(0, 3).join("/") || "http://localhost:3005";
+
+            // Determine the best affiliate portal URL
+            let affiliatePortalUrl: string;
+
+            // Determine base domain based on environment (staging or production)
+            const isStaging = process.env.STAGING === "true" || 
+                              process.env.NODE_ENV === "staging" ||
+                              frontendOrigin?.includes("fusehealthstaging.xyz");
+            const baseDomain = isStaging ? "fusehealthstaging.xyz" : "fusehealth.com";
+
+            if (process.env.NODE_ENV === "production" || isStaging) {
+              // Check if parent clinic has custom domain configured
+              if (parentClinic.isCustomDomain && parentClinic.customDomain) {
+                // Try the main admin URL: admin.{customDomain without 'app.' prefix}
+                const mainAdminUrl = `https://admin.${parentClinic.customDomain.replace(/^app\./, '')}`;
+
+                try {
+                  // Check if the URL is accessible with a quick HEAD request (timeout 3 seconds)
+                  await axios.head(mainAdminUrl, {
+                    timeout: 3000,
+                    validateStatus: () => true, // Accept any status code (even 404 means domain resolves)
+                  });
+
+                  // If we get any response (even 404 is fine, means domain resolves), use it
+                  affiliatePortalUrl = mainAdminUrl;
+                  console.log(`✅ [Affiliate Re-invite] Using main admin URL: ${mainAdminUrl}`);
+                } catch (error: any) {
+                  // If request fails (DNS not configured, timeout, etc.), use fallback
+                  affiliatePortalUrl = `https://admin.${parentClinic.slug}.${baseDomain}`;
+                  console.log(`⚠️ [Affiliate Re-invite] Main URL not accessible (${error.message}), using fallback: ${affiliatePortalUrl}`);
+                }
+              } else {
+                // No custom domain, use fallback URL format
+                affiliatePortalUrl = `https://admin.${parentClinic.slug}.${baseDomain}`;
+                console.log(`ℹ️ [Affiliate Re-invite] No custom domain configured, using fallback: ${affiliatePortalUrl}`);
+              }
+            } else {
+              // Development environment
+              affiliatePortalUrl = frontendOrigin.includes("3005")
+                ? frontendOrigin
+                : "http://localhost:3005";
+            }
+
+            // Send re-invitation email with new credentials
+            const emailSent = await MailsSender.sendEmail({
+              to: existingUser.email,
+              subject: "Welcome Back to Fuse Affiliate Portal",
+              html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                  <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center;">
+                    <h1 style="color: white; margin: 0; font-size: 28px;">Welcome Back to Fuse Affiliate Portal!</h1>
+                  </div>
+                  
+                  <div style="padding: 40px 30px; background-color: #f8f9fa;">
+                    <h2 style="color: #333; margin-top: 0;">You've been re-invited as an Affiliate</h2>
+                    
+                    <p style="color: #666; font-size: 16px; line-height: 1.6;">
+                      You have been re-invited to join the Fuse Affiliate Program. Use the credentials below to sign in to your affiliate dashboard:
+                    </p>
+                    
+                    <div style="background-color: #fff; border: 2px solid #e0e0e0; border-radius: 8px; padding: 20px; margin: 30px 0;">
+                      <p style="margin: 10px 0; color: #333;"><strong>Email:</strong> ${existingUser.email}</p>
+                      <p style="margin: 10px 0; color: #333;"><strong>Temporary Password:</strong> <code style="background: #f5f5f5; padding: 4px 8px; border-radius: 4px; font-family: monospace;">${tempPassword}</code></p>
+                    </div>
+                    
+                    <div style="text-align: center; margin: 30px 0;">
+                      <a href="${affiliatePortalUrl}/signin" 
+                         style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                                color: white; 
+                                padding: 15px 30px; 
+                                text-decoration: none; 
+                                border-radius: 8px; 
+                                font-weight: bold; 
+                                display: inline-block;">
+                        Sign In to Affiliate Portal
+                      </a>
+                    </div>
+                    
+                    <p style="color: #666; font-size: 14px;">
+                      <strong>Important:</strong> Please change your password after your first login for security.
+                    </p>
+                    
+                    <p style="color: #666; font-size: 14px; margin-top: 20px;">
+                      If you have any questions, please contact your brand partner.
+                    </p>
+                  </div>
+                  
+                  <div style="background-color: #333; padding: 20px; text-align: center;">
+                    <p style="color: #ccc; margin: 0; font-size: 14px;">
+                      Best regards,<br>
+                      The Fuse Team
+                    </p>
+                  </div>
+                </div>
+              `,
+              text: `Welcome Back to Fuse Affiliate Portal!
+
+You've been re-invited as an Affiliate. Use the credentials below to sign in:
+
+Email: ${existingUser.email}
+Temporary Password: ${tempPassword}
+
+Sign in at: ${affiliatePortalUrl}/signin
+
+Important: Please change your password after your first login for security.
+
+Best regards,
+The Fuse Team`,
+            });
+
+            if (emailSent) {
+              console.log("✅ [Affiliate Re-invite] Re-invitation email sent successfully");
+            } else {
+              console.log("⚠️ [Affiliate Re-invite] Failed to send re-invitation email, but affiliate was re-activated");
+            }
+
+            return res.status(200).json({
+              success: true,
+              message: "Affiliate re-invited successfully",
+              data: {
+                affiliateId: existingUser.id,
+                email: existingUser.email,
+                emailSent: emailSent,
+                reInvited: true,
+              },
+            });
+          }
+          
+          // Affiliate is still active with a parent clinic
           return res.status(409).json({
             success: false,
             message: "An affiliate with this email already exists",
           });
         }
+        
         // If user exists but is not an affiliate, we could convert them, but for now return error
         return res.status(409).json({
           success: false,
@@ -781,7 +947,13 @@ export function registerAffiliateEndpoints(
       // Determine the best affiliate portal URL
       let affiliatePortalUrl: string;
 
-      if (process.env.NODE_ENV === "production") {
+      // Determine base domain based on environment (staging or production)
+      const isStaging = process.env.STAGING === "true" || 
+                        process.env.NODE_ENV === "staging" ||
+                        frontendOrigin?.includes("fusehealthstaging.xyz");
+      const baseDomain = isStaging ? "fusehealthstaging.xyz" : "fusehealth.com";
+
+      if (process.env.NODE_ENV === "production" || isStaging) {
         // Check if parent clinic has custom domain configured
         if (parentClinic.isCustomDomain && parentClinic.customDomain) {
           // Try the main admin URL: admin.{customDomain without 'app.' prefix}
@@ -799,12 +971,12 @@ export function registerAffiliateEndpoints(
             console.log(`✅ [Affiliate Invite] Using main admin URL: ${mainAdminUrl}`);
           } catch (error: any) {
             // If request fails (DNS not configured, timeout, etc.), use fallback
-            affiliatePortalUrl = `https://admin.${parentClinic.slug}.fusehealth.com`;
+            affiliatePortalUrl = `https://admin.${parentClinic.slug}.${baseDomain}`;
             console.log(`⚠️ [Affiliate Invite] Main URL not accessible (${error.message}), using fallback: ${affiliatePortalUrl}`);
           }
         } else {
           // No custom domain, use fallback URL format
-          affiliatePortalUrl = `https://admin.${parentClinic.slug}.fusehealth.com`;
+          affiliatePortalUrl = `https://admin.${parentClinic.slug}.${baseDomain}`;
           console.log(`ℹ️ [Affiliate Invite] No custom domain configured, using fallback: ${affiliatePortalUrl}`);
         }
       } else {
@@ -1459,49 +1631,77 @@ The Fuse Team`,
         });
       }
 
-      // Step 1: Find the affiliate clinic by slug
+      // Step 1: Find the brand clinic first
+      const brandClinic = await Clinic.findOne({
+        where: { slug: brandSlug.trim() }
+      });
+
+      if (!brandClinic) {
+        console.log("❌ Brand clinic not found:", brandSlug);
+        return res.status(404).json({
+          success: false,
+          message: "Brand clinic not found",
+        });
+      }
+
+      console.log("✅ Brand clinic found:", { id: brandClinic.id, slug: brandClinic.slug, name: brandClinic.name });
+
+      // Step 2: Find the affiliate clinic that belongs to this brand
       const affiliateClinic = await Clinic.findOne({
         where: {
           slug: affiliateSlug.trim(),
-        },
+          affiliateOwnerClinicId: brandClinic.id
+        }
       });
 
       if (!affiliateClinic) {
-        console.log("❌ Affiliate clinic not found:", affiliateSlug);
+        console.log("❌ Affiliate clinic not found or doesn't belong to brand:", { 
+          affiliateSlug, 
+          brandSlug,
+          brandClinicId: brandClinic.id 
+        });
         return res.status(403).json({
           success: false,
           message: "Invalid affiliate",
         });
       }
 
-      // Step 2: Verify this clinic is an affiliate (has a parent clinic)
-      if (!affiliateClinic.affiliateOwnerClinicId) {
-        console.log("❌ Clinic is not an affiliate (no parent clinic):", affiliateSlug);
+      console.log("✅ Affiliate clinic found:", { 
+        id: affiliateClinic.id, 
+        slug: affiliateClinic.slug, 
+        name: affiliateClinic.name,
+        parentId: affiliateClinic.affiliateOwnerClinicId 
+      });
+
+      // Step 3: Find the user who owns this affiliate clinic
+      const affiliate = await User.findOne({
+        where: {
+          clinicId: affiliateClinic.id
+        },
+        include: [
+          {
+            model: UserRoles,
+            as: "userRoles",
+            required: true,
+          }
+        ],
+      });
+
+      if (!affiliate) {
+        console.log("❌ Affiliate user not found for clinic:", affiliateClinic.id);
         return res.status(403).json({
           success: false,
-          message: "Invalid affiliate configuration",
+          message: "Invalid affiliate",
         });
       }
 
-      const parentClinic = await Clinic.findByPk(affiliateClinic.affiliateOwnerClinicId);
+      await affiliate.getUserRoles();
 
-      if (!parentClinic) {
-        console.log("❌ Parent clinic not found:", affiliateClinic.affiliateOwnerClinicId);
+      if (!affiliate.userRoles?.hasRole("affiliate")) {
+        console.log("❌ User is not an affiliate:", affiliateSlug);
         return res.status(403).json({
           success: false,
-          message: "Invalid affiliate configuration",
-        });
-      }
-
-      // Step 3: Verify that the parent clinic slug matches the brand slug in URL
-      if (parentClinic.slug !== brandSlug.trim()) {
-        console.log("❌ Brand slug mismatch:", {
-          expected: parentClinic.slug,
-          provided: brandSlug,
-        });
-        return res.status(403).json({
-          success: false,
-          message: "Affiliate does not belong to this brand",
+          message: "Invalid affiliate",
         });
       }
 
@@ -1519,23 +1719,22 @@ The Fuse Team`,
 
       // Step 5: All validations passed - return the parent clinic info
       console.log("✅ Affiliate access validated:", {
-        affiliateSlug,
-        brandSlug,
+        affiliateSlug: affiliateClinic.slug,
+        brandSlug: brandClinic.slug,
+        affiliateId: affiliate.id,
         affiliateClinicId: affiliateClinic.id,
-        affiliateUserId: affiliateUser?.id,
-        parentClinicId: parentClinic.id,
+        parentClinicId: brandClinic.id,
       });
 
       res.status(200).json({
         success: true,
         data: {
-          affiliateId: affiliateUser?.id || null,
-          affiliateClinicId: affiliateClinic.id,
+          affiliateId: affiliate.id,
           affiliateSlug: affiliateClinic.slug,
           brandClinic: {
-            id: parentClinic.id,
-            slug: parentClinic.slug,
-            name: parentClinic.name,
+            id: brandClinic.id,
+            slug: brandClinic.slug,
+            name: brandClinic.name,
           },
         },
       });

@@ -297,8 +297,8 @@ app.use(
           /^https:\/\/([a-zA-Z0-9-]+\.)*fuse\.health$/.test(origin)) ||
         // Allow any origin containing fusehealth.com (e.g., https://app.fusehealth.com, https://doctor.fusehealth.com)
         origin.includes("fusehealth.com") ||
-        // Allow fusehealthstaging.xyz and all its subdomains (e.g., fusehealthstaging.xyz, backend.fusehealthstaging.xyz)
-        /^https:\/\/([a-zA-Z0-9-]+\.)?fusehealthstaging\.xyz$/.test(origin) ||
+        // Allow fusehealthstaging.xyz and all its subdomains (e.g., fusehealthstaging.xyz, backend.fusehealthstaging.xyz, admin.checkhealth.fusehealthstaging.xyz)
+        /^https:\/\/([a-zA-Z0-9-]+\.)*fusehealthstaging\.xyz$/.test(origin) ||
         // Allow all subdomains of unboundedhealth.xyz (legacy support)
         /^https:\/\/[a-zA-Z0-9-]+\.unboundedhealth\.xyz$/.test(origin);
 
