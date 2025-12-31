@@ -1,0 +1,11 @@
+For the affiliate:
+
+admin.checkhealth.fusehealthstaging.xyz/analytics
+    eduardo.hidalgo.trabajo@gmail.com 
+    password: Hola@123
+
+For the brand:
+
+app.fusehealthstaging.xyz 
+    rami.edu.hi@gmail.com 
+    password: Hola@123
