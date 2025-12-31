@@ -109,9 +109,16 @@ export function registerPublicEndpoints(app: Express) {
                 });
             }
 
-            // Get products for this clinic
+            // If this is an affiliate clinic, use the parent clinic's products
+            let clinicIdToUse = clinic.id;
+            if (clinic.affiliateOwnerClinicId) {
+                console.log(`🔗 Affiliate clinic detected (${clinic.slug}), using parent clinic's products`);
+                clinicIdToUse = clinic.affiliateOwnerClinicId;
+            }
+
+            // Get products for this clinic (or parent clinic if affiliate)
             const tenantProducts = await TenantProduct.findAll({
-                where: { clinicId: clinic.id },
+                where: { clinicId: clinicIdToUse },
                 include: [{
                     model: Product,
                     as: "product",
@@ -157,7 +164,7 @@ export function registerPublicEndpoints(app: Express) {
             // For each product, get the first TenantProductForm (the form ID used in URLs)
             const products = await Promise.all(tenantProducts.map(async (tp: any) => {
                 const firstForm = await TenantProductForm.findOne({
-                    where: { productId: tp.product.id, clinicId: clinic.id },
+                    where: { productId: tp.product.id, clinicId: clinicIdToUse },
                     order: [['createdAt', 'ASC']],
                     attributes: ['id'],
                 });
