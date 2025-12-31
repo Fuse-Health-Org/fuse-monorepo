@@ -460,12 +460,13 @@ export function registerClientManagementEndpoints(
         const user = await User.findByPk(currentUser.id, {
           include: [{ model: UserRoles, as: "userRoles", required: false }],
         });
-        if (!user || !user.hasRoleSync("admin")) {
+        // Allow both admin and brand roles to manage custom features
+        if (!user || (!user.hasRoleSync("admin") && !user.hasRoleSync("brand"))) {
           return res.status(403).json({ success: false, message: "Forbidden" });
         }
 
         const { userId } = req.params;
-        const { canAddCustomProducts, hasAccessToAnalytics } = req.body;
+        const { canAddCustomProducts, hasAccessToAnalytics, canUploadCustomProductImages } = req.body;
 
         // Find or create custom features for this user
         let customFeatures = await TenantCustomFeatures.findOne({
@@ -484,6 +485,10 @@ export function registerClientManagementEndpoints(
               typeof hasAccessToAnalytics === "boolean"
                 ? hasAccessToAnalytics
                 : false,
+            canUploadCustomProductImages:
+              typeof canUploadCustomProductImages === "boolean"
+                ? canUploadCustomProductImages
+                : false,
           });
           console.log(
             "✅ [Client Mgmt] Created custom features for user:",
@@ -499,6 +504,10 @@ export function registerClientManagementEndpoints(
 
           if (typeof hasAccessToAnalytics === "boolean") {
             updates.hasAccessToAnalytics = hasAccessToAnalytics;
+          }
+
+          if (typeof canUploadCustomProductImages === "boolean") {
+            updates.canUploadCustomProductImages = canUploadCustomProductImages;
           }
 
           await customFeatures.update(updates);

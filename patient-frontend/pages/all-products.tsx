@@ -28,13 +28,41 @@ interface Product {
     formId?: string;
 }
 
+interface Program {
+    id: string;
+    name: string;
+    description?: string;
+    medicalTemplateId?: string;
+    medicalTemplate?: {
+        id: string;
+        title: string;
+        description?: string;
+    };
+    isActive: boolean;
+    // Frontend display product - used for showing product image on program cards
+    frontendDisplayProductId?: string;
+    frontendDisplayProduct?: {
+        id: string;
+        name: string;
+        imageUrl?: string;
+        slug?: string;
+    };
+}
+
+// Union type for grid items
+type GridItem =
+    | { type: 'product'; data: Product }
+    | { type: 'program'; data: Program };
+
 export default function AllProducts() {
     const router = useRouter();
     const [customWebsite, setCustomWebsite] = useState<CustomWebsite | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [products, setProducts] = useState<Product[]>([]);
     const [productsLoading, setProductsLoading] = useState(true);
-    const [hoveredCardIndex, setHoveredCardIndex] = useState<number | null>(null);
+    const [programs, setPrograms] = useState<Program[]>([]);
+    const [programsLoading, setProgramsLoading] = useState(true);
+    const [hoveredCardIndex, setHoveredCardIndex] = useState<string | null>(null);
 
     useEffect(() => {
         const loadCustomWebsite = async () => {
@@ -83,7 +111,20 @@ export default function AllProducts() {
         const loadProducts = async () => {
             try {
                 setProductsLoading(true);
-                const result = await apiCall('/public/all-products');
+                const domainInfo = await extractClinicSlugFromDomain();
+
+                // Build endpoint with clinic slug if present
+                let endpoint = domainInfo.hasClinicSubdomain && domainInfo.clinicSlug
+                    ? `/public/products/${domainInfo.clinicSlug}`
+                    : `/public/products`;
+
+                // Add affiliateSlug as query parameter if present
+                if (domainInfo.affiliateSlug) {
+                    endpoint += `?affiliateSlug=${encodeURIComponent(domainInfo.affiliateSlug)}`;
+                }
+
+                console.log('📦 Fetching products from:', endpoint);
+                const result = await apiCall(endpoint);
                 console.log('📦 All products response:', result);
 
                 // Handle nested data structure - apiCall might return { data: { success, data } }
@@ -109,6 +150,54 @@ export default function AllProducts() {
         };
 
         loadProducts();
+    }, []);
+
+    // Load programs for the clinic/affiliate
+    useEffect(() => {
+        const loadPrograms = async () => {
+            try {
+                setProgramsLoading(true);
+                const domainInfo = await extractClinicSlugFromDomain();
+
+                if (!domainInfo.clinicSlug) {
+                    console.log('ℹ️ No clinic slug found, skipping programs load');
+                    setPrograms([]);
+                    return;
+                }
+
+                // Build the API URL with affiliate slug if present
+                let apiUrl = `/public/programs/by-clinic/${domainInfo.clinicSlug}`;
+                if (domainInfo.affiliateSlug) {
+                    apiUrl += `?affiliateSlug=${encodeURIComponent(domainInfo.affiliateSlug)}`;
+                }
+
+                console.log('📋 Fetching programs:', apiUrl);
+                const result = await apiCall(apiUrl);
+                console.log('📋 Programs response:', result);
+
+                // Handle nested data structure
+                let programsData = result.data;
+                if (result.data?.data) {
+                    programsData = result.data.data;
+                }
+
+                console.log('📋 Programs data:', programsData);
+
+                if (Array.isArray(programsData)) {
+                    setPrograms(programsData);
+                } else {
+                    console.error('❌ Programs data is not an array:', programsData);
+                    setPrograms([]);
+                }
+            } catch (error) {
+                console.error('❌ Error loading programs:', error);
+                setPrograms([]);
+            } finally {
+                setProgramsLoading(false);
+            }
+        };
+
+        loadPrograms();
     }, []);
 
     // Handle nested data structure from API response
@@ -171,12 +260,13 @@ export default function AllProducts() {
         const rectangleColors = ["#004d4d", "#004d4d", "#8b7355", "#8b7355"];
         const rectangleColor = rectangleColors[index % 4];
 
-        const isHovered = hoveredCardIndex === index;
+        const cardId = `product-${product.id}`;
+        const isHovered = hoveredCardIndex === cardId;
 
         return (
             <div
                 key={product.id}
-                onMouseEnter={() => setHoveredCardIndex(index)}
+                onMouseEnter={() => setHoveredCardIndex(cardId)}
                 onMouseLeave={() => setHoveredCardIndex(null)}
                 style={{
                     cursor: "pointer",
@@ -293,6 +383,223 @@ export default function AllProducts() {
             </div>
         );
     };
+
+    // Helper function to render a program card (matches product card style)
+    const renderProgramCard = (program: Program, index: number) => {
+        const cardId = `program-${program.id}`;
+        const isHovered = hoveredCardIndex === cardId;
+        const hasTemplate = !!program.medicalTemplateId;
+
+        // Program colors - purple-ish tones to differentiate from products
+        const programColors = ["#6366f1", "#8b5cf6", "#7c3aed", "#6d28d9"];
+        const cardColor = programColors[index % 4];
+
+        // Use the frontend display product image if available
+        const displayImageUrl = program.frontendDisplayProduct?.imageUrl;
+
+        return (
+            <div
+                key={program.id}
+                onClick={() => {
+                    if (hasTemplate) {
+                        window.open(`/my-products/${program.id}/program`, '_blank');
+                    }
+                }}
+                onMouseEnter={() => setHoveredCardIndex(cardId)}
+                onMouseLeave={() => setHoveredCardIndex(null)}
+                style={{
+                    cursor: hasTemplate ? "pointer" : "default",
+                    position: "relative",
+                    transform: isHovered ? "scale(1.05)" : "scale(1)",
+                    transition: "transform 0.3s ease",
+                }}
+            >
+                {/* Program badge - top left */}
+                <span style={{
+                    position: "absolute",
+                    top: "0.5rem",
+                    left: "0.5rem",
+                    background: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
+                    color: "white",
+                    fontSize: "0.625rem",
+                    padding: "0.25rem 0.5rem",
+                    borderRadius: "0.25rem",
+                    fontWeight: 600,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                    zIndex: 2,
+                }}>
+                    Program
+                </span>
+                {/* Heart button like products have */}
+                <button style={{
+                    position: "absolute",
+                    top: "0.5rem",
+                    right: "0.5rem",
+                    background: "white",
+                    border: "1px solid #e2e8f0",
+                    borderRadius: "50%",
+                    width: "2.5rem",
+                    height: "2.5rem",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "pointer",
+                    zIndex: 1,
+                }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                    </svg>
+                </button>
+                <div
+                    style={{
+                        backgroundColor: "#e8e6e1",
+                        borderRadius: "0.5rem",
+                        padding: "2rem",
+                        marginBottom: "1rem",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        aspectRatio: "1/1",
+                        overflow: "hidden",
+                    }}
+                >
+                    {displayImageUrl ? (
+                        // Show product image if frontendDisplayProduct is set
+                        <img
+                            src={displayImageUrl}
+                            alt={program.frontendDisplayProduct?.name || program.name}
+                            style={{
+                                width: "100%",
+                                height: "100%",
+                                objectFit: "cover",
+                                transform: isHovered ? "scale(1.1)" : "scale(1)",
+                                transition: "transform 0.3s ease",
+                            }}
+                        />
+                    ) : (
+                        // Default gradient with stethoscope icon
+                        <div
+                            style={{
+                                width: "8rem",
+                                height: "12rem",
+                                background: `linear-gradient(135deg, ${cardColor} 0%, ${cardColor}dd 100%)`,
+                                borderRadius: "0.5rem",
+                                display: "flex",
+                                flexDirection: "column",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                transform: isHovered ? "scale(1.15)" : "scale(1)",
+                                transition: "transform 0.3s ease",
+                            }}
+                        >
+                            {/* Stethoscope icon */}
+                            <svg
+                                width="32"
+                                height="32"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="white"
+                                strokeWidth="1.5"
+                                style={{ marginBottom: "0.5rem" }}
+                            >
+                                <path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3" />
+                                <path d="M8 15v1a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6v-4" />
+                                <circle cx="20" cy="10" r="2" />
+                            </svg>
+                            <span style={{
+                                fontFamily: "Georgia, serif",
+                                color: "white",
+                                fontSize: "0.875rem",
+                                textAlign: "center",
+                                padding: "0 0.5rem",
+                                lineHeight: 1.3,
+                            }}>
+                                {program.name.length > 30 ? program.name.substring(0, 30) + '...' : program.name}
+                            </span>
+                        </div>
+                    )}
+                </div>
+                <h3 style={{
+                    fontFamily: "Georgia, serif",
+                    fontSize: "1.25rem",
+                    marginBottom: "0.5rem",
+                    fontWeight: 400,
+                    color: isHovered ? "#6366f1" : "inherit",
+                    transition: "color 0.3s ease",
+                }}>
+                    {program.name}
+                </h3>
+                <p style={{ fontSize: "0.875rem", color: "#525252", marginBottom: "0.75rem", minHeight: "2.5rem" }}>
+                    {program.description || program.medicalTemplate?.title || "Comprehensive health program"}
+                </p>
+                <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "1rem" }}>
+                    <span
+                        style={{
+                            backgroundColor: "#6366f1",
+                            color: "white",
+                            padding: "0.25rem 0.75rem",
+                            borderRadius: "1rem",
+                            fontSize: "0.75rem",
+                            fontWeight: 600,
+                        }}
+                    >
+                        Health Program
+                    </span>
+                </div>
+                {hasTemplate ? (
+                    <a
+                        href={`/my-products/${program.id}/program`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            padding: "0.5rem 1.25rem",
+                            borderRadius: "0.25rem",
+                            fontSize: "0.875rem",
+                            fontWeight: 600,
+                            textDecoration: "none",
+                            backgroundColor: primaryColor,
+                            color: "white",
+                            cursor: "pointer",
+                            border: "none",
+                        }}
+                    >
+                        Get Started
+                    </a>
+                ) : (
+                    <button
+                        disabled
+                        style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            padding: "0.5rem 1.25rem",
+                            borderRadius: "0.25rem",
+                            fontSize: "0.875rem",
+                            fontWeight: 600,
+                            backgroundColor: "#9ca3af",
+                            color: "white",
+                            cursor: "not-allowed",
+                            border: "none",
+                        }}
+                    >
+                        Coming Soon
+                    </button>
+                )}
+            </div>
+        );
+    };
+
+    // Combine programs and products into a single grid items array
+    // Programs appear first, then products
+    const allGridItems: GridItem[] = [
+        ...programs.map((program): GridItem => ({ type: 'program', data: program })),
+        ...products.map((product): GridItem => ({ type: 'product', data: product })),
+    ];
+
+    const isGridLoading = productsLoading || programsLoading;
 
     // Show loading skeleton while fetching custom website
     if (isLoading) {
@@ -512,12 +819,16 @@ export default function AllProducts() {
                 <div style={{ marginBottom: "2rem" }}>
                     <p style={{ fontSize: "0.875rem", color: "#737373", marginBottom: "0.5rem" }}>SHOP</p>
                     <h2 style={{ fontFamily: "Georgia, serif", fontSize: "3rem", marginBottom: "0.75rem", fontWeight: 400 }}>
-                        All Products
+                        {programs.length > 0 ? "Programs & Products" : "All Products"}
                     </h2>
-                    <p style={{ color: "#404040" }}>Browse our complete catalog of health and wellness products.</p>
+                    <p style={{ color: "#404040" }}>
+                        {programs.length > 0
+                            ? "Browse our comprehensive health programs and wellness products."
+                            : "Browse our complete catalog of health and wellness products."}
+                    </p>
                 </div>
                 {/* Filter Tabs */}
-                <div style={{ display: "flex", gap: "0.5rem", marginBottom: "3rem" }}>
+                <div style={{ display: "flex", gap: "0.5rem", marginBottom: "3rem", flexWrap: "wrap" }}>
                     <button
                         style={{
                             padding: "0.5rem 1rem",
@@ -531,6 +842,21 @@ export default function AllProducts() {
                     >
                         All
                     </button>
+                    {programs.length > 0 && (
+                        <button
+                            style={{
+                                padding: "0.5rem 1rem",
+                                backgroundColor: "white",
+                                color: "inherit",
+                                border: "1px solid #d4d4d4",
+                                borderRadius: "0.25rem",
+                                fontSize: "0.875rem",
+                                cursor: "pointer",
+                            }}
+                        >
+                            Programs
+                        </button>
+                    )}
                     <button
                         style={{
                             padding: "0.5rem 1rem",
@@ -571,14 +897,14 @@ export default function AllProducts() {
                         Wellness
                     </button>
                 </div>
-                {/* Products Grid */}
-                {productsLoading ? (
+                {/* Combined Programs & Products Grid */}
+                {isGridLoading ? (
                     <div style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>
-                        <p>Loading products...</p>
+                        <p>Loading...</p>
                     </div>
-                ) : products.length === 0 ? (
+                ) : allGridItems.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>
-                        <p>No products available at the moment.</p>
+                        <p>No programs or products available at the moment.</p>
                     </div>
                 ) : (
                     <>
@@ -590,7 +916,11 @@ export default function AllProducts() {
                                 marginBottom: "2rem",
                             }}
                         >
-                            {products.map(renderProductCard)}
+                            {allGridItems.map((item, index) =>
+                                item.type === 'program'
+                                    ? renderProgramCard(item.data, index)
+                                    : renderProductCard(item.data, index)
+                            )}
                         </div>
                         <div style={{ display: "flex", justifyContent: "center", marginBottom: "4rem" }}>
                             <button

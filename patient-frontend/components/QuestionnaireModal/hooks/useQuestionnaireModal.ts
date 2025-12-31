@@ -56,31 +56,29 @@ export function useQuestionnaireModal(
     cardNumber: "", expiryDate: "", securityCode: "", country: "brazil"
   });
 
-  // Affiliate tracking: Extract affiliate slug from URL
+  // Affiliate tracking: Derive affiliate slug from URL using extractClinicSlugFromDomain
   const [affiliateSlug, setAffiliateSlug] = useState<string | null>(null);
   
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const hostname = window.location.hostname;
-      const parts = hostname.split('.');
+    const detectAffiliateSlug = async () => {
+      if (typeof window === 'undefined') return;
       
-      // Check for affiliate subdomain pattern
-      if (hostname.includes('.localhost')) {
-        const beforeLocalhost = hostname.split('.localhost')[0];
-        const subdomainParts = beforeLocalhost.split('.');
-        if (subdomainParts.length >= 2) {
-          // affiliate.brand.localhost -> affiliateSlug = first part
-          setAffiliateSlug(subdomainParts[0]);
-          console.log('👤 Detected affiliate slug (dev):', subdomainParts[0]);
+      try {
+        // Import dynamically to avoid circular dependency
+        const { extractClinicSlugFromDomain } = await import('../../../lib/clinic-utils');
+        const domainInfo = await extractClinicSlugFromDomain();
+        
+        // Use affiliateSlug from domain detection (works for subdomains AND custom domains)
+        if (domainInfo.affiliateSlug) {
+          setAffiliateSlug(domainInfo.affiliateSlug);
+          console.log('👤 Detected affiliate slug from domain:', domainInfo.affiliateSlug);
         }
-      } else if (hostname.endsWith('.fusehealth.com') || hostname.endsWith('.fuse.health') || hostname.endsWith('.fusehealthstaging.xyz')) {
-        if (parts.length >= 4) {
-          // affiliate.brand.fusehealth.com -> affiliateSlug = first part
-          setAffiliateSlug(parts[0]);
-          console.log('👤 Detected affiliate slug (prod):', parts[0]);
-        }
+      } catch (error) {
+        console.error('❌ Error detecting affiliate slug:', error);
       }
-    }
+    };
+    
+    detectAffiliateSlug();
   }, []);
 
   // Auth state

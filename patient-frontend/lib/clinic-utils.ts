@@ -60,8 +60,34 @@ export async function extractClinicSlugFromDomain(): Promise<ClinicDomainInfo> {
       });
 
       if (customDomainResult.success && customDomainResult.data?.slug) {
-        const clinicSlug = customDomainResult.data.slug;
-        console.log('✅ Found clinic via custom domain:', clinicSlug);
+        const data = customDomainResult.data;
+        const isAffiliate = data.isAffiliate || false;
+        const parentClinic = data.parentClinic || null;
+
+        // Check if this is an affiliate custom domain
+        if (isAffiliate && parentClinic) {
+          const affiliateSlug = data.slug;
+          const parentSlug = parentClinic.slug;
+
+          console.log('✅ Found affiliate via custom domain:', { 
+            affiliateSlug, 
+            parentSlug,
+            hostname 
+          });
+
+          // Return parent clinic slug to load products from parent brand
+          return {
+            hasClinicSubdomain: true,
+            clinicSlug: parentSlug,        // Load products from parent brand
+            affiliateSlug: affiliateSlug,   // For tracking
+            isDevelopment: false,
+            isProduction: true
+          };
+        }
+
+        // Regular brand custom domain (not affiliate)
+        const clinicSlug = data.slug;
+        console.log('✅ Found brand clinic via custom domain:', clinicSlug);
 
         return {
           hasClinicSubdomain: true,

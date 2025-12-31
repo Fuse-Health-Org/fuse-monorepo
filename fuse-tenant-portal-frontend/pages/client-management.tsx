@@ -21,6 +21,7 @@ interface TenantCustomFeatures {
   userId: string
   canAddCustomProducts: boolean
   hasAccessToAnalytics: boolean
+  canUploadCustomProductImages: boolean
   createdAt: string
   updatedAt: string
 }
@@ -65,7 +66,7 @@ interface User {
   createdAt: string
   updatedAt: string
   brandSubscriptions?: BrandSubscription[]
-  tenantCustomFeatures?: TenantCustomFeatures[]
+  tenantCustomFeatures?: TenantCustomFeatures | TenantCustomFeatures[]
   userRoles?: UserRoles
 }
 
@@ -95,6 +96,7 @@ export default function ClientManagement() {
   const [customFeaturesData, setCustomFeaturesData] = useState({
     canAddCustomProducts: false,
     hasAccessToAnalytics: false,
+    canUploadCustomProductImages: false,
   })
 
   // User roles state
@@ -181,16 +183,21 @@ export default function ClientManagement() {
     }
 
     // Load custom features
-    const customFeatures = user.tenantCustomFeatures?.[0]
+    // tenantCustomFeatures can be an object (from @HasOne) or array (legacy), handle both
+    const customFeatures = Array.isArray(user.tenantCustomFeatures) 
+      ? user.tenantCustomFeatures[0] 
+      : user.tenantCustomFeatures
     if (customFeatures) {
       setCustomFeaturesData({
-        canAddCustomProducts: customFeatures.canAddCustomProducts,
-        hasAccessToAnalytics: customFeatures.hasAccessToAnalytics,
+        canAddCustomProducts: customFeatures.canAddCustomProducts || false,
+        hasAccessToAnalytics: customFeatures.hasAccessToAnalytics || false,
+        canUploadCustomProductImages: customFeatures.canUploadCustomProductImages || false,
       })
     } else {
       setCustomFeaturesData({
         canAddCustomProducts: false,
         hasAccessToAnalytics: false,
+        canUploadCustomProductImages: false,
       })
     }
 
@@ -358,7 +365,7 @@ export default function ClientManagement() {
       const updatedUser = {
         ...selectedUser,
         brandSubscriptions: subscriptionResult.data ? [subscriptionResult.data] : selectedUser.brandSubscriptions,
-        tenantCustomFeatures: featuresResult.data ? [featuresResult.data] : selectedUser.tenantCustomFeatures,
+        tenantCustomFeatures: featuresResult.data || selectedUser.tenantCustomFeatures,
       }
       setSelectedUser(updatedUser)
 
@@ -817,6 +824,29 @@ export default function ClientManagement() {
                                     </span>
                                     <p className="text-xs text-[#6B7280]">
                                       Allow this user to access the Analytics section
+                                    </p>
+                                  </div>
+                                </label>
+                              </div>
+
+                              {/* Can Upload Custom Product Images */}
+                              <div>
+                                <label className="flex items-center space-x-3 cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={customFeaturesData.canUploadCustomProductImages}
+                                    onChange={(e) => setCustomFeaturesData({
+                                      ...customFeaturesData,
+                                      canUploadCustomProductImages: e.target.checked
+                                    })}
+                                    className="w-4 h-4 text-[#4FA59C] border-[#D1D5DB] rounded focus:ring-[#4FA59C]"
+                                  />
+                                  <div>
+                                    <span className="text-sm font-medium text-[#374151]">
+                                      Can Upload Custom Product Images
+                                    </span>
+                                    <p className="text-xs text-[#6B7280]">
+                                      Allow this user to upload custom images for products
                                     </p>
                                   </div>
                                 </label>

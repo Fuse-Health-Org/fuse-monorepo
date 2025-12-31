@@ -116,54 +116,7 @@ export default class User extends Entity {
   })
   declare website?: string;
 
-  // Plan selection fields
-  @Column({
-    type: DataType.STRING(100),
-    allowNull: true,
-  })
-  declare selectedPlanCategory?: string;
 
-  @Column({
-    type: DataType.STRING(100),
-    allowNull: true,
-  })
-  declare selectedPlanType?: string;
-
-  @Column({
-    type: DataType.STRING(255),
-    allowNull: true,
-  })
-  declare selectedPlanName?: string;
-
-  @Column({
-    type: DataType.DECIMAL(10, 2),
-    allowNull: true,
-  })
-  declare selectedPlanPrice?: number;
-
-  @Column({
-    type: DataType.STRING(100),
-    allowNull: true,
-  })
-  declare selectedDownpaymentType?: string;
-
-  @Column({
-    type: DataType.STRING(255),
-    allowNull: true,
-  })
-  declare selectedDownpaymentName?: string;
-
-  @Column({
-    type: DataType.DECIMAL(10, 2),
-    allowNull: true,
-  })
-  declare selectedDownpaymentPrice?: number;
-
-  @Column({
-    type: DataType.DATE,
-    allowNull: true,
-  })
-  declare planSelectionTimestamp?: Date;
 
   /**
    * @deprecated This field is deprecated. Use the UserRoles table instead for multi-role support.

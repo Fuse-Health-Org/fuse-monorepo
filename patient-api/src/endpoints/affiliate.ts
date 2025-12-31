@@ -2,6 +2,7 @@ import { Express } from "express";
 import { Op, QueryTypes } from "sequelize";
 import axios from "axios";
 import multer from "multer";
+import { promises as dns } from 'dns';
 import User from "../models/User";
 import Order from "../models/Order";
 import OrderItem from "../models/OrderItem";
@@ -1284,6 +1285,12 @@ The Fuse Team`,
         where: { clinicId: user.clinic.id },
       });
 
+      // Get parent clinic info for domain configuration
+      let parentClinic: Clinic | null = null;
+      if (user.clinic.affiliateOwnerClinicId) {
+        parentClinic = await Clinic.findByPk(user.clinic.affiliateOwnerClinicId);
+      }
+
       res.status(200).json({
         success: true,
         data: {
@@ -1295,7 +1302,16 @@ The Fuse Team`,
             isActive: user.clinic.isActive,
             affiliateOwnerClinicId: user.clinic.affiliateOwnerClinicId,
             defaultFormColor: user.clinic.defaultFormColor,
+            isCustomDomain: user.clinic.isCustomDomain,
+            customDomain: user.clinic.customDomain,
           },
+          parentClinic: parentClinic ? {
+            id: parentClinic.id,
+            slug: parentClinic.slug,
+            name: parentClinic.name,
+            customDomain: parentClinic.customDomain,
+            isCustomDomain: parentClinic.isCustomDomain,
+          } : null,
           customWebsite: customWebsite ? {
             portalTitle: customWebsite.portalTitle,
             portalDescription: customWebsite.portalDescription,
@@ -1361,8 +1377,11 @@ The Fuse Team`,
       const {
         // Clinic fields
         name,
+        slug,
         logo,
         defaultFormColor,
+        isCustomDomain,
+        customDomain,
         // CustomWebsite fields
         portalTitle,
         portalDescription,
@@ -1374,10 +1393,37 @@ The Fuse Team`,
         isActive,
       } = req.body;
 
+      // Validate slug if provided
+      if (slug !== undefined && slug !== user.clinic.slug) {
+        // Check if slug is valid format (lowercase, alphanumeric, hyphens only)
+        const slugRegex = /^[a-z0-9-]+$/;
+        if (!slugRegex.test(slug)) {
+          return res.status(400).json({
+            success: false,
+            message: "Slug can only contain lowercase letters, numbers, and hyphens",
+          });
+        }
+
+        // Check if slug is already taken by another clinic
+        const existingClinic = await Clinic.findOne({
+          where: { slug: slug.trim() },
+        });
+
+        if (existingClinic && existingClinic.id !== user.clinic.id) {
+          return res.status(409).json({
+            success: false,
+            message: "This slug is already taken. Please choose a different one.",
+          });
+        }
+      }
+
       // Update clinic fields
       if (name) user.clinic.name = name.trim();
+      if (slug !== undefined) user.clinic.slug = slug.trim();
       if (logo !== undefined) user.clinic.logo = logo;
       if (defaultFormColor !== undefined) user.clinic.defaultFormColor = defaultFormColor;
+      if (isCustomDomain !== undefined) user.clinic.isCustomDomain = isCustomDomain;
+      if (customDomain !== undefined) user.clinic.customDomain = customDomain;
 
       await user.clinic.save();
 
@@ -1434,6 +1480,8 @@ The Fuse Team`,
             logo: user.clinic.logo,
             isActive: user.clinic.isActive,
             defaultFormColor: user.clinic.defaultFormColor,
+            isCustomDomain: user.clinic.isCustomDomain,
+            customDomain: user.clinic.customDomain,
           },
           customWebsite: customWebsite ? {
             portalTitle: customWebsite.portalTitle,
@@ -1450,6 +1498,15 @@ The Fuse Team`,
       });
     } catch (error) {
       console.error("❌ Error updating affiliate clinic:", error);
+      
+      // Handle specific errors
+      if ((error as any).name === "SequelizeUniqueConstraintError") {
+        return res.status(409).json({
+          success: false,
+          message: "This slug is already taken. Please choose a different one.",
+        });
+      }
+
       res.status(500).json({
         success: false,
         message: "Failed to update affiliate clinic",
@@ -1648,7 +1705,19 @@ The Fuse Team`,
         });
       }
 
-      // Step 4: All validations passed - return the parent clinic info
+      // Step 4: Find the affiliate user (optional, for response data)
+      const affiliateUser = await User.findOne({
+        where: { clinicId: affiliateClinic.id },
+        include: [
+          {
+            model: UserRoles,
+            as: "userRoles",
+            required: false,
+          },
+        ],
+      });
+
+      // Step 5: All validations passed - return the parent clinic info
       console.log("✅ Affiliate access validated:", {
         affiliateSlug: affiliateClinic.slug,
         brandSlug: brandClinic.slug,
@@ -1678,7 +1747,7 @@ The Fuse Team`,
     }
   });
 
-  // Public endpoint: Get affiliate by slug (website)
+  // Public endpoint: Get affiliate by slug (clinic slug)
   app.get("/public/affiliate/by-slug/:slug", async (req, res) => {
     try {
       const { slug } = req.params;
@@ -1690,43 +1759,48 @@ The Fuse Team`,
         });
       }
 
-      // Find affiliate by website (slug) field
-      const affiliate = await User.findOne({
+      // Find affiliate clinic by slug
+      const affiliateClinic = await Clinic.findOne({
         where: {
-          website: slug.trim(),
+          slug: slug.trim(),
         },
+      });
+
+      if (!affiliateClinic) {
+        return res.status(404).json({
+          success: false,
+          message: "Affiliate not found",
+        });
+      }
+
+      // Verify this is an affiliate clinic (has a parent)
+      if (!affiliateClinic.affiliateOwnerClinicId) {
+        return res.status(404).json({
+          success: false,
+          message: "Affiliate not found",
+        });
+      }
+
+      // Find the affiliate user for this clinic
+      const affiliateUser = await User.findOne({
+        where: { clinicId: affiliateClinic.id },
         include: [
           {
             model: UserRoles,
             as: "userRoles",
-            required: true,
+            required: false,
           },
         ],
       });
 
-      if (!affiliate) {
-        return res.status(404).json({
-          success: false,
-          message: "Affiliate not found",
-        });
-      }
-
-      await affiliate.getUserRoles();
-
-      if (!affiliate.userRoles?.hasRole("affiliate")) {
-        return res.status(404).json({
-          success: false,
-          message: "Affiliate not found",
-        });
-      }
-
       res.status(200).json({
         success: true,
         data: {
-          id: affiliate.id,
-          firstName: affiliate.firstName,
-          email: affiliate.email,
-          website: affiliate.website,
+          id: affiliateUser?.id || null,
+          clinicId: affiliateClinic.id,
+          firstName: affiliateUser?.firstName || affiliateClinic.name,
+          email: affiliateUser?.email || null,
+          slug: affiliateClinic.slug,
         },
       });
     } catch (error) {
@@ -2044,6 +2118,156 @@ The Fuse Team`,
       res.status(500).json({
         success: false,
         message: "Failed to toggle product image",
+      });
+    }
+  });
+
+  // Verify affiliate custom domain CNAME
+  app.post("/affiliate/verify-domain", authenticateJWT, async (req, res) => {
+    try {
+      const currentUser = getCurrentUser(req);
+      if (!currentUser) {
+        return res.status(401).json({
+          success: false,
+          message: "Not authenticated",
+        });
+      }
+
+      const { customDomain } = req.body;
+
+      if (!customDomain) {
+        return res.status(400).json({
+          success: false,
+          message: "Custom domain is required",
+        });
+      }
+
+      // Get user's affiliate clinic
+      const user = await User.findByPk(currentUser.id, {
+        include: [
+          { model: UserRoles, as: "userRoles", required: false },
+          { model: Clinic, as: "clinic", required: false },
+        ],
+      });
+
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found",
+        });
+      }
+
+      await user.getUserRoles();
+      if (!user.userRoles?.hasRole("affiliate")) {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied. Affiliate role required.",
+        });
+      }
+
+      if (!user.clinic) {
+        return res.status(404).json({
+          success: false,
+          message: "Affiliate clinic not found",
+        });
+      }
+
+      // Get parent clinic to construct the expected CNAME
+      const parentClinic = user.clinic.affiliateOwnerClinicId 
+        ? await Clinic.findByPk(user.clinic.affiliateOwnerClinicId)
+        : null;
+
+      if (!parentClinic) {
+        return res.status(404).json({
+          success: false,
+          message: "Parent clinic not found for affiliate",
+        });
+      }
+
+      const isStaging = process.env.NEXT_PUBLIC_IS_STAGING === 'true' || process.env.NODE_ENV === 'development';
+      const baseDomain = isStaging ? 'fusehealthstaging.xyz' : 'fusehealth.com';
+      
+      // Affiliate CNAME structure: affiliate.brand.com -> affiliate.brand.fusehealth.com
+      const expectedCname = `${user.clinic.slug}.${parentClinic.slug}.${baseDomain}`;
+
+      console.log("🔍 [Affiliate Domain Verification] Checking domain:", {
+        customDomain,
+        expectedCname,
+        affiliateSlug: user.clinic.slug,
+        parentSlug: parentClinic.slug,
+      });
+
+      try {
+        // Try to get CNAME records for the custom domain
+        const cnameRecords = await dns.resolveCname(customDomain);
+
+        if (cnameRecords && cnameRecords.length > 0) {
+          const actualCname = cnameRecords[0];
+
+          console.log("🔍 [Affiliate Domain Verification] Found CNAME:", {
+            actualCname,
+            expectedCname,
+          });
+
+          // Check if CNAME points to the correct subdomain
+          if (
+            actualCname === expectedCname ||
+            actualCname === `${expectedCname}.`
+          ) {
+            return res.json({
+              success: true,
+              verified: true,
+              message: "Domain verified successfully!",
+              actualCname: actualCname,
+              expectedCname: expectedCname,
+            });
+          } else {
+            // CNAME exists but points to different domain
+            return res.json({
+              success: true,
+              verified: false,
+              message: `CNAME is configured but points to a different domain`,
+              actualCname: actualCname,
+              expectedCname: expectedCname,
+              error: "CNAME_MISMATCH",
+            });
+          }
+        } else {
+          return res.json({
+            success: true,
+            verified: false,
+            message: "No CNAME record found for this domain",
+            expectedCname: expectedCname,
+            error: "NO_CNAME",
+          });
+        }
+      } catch (dnsError: any) {
+        // DNS lookup failed - domain doesn't exist or no CNAME configured
+        console.log("🔍 [Affiliate Domain Verification] DNS error:", dnsError.code);
+
+        if (dnsError.code === "ENODATA" || dnsError.code === "ENOTFOUND") {
+          return res.json({
+            success: true,
+            verified: false,
+            message: "No CNAME record found. Please configure your DNS.",
+            expectedCname: expectedCname,
+            error: "NO_CNAME",
+          });
+        }
+
+        return res.json({
+          success: true,
+          verified: false,
+          message: "Unable to verify domain. Please try again later.",
+          expectedCname: expectedCname,
+          error: "DNS_ERROR",
+        });
+      }
+    } catch (error) {
+      console.error("❌ Error verifying affiliate domain:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to verify domain",
       });
     }
   });
