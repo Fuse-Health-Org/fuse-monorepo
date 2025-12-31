@@ -41,7 +41,7 @@ router.get('/public/programs/by-clinic/:clinicSlug', async (req: Request, res: R
     if (affiliateSlug && typeof affiliateSlug === 'string') {
       // An affiliate slug is provided - find the affiliate clinic
       const affiliateClinic = await Clinic.findOne({
-        where: { 
+        where: {
           slug: affiliateSlug,
           affiliateOwnerClinicId: clinic.id
         }
@@ -60,7 +60,7 @@ router.get('/public/programs/by-clinic/:clinicSlug', async (req: Request, res: R
 
     // Fetch active programs for the clinic
     const programs = await Program.findAll({
-      where: { 
+      where: {
         clinicId: programClinicId,
         isActive: true
       },
@@ -69,6 +69,12 @@ router.get('/public/programs/by-clinic/:clinicSlug', async (req: Request, res: R
           model: Questionnaire,
           as: 'medicalTemplate',
           attributes: ['id', 'title', 'description', 'formTemplateType'],
+        },
+        {
+          model: Product,
+          as: 'frontendDisplayProduct',
+          attributes: ['id', 'name', 'imageUrl', 'slug'],
+          required: false,
         },
       ],
       order: [['createdAt', 'DESC']],
@@ -86,6 +92,14 @@ router.get('/public/programs/by-clinic/:clinicSlug', async (req: Request, res: R
         description: (program.medicalTemplate as any).description,
       } : null,
       isActive: program.isActive,
+      // Frontend display product - used for showing product image on program cards
+      frontendDisplayProductId: program.frontendDisplayProductId,
+      frontendDisplayProduct: program.frontendDisplayProduct ? {
+        id: (program.frontendDisplayProduct as any).id,
+        name: (program.frontendDisplayProduct as any).name,
+        imageUrl: (program.frontendDisplayProduct as any).imageUrl,
+        slug: (program.frontendDisplayProduct as any).slug,
+      } : null,
     }));
 
     return res.json({
@@ -151,7 +165,7 @@ router.get('/public/programs/:id', async (req: Request, res: Response) => {
 
     for (const fp of formProducts) {
       if (!fp.product) continue;
-      
+
       const product = fp.product;
       let tenantProductInfo: { id: string; price: number; isActive: boolean } | null = null;
 
@@ -368,10 +382,10 @@ router.post('/programs', authenticateJWT, async (req: Request, res: Response) =>
       });
     }
 
-    const { 
-      name, 
-      description, 
-      medicalTemplateId, 
+    const {
+      name,
+      description,
+      medicalTemplateId,
       isActive,
       // Non-medical services
       hasPatientPortal,
@@ -464,11 +478,12 @@ router.put('/programs/:id', authenticateJWT, async (req: Request, res: Response)
 
     const clinicId = (currentUser as any).clinicId;
     const { id } = req.params;
-    const { 
-      name, 
-      description, 
-      medicalTemplateId, 
+    const {
+      name,
+      description,
+      medicalTemplateId,
       isActive,
+      frontendDisplayProductId,
       // Non-medical services
       hasPatientPortal,
       patientPortalPrice,
@@ -509,6 +524,7 @@ router.put('/programs/:id', authenticateJWT, async (req: Request, res: Response)
     if (description !== undefined) program.description = description;
     if (medicalTemplateId !== undefined) program.medicalTemplateId = medicalTemplateId;
     if (isActive !== undefined) program.isActive = isActive;
+    if (frontendDisplayProductId !== undefined) program.frontendDisplayProductId = frontendDisplayProductId || null;
 
     // Update non-medical services
     if (hasPatientPortal !== undefined) program.hasPatientPortal = hasPatientPortal;

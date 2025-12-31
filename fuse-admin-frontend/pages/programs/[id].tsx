@@ -70,6 +70,7 @@ export default function ProgramEditor() {
     const [description, setDescription] = useState('')
     const [medicalTemplateId, setMedicalTemplateId] = useState<string | null>(null)
     const [isActive, setIsActive] = useState(true)
+    const [frontendDisplayProductId, setFrontendDisplayProductId] = useState<string | null>(null)
 
     // Non-medical services state
     const [hasPatientPortal, setHasPatientPortal] = useState(false)
@@ -199,6 +200,7 @@ export default function ProgramEditor() {
                     setDescription(program.description || '')
                     setMedicalTemplateId(program.medicalTemplateId || null)
                     setIsActive(program.isActive)
+                    setFrontendDisplayProductId(program.frontendDisplayProductId || null)
                     // Load non-medical services
                     setHasPatientPortal(program.hasPatientPortal || false)
                     setPatientPortalPrice(parseFloat(program.patientPortalPrice) || 0)
@@ -256,6 +258,7 @@ export default function ProgramEditor() {
                 name: name.trim(),
                 description: description.trim() || undefined,
                 medicalTemplateId: medicalTemplateId || undefined,
+                frontendDisplayProductId: frontendDisplayProductId || null,
                 // Non-medical services
                 hasPatientPortal,
                 patientPortalPrice,
@@ -1053,10 +1056,12 @@ export default function ProgramEditor() {
                         <div className="bg-card rounded-2xl shadow-sm border border-border p-6 mt-6">
                             <div className="flex items-center gap-2 mb-2">
                                 <Pill className="h-5 w-5 text-blue-500" />
-                                <h3 className="text-lg font-semibold">Individual Product Form Links</h3>
+                                <h3 className="text-lg font-semibold">Products ({selectedTemplateDetails.formProducts.filter(fp => fp.product).length})</h3>
                             </div>
                             <p className="text-sm text-muted-foreground mb-4">
-                                Direct links to individual products from template: <span className="font-medium text-foreground">{selectedTemplateDetails.title}</span>
+                                Products from template: <span className="font-medium text-foreground">{selectedTemplateDetails.title}</span>
+                                <br />
+                                <span className="text-xs">Click the circle next to a product to use its image as the program's display image on the frontend.</span>
                             </p>
 
                             <div className="space-y-4">
@@ -1065,17 +1070,38 @@ export default function ProgramEditor() {
                                     .map((fp) => {
                                         const product = fp.product!
                                         const productForms = enabledForms.filter(f => f.productId === product.id)
+                                        const isDisplayProduct = frontendDisplayProductId === product.id
                                         
                                         return (
-                                            <div key={fp.id} className="border border-border rounded-xl overflow-hidden">
+                                            <div key={fp.id} className={`border rounded-xl overflow-hidden transition-all ${isDisplayProduct ? 'border-primary ring-2 ring-primary/20' : 'border-border'}`}>
                                                 {/* Product Header */}
                                                 <div className="bg-muted/30 p-4 border-b border-border">
                                                     <div className="flex items-center gap-4">
+                                                        {/* Display Image Selection Radio */}
+                                                        <div className="flex flex-col items-center gap-1">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setFrontendDisplayProductId(isDisplayProduct ? null : product.id)}
+                                                                className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
+                                                                    isDisplayProduct 
+                                                                        ? 'border-primary bg-primary' 
+                                                                        : 'border-muted-foreground/30 hover:border-primary/50'
+                                                                }`}
+                                                                title={isDisplayProduct ? 'Click to unset as display image' : 'Use this product image for program display'}
+                                                            >
+                                                                {isDisplayProduct && (
+                                                                    <Check className="h-4 w-4 text-primary-foreground" />
+                                                                )}
+                                                            </button>
+                                                            <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                                                                {isDisplayProduct ? 'Display' : ''}
+                                                            </span>
+                                                        </div>
                                                         {product.imageUrl && (
                                                             <img
                                                                 src={product.imageUrl}
                                                                 alt={product.name}
-                                                                className="w-16 h-16 rounded-lg object-cover border border-border"
+                                                                className={`w-16 h-16 rounded-lg object-cover border ${isDisplayProduct ? 'border-primary' : 'border-border'}`}
                                                             />
                                                         )}
                                                         <div className="flex-1">
@@ -1084,6 +1110,11 @@ export default function ProgramEditor() {
                                                                 <p className="text-sm text-muted-foreground mt-1">
                                                                     <span className="font-medium">SIG:</span> {product.placeholderSig}
                                                                 </p>
+                                                            )}
+                                                            {isDisplayProduct && (
+                                                                <Badge variant="default" className="mt-1 text-xs">
+                                                                    Frontend Display Image
+                                                                </Badge>
                                                             )}
                                                         </div>
                                                         <div className="text-right">

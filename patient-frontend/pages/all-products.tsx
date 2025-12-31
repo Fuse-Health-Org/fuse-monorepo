@@ -39,6 +39,14 @@ interface Program {
         description?: string;
     };
     isActive: boolean;
+    // Frontend display product - used for showing product image on program cards
+    frontendDisplayProductId?: string;
+    frontendDisplayProduct?: {
+        id: string;
+        name: string;
+        imageUrl?: string;
+        slug?: string;
+    };
 }
 
 // Union type for grid items
@@ -373,6 +381,9 @@ export default function AllProducts() {
         const programColors = ["#6366f1", "#8b5cf6", "#7c3aed", "#6d28d9"];
         const cardColor = programColors[index % 4];
 
+        // Use the frontend display product image if available
+        const displayImageUrl = program.frontendDisplayProduct?.imageUrl;
+
         return (
             <div
                 key={program.id}
@@ -440,45 +451,61 @@ export default function AllProducts() {
                         overflow: "hidden",
                     }}
                 >
-                    <div
-                        style={{
-                            width: "8rem",
-                            height: "12rem",
-                            background: `linear-gradient(135deg, ${cardColor} 0%, ${cardColor}dd 100%)`,
-                            borderRadius: "0.5rem",
-                            display: "flex",
-                            flexDirection: "column",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            transform: isHovered ? "scale(1.15)" : "scale(1)",
-                            transition: "transform 0.3s ease",
-                        }}
-                    >
-                        {/* Stethoscope icon */}
-                        <svg
-                            width="32"
-                            height="32"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="white"
-                            strokeWidth="1.5"
-                            style={{ marginBottom: "0.5rem" }}
+                    {displayImageUrl ? (
+                        // Show product image if frontendDisplayProduct is set
+                        <img
+                            src={displayImageUrl}
+                            alt={program.frontendDisplayProduct?.name || program.name}
+                            style={{
+                                width: "100%",
+                                height: "100%",
+                                objectFit: "cover",
+                                transform: isHovered ? "scale(1.1)" : "scale(1)",
+                                transition: "transform 0.3s ease",
+                            }}
+                        />
+                    ) : (
+                        // Default gradient with stethoscope icon
+                        <div
+                            style={{
+                                width: "8rem",
+                                height: "12rem",
+                                background: `linear-gradient(135deg, ${cardColor} 0%, ${cardColor}dd 100%)`,
+                                borderRadius: "0.5rem",
+                                display: "flex",
+                                flexDirection: "column",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                transform: isHovered ? "scale(1.15)" : "scale(1)",
+                                transition: "transform 0.3s ease",
+                            }}
                         >
-                            <path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3" />
-                            <path d="M8 15v1a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6v-4" />
-                            <circle cx="20" cy="10" r="2" />
-                        </svg>
-                        <span style={{
-                            fontFamily: "Georgia, serif",
-                            color: "white",
-                            fontSize: "0.875rem",
-                            textAlign: "center",
-                            padding: "0 0.5rem",
-                            lineHeight: 1.3,
-                        }}>
-                            {program.name.length > 30 ? program.name.substring(0, 30) + '...' : program.name}
-                        </span>
-                    </div>
+                            {/* Stethoscope icon */}
+                            <svg
+                                width="32"
+                                height="32"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="white"
+                                strokeWidth="1.5"
+                                style={{ marginBottom: "0.5rem" }}
+                            >
+                                <path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3" />
+                                <path d="M8 15v1a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6v-4" />
+                                <circle cx="20" cy="10" r="2" />
+                            </svg>
+                            <span style={{
+                                fontFamily: "Georgia, serif",
+                                color: "white",
+                                fontSize: "0.875rem",
+                                textAlign: "center",
+                                padding: "0 0.5rem",
+                                lineHeight: 1.3,
+                            }}>
+                                {program.name.length > 30 ? program.name.substring(0, 30) + '...' : program.name}
+                            </span>
+                        </div>
+                    )}
                 </div>
                 <h3 style={{
                     fontFamily: "Georgia, serif",
