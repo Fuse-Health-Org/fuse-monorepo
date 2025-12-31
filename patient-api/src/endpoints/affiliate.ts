@@ -1574,27 +1574,64 @@ The Fuse Team`,
         });
       }
 
-      // Step 1: Find the affiliate by website (slug)
+      // Step 1: Find the brand clinic first
+      const brandClinic = await Clinic.findOne({
+        where: { slug: brandSlug.trim() }
+      });
+
+      if (!brandClinic) {
+        console.log("❌ Brand clinic not found:", brandSlug);
+        return res.status(404).json({
+          success: false,
+          message: "Brand clinic not found",
+        });
+      }
+
+      console.log("✅ Brand clinic found:", { id: brandClinic.id, slug: brandClinic.slug, name: brandClinic.name });
+
+      // Step 2: Find the affiliate clinic that belongs to this brand
+      const affiliateClinic = await Clinic.findOne({
+        where: {
+          slug: affiliateSlug.trim(),
+          affiliateOwnerClinicId: brandClinic.id
+        }
+      });
+
+      if (!affiliateClinic) {
+        console.log("❌ Affiliate clinic not found or doesn't belong to brand:", { 
+          affiliateSlug, 
+          brandSlug,
+          brandClinicId: brandClinic.id 
+        });
+        return res.status(403).json({
+          success: false,
+          message: "Invalid affiliate",
+        });
+      }
+
+      console.log("✅ Affiliate clinic found:", { 
+        id: affiliateClinic.id, 
+        slug: affiliateClinic.slug, 
+        name: affiliateClinic.name,
+        parentId: affiliateClinic.affiliateOwnerClinicId 
+      });
+
+      // Step 3: Find the user who owns this affiliate clinic
       const affiliate = await User.findOne({
         where: {
-          website: affiliateSlug.trim(),
+          clinicId: affiliateClinic.id
         },
         include: [
           {
             model: UserRoles,
             as: "userRoles",
             required: true,
-          },
-          {
-            model: Clinic,
-            as: "clinic",
-            required: true,
-          },
+          }
         ],
       });
 
       if (!affiliate) {
-        console.log("❌ Affiliate not found:", affiliateSlug);
+        console.log("❌ Affiliate user not found for clinic:", affiliateClinic.id);
         return res.status(403).json({
           success: false,
           message: "Invalid affiliate",
@@ -1611,54 +1648,24 @@ The Fuse Team`,
         });
       }
 
-      // Step 2: Get the parent clinic (brand) that this affiliate belongs to
-      if (!affiliate.clinic?.affiliateOwnerClinicId) {
-        console.log("❌ Affiliate has no parent clinic:", affiliateSlug);
-        return res.status(403).json({
-          success: false,
-          message: "Invalid affiliate configuration",
-        });
-      }
-
-      const parentClinic = await Clinic.findByPk(affiliate.clinic.affiliateOwnerClinicId);
-
-      if (!parentClinic) {
-        console.log("❌ Parent clinic not found:", affiliate.clinic.affiliateOwnerClinicId);
-        return res.status(403).json({
-          success: false,
-          message: "Invalid affiliate configuration",
-        });
-      }
-
-      // Step 3: Verify that the parent clinic slug matches the brand slug in URL
-      if (parentClinic.slug !== brandSlug.trim()) {
-        console.log("❌ Brand slug mismatch:", {
-          expected: parentClinic.slug,
-          provided: brandSlug,
-        });
-        return res.status(403).json({
-          success: false,
-          message: "Affiliate does not belong to this brand",
-        });
-      }
-
       // Step 4: All validations passed - return the parent clinic info
       console.log("✅ Affiliate access validated:", {
-        affiliateSlug,
-        brandSlug,
+        affiliateSlug: affiliateClinic.slug,
+        brandSlug: brandClinic.slug,
         affiliateId: affiliate.id,
-        parentClinicId: parentClinic.id,
+        affiliateClinicId: affiliateClinic.id,
+        parentClinicId: brandClinic.id,
       });
 
       res.status(200).json({
         success: true,
         data: {
           affiliateId: affiliate.id,
-          affiliateSlug: affiliate.website,
+          affiliateSlug: affiliateClinic.slug,
           brandClinic: {
-            id: parentClinic.id,
-            slug: parentClinic.slug,
-            name: parentClinic.name,
+            id: brandClinic.id,
+            slug: brandClinic.slug,
+            name: brandClinic.name,
           },
         },
       });
