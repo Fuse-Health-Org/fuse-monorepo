@@ -1326,7 +1326,7 @@ The Fuse Team`,
       });
     } catch (error) {
       console.error("❌ Error updating affiliate clinic:", error);
-      
+
       // Handle specific errors
       if ((error as any).name === "SequelizeUniqueConstraintError") {
         return res.status(409).json({
@@ -1376,9 +1376,9 @@ The Fuse Team`,
       // Get all affiliate users with their clinics
       const affiliates = await User.findAll({
         include: [
-          { 
-            model: UserRoles, 
-            as: "userRoles", 
+          {
+            model: UserRoles,
+            as: "userRoles",
             required: true,
             where: {
               affiliate: true,
@@ -1974,7 +1974,7 @@ The Fuse Team`,
       }
 
       // Get parent clinic to construct the expected CNAME
-      const parentClinic = user.clinic.affiliateOwnerClinicId 
+      const parentClinic = user.clinic.affiliateOwnerClinicId
         ? await Clinic.findByPk(user.clinic.affiliateOwnerClinicId)
         : null;
 
@@ -1987,7 +1987,7 @@ The Fuse Team`,
 
       const isStaging = process.env.NEXT_PUBLIC_IS_STAGING === 'true' || process.env.NODE_ENV === 'development';
       const baseDomain = isStaging ? 'fusehealthstaging.xyz' : 'fusehealth.com';
-      
+
       // Affiliate CNAME structure: affiliate.brand.com -> affiliate.brand.fusehealth.com
       const expectedCname = `${user.clinic.slug}.${parentClinic.slug}.${baseDomain}`;
 
