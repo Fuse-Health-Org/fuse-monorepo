@@ -4030,7 +4030,7 @@ app.post(
         data: {
           id: product.id,
           name: product.name,
-          imageUrl: product.imageUrl,
+          imageUrl: imageUrl, // Use the local variable, not the stale product instance
         },
       });
     } catch (error) {

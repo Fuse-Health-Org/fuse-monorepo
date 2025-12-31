@@ -2,6 +2,7 @@ import { Table, Column, DataType, ForeignKey, BelongsTo } from 'sequelize-typesc
 import Entity from './Entity';
 import Clinic from './Clinic';
 import Questionnaire from './Questionnaire';
+import Product from './Product';
 
 @Table({
     freezeTableName: true,
@@ -39,6 +40,26 @@ export default class Program extends Entity {
 
     @BelongsTo(() => Questionnaire, 'medicalTemplateId')
     declare medicalTemplate?: Questionnaire;
+
+    /**
+     * Frontend Display Product ID
+     * 
+     * When a program has multiple products in its medical template, this field allows
+     * the admin to select which product's image should be displayed on the frontend
+     * (landing page, all-products page) instead of the default program icon.
+     * 
+     * If set, the program card will show this product's imageUrl.
+     * If not set, the program card will show the default stethoscope icon with gradient.
+     */
+    @ForeignKey(() => Product)
+    @Column({
+        type: DataType.UUID,
+        allowNull: true,
+    })
+    declare frontendDisplayProductId?: string;
+
+    @BelongsTo(() => Product, 'frontendDisplayProductId')
+    declare frontendDisplayProduct?: Product;
 
     // Non-Medical Services - Patient Portal
     @Column({
