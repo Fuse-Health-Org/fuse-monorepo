@@ -165,8 +165,9 @@ export function registerAffiliateEndpoints(
         });
       });
 
-      // HIPAA Compliance: Only return data if there are more than 10 records
-      if (nonMedicalOrders.length <= 10) {
+      // HIPAA Compliance: Only return data if there are more than 10 records (production only)
+      const isProduction = process.env.NODE_ENV === "production" && process.env.STAGING !== "true";
+      if (isProduction && nonMedicalOrders.length <= 10) {
         return res.status(200).json({
           success: true,
           data: {
