@@ -135,11 +135,12 @@ export function ProductDetailsEditor({ product, onUpdate }: ProductDetailsEditor
                 return
             }
 
-            setImagePreview(data.data.imageUrl)
+            const newImageUrl = data.data.imageUrl
+            setImagePreview(newImageUrl)
             toast.success('Image uploaded successfully')
             
-            // Refresh product data
-            await onUpdate({})
+            // Update parent with the new imageUrl so it stays in sync
+            await onUpdate({ imageUrl: newImageUrl })
         } catch (error: any) {
             console.error('Error uploading image:', error)
             toast.error(error.message || 'Failed to upload image')
@@ -180,8 +181,8 @@ export function ProductDetailsEditor({ product, onUpdate }: ProductDetailsEditor
             setImagePreview(null)
             toast.success('Image removed successfully')
             
-            // Refresh product data
-            await onUpdate({})
+            // Update parent with null imageUrl so it stays in sync
+            await onUpdate({ imageUrl: null })
         } catch (error: any) {
             console.error('Error removing image:', error)
             toast.error(error.message || 'Failed to remove image')
