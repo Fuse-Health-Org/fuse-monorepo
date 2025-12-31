@@ -1459,56 +1459,34 @@ The Fuse Team`,
         });
       }
 
-      // Step 1: Find the affiliate by website (slug)
-      const affiliate = await User.findOne({
+      // Step 1: Find the affiliate clinic by slug
+      const affiliateClinic = await Clinic.findOne({
         where: {
-          website: affiliateSlug.trim(),
+          slug: affiliateSlug.trim(),
         },
-        include: [
-          {
-            model: UserRoles,
-            as: "userRoles",
-            required: true,
-          },
-          {
-            model: Clinic,
-            as: "clinic",
-            required: true,
-          },
-        ],
       });
 
-      if (!affiliate) {
-        console.log("❌ Affiliate not found:", affiliateSlug);
+      if (!affiliateClinic) {
+        console.log("❌ Affiliate clinic not found:", affiliateSlug);
         return res.status(403).json({
           success: false,
           message: "Invalid affiliate",
         });
       }
 
-      await affiliate.getUserRoles();
-
-      if (!affiliate.userRoles?.hasRole("affiliate")) {
-        console.log("❌ User is not an affiliate:", affiliateSlug);
-        return res.status(403).json({
-          success: false,
-          message: "Invalid affiliate",
-        });
-      }
-
-      // Step 2: Get the parent clinic (brand) that this affiliate belongs to
-      if (!affiliate.clinic?.affiliateOwnerClinicId) {
-        console.log("❌ Affiliate has no parent clinic:", affiliateSlug);
+      // Step 2: Verify this clinic is an affiliate (has a parent clinic)
+      if (!affiliateClinic.affiliateOwnerClinicId) {
+        console.log("❌ Clinic is not an affiliate (no parent clinic):", affiliateSlug);
         return res.status(403).json({
           success: false,
           message: "Invalid affiliate configuration",
         });
       }
 
-      const parentClinic = await Clinic.findByPk(affiliate.clinic.affiliateOwnerClinicId);
+      const parentClinic = await Clinic.findByPk(affiliateClinic.affiliateOwnerClinicId);
 
       if (!parentClinic) {
-        console.log("❌ Parent clinic not found:", affiliate.clinic.affiliateOwnerClinicId);
+        console.log("❌ Parent clinic not found:", affiliateClinic.affiliateOwnerClinicId);
         return res.status(403).json({
           success: false,
           message: "Invalid affiliate configuration",
@@ -1527,19 +1505,33 @@ The Fuse Team`,
         });
       }
 
-      // Step 4: All validations passed - return the parent clinic info
+      // Step 4: Find the affiliate user (optional, for response data)
+      const affiliateUser = await User.findOne({
+        where: { clinicId: affiliateClinic.id },
+        include: [
+          {
+            model: UserRoles,
+            as: "userRoles",
+            required: false,
+          },
+        ],
+      });
+
+      // Step 5: All validations passed - return the parent clinic info
       console.log("✅ Affiliate access validated:", {
         affiliateSlug,
         brandSlug,
-        affiliateId: affiliate.id,
+        affiliateClinicId: affiliateClinic.id,
+        affiliateUserId: affiliateUser?.id,
         parentClinicId: parentClinic.id,
       });
 
       res.status(200).json({
         success: true,
         data: {
-          affiliateId: affiliate.id,
-          affiliateSlug: affiliate.website,
+          affiliateId: affiliateUser?.id || null,
+          affiliateClinicId: affiliateClinic.id,
+          affiliateSlug: affiliateClinic.slug,
           brandClinic: {
             id: parentClinic.id,
             slug: parentClinic.slug,
@@ -1556,7 +1548,7 @@ The Fuse Team`,
     }
   });
 
-  // Public endpoint: Get affiliate by slug (website)
+  // Public endpoint: Get affiliate by slug (clinic slug)
   app.get("/public/affiliate/by-slug/:slug", async (req, res) => {
     try {
       const { slug } = req.params;
@@ -1568,43 +1560,48 @@ The Fuse Team`,
         });
       }
 
-      // Find affiliate by website (slug) field
-      const affiliate = await User.findOne({
+      // Find affiliate clinic by slug
+      const affiliateClinic = await Clinic.findOne({
         where: {
-          website: slug.trim(),
+          slug: slug.trim(),
         },
+      });
+
+      if (!affiliateClinic) {
+        return res.status(404).json({
+          success: false,
+          message: "Affiliate not found",
+        });
+      }
+
+      // Verify this is an affiliate clinic (has a parent)
+      if (!affiliateClinic.affiliateOwnerClinicId) {
+        return res.status(404).json({
+          success: false,
+          message: "Affiliate not found",
+        });
+      }
+
+      // Find the affiliate user for this clinic
+      const affiliateUser = await User.findOne({
+        where: { clinicId: affiliateClinic.id },
         include: [
           {
             model: UserRoles,
             as: "userRoles",
-            required: true,
+            required: false,
           },
         ],
       });
 
-      if (!affiliate) {
-        return res.status(404).json({
-          success: false,
-          message: "Affiliate not found",
-        });
-      }
-
-      await affiliate.getUserRoles();
-
-      if (!affiliate.userRoles?.hasRole("affiliate")) {
-        return res.status(404).json({
-          success: false,
-          message: "Affiliate not found",
-        });
-      }
-
       res.status(200).json({
         success: true,
         data: {
-          id: affiliate.id,
-          firstName: affiliate.firstName,
-          email: affiliate.email,
-          website: affiliate.website,
+          id: affiliateUser?.id || null,
+          clinicId: affiliateClinic.id,
+          firstName: affiliateUser?.firstName || affiliateClinic.name,
+          email: affiliateUser?.email || null,
+          slug: affiliateClinic.slug,
         },
       });
     } catch (error) {

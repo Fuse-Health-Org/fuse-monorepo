@@ -111,7 +111,20 @@ export default function AllProducts() {
         const loadProducts = async () => {
             try {
                 setProductsLoading(true);
-                const result = await apiCall('/public/all-products');
+                const domainInfo = await extractClinicSlugFromDomain();
+
+                // Build endpoint with clinic slug if present
+                let endpoint = domainInfo.hasClinicSubdomain && domainInfo.clinicSlug
+                    ? `/public/products/${domainInfo.clinicSlug}`
+                    : `/public/products`;
+
+                // Add affiliateSlug as query parameter if present
+                if (domainInfo.affiliateSlug) {
+                    endpoint += `?affiliateSlug=${encodeURIComponent(domainInfo.affiliateSlug)}`;
+                }
+
+                console.log('📦 Fetching products from:', endpoint);
+                const result = await apiCall(endpoint);
                 console.log('📦 All products response:', result);
 
                 // Handle nested data structure - apiCall might return { data: { success, data } }
