@@ -99,12 +99,7 @@ export function useProducts(baseUrl: string) {
 
     const assignProductsToForm = useCallback(
         async (formTemplateId: string, productIds: string[], productOfferType?: 'single_choice' | 'multiple_choice') => {
-            console.log("📦 [Hook] assignProductsToForm called with:", { formTemplateId, productIds, productOfferType })
-
             if (!token) throw new Error("Not authenticated")
-
-            const payload = { productIds, productOfferType }
-            console.log("📦 [Hook] Sending payload:", JSON.stringify(payload))
 
             const response = await fetch(`${baseUrl}/questionnaires/${formTemplateId}/assign-products`, {
                 method: "POST",
@@ -112,10 +107,8 @@ export function useProducts(baseUrl: string) {
                     "Content-Type": "application/json",
                     Authorization: `Bearer ${token}`,
                 },
-                body: JSON.stringify(payload),
+                body: JSON.stringify({ productIds, productOfferType }),
             })
-
-            console.log("📦 [Hook] Response status:", response.status)
 
             if (!response.ok) {
                 const data = await response.json().catch(() => ({}))
@@ -123,9 +116,7 @@ export function useProducts(baseUrl: string) {
             }
 
             await fetchAssignments()
-            const result = await response.json()
-            console.log("📦 [Hook] Response data:", result)
-            return result
+            return await response.json()
         },
         [baseUrl, token, fetchAssignments]
     )

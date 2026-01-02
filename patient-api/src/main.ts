@@ -6534,11 +6534,11 @@ app.post("/payments/product/sub", async (req, res) => {
     // Detect affiliate from body or hostname
     let validAffiliateId: string | undefined = undefined;
     const affiliateSlugFromBody = req.body.affiliateSlug;
-    
+
     if (affiliateSlugFromBody) {
       // Prefer affiliate slug from request body (sent by frontend)
       console.log("🔍 Detecting affiliate from request body:", { affiliateSlug: affiliateSlugFromBody });
-      
+
       const affiliateBySlug = await User.findOne({
         where: {
           website: affiliateSlugFromBody,
@@ -6597,7 +6597,7 @@ app.post("/payments/product/sub", async (req, res) => {
 
     // Create order
     const orderNumber = await Order.generateOrderNumber();
-    
+
     console.log("📝 [ORDER CREATION] Creating order with:", {
       orderNumber,
       userId: currentUser.id,
@@ -6606,7 +6606,7 @@ app.post("/payments/product/sub", async (req, res) => {
       hasAffiliateSlugFromBody: !!affiliateSlugFromBody,
       affiliateSlugValue: affiliateSlugFromBody,
     });
-    
+
     const order = await Order.create({
       orderNumber,
       userId: currentUser.id,
@@ -6629,7 +6629,7 @@ app.post("/payments/product/sub", async (req, res) => {
       pharmacyWholesaleAmount: Number(pharmacyWholesaleUsd.toFixed(2)),
       brandAmount: Number(brandAmountUsd.toFixed(2)),
     });
-    
+
     console.log("✅ [ORDER CREATION] Order created successfully:", {
       orderId: order.id,
       orderNumber: order.orderNumber,
@@ -6877,7 +6877,7 @@ app.post("/payments/program/sub", async (req, res) => {
     if (authHeader) {
       try {
         currentUser = getCurrentUser(req);
-      } catch {}
+      } catch { }
     }
 
     if (!currentUser) {
@@ -6926,7 +6926,7 @@ app.post("/payments/program/sub", async (req, res) => {
 
     // Create dynamic Stripe product and price for this program subscription
     console.log("📦 Creating Stripe product for program subscription...");
-    
+
     const stripeProduct = await stripe.products.create({
       name: `${program.name} Subscription`,
       metadata: {
@@ -7002,7 +7002,7 @@ app.post("/payments/program/sub", async (req, res) => {
           where: { productId, clinicId: program.clinicId },
         });
         const unitPrice = tenantProduct?.price || product.price || 0;
-        
+
         await OrderItem.create({
           orderId: order.id,
           productId: product.id,
@@ -8924,10 +8924,6 @@ app.get(
       }
 
       const forms = await questionnaireService.listAllProductForms();
-      
-      // Debug logging
-      const formsWithOfferType = forms.filter((f: any) => f.productOfferType === 'multiple_choice');
-      console.log("📋 Product forms with multiple_choice:", formsWithOfferType.map((f: any) => ({ id: f.id, title: f.title, productOfferType: f.productOfferType })));
 
       res.status(200).json({ success: true, data: forms });
     } catch (error) {
@@ -9155,7 +9151,6 @@ app.post(
   "/questionnaires/:id/assign-products",
   authenticateJWT,
   async (req, res) => {
-    console.log("🔴🔴🔴 ASSIGN-PRODUCTS ENDPOINT HIT 🔴🔴🔴");
     try {
       const currentUser = getCurrentUser(req);
 
@@ -9167,13 +9162,6 @@ app.post(
 
       const { id: formTemplateId } = req.params;
       const { productIds, productOfferType } = req.body;
-
-      console.log("📦 Assign products request:", { 
-        formTemplateId, 
-        productIds, 
-        productOfferType,
-        productIdsLength: productIds?.length 
-      });
 
       if (!Array.isArray(productIds)) {
         return res.status(400).json({
@@ -9191,21 +9179,13 @@ app.post(
         });
       }
 
-      console.log("📦 Found questionnaire, current productOfferType:", questionnaire.productOfferType);
-
       // Update productOfferType if provided
       // Force single_choice if less than 2 products
-      const effectiveOfferType = productIds.length < 2 
-        ? 'single_choice' 
+      const effectiveOfferType = productIds.length < 2
+        ? 'single_choice'
         : (productOfferType === 'multiple_choice' ? 'multiple_choice' : 'single_choice');
-      
-      console.log("📦 Setting productOfferType to:", effectiveOfferType);
-      
+
       await questionnaire.update({ productOfferType: effectiveOfferType });
-      
-      // Reload to verify
-      await questionnaire.reload();
-      console.log("📦 After save, productOfferType is:", questionnaire.productOfferType);
 
       // Delete existing assignments for this form
       await FormProducts.destroy({

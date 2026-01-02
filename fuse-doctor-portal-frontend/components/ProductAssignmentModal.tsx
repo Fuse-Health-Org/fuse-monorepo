@@ -60,21 +60,13 @@ export function ProductAssignmentModal({
     }
 
     const handleSave = async () => {
-        console.log("📦 [Modal] handleSave called")
-        console.log("📦 [Modal] productOfferType state:", productOfferType)
-        console.log("📦 [Modal] selectedProductIds:", Array.from(selectedProductIds))
-        
         setSaving(true)
         try {
             // Force single_choice if less than 2 products
             const effectiveOfferType = selectedProductIds.size < 2 ? 'single_choice' : productOfferType
-            console.log("📦 [Modal] effectiveOfferType to send:", effectiveOfferType)
-            
             await onSave(Array.from(selectedProductIds), effectiveOfferType)
-            console.log("📦 [Modal] onSave completed successfully")
             onClose()
         } catch (error: any) {
-            console.error("📦 [Modal] Error saving:", error)
             alert(error.message || "Failed to assign products")
         } finally {
             setSaving(false)
