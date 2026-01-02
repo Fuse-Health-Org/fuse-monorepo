@@ -8924,6 +8924,10 @@ app.get(
       }
 
       const forms = await questionnaireService.listAllProductForms();
+      
+      // Debug logging
+      const formsWithOfferType = forms.filter((f: any) => f.productOfferType === 'multiple_choice');
+      console.log("📋 Product forms with multiple_choice:", formsWithOfferType.map((f: any) => ({ id: f.id, title: f.title, productOfferType: f.productOfferType })));
 
       res.status(200).json({ success: true, data: forms });
     } catch (error) {
@@ -9151,6 +9155,7 @@ app.post(
   "/questionnaires/:id/assign-products",
   authenticateJWT,
   async (req, res) => {
+    console.log("🔴🔴🔴 ASSIGN-PRODUCTS ENDPOINT HIT 🔴🔴🔴");
     try {
       const currentUser = getCurrentUser(req);
 
@@ -9161,7 +9166,14 @@ app.post(
       }
 
       const { id: formTemplateId } = req.params;
-      const { productIds } = req.body;
+      const { productIds, productOfferType } = req.body;
+
+      console.log("📦 Assign products request:", { 
+        formTemplateId, 
+        productIds, 
+        productOfferType,
+        productIdsLength: productIds?.length 
+      });
 
       if (!Array.isArray(productIds)) {
         return res.status(400).json({
@@ -9169,6 +9181,31 @@ app.post(
           message: "productIds must be an array",
         });
       }
+
+      // Find the questionnaire to update productOfferType
+      const questionnaire = await Questionnaire.findByPk(formTemplateId);
+      if (!questionnaire) {
+        return res.status(404).json({
+          success: false,
+          message: "Form template not found",
+        });
+      }
+
+      console.log("📦 Found questionnaire, current productOfferType:", questionnaire.productOfferType);
+
+      // Update productOfferType if provided
+      // Force single_choice if less than 2 products
+      const effectiveOfferType = productIds.length < 2 
+        ? 'single_choice' 
+        : (productOfferType === 'multiple_choice' ? 'multiple_choice' : 'single_choice');
+      
+      console.log("📦 Setting productOfferType to:", effectiveOfferType);
+      
+      await questionnaire.update({ productOfferType: effectiveOfferType });
+      
+      // Reload to verify
+      await questionnaire.reload();
+      console.log("📦 After save, productOfferType is:", questionnaire.productOfferType);
 
       // Delete existing assignments for this form
       await FormProducts.destroy({
@@ -9188,7 +9225,10 @@ app.post(
       res.status(200).json({
         success: true,
         message: `Assigned ${productIds.length} products to form`,
-        data: assignments,
+        data: {
+          assignments,
+          productOfferType: effectiveOfferType,
+        },
       });
     } catch (error) {
       console.error("❌ Error assigning products:", error);
