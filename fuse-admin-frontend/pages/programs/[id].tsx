@@ -18,7 +18,8 @@ import {
     Pill,
     X,
     Settings2,
-    ExternalLink
+    ExternalLink,
+    AlertTriangle
 } from 'lucide-react'
 
 interface TemplateProduct {
@@ -130,6 +131,9 @@ export default function ProgramEditor() {
     
     // Individual product program configurations (when mode is 'per_product')
     const [individualProductPrograms, setIndividualProductPrograms] = useState<Record<string, IndividualProductProgram>>({})
+    
+    // Warning dialog for switching to unified mode
+    const [showUnifiedWarning, setShowUnifiedWarning] = useState(false)
     
     // Modal state for configuring individual product program
     const [configModalOpen, setConfigModalOpen] = useState(false)
@@ -322,6 +326,25 @@ export default function ProgramEditor() {
         }
     }
 
+    // Handle switching to unified mode with warning
+    const handleSwitchToUnified = () => {
+        // Check if there are existing per-product programs
+        const hasExistingPrograms = Object.values(individualProductPrograms).some(p => p.existingProgramId)
+        
+        if (programMode === 'per_product' && hasExistingPrograms) {
+            // Show warning dialog
+            setShowUnifiedWarning(true)
+        } else {
+            // No existing programs to delete, just switch
+            setProgramMode('unified')
+        }
+    }
+
+    const confirmSwitchToUnified = () => {
+        setProgramMode('unified')
+        setShowUnifiedWarning(false)
+    }
+
     const handleSave = async () => {
         if (!name.trim()) {
             setError('Program name is required')
@@ -366,10 +389,10 @@ export default function ProgramEditor() {
             const data = await response.json()
 
             if (response.ok && data.success) {
+                const mainProgramId = isCreateMode ? data.data.id : id
+                
                 // If in per_product mode, save/update individual product programs
                 if (programMode === 'per_product' && Object.keys(individualProductPrograms).length > 0) {
-                    const mainProgramId = isCreateMode ? data.data.id : id
-                    
                     for (const [productId, config] of Object.entries(individualProductPrograms)) {
                         const individualPayload = {
                             name: config.programName,
@@ -403,6 +426,35 @@ export default function ProgramEditor() {
                             body: JSON.stringify(individualPayload)
                         })
                     }
+                } else if (programMode === 'unified' && !isCreateMode) {
+                    // If switching to unified mode, delete any existing child programs
+                    // First, fetch all child programs for this parent
+                    const childProgramsResponse = await fetch(
+                        `${API_URL}/programs?parentProgramId=${mainProgramId}&includeChildren=true`,
+                        {
+                            headers: {
+                                'Authorization': `Bearer ${token}`,
+                            }
+                        }
+                    )
+                    
+                    if (childProgramsResponse.ok) {
+                        const childProgramsData = await childProgramsResponse.json()
+                        if (childProgramsData.success && Array.isArray(childProgramsData.data)) {
+                            // Delete each child program
+                            for (const childProgram of childProgramsData.data) {
+                                await fetch(`${API_URL}/programs/${childProgram.id}`, {
+                                    method: 'DELETE',
+                                    headers: {
+                                        'Authorization': `Bearer ${token}`,
+                                    }
+                                })
+                            }
+                        }
+                    }
+                    
+                    // Clear the local state
+                    setIndividualProductPrograms({})
                 }
                 
                 router.push('/programs')
@@ -1248,7 +1300,7 @@ export default function ProgramEditor() {
                                 <div className="grid grid-cols-2 gap-3">
                                     <button
                                         type="button"
-                                        onClick={() => setProgramMode('unified')}
+                                        onClick={handleSwitchToUnified}
                                         className={`p-4 rounded-lg border-2 text-left transition-all ${
                                             programMode === 'unified'
                                                 ? 'border-primary bg-primary/5'
@@ -1631,6 +1683,45 @@ export default function ProgramEditor() {
                     )}
                 </div>
             </div>
+            
+            {/* Warning Dialog for Switching to Unified Mode */}
+            {showUnifiedWarning && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <div className="bg-card rounded-2xl shadow-xl border border-border w-full max-w-md mx-4">
+                        <div className="p-6">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                                    <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-semibold">Switch to Unified Pricing?</h3>
+                                </div>
+                            </div>
+                            <p className="text-sm text-muted-foreground mb-6">
+                                Switching to unified pricing mode will <span className="font-medium text-foreground">permanently delete</span> all 
+                                individual product programs and their custom pricing configurations. 
+                                The unified non-medical services pricing will apply to all products.
+                            </p>
+                            <div className="flex gap-3">
+                                <Button
+                                    variant="outline"
+                                    onClick={() => setShowUnifiedWarning(false)}
+                                    className="flex-1"
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    variant="destructive"
+                                    onClick={confirmSwitchToUnified}
+                                    className="flex-1"
+                                >
+                                    Delete & Switch
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
             
             {/* Individual Product Program Configuration Modal */}
             {configModalOpen && configModalData && (
