@@ -124,54 +124,70 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                 {isProgramCheckout && programData && (
                     <Card>
                         <CardBody className="p-6">
-                            <h3 className="text-lg font-medium text-gray-900 mb-2">Select Your Products</h3>
-                            <p className="text-sm text-gray-600 mb-6">Choose which products you'd like to include in your subscription</p>
-                            
-                            <div className="space-y-3">
-                                {programData.products.map((product) => (
-                                    <div
-                                        key={product.id}
-                                        className={`relative rounded-lg border-2 p-4 transition-all cursor-pointer ${
-                                            paymentStatus === 'processing' || !!clientSecret 
-                                                ? 'opacity-60 cursor-not-allowed bg-gray-50' 
-                                                : ''
-                                        } ${
-                                            selectedProgramProducts[product.id] 
-                                                ? 'border-success-500 bg-success-50' 
-                                                : 'border-gray-200 bg-white hover:border-gray-300'
-                                        }`}
-                                        onClick={() => {
-                                            if (paymentStatus !== 'processing' && !clientSecret && onProgramProductToggle) {
-                                                onProgramProductToggle(product.id);
-                                            }
-                                        }}
-                                    >
-                                        <div className="flex items-center gap-4">
-                                            <input
-                                                type="checkbox"
-                                                checked={!!selectedProgramProducts[product.id]}
-                                                onChange={() => {}}
-                                                disabled={paymentStatus === 'processing' || !!clientSecret}
-                                                className="w-5 h-5 rounded border-gray-300"
-                                                style={{ accentColor: theme.primary }}
-                                            />
-                                            {product.imageUrl && (
-                                                <img
-                                                    src={product.imageUrl}
-                                                    alt={product.name}
-                                                    className="w-12 h-12 rounded-lg object-cover"
-                                                />
-                                            )}
-                                            <div className="flex-1">
-                                                <div className="font-medium text-gray-900">{product.name}</div>
-                                            </div>
-                                            <div className="text-lg font-semibold" style={{ color: theme.primary }}>
-                                                ${product.displayPrice.toFixed(2)}
-                                            </div>
+                            {(() => {
+                                const productOfferType = programData.productOfferType || programData.medicalTemplate?.productOfferType || 'multiple_choice';
+                                const isSingleChoice = productOfferType === 'single_choice';
+                                
+                                return (
+                                    <>
+                                        <h3 className="text-lg font-medium text-gray-900 mb-2">
+                                            {isSingleChoice ? 'Select Your Product' : 'Select Your Products'}
+                                        </h3>
+                                        <p className="text-sm text-gray-600 mb-6">
+                                            {isSingleChoice 
+                                                ? 'Choose one product for your subscription' 
+                                                : 'Choose which products you\'d like to include in your subscription'}
+                                        </p>
+                                        
+                                        <div className="space-y-3">
+                                            {programData.products.map((product) => (
+                                                <div
+                                                    key={product.id}
+                                                    className={`relative rounded-lg border-2 p-4 transition-all cursor-pointer ${
+                                                        paymentStatus === 'processing' || !!clientSecret 
+                                                            ? 'opacity-60 cursor-not-allowed bg-gray-50' 
+                                                            : ''
+                                                    } ${
+                                                        selectedProgramProducts[product.id] 
+                                                            ? 'border-success-500 bg-success-50' 
+                                                            : 'border-gray-200 bg-white hover:border-gray-300'
+                                                    }`}
+                                                    onClick={() => {
+                                                        if (paymentStatus !== 'processing' && !clientSecret && onProgramProductToggle) {
+                                                            onProgramProductToggle(product.id);
+                                                        }
+                                                    }}
+                                                >
+                                                    <div className="flex items-center gap-4">
+                                                        <input
+                                                            type={isSingleChoice ? "radio" : "checkbox"}
+                                                            name={isSingleChoice ? "program-product-selection" : undefined}
+                                                            checked={!!selectedProgramProducts[product.id]}
+                                                            onChange={() => {}}
+                                                            disabled={paymentStatus === 'processing' || !!clientSecret}
+                                                            className={`w-5 h-5 ${isSingleChoice ? '' : 'rounded'} border-gray-300`}
+                                                            style={{ accentColor: theme.primary }}
+                                                        />
+                                                        {product.imageUrl && (
+                                                            <img
+                                                                src={product.imageUrl}
+                                                                alt={product.name}
+                                                                className="w-12 h-12 rounded-lg object-cover"
+                                                            />
+                                                        )}
+                                                        <div className="flex-1">
+                                                            <div className="font-medium text-gray-900">{product.name}</div>
+                                                        </div>
+                                                        <div className="text-lg font-semibold" style={{ color: theme.primary }}>
+                                                            ${product.displayPrice.toFixed(2)}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
                                         </div>
-                                    </div>
-                                ))}
-                            </div>
+                                    </>
+                                );
+                            })()}
 
                             {/* Non-Medical Services */}
                             {programData.nonMedicalServicesFee > 0 && (
@@ -488,8 +504,16 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                         {isProgramCheckout && !clientSecret && paymentStatus === 'idle' && !hasSelectedProgramProducts && (
                             <div className="text-center py-8 bg-gray-50 rounded-lg border border-gray-200">
                                 <Icon icon="lucide:mouse-pointer-click" className="text-3xl text-gray-400 mx-auto mb-2" />
-                                <p className="text-lg font-medium text-gray-700 mb-1">Select Products Above</p>
-                                <p className="text-sm text-gray-500">Choose at least one product to continue</p>
+                                <p className="text-lg font-medium text-gray-700 mb-1">
+                                    {(programData?.productOfferType || programData?.medicalTemplate?.productOfferType) === 'single_choice' 
+                                        ? 'Select a Product Above' 
+                                        : 'Select Products Above'}
+                                </p>
+                                <p className="text-sm text-gray-500">
+                                    {(programData?.productOfferType || programData?.medicalTemplate?.productOfferType) === 'single_choice'
+                                        ? 'Choose one product to continue'
+                                        : 'Choose at least one product to continue'}
+                                </p>
                             </div>
                         )}
 

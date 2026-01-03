@@ -111,11 +111,14 @@ export interface ProgramData {
         id: string;
         title: string;
         description?: string;
+        productOfferType?: 'single_choice' | 'multiple_choice';
     };
     isActive: boolean;
     products: ProgramProductWithPricing[];
     nonMedicalServices: ProgramNonMedicalServices;
     nonMedicalServicesFee: number;
+    /** Controls whether user can select one or multiple products */
+    productOfferType?: 'single_choice' | 'multiple_choice';
 }
 
 export interface QuestionnaireModalProps {
