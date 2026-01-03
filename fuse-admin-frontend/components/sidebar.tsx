@@ -79,10 +79,10 @@ export function Sidebar() {
   })
 
   // Check if user has access to analytics based on tier or custom features
-  const hasAccessToAnalytics = true
-    // subscription?.customFeatures?.hasAccessToAnalytics ||
-    // subscription?.tierConfig?.hasAccessToAnalytics ||
-    // false;
+  const hasAccessToAnalytics = 
+    subscription?.customFeatures?.hasAccessToAnalytics ||
+    subscription?.tierConfig?.hasAccessToAnalytics ||
+    false;
 
   // Check if user has access to Portal (Standard tier or higher)
   // Plan types hierarchy: starter < standard < professional
