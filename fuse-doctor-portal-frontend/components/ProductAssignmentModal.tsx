@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { X, Search, Package, Check } from "lucide-react"
+import { X, Search, Package, Check, ToggleLeft, ToggleRight } from "lucide-react"
 
 interface Product {
     id: string
@@ -9,6 +9,8 @@ interface Product {
     imageUrl?: string | null
 }
 
+type ProductOfferType = 'single_choice' | 'multiple_choice'
+
 interface ProductAssignmentModalProps {
     isOpen: boolean
     onClose: () => void
@@ -16,7 +18,8 @@ interface ProductAssignmentModalProps {
     formId: string
     products: Product[]
     assignedProductIds: string[]
-    onSave: (productIds: string[]) => Promise<void>
+    initialProductOfferType?: ProductOfferType
+    onSave: (productIds: string[], productOfferType: ProductOfferType) => Promise<void>
 }
 
 export function ProductAssignmentModal({
@@ -26,15 +29,25 @@ export function ProductAssignmentModal({
     formId,
     products,
     assignedProductIds,
+    initialProductOfferType = 'single_choice',
     onSave,
 }: ProductAssignmentModalProps) {
     const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set(assignedProductIds))
     const [searchQuery, setSearchQuery] = useState("")
     const [saving, setSaving] = useState(false)
+    const [productOfferType, setProductOfferType] = useState<ProductOfferType>(initialProductOfferType)
 
     useEffect(() => {
         setSelectedProductIds(new Set(assignedProductIds))
-    }, [assignedProductIds, isOpen])
+        setProductOfferType(initialProductOfferType)
+    }, [assignedProductIds, initialProductOfferType, isOpen])
+
+    // Auto-set to single_choice when less than 2 products selected
+    useEffect(() => {
+        if (selectedProductIds.size < 2) {
+            setProductOfferType('single_choice')
+        }
+    }, [selectedProductIds.size])
 
     const toggleProduct = (productId: string) => {
         const newSet = new Set(selectedProductIds)
@@ -49,7 +62,9 @@ export function ProductAssignmentModal({
     const handleSave = async () => {
         setSaving(true)
         try {
-            await onSave(Array.from(selectedProductIds))
+            // Force single_choice if less than 2 products
+            const effectiveOfferType = selectedProductIds.size < 2 ? 'single_choice' : productOfferType
+            await onSave(Array.from(selectedProductIds), effectiveOfferType)
             onClose()
         } catch (error: any) {
             alert(error.message || "Failed to assign products")
@@ -58,14 +73,26 @@ export function ProductAssignmentModal({
         }
     }
 
-    const filteredProducts = products.filter((product) => {
-        if (!searchQuery) return true
-        return (
-            product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            product.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            product.category?.toLowerCase().includes(searchQuery.toLowerCase())
-        )
-    })
+    const canEnableMultipleChoice = selectedProductIds.size >= 2
+
+    const filteredProducts = products
+        .filter((product) => {
+            if (!searchQuery) return true
+            return (
+                product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                product.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                product.category?.toLowerCase().includes(searchQuery.toLowerCase())
+            )
+        })
+        .sort((a, b) => {
+            // Sort selected products to the top
+            const aSelected = selectedProductIds.has(a.id)
+            const bSelected = selectedProductIds.has(b.id)
+            if (aSelected && !bSelected) return -1
+            if (!aSelected && bSelected) return 1
+            // Then sort alphabetically by name
+            return a.name.localeCompare(b.name)
+        })
 
     if (!isOpen) return null
 
@@ -105,18 +132,63 @@ export function ProductAssignmentModal({
                     </div>
 
                     {/* Selection summary */}
-                    <div className="mt-4 flex items-center gap-2 text-sm">
-                        <span className="text-muted-foreground">
-                            {selectedProductIds.size} product{selectedProductIds.size !== 1 ? 's' : ''} selected
-                        </span>
-                        {selectedProductIds.size > 0 && (
+                    <div className="mt-4 flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-2">
+                            <span className="text-muted-foreground">
+                                {selectedProductIds.size} product{selectedProductIds.size !== 1 ? 's' : ''} selected
+                            </span>
+                            {selectedProductIds.size > 0 && (
+                                <button
+                                    onClick={() => setSelectedProductIds(new Set())}
+                                    className="text-destructive hover:text-destructive/80 font-medium"
+                                >
+                                    Clear all
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Product Offer Type Toggle */}
+                        <div className={`flex items-center gap-3 px-4 py-2 rounded-xl border ${
+                            canEnableMultipleChoice 
+                                ? 'bg-background border-border' 
+                                : 'bg-muted/50 border-border/50'
+                        }`}>
+                            <span className={`text-sm font-medium ${
+                                !canEnableMultipleChoice ? 'text-muted-foreground' : 'text-foreground'
+                            }`}>
+                                Selection Mode:
+                            </span>
                             <button
-                                onClick={() => setSelectedProductIds(new Set())}
-                                className="text-destructive hover:text-destructive/80 font-medium"
+                                onClick={() => canEnableMultipleChoice && setProductOfferType(
+                                    productOfferType === 'single_choice' ? 'multiple_choice' : 'single_choice'
+                                )}
+                                disabled={!canEnableMultipleChoice}
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all ${
+                                    !canEnableMultipleChoice 
+                                        ? 'cursor-not-allowed opacity-50' 
+                                        : 'hover:bg-muted cursor-pointer'
+                                }`}
+                                title={!canEnableMultipleChoice ? 'Select at least 2 products to enable multiple choice' : ''}
                             >
-                                Clear all
+                                {productOfferType === 'multiple_choice' ? (
+                                    <ToggleRight className="h-5 w-5 text-primary" />
+                                ) : (
+                                    <ToggleLeft className="h-5 w-5 text-muted-foreground" />
+                                )}
+                                <span className={`text-sm font-medium ${
+                                    productOfferType === 'multiple_choice' 
+                                        ? 'text-primary' 
+                                        : 'text-muted-foreground'
+                                }`}>
+                                    {productOfferType === 'multiple_choice' ? 'Multiple Choice' : 'Single Choice'}
+                                </span>
                             </button>
-                        )}
+                            {!canEnableMultipleChoice && (
+                                <span className="text-xs text-muted-foreground italic">
+                                    (requires 2+ products)
+                                </span>
+                            )}
+                        </div>
                     </div>
                 </div>
 

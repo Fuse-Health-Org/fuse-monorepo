@@ -729,10 +729,31 @@ export function useQuestionnaireModal(
     setSelectedProducts(prev => ({ ...prev, [productId]: quantity }));
   }, []);
 
-  // Program product toggle
+  // Program product toggle - handles both single_choice and multiple_choice modes
   const handleProgramProductToggle = useCallback((productId: string) => {
-    setSelectedProgramProducts(prev => ({ ...prev, [productId]: !prev[productId] }));
-  }, []);
+    const offerType = programData?.productOfferType || programData?.medicalTemplate?.productOfferType || 'multiple_choice';
+    
+    if (offerType === 'single_choice') {
+      // In single_choice mode, selecting a product deselects all others
+      setSelectedProgramProducts(prev => {
+        // If clicking the already selected product, deselect it
+        if (prev[productId]) {
+          return { [productId]: false };
+        }
+        // Otherwise, select only this product
+        const newState: Record<string, boolean> = {};
+        if (programData?.products) {
+          programData.products.forEach(p => {
+            newState[p.id] = p.id === productId;
+          });
+        }
+        return newState;
+      });
+    } else {
+      // In multiple_choice mode, toggle the product
+      setSelectedProgramProducts(prev => ({ ...prev, [productId]: !prev[productId] }));
+    }
+  }, [programData]);
 
   // Create program subscription with dynamic pricing
   const createProgramSubscription = useCallback(async () => {

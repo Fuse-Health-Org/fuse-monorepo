@@ -95,6 +95,7 @@ class QuestionnaireService {
         "productId",
         "category",
         "userId",
+        "productOfferType",
         "createdAt",
         "updatedAt",
       ],

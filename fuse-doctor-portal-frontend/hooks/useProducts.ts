@@ -98,7 +98,7 @@ export function useProducts(baseUrl: string) {
     }, [baseUrl, token])
 
     const assignProductsToForm = useCallback(
-        async (formTemplateId: string, productIds: string[]) => {
+        async (formTemplateId: string, productIds: string[], productOfferType?: 'single_choice' | 'multiple_choice') => {
             if (!token) throw new Error("Not authenticated")
 
             const response = await fetch(`${baseUrl}/questionnaires/${formTemplateId}/assign-products`, {
@@ -107,7 +107,7 @@ export function useProducts(baseUrl: string) {
                     "Content-Type": "application/json",
                     Authorization: `Bearer ${token}`,
                 },
-                body: JSON.stringify({ productIds }),
+                body: JSON.stringify({ productIds, productOfferType }),
             })
 
             if (!response.ok) {
@@ -116,6 +116,7 @@ export function useProducts(baseUrl: string) {
             }
 
             await fetchAssignments()
+            return await response.json()
         },
         [baseUrl, token, fetchAssignments]
     )

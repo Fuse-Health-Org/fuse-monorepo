@@ -28,11 +28,13 @@ export default function MultiChoiceForms() {
     title: string;
     description: string;
     createdAt: string;
+    productOfferType?: 'single_choice' | 'multiple_choice';
     user?: { id: string; email: string; firstName?: string; lastName?: string } | null;
   }>>([])
   const [selectedFormForProducts, setSelectedFormForProducts] = useState<{
     id: string;
     title: string;
+    productOfferType?: 'single_choice' | 'multiple_choice';
   } | null>(null)
 
   // Use products hook
@@ -64,6 +66,7 @@ export default function MultiChoiceForms() {
             title: f.title || 'Untitled Form',
             description: f.description || '',
             createdAt: f.createdAt || '',
+            productOfferType: f.productOfferType || 'single_choice',
             user: f.user || null,
           })))
         } else {
@@ -99,6 +102,7 @@ export default function MultiChoiceForms() {
           title: f.title || 'Untitled Form',
           description: f.description || '',
           createdAt: f.createdAt || '',
+          productOfferType: f.productOfferType || 'single_choice',
           user: f.user || null,
         })))
       }
@@ -116,12 +120,15 @@ export default function MultiChoiceForms() {
     setSelectedFormForProducts({
       id: template.id,
       title: template.title || "Untitled Form",
+      productOfferType: template.productOfferType || 'single_choice',
     })
   }
 
-  const handleSaveProductAssignment = async (productIds: string[]) => {
+  const handleSaveProductAssignment = async (productIds: string[], productOfferType: 'single_choice' | 'multiple_choice') => {
     if (!selectedFormForProducts) return
-    await assignProductsToForm(selectedFormForProducts.id, productIds)
+    await assignProductsToForm(selectedFormForProducts.id, productIds, productOfferType)
+    // Refresh templates to get updated productOfferType
+    refresh()
   }
 
   // Filter and sort templates
@@ -378,6 +385,7 @@ export default function MultiChoiceForms() {
           formId={selectedFormForProducts.id}
           products={products}
           assignedProductIds={getAssignedProducts(selectedFormForProducts.id)}
+          initialProductOfferType={selectedFormForProducts.productOfferType}
           onSave={handleSaveProductAssignment}
         />
       )}
