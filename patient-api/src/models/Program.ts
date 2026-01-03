@@ -42,6 +42,27 @@ export default class Program extends Entity {
     declare medicalTemplate?: Questionnaire;
 
     /**
+     * Parent Program ID
+     * 
+     * When a program is created as a per-product variant (with individualProductId set),
+     * it should reference its parent program. This allows:
+     * - Organizing child programs under a parent
+     * - Filtering out child programs from the main programs list
+     * - Cascading updates/deletions from parent to children
+     * 
+     * If null, this is a parent/standalone program.
+     */
+    @ForeignKey(() => Program)
+    @Column({
+        type: DataType.UUID,
+        allowNull: true,
+    })
+    declare parentProgramId?: string;
+
+    @BelongsTo(() => Program, 'parentProgramId')
+    declare parentProgram?: Program;
+
+    /**
      * Individual Product ID
      * 
      * A program is globally tied to a medicalTemplateId (the form/questionnaire).

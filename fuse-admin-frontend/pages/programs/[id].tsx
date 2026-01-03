@@ -17,7 +17,8 @@ import {
     Copy,
     Pill,
     X,
-    Settings2
+    Settings2,
+    ExternalLink
 } from 'lucide-react'
 
 interface TemplateProduct {
@@ -244,10 +245,8 @@ export default function ProgramEditor() {
                     setHasEasyShopping(program.hasEasyShopping || false)
                     setEasyShoppingPrice(parseFloat(program.easyShoppingPrice) || 0)
                     
-                    // Fetch individual product programs for this template
-                    if (program.medicalTemplateId) {
-                        await fetchIndividualProductPrograms(program.medicalTemplateId)
-                    }
+                    // Fetch individual product programs (children) for this program
+                    await fetchIndividualProductPrograms(program.id)
                 }
             } else {
                 setError('Failed to load program')
@@ -260,18 +259,19 @@ export default function ProgramEditor() {
         }
     }
     
-    // Fetch individual product programs that share the same medicalTemplateId
-    const fetchIndividualProductPrograms = async (templateId: string) => {
+    // Fetch individual product programs that belong to this parent program
+    const fetchIndividualProductPrograms = async (parentId: string) => {
         try {
-            const response = await fetch(`${API_URL}/programs?medicalTemplateId=${templateId}`, {
+            // Use parentProgramId to get child programs, and includeChildren to bypass the default filter
+            const response = await fetch(`${API_URL}/programs?parentProgramId=${parentId}&includeChildren=true`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             })
             
             if (response.ok) {
                 const data = await response.json()
                 if (data.success && Array.isArray(data.data)) {
-                    // Filter to only individual product programs (those with individualProductId set)
-                    const individualPrograms = data.data.filter((p: any) => p.individualProductId && p.id !== id)
+                    // These are child programs with individualProductId set
+                    const individualPrograms = data.data.filter((p: any) => p.individualProductId)
                     
                     if (individualPrograms.length > 0) {
                         setProgramMode('per_product')
@@ -375,6 +375,7 @@ export default function ProgramEditor() {
                             name: config.programName,
                             medicalTemplateId: medicalTemplateId,
                             individualProductId: productId,
+                            parentProgramId: mainProgramId, // Link child program to parent
                             hasPatientPortal: config.hasPatientPortal,
                             patientPortalPrice: config.patientPortalPrice,
                             hasBmiCalculator: config.hasBmiCalculator,
@@ -1154,54 +1155,69 @@ export default function ProgramEditor() {
                                             </div>
 
                                             {/* Form URLs */}
-                                            <div className="bg-card border border-border rounded-lg p-3">
-                                                <div className="space-y-3">
-                                                    {/* Subdomain URL */}
-                                                    <div>
-                                                        <div className="text-xs font-medium text-muted-foreground mb-1">
-                                                            Subdomain URL:
-                                                        </div>
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="text-xs truncate flex-1 font-mono bg-muted px-2 py-1 rounded">
-                                                                {programUrl}
-                                                            </div>
-                                                            <Button size="sm" variant="outline" onClick={() => window.open(programUrl, '_blank')}>
-                                                                Preview
-                                                            </Button>
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                {/* Subdomain URL */}
+                                                <div className="relative group">
+                                                    <Button 
+                                                        size="sm" 
+                                                        variant="outline" 
+                                                        onClick={() => window.open(programUrl, '_blank')}
+                                                        className="gap-1.5"
+                                                    >
+                                                        <ExternalLink className="h-3.5 w-3.5" />
+                                                        Preview Subdomain
+                                                    </Button>
+                                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 bg-foreground text-background text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50 max-w-xs truncate">
+                                                        {programUrl}
+                                                    </div>
+                                                </div>
+                                                <Button 
+                                                    size="sm" 
+                                                    variant="ghost" 
+                                                    onClick={() => handleCopyUrl(programUrl, 'program-subdomain')}
+                                                    className="h-8 w-8 p-0"
+                                                    title="Copy subdomain URL"
+                                                >
+                                                    {copiedUrl === 'program-subdomain' ? (
+                                                        <Check className="h-3.5 w-3.5 text-green-500" />
+                                                    ) : (
+                                                        <Copy className="h-3.5 w-3.5" />
+                                                    )}
+                                                </Button>
+
+                                                {/* Custom Domain URL */}
+                                                {customProgramUrl && (
+                                                    <>
+                                                        <div className="w-px h-6 bg-border mx-1" />
+                                                        <div className="relative group">
                                                             <Button 
                                                                 size="sm" 
                                                                 variant="outline" 
-                                                                onClick={() => handleCopyUrl(programUrl, 'program-subdomain')}
+                                                                onClick={() => window.open(customProgramUrl, '_blank')}
+                                                                className="gap-1.5"
                                                             >
-                                                                {copiedUrl === 'program-subdomain' ? 'Copied!' : 'Copy'}
+                                                                <ExternalLink className="h-3.5 w-3.5" />
+                                                                Preview Custom Domain
                                                             </Button>
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Custom Domain URL */}
-                                                    {customProgramUrl && (
-                                                        <div>
-                                                            <div className="text-xs font-medium text-muted-foreground mb-1">
-                                                                Custom Domain URL:
-                                                            </div>
-                                                            <div className="flex items-center gap-2">
-                                                                <div className="text-xs truncate flex-1 font-mono bg-muted px-2 py-1 rounded">
-                                                                    {customProgramUrl}
-                                                                </div>
-                                                                <Button size="sm" variant="outline" onClick={() => window.open(customProgramUrl, '_blank')}>
-                                                                    Preview
-                                                                </Button>
-                                                                <Button 
-                                                                    size="sm" 
-                                                                    variant="outline" 
-                                                                    onClick={() => handleCopyUrl(customProgramUrl, 'program-custom')}
-                                                                >
-                                                                    {copiedUrl === 'program-custom' ? 'Copied!' : 'Copy'}
-                                                                </Button>
+                                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 bg-foreground text-background text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50 max-w-xs truncate">
+                                                                {customProgramUrl}
                                                             </div>
                                                         </div>
-                                                    )}
-                                                </div>
+                                                        <Button 
+                                                            size="sm" 
+                                                            variant="ghost" 
+                                                            onClick={() => handleCopyUrl(customProgramUrl, 'program-custom')}
+                                                            className="h-8 w-8 p-0"
+                                                            title="Copy custom domain URL"
+                                                        >
+                                                            {copiedUrl === 'program-custom' ? (
+                                                                <Check className="h-3.5 w-3.5 text-green-500" />
+                                                            ) : (
+                                                                <Copy className="h-3.5 w-3.5" />
+                                                            )}
+                                                        </Button>
+                                                    </>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
@@ -1419,54 +1435,69 @@ export default function ProgramEditor() {
 
                                                             {/* Form URLs */}
                                                             {urls ? (
-                                                                <div className="bg-card border border-border rounded-lg p-3">
-                                                                    <div className="space-y-3">
-                                                                        {/* Standard Subdomain URL */}
-                                                                        <div>
-                                                                            <div className="text-xs font-medium text-muted-foreground mb-1">
-                                                                                Subdomain URL:
-                                                                            </div>
-                                                                            <div className="flex items-center gap-2">
-                                                                                <div className="text-xs truncate flex-1 font-mono bg-muted px-2 py-1 rounded">
-                                                                                    {urls.subdomainUrl}
-                                                                                </div>
-                                                                                <Button size="sm" variant="outline" onClick={() => window.open(urls.subdomainUrl, '_blank')}>
-                                                                                    Preview
-                                                                                </Button>
+                                                                <div className="flex items-center gap-2 flex-wrap">
+                                                                    {/* Subdomain URL */}
+                                                                    <div className="relative group">
+                                                                        <Button 
+                                                                            size="sm" 
+                                                                            variant="outline" 
+                                                                            onClick={() => window.open(urls.subdomainUrl, '_blank')}
+                                                                            className="gap-1.5"
+                                                                        >
+                                                                            <ExternalLink className="h-3.5 w-3.5" />
+                                                                            Preview Subdomain
+                                                                        </Button>
+                                                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 bg-foreground text-background text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50 max-w-xs truncate">
+                                                                            {urls.subdomainUrl}
+                                                                        </div>
+                                                                    </div>
+                                                                    <Button 
+                                                                        size="sm" 
+                                                                        variant="ghost" 
+                                                                        onClick={() => handleCopyUrl(urls.subdomainUrl, `${product.id}-subdomain`)}
+                                                                        className="h-8 w-8 p-0"
+                                                                        title="Copy subdomain URL"
+                                                                    >
+                                                                        {copiedUrl === `${product.id}-subdomain` ? (
+                                                                            <Check className="h-3.5 w-3.5 text-green-500" />
+                                                                        ) : (
+                                                                            <Copy className="h-3.5 w-3.5" />
+                                                                        )}
+                                                                    </Button>
+
+                                                                    {/* Custom Domain URL (if configured) */}
+                                                                    {urls.customDomainUrl && (
+                                                                        <>
+                                                                            <div className="w-px h-6 bg-border mx-1" />
+                                                                            <div className="relative group">
                                                                                 <Button 
                                                                                     size="sm" 
                                                                                     variant="outline" 
-                                                                                    onClick={() => handleCopyUrl(urls.subdomainUrl, `${product.id}-subdomain`)}
+                                                                                    onClick={() => urls.customDomainUrl && window.open(urls.customDomainUrl, '_blank')}
+                                                                                    className="gap-1.5"
                                                                                 >
-                                                                                    {copiedUrl === `${product.id}-subdomain` ? 'Copied!' : 'Copy'}
+                                                                                    <ExternalLink className="h-3.5 w-3.5" />
+                                                                                    Preview Custom Domain
                                                                                 </Button>
-                                                                            </div>
-                                                                        </div>
-
-                                                                        {/* Custom Domain URL (if configured) */}
-                                                                        {urls.customDomainUrl && (
-                                                                            <div>
-                                                                                <div className="text-xs font-medium text-muted-foreground mb-1">
-                                                                                    Custom Domain URL:
-                                                                                </div>
-                                                                                <div className="flex items-center gap-2">
-                                                                                    <div className="text-xs truncate flex-1 font-mono bg-muted px-2 py-1 rounded">
-                                                                                        {urls.customDomainUrl}
-                                                                                    </div>
-                                                                                    <Button size="sm" variant="outline" onClick={() => urls.customDomainUrl && window.open(urls.customDomainUrl, '_blank')}>
-                                                                                        Preview
-                                                                                    </Button>
-                                                                                    <Button 
-                                                                                        size="sm" 
-                                                                                        variant="outline" 
-                                                                                        onClick={() => urls.customDomainUrl && handleCopyUrl(urls.customDomainUrl, `${product.id}-custom`)}
-                                                                                    >
-                                                                                        {copiedUrl === `${product.id}-custom` ? 'Copied!' : 'Copy'}
-                                                                                    </Button>
+                                                                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 bg-foreground text-background text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50 max-w-xs truncate">
+                                                                                    {urls.customDomainUrl}
                                                                                 </div>
                                                                             </div>
-                                                                        )}
-                                                                    </div>
+                                                                            <Button 
+                                                                                size="sm" 
+                                                                                variant="ghost" 
+                                                                                onClick={() => urls.customDomainUrl && handleCopyUrl(urls.customDomainUrl, `${product.id}-custom`)}
+                                                                                className="h-8 w-8 p-0"
+                                                                                title="Copy custom domain URL"
+                                                                            >
+                                                                                {copiedUrl === `${product.id}-custom` ? (
+                                                                                    <Check className="h-3.5 w-3.5 text-green-500" />
+                                                                                ) : (
+                                                                                    <Copy className="h-3.5 w-3.5" />
+                                                                                )}
+                                                                            </Button>
+                                                                        </>
+                                                                    )}
                                                                 </div>
                                                             ) : (
                                                                 <div className="text-xs text-muted-foreground bg-amber-50 dark:bg-amber-950/20 p-3 rounded">

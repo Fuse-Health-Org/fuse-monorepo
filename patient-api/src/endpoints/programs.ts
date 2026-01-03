@@ -275,6 +275,8 @@ router.get('/public/programs/:id', async (req: Request, res: Response) => {
  * GET /programs
  * Query params:
  *   - medicalTemplateId: Filter by medical template ID (to get individual product programs)
+ *   - parentProgramId: Filter by parent program ID (to get child programs)
+ *   - includeChildren: If 'true', include child programs; otherwise only parent programs are returned
  */
 router.get('/programs', authenticateJWT, async (req: Request, res: Response) => {
   try {
@@ -294,11 +296,21 @@ router.get('/programs', authenticateJWT, async (req: Request, res: Response) => 
       });
     }
 
-    const { medicalTemplateId } = req.query;
+    const { medicalTemplateId, parentProgramId, includeChildren } = req.query;
     
     const whereClause: any = { clinicId };
+    
+    // Filter by medical template if provided
     if (medicalTemplateId && typeof medicalTemplateId === 'string') {
       whereClause.medicalTemplateId = medicalTemplateId;
+    }
+    
+    // Filter by parent program if provided
+    if (parentProgramId && typeof parentProgramId === 'string') {
+      whereClause.parentProgramId = parentProgramId;
+    } else if (includeChildren !== 'true') {
+      // By default, only return parent programs (those without parentProgramId)
+      whereClause.parentProgramId = null;
     }
 
     const programs = await Program.findAll({
@@ -411,6 +423,7 @@ router.post('/programs', authenticateJWT, async (req: Request, res: Response) =>
       description,
       medicalTemplateId,
       individualProductId,
+      parentProgramId,
       isActive,
       // Non-medical services
       hasPatientPortal,
@@ -454,12 +467,24 @@ router.post('/programs', authenticateJWT, async (req: Request, res: Response) =>
       }
     }
 
+    // Verify parent program exists if provided
+    if (parentProgramId) {
+      const parentProgram = await Program.findByPk(parentProgramId);
+      if (!parentProgram) {
+        return res.status(404).json({
+          success: false,
+          error: 'Parent program not found',
+        });
+      }
+    }
+
     const program = await Program.create({
       name,
       description,
       clinicId,
       medicalTemplateId: medicalTemplateId || null,
       individualProductId: individualProductId || null,
+      parentProgramId: parentProgramId || null,
       isActive: isActive !== undefined ? isActive : true,
       // Non-medical services
       hasPatientPortal: hasPatientPortal || false,
@@ -526,6 +551,7 @@ router.put('/programs/:id', authenticateJWT, async (req: Request, res: Response)
       description,
       medicalTemplateId,
       individualProductId,
+      parentProgramId,
       isActive,
       frontendDisplayProductId,
       // Non-medical services
@@ -574,11 +600,23 @@ router.put('/programs/:id', authenticateJWT, async (req: Request, res: Response)
       }
     }
 
+    // Verify parent program exists if provided
+    if (parentProgramId) {
+      const parentProgram = await Program.findByPk(parentProgramId);
+      if (!parentProgram) {
+        return res.status(404).json({
+          success: false,
+          error: 'Parent program not found',
+        });
+      }
+    }
+
     // Update fields
     if (name !== undefined) program.name = name;
     if (description !== undefined) program.description = description;
     if (medicalTemplateId !== undefined) program.medicalTemplateId = medicalTemplateId;
     if (individualProductId !== undefined) program.individualProductId = individualProductId || null;
+    if (parentProgramId !== undefined) program.parentProgramId = parentProgramId || null;
     if (isActive !== undefined) program.isActive = isActive;
     if (frontendDisplayProductId !== undefined) program.frontendDisplayProductId = frontendDisplayProductId || null;
 
