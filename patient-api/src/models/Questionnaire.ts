@@ -7,6 +7,8 @@ import TenantProduct from './TenantProduct';
 import Product from './Product';
 import FormProducts from './FormProducts';
 
+export type ProductOfferType = 'single_choice' | 'multiple_choice';
+
 @Table({
     freezeTableName: true,
     indexes: [
@@ -149,6 +151,13 @@ export default class Questionnaire extends Entity {
         defaultValue: 'in_progress',
     })
     declare status: 'in_progress' | 'ready_for_review' | 'ready';
+
+    @Column({
+        type: DataType.ENUM('single_choice', 'multiple_choice'),
+        allowNull: false,
+        defaultValue: 'single_choice',
+    })
+    declare productOfferType: ProductOfferType;
 
     // productId and product already declared above; duplicate declarations removed
 

@@ -131,7 +131,7 @@ router.get('/public/programs/:id', async (req: Request, res: Response) => {
         {
           model: Questionnaire,
           as: 'medicalTemplate',
-          attributes: ['id', 'title', 'description', 'formTemplateType'],
+          attributes: ['id', 'title', 'description', 'formTemplateType', 'productOfferType'],
           include: [
             {
               model: FormProducts,
@@ -231,6 +231,9 @@ router.get('/public/programs/:id', async (req: Request, res: Response) => {
       .filter((s: any) => s.enabled)
       .reduce((sum: number, s: any) => sum + s.price, 0);
 
+    // Get productOfferType from the medical template
+    const productOfferType = (program.medicalTemplate as any)?.productOfferType || 'single_choice';
+
     // Build response
     const responseData = {
       id: program.id,
@@ -242,6 +245,7 @@ router.get('/public/programs/:id', async (req: Request, res: Response) => {
         id: (program.medicalTemplate as any).id,
         title: (program.medicalTemplate as any).title,
         description: (program.medicalTemplate as any).description,
+        productOfferType: (program.medicalTemplate as any).productOfferType,
       } : null,
       isActive: program.isActive,
       // All products with pricing
@@ -249,6 +253,8 @@ router.get('/public/programs/:id', async (req: Request, res: Response) => {
       // Non-medical services
       nonMedicalServices,
       nonMedicalServicesFee,
+      // Product offer type (single_choice or multiple_choice)
+      productOfferType,
     };
 
     return res.json({
