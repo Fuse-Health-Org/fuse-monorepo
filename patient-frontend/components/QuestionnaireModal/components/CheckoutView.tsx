@@ -44,22 +44,83 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
 }) => {
     const selectedPlanData = plans.find((plan) => plan.id === selectedPlan);
     const isProgramCheckout = !!programData;
+    const hasPerProductPricing = programData?.hasPerProductPricing || false;
 
-    // Calculate program total
+    // Calculate program total - handles both unified and per-product pricing
     const calculateProgramTotal = () => {
         if (!programData) return 0;
-        const productsTotal = programData.products
-            .filter(p => selectedProgramProducts[p.id])
-            .reduce((sum, p) => sum + p.displayPrice, 0);
+        
+        const selectedProducts = programData.products.filter(p => selectedProgramProducts[p.id]);
+        const productsTotal = selectedProducts.reduce((sum, p) => sum + p.displayPrice, 0);
+        
+        // For per-product pricing, sum up each product's individual non-medical services fee
+        if (hasPerProductPricing) {
+            const nonMedicalTotal = selectedProducts.reduce((sum, p) => {
+                // Use the product's individual program fee if available, otherwise 0
+                return sum + (p.perProductProgram?.nonMedicalServicesFee || 0);
+            }, 0);
+            return productsTotal + nonMedicalTotal;
+        }
+        
+        // For unified pricing, use the parent program's non-medical services fee
         return productsTotal + programData.nonMedicalServicesFee;
     };
 
+    // Calculate total non-medical services fee based on selected products
+    const calculateNonMedicalServicesFee = () => {
+        if (!programData) return 0;
+        
+        if (hasPerProductPricing) {
+            const selectedProducts = programData.products.filter(p => selectedProgramProducts[p.id]);
+            return selectedProducts.reduce((sum, p) => {
+                return sum + (p.perProductProgram?.nonMedicalServicesFee || 0);
+            }, 0);
+        }
+        
+        return programData.nonMedicalServicesFee;
+    };
+
     const programTotal = isProgramCheckout ? calculateProgramTotal() : 0;
+    const currentNonMedicalServicesFee = isProgramCheckout ? calculateNonMedicalServicesFee() : 0;
     const hasSelectedProgramProducts = isProgramCheckout && Object.values(selectedProgramProducts).some(v => v);
 
-    // Get enabled non-medical services for display
+    // Get enabled non-medical services for display - handles both unified and per-product pricing
     const getEnabledNonMedicalServices = () => {
         if (!programData) return [];
+        
+        // For per-product pricing, aggregate services from all selected products
+        if (hasPerProductPricing) {
+            const selectedProducts = programData.products.filter(p => selectedProgramProducts[p.id]);
+            const aggregatedServices: { name: string; price: number; productName?: string }[] = [];
+            
+            for (const product of selectedProducts) {
+                const perProduct = product.perProductProgram;
+                if (!perProduct) continue;
+                
+                const productLabel = selectedProducts.length > 1 ? ` (${product.name})` : '';
+                const nms = perProduct.nonMedicalServices;
+                
+                if (nms.patientPortal.enabled) {
+                    aggregatedServices.push({ name: `Patient Portal${productLabel}`, price: nms.patientPortal.price, productName: product.name });
+                }
+                if (nms.bmiCalculator.enabled) {
+                    aggregatedServices.push({ name: `BMI Calculator${productLabel}`, price: nms.bmiCalculator.price, productName: product.name });
+                }
+                if (nms.proteinIntakeCalculator.enabled) {
+                    aggregatedServices.push({ name: `Protein Intake Calculator${productLabel}`, price: nms.proteinIntakeCalculator.price, productName: product.name });
+                }
+                if (nms.calorieDeficitCalculator.enabled) {
+                    aggregatedServices.push({ name: `Calorie Deficit Calculator${productLabel}`, price: nms.calorieDeficitCalculator.price, productName: product.name });
+                }
+                if (nms.easyShopping.enabled) {
+                    aggregatedServices.push({ name: `Easy Shopping${productLabel}`, price: nms.easyShopping.price, productName: product.name });
+                }
+            }
+            
+            return aggregatedServices;
+        }
+        
+        // For unified pricing, use the parent program's services
         const services: { name: string; price: number }[] = [];
         if (programData.nonMedicalServices.patientPortal.enabled) {
             services.push({ name: 'Patient Portal', price: programData.nonMedicalServices.patientPortal.price });
@@ -190,7 +251,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                             })()}
 
                             {/* Non-Medical Services */}
-                            {programData.nonMedicalServicesFee > 0 && (
+                            {(hasPerProductPricing ? currentNonMedicalServicesFee > 0 : programData.nonMedicalServicesFee > 0) && (
                                 <div className="mt-6 pt-6 border-t border-gray-200">
                                     <h4 className="text-md font-medium text-gray-900 mb-3">Included Services</h4>
                                     <div className="space-y-2">
@@ -206,7 +267,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                                         <div className="flex justify-between items-center text-sm pt-2 border-t border-gray-100">
                                             <span className="font-medium text-gray-900">Services Total</span>
                                             <span className="font-semibold" style={{ color: theme.primary }}>
-                                                ${programData.nonMedicalServicesFee.toFixed(2)}
+                                                ${currentNonMedicalServicesFee.toFixed(2)}
                                             </span>
                                         </div>
                                     </div>
@@ -636,7 +697,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                                 </div>
 
                                 {/* Non-medical services in summary */}
-                                {programData.nonMedicalServicesFee > 0 && (
+                                {(hasPerProductPricing ? currentNonMedicalServicesFee > 0 : programData.nonMedicalServicesFee > 0) && (
                                     <>
                                         <Divider className="my-4" />
                                         <div className="space-y-2 mb-4">

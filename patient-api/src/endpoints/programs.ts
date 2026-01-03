@@ -159,6 +159,65 @@ router.get('/public/programs/:id', async (req: Request, res: Response) => {
       });
     }
 
+    // Fetch child programs (per-product programs) for this parent program
+    const childPrograms = await Program.findAll({
+      where: {
+        parentProgramId: program.id,
+        isActive: true,
+      },
+      attributes: [
+        'id', 'name', 'individualProductId',
+        'hasPatientPortal', 'patientPortalPrice',
+        'hasBmiCalculator', 'bmiCalculatorPrice',
+        'hasProteinIntakeCalculator', 'proteinIntakeCalculatorPrice',
+        'hasCalorieDeficitCalculator', 'calorieDeficitCalculatorPrice',
+        'hasEasyShopping', 'easyShoppingPrice',
+      ],
+    });
+
+    // Build a map of productId -> child program's non-medical services
+    const perProductPrograms: Record<string, any> = {};
+    for (const childProg of childPrograms) {
+      if (childProg.individualProductId) {
+        const childNonMedicalServices = {
+          patientPortal: {
+            enabled: childProg.hasPatientPortal,
+            price: parseFloat(String(childProg.patientPortalPrice)) || 0,
+          },
+          bmiCalculator: {
+            enabled: childProg.hasBmiCalculator,
+            price: parseFloat(String(childProg.bmiCalculatorPrice)) || 0,
+          },
+          proteinIntakeCalculator: {
+            enabled: childProg.hasProteinIntakeCalculator,
+            price: parseFloat(String(childProg.proteinIntakeCalculatorPrice)) || 0,
+          },
+          calorieDeficitCalculator: {
+            enabled: childProg.hasCalorieDeficitCalculator,
+            price: parseFloat(String(childProg.calorieDeficitCalculatorPrice)) || 0,
+          },
+          easyShopping: {
+            enabled: childProg.hasEasyShopping,
+            price: parseFloat(String(childProg.easyShoppingPrice)) || 0,
+          },
+        };
+        
+        const childNonMedicalServicesFee = Object.values(childNonMedicalServices)
+          .filter((s: any) => s.enabled)
+          .reduce((sum: number, s: any) => sum + s.price, 0);
+        
+        perProductPrograms[childProg.individualProductId] = {
+          programId: childProg.id,
+          programName: childProg.name,
+          nonMedicalServices: childNonMedicalServices,
+          nonMedicalServicesFee: childNonMedicalServicesFee,
+        };
+      }
+    }
+
+    // Determine if this is a per-product pricing program
+    const hasPerProductPricing = Object.keys(perProductPrograms).length > 0;
+
     // Get all products from the program's template with their tenant pricing
     const formProducts = (program.medicalTemplate as any)?.formProducts || [];
     const productsWithPricing: any[] = [];
@@ -190,6 +249,9 @@ router.get('/public/programs/:id', async (req: Request, res: Response) => {
 
       const displayPrice = tenantProductInfo ? tenantProductInfo.price : (product.price || 0);
 
+      // Get per-product program info if available
+      const perProductProgram = perProductPrograms[product.id] || null;
+
       productsWithPricing.push({
         id: product.id,
         name: product.name,
@@ -199,10 +261,12 @@ router.get('/public/programs/:id', async (req: Request, res: Response) => {
         categories: product.categories,
         tenantProduct: tenantProductInfo,
         displayPrice,
+        // Include per-product program's non-medical services if available
+        perProductProgram,
       });
     }
 
-    // Build non-medical services info from program
+    // Build non-medical services info from parent program (used for unified pricing)
     const nonMedicalServices = {
       patientPortal: {
         enabled: program.hasPatientPortal,
@@ -226,7 +290,7 @@ router.get('/public/programs/:id', async (req: Request, res: Response) => {
       },
     };
 
-    // Calculate total non-medical services fee
+    // Calculate total non-medical services fee for unified pricing
     const nonMedicalServicesFee = Object.values(nonMedicalServices)
       .filter((s: any) => s.enabled)
       .reduce((sum: number, s: any) => sum + s.price, 0);
@@ -248,13 +312,15 @@ router.get('/public/programs/:id', async (req: Request, res: Response) => {
         productOfferType: (program.medicalTemplate as any).productOfferType,
       } : null,
       isActive: program.isActive,
-      // All products with pricing
+      // All products with pricing (includes per-product program info if available)
       products: productsWithPricing,
-      // Non-medical services
+      // Non-medical services (parent program - used for unified pricing)
       nonMedicalServices,
       nonMedicalServicesFee,
       // Product offer type (single_choice or multiple_choice)
       productOfferType,
+      // Whether this program has per-product pricing
+      hasPerProductPricing,
     };
 
     return res.json({
