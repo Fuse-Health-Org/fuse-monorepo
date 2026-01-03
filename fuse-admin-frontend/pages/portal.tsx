@@ -712,10 +712,9 @@ export default function PortalPage() {
                           if (isCustomDomain && customDomain) {
                             return `https://${customDomain}`
                           }
-                          // Use NEXT_PUBLIC_PATIENT_FRONTEND_URL to determine the base domain
-                          const baseUrl = process.env.NEXT_PUBLIC_PATIENT_FRONTEND_URL || 'https://patient.fusehealthrx.com'
-                          const baseDomain = baseUrl.replace(/^https?:\/\//, '').replace(/\/$/, '')
-                          return `https://${clinicSlug}.${baseDomain}`
+                          // Use NEXT_PUBLIC_PATIENT_FRONTEND_URL directly (it already has the full URL)
+                          const baseUrl = process.env.NEXT_PUBLIC_PATIENT_FRONTEND_URL || 'https://checkhealth.fusehealthstaging.xyz'
+                          return baseUrl
                         })()}
                       </p>
                       {typeof window !== 'undefined' && window.location.hostname.includes('localhost') && (
@@ -734,10 +733,8 @@ export default function PortalPage() {
                       } else if (isCustomDomain && customDomain) {
                         url = `https://${customDomain}`
                       } else {
-                        // Use NEXT_PUBLIC_PATIENT_FRONTEND_URL to determine the base domain
-                        const baseUrl = process.env.NEXT_PUBLIC_PATIENT_FRONTEND_URL || 'https://patient.fusehealthrx.com'
-                        const baseDomain = baseUrl.replace(/^https?:\/\//, '').replace(/\/$/, '')
-                        url = `https://${clinicSlug}.${baseDomain}`
+                        // Use NEXT_PUBLIC_PATIENT_FRONTEND_URL directly (it already has the full URL)
+                        url = process.env.NEXT_PUBLIC_PATIENT_FRONTEND_URL || 'https://checkhealth.fusehealthstaging.xyz'
                       }
                       window.open(url, '_blank')
                     }}
