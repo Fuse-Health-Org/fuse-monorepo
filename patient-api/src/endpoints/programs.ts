@@ -273,6 +273,8 @@ router.get('/public/programs/:id', async (req: Request, res: Response) => {
 /**
  * Get all programs for the current clinic
  * GET /programs
+ * Query params:
+ *   - medicalTemplateId: Filter by medical template ID (to get individual product programs)
  */
 router.get('/programs', authenticateJWT, async (req: Request, res: Response) => {
   try {
@@ -292,13 +294,26 @@ router.get('/programs', authenticateJWT, async (req: Request, res: Response) => 
       });
     }
 
+    const { medicalTemplateId } = req.query;
+    
+    const whereClause: any = { clinicId };
+    if (medicalTemplateId && typeof medicalTemplateId === 'string') {
+      whereClause.medicalTemplateId = medicalTemplateId;
+    }
+
     const programs = await Program.findAll({
-      where: { clinicId },
+      where: whereClause,
       include: [
         {
           model: Questionnaire,
           as: 'medicalTemplate',
           attributes: ['id', 'title', 'description', 'formTemplateType'],
+        },
+        {
+          model: Product,
+          as: 'individualProduct',
+          attributes: ['id', 'name', 'slug', 'imageUrl'],
+          required: false,
         },
       ],
       order: [['createdAt', 'DESC']],
@@ -368,7 +383,10 @@ router.get('/programs/:id', authenticateJWT, async (req: Request, res: Response)
 /**
  * Create a new program
  * POST /programs
- * Body: { name, description?, medicalTemplateId?, isActive?, hasPatientPortal?, patientPortalPrice?, ... }
+ * Body: { name, description?, medicalTemplateId?, individualProductId?, isActive?, hasPatientPortal?, patientPortalPrice?, ... }
+ * 
+ * individualProductId: When set, this program is specific to one product from the form.
+ * This allows different pricing/services for different products within the same medical template.
  */
 router.post('/programs', authenticateJWT, async (req: Request, res: Response) => {
   try {
@@ -392,6 +410,7 @@ router.post('/programs', authenticateJWT, async (req: Request, res: Response) =>
       name,
       description,
       medicalTemplateId,
+      individualProductId,
       isActive,
       // Non-medical services
       hasPatientPortal,
@@ -424,11 +443,23 @@ router.post('/programs', authenticateJWT, async (req: Request, res: Response) =>
       }
     }
 
+    // Verify individual product exists if provided
+    if (individualProductId) {
+      const product = await Product.findByPk(individualProductId);
+      if (!product) {
+        return res.status(404).json({
+          success: false,
+          error: 'Individual product not found',
+        });
+      }
+    }
+
     const program = await Program.create({
       name,
       description,
       clinicId,
       medicalTemplateId: medicalTemplateId || null,
+      individualProductId: individualProductId || null,
       isActive: isActive !== undefined ? isActive : true,
       // Non-medical services
       hasPatientPortal: hasPatientPortal || false,
@@ -451,6 +482,12 @@ router.post('/programs', authenticateJWT, async (req: Request, res: Response) =>
           as: 'medicalTemplate',
           attributes: ['id', 'title', 'description', 'formTemplateType'],
         },
+        {
+          model: Product,
+          as: 'individualProduct',
+          attributes: ['id', 'name', 'slug', 'imageUrl'],
+          required: false,
+        },
       ],
     });
 
@@ -470,7 +507,7 @@ router.post('/programs', authenticateJWT, async (req: Request, res: Response) =>
 /**
  * Update a program
  * PUT /programs/:id
- * Body: { name?, description?, medicalTemplateId?, isActive? }
+ * Body: { name?, description?, medicalTemplateId?, individualProductId?, isActive?, ... }
  */
 router.put('/programs/:id', authenticateJWT, async (req: Request, res: Response) => {
   try {
@@ -488,6 +525,7 @@ router.put('/programs/:id', authenticateJWT, async (req: Request, res: Response)
       name,
       description,
       medicalTemplateId,
+      individualProductId,
       isActive,
       frontendDisplayProductId,
       // Non-medical services
@@ -525,10 +563,22 @@ router.put('/programs/:id', authenticateJWT, async (req: Request, res: Response)
       }
     }
 
+    // Verify individual product exists if provided
+    if (individualProductId) {
+      const product = await Product.findByPk(individualProductId);
+      if (!product) {
+        return res.status(404).json({
+          success: false,
+          error: 'Individual product not found',
+        });
+      }
+    }
+
     // Update fields
     if (name !== undefined) program.name = name;
     if (description !== undefined) program.description = description;
     if (medicalTemplateId !== undefined) program.medicalTemplateId = medicalTemplateId;
+    if (individualProductId !== undefined) program.individualProductId = individualProductId || null;
     if (isActive !== undefined) program.isActive = isActive;
     if (frontendDisplayProductId !== undefined) program.frontendDisplayProductId = frontendDisplayProductId || null;
 
@@ -553,6 +603,12 @@ router.put('/programs/:id', authenticateJWT, async (req: Request, res: Response)
           model: Questionnaire,
           as: 'medicalTemplate',
           attributes: ['id', 'title', 'description', 'formTemplateType'],
+        },
+        {
+          model: Product,
+          as: 'individualProduct',
+          attributes: ['id', 'name', 'slug', 'imageUrl'],
+          required: false,
         },
       ],
     });
