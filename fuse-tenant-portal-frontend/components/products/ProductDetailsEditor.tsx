@@ -181,8 +181,8 @@ export function ProductDetailsEditor({ product, onUpdate }: ProductDetailsEditor
             setImagePreview(null)
             toast.success('Image removed successfully')
             
-            // Update parent with null imageUrl so it stays in sync
-            await onUpdate({ imageUrl: null })
+            // Update parent with undefined imageUrl so it stays in sync
+            await onUpdate({ imageUrl: undefined })
         } catch (error: any) {
             console.error('Error removing image:', error)
             toast.error(error.message || 'Failed to remove image')

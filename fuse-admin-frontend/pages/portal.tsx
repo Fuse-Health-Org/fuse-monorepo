@@ -705,11 +705,17 @@ export default function PortalPage() {
                           : 'Your Brand Portal URL'}
                       </h3>
                       <p className="text-sm font-mono text-muted-foreground truncate">
-                        {typeof window !== 'undefined' && window.location.hostname.includes('localhost')
-                          ? `http://${clinicSlug}.localhost:3000`
-                          : isCustomDomain && customDomain
-                            ? `https://${customDomain}`
-                            : `https://${clinicSlug}.yourdomain.com`}
+                        {(() => {
+                          if (typeof window !== 'undefined' && window.location.hostname.includes('localhost')) {
+                            return `http://${clinicSlug}.localhost:3000`
+                          }
+                          if (isCustomDomain && customDomain) {
+                            return `https://${customDomain}`
+                          }
+                          // Use NEXT_PUBLIC_PATIENT_FRONTEND_URL directly (it already has the full URL)
+                          const baseUrl = process.env.NEXT_PUBLIC_PATIENT_FRONTEND_URL || 'https://checkhealth.fusehealthstaging.xyz'
+                          return baseUrl
+                        })()}
                       </p>
                       {typeof window !== 'undefined' && window.location.hostname.includes('localhost') && (
                         <p className="text-xs text-blue-600 mt-1">
@@ -721,12 +727,15 @@ export default function PortalPage() {
                   <Button
                     variant="outline"
                     onClick={() => {
-                      const isLocal = typeof window !== 'undefined' && window.location.hostname.includes('localhost')
-                      const url = isLocal
-                        ? `http://${clinicSlug}.localhost:3000`
-                        : isCustomDomain && customDomain
-                          ? `https://${customDomain}`
-                          : `https://${clinicSlug}.yourdomain.com`
+                      let url: string
+                      if (typeof window !== 'undefined' && window.location.hostname.includes('localhost')) {
+                        url = `http://${clinicSlug}.localhost:3000`
+                      } else if (isCustomDomain && customDomain) {
+                        url = `https://${customDomain}`
+                      } else {
+                        // Use NEXT_PUBLIC_PATIENT_FRONTEND_URL directly (it already has the full URL)
+                        url = process.env.NEXT_PUBLIC_PATIENT_FRONTEND_URL || 'https://checkhealth.fusehealthstaging.xyz'
+                      }
                       window.open(url, '_blank')
                     }}
                   >
