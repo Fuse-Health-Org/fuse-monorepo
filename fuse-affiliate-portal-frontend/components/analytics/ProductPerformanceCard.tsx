@@ -2,11 +2,14 @@ import { Card, CardBody, CardHeader } from "@heroui/react"
 import { Icon } from "@iconify/react"
 
 interface ProductStats {
-  productId: string
-  productName: string
+  id: string
+  name: string
+  views: number
+  conversions: number
+  conversionRate: number
   orders: number
   revenue: number
-  customers: number
+  likes: number
 }
 
 interface ProductPerformanceCardProps {
@@ -42,10 +45,10 @@ export function ProductPerformanceCard({ productStats, onProductClick }: Product
               className="text-5xl text-muted-foreground mx-auto mb-4"
             />
             <h3 className="text-lg font-medium mb-2">
-              No orders yet
+              No products available
             </h3>
             <p className="text-muted-foreground">
-              Product performance will appear here once customers purchase through your affiliate links
+              Product performance will appear here once the brand adds products
             </p>
           </div>
         ) : (
@@ -53,25 +56,29 @@ export function ProductPerformanceCard({ productStats, onProductClick }: Product
             {productStats.map((product, index) => (
               <div
                 key={index}
-                onClick={() => onProductClick?.(product.productId)}
+                onClick={() => onProductClick?.(product.id)}
                 className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors cursor-pointer"
               >
                 <div className="flex-1">
                   <h3 className="font-medium">
-                    {product.productName}
+                    {product.name}
                   </h3>
                   <div className="flex items-center gap-6 mt-2 text-sm text-muted-foreground">
+                    <div className="flex items-center gap-2">
+                      <Icon icon="lucide:eye" className="text-base" />
+                      <span>{formatNumber(product.views)} {product.views === 1 ? 'view' : 'views'}</span>
+                    </div>
                     <div className="flex items-center gap-2">
                       <Icon icon="lucide:shopping-bag" className="text-base" />
                       <span>{formatNumber(product.orders)} {product.orders === 1 ? 'order' : 'orders'}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Icon icon="lucide:users" className="text-base" />
-                      <span>{formatNumber(product.customers)} {product.customers === 1 ? 'customer' : 'customers'}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
                       <Icon icon="lucide:dollar-sign" className="text-base" />
                       <span>{formatCurrency(product.revenue)}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Icon icon="lucide:heart" className="text-base text-red-500" />
+                      <span>{formatNumber(product.likes)} {product.likes === 1 ? 'like' : 'likes'}</span>
                     </div>
                   </div>
                 </div>

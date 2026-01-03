@@ -12,9 +12,12 @@ export interface AffiliateDomainInfo {
  * Extracts affiliate slug from current domain
  * 
  * Examples:
- * - checktwo.limitless.fusehealth.com -> affiliateSlug: "checktwo", brandSlug: "limitless"
- * - checktwo.limitless.localhost:3000 -> affiliateSlug: "checktwo", brandSlug: "limitless"
- * - localhost:3000 -> no affiliate
+ * Development:
+ * - affiliate.brand.localhost:3000 (3 parts) -> affiliateSlug: "affiliate", brandSlug: "brand" (IS AFFILIATE)
+ * - brand.localhost:3000 (2 parts) -> NO AFFILIATE (brand direct)
+ * - localhost:3000 (1 part) -> NO AFFILIATE
+ * Production:
+ * - affiliate.brand.fusehealth.com -> affiliateSlug: "affiliate", brandSlug: "brand"
  */
 export async function extractAffiliateSlugFromDomain(): Promise<AffiliateDomainInfo> {
   if (typeof window === 'undefined') {
@@ -30,7 +33,7 @@ export async function extractAffiliateSlugFromDomain(): Promise<AffiliateDomainI
   const hostname = window.location.hostname;
   const parts = hostname.split('.');
 
-  console.log('🔍 Affiliate domain analysis:', { hostname, parts });
+  console.log('🔍 Affiliate domain analysis:', { hostname, parts, partsLength: parts.length });
 
   // Development: Check if 'localhost' appears
   const localhostIndex = parts.indexOf('localhost');
@@ -43,13 +46,17 @@ export async function extractAffiliateSlugFromDomain(): Promise<AffiliateDomainI
   let brandSlug: string | null = null;
   let hasAffiliateSubdomain = false;
 
-  if (isDevelopment && localhostIndex >= 2) {
-    // Development: checktwo.limitless.localhost -> affiliateSlug: "checktwo", brandSlug: "limitless"
-    if (parts.length >= 3 && localhostIndex >= 2) {
+  if (isDevelopment && localhostIndex >= 1) {
+    // Development: Only 3 parts pattern is affiliate
+    if (parts.length === 3 && localhostIndex === 2) {
+      // Pattern: affiliate.brand.localhost (3 parts = AFFILIATE)
       affiliateSlug = parts[0];
       brandSlug = parts[1];
       hasAffiliateSubdomain = true;
     }
+    // Pattern: brand.localhost (2 parts = BRAND, not affiliate)
+    // Pattern: localhost (1 part = BRAND, not affiliate)
+    // These cases: hasAffiliateSubdomain stays false
   } else if (isProduction && parts.length >= 4) {
     // Production: checktwo.limitless.fusehealth.com
     // Check if it matches pattern: affiliate.brand.domain.extension

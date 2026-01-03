@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 const features = [
   { icon: "flask", text: "Compounded in the USA" },
@@ -82,6 +82,41 @@ interface ScrollingFeaturesBarProps {
 }
 
 export default function ScrollingFeaturesBar({ textColor = "#004d4d", position = "static" }: ScrollingFeaturesBarProps) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [scrollPosition, setScrollPosition] = useState(0);
+  const animationRef = useRef<number>();
+
+  useEffect(() => {
+    const scroll = () => {
+      if (scrollRef.current) {
+        const scrollWidth = scrollRef.current.scrollWidth;
+        const clientWidth = scrollRef.current.clientWidth;
+        const maxScroll = scrollWidth / 2; // Half because we have 2 sets
+
+        setScrollPosition((prev) => {
+          const newPosition = prev + 0.5; // Speed of scroll (pixels per frame)
+          
+          // When we reach the end of the first set, reset to 0
+          if (newPosition >= maxScroll) {
+            return 0;
+          }
+          
+          return newPosition;
+        });
+      }
+      
+      animationRef.current = requestAnimationFrame(scroll);
+    };
+
+    animationRef.current = requestAnimationFrame(scroll);
+
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, []);
+
   return (
     <div
       style={{
@@ -96,21 +131,14 @@ export default function ScrollingFeaturesBar({ textColor = "#004d4d", position =
         zIndex: position === "absolute" ? 20 : undefined,
       }}
     >
-      <style jsx global>{`
-        @keyframes scrollFeatures {
-          0% {
-            transform: translateX(0);
-          }
-          100% {
-            transform: translateX(-50%);
-          }
-        }
-        .features-scroll-container {
-          display: flex;
-          animation: scrollFeatures 30s linear infinite;
-        }
-      `}</style>
-      <div className="features-scroll-container">
+      <div
+        ref={scrollRef}
+        style={{
+          display: "flex",
+          transform: `translateX(-${scrollPosition}px)`,
+          willChange: "transform",
+        }}
+      >
         {/* First set of features */}
         {features.map((feature, idx) => (
           <div
@@ -123,6 +151,7 @@ export default function ScrollingFeaturesBar({ textColor = "#004d4d", position =
               whiteSpace: "nowrap",
               fontSize: "0.9rem",
               fontWeight: 500,
+              flexShrink: 0,
             }}
           >
             <FeatureIcon icon={feature.icon} />
@@ -141,6 +170,7 @@ export default function ScrollingFeaturesBar({ textColor = "#004d4d", position =
               whiteSpace: "nowrap",
               fontSize: "0.9rem",
               fontWeight: 500,
+              flexShrink: 0,
             }}
           >
             <FeatureIcon icon={feature.icon} />

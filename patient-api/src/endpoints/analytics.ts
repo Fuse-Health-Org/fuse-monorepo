@@ -11,6 +11,8 @@ import AnalyticsService from "../services/analytics.service";
 import Order from "../models/Order";
 import OrderItem from "../models/OrderItem";
 import User from "../models/User";
+import Like from "../models/Like";
+import Clinic from "../models/Clinic";
 
 const router = Router();
 
@@ -375,6 +377,7 @@ router.get(
         success: true,
         data: {
           productId,
+          tenantProductId: productId, // This is actually the tenant product ID
           timeRange,
           startDate: startDate.toISOString(),
           endDate: endDate.toISOString(),
@@ -460,6 +463,21 @@ router.get(
           startDate.setDate(endDate.getDate() - 30);
       }
 
+      // Get user's clinic ID
+      const user = await User.findByPk(userId, {
+        attributes: ['clinicId'],
+      });
+
+      if (!user || !user.clinicId) {
+        return res.status(404).json({
+          success: false,
+          error: "User clinic not found",
+        });
+      }
+
+      const clinicId = user.clinicId;
+
+      // Get analytics events
       const analytics = await TenantAnalyticsEvents.findAll({
         where: {
           userId,
@@ -484,6 +502,30 @@ router.get(
         order: [["createdAt", "ASC"]],
       });
 
+      // Get all tenant products owned by this clinic
+      const allUserProducts = await TenantProduct.findAll({
+        where: { clinicId },
+        include: [
+          {
+            model: Product,
+            attributes: ["id", "name"],
+          },
+        ],
+        attributes: ["id"],
+      });
+
+      // Get products with likes (to include them even if no analytics events)
+      const productsWithLikes = await Like.findAll({
+        where: {
+          liked: true,
+          tenantProductId: {
+            [Op.in]: allUserProducts.map(p => p.id),
+          },
+        },
+        attributes: ["tenantProductId"],
+        group: ["tenantProductId"],
+      });
+
       const productAnalytics: Record<
         string,
         {
@@ -493,6 +535,17 @@ router.get(
         }
       > = {};
 
+      // Initialize all user products in the map
+      allUserProducts.forEach((tp) => {
+        const tenantProduct = tp.toJSON() as any;
+        productAnalytics[tp.id] = {
+          productName: tenantProduct.product?.name || "Unknown Product",
+          views: 0,
+          conversions: 0,
+        };
+      });
+
+      // Process analytics events
       analytics.forEach((event) => {
         const eventData = event.toJSON() as any;
         const productId = eventData.productId;
@@ -514,9 +567,29 @@ router.get(
         }
       });
 
+      // Ensure products with likes are included
+      productsWithLikes.forEach((like) => {
+        const productId = like.tenantProductId;
+        
+        // Product should already be in the map from allUserProducts
+        // This just ensures it's there in case of any edge cases
+        if (!productAnalytics[productId]) {
+          const product = allUserProducts.find(p => p.id === productId);
+          if (product) {
+            const productData = product.toJSON() as any;
+            productAnalytics[productId] = {
+              productName: productData.product?.name || "Unknown Product",
+              views: 0,
+              conversions: 0,
+            };
+          }
+        }
+      });
+
       const productAnalyticsWithRates = Object.entries(productAnalytics).map(
         ([productId, data]) => ({
           productId,
+          tenantProductId: productId, // This is actually the tenant product ID
           productName: data.productName,
           views: data.views,
           conversions: data.conversions,
@@ -553,7 +626,8 @@ router.get(
     } catch (error) {
       if (process.env.NODE_ENV === "development") {
         console.error(
-          "❌ [Analytics Overview] Error fetching overview analytics"
+          "❌ [Analytics Overview] Error fetching overview analytics:",
+          error
         );
       }
       return res.status(500).json({
@@ -777,6 +851,22 @@ router.get(
         });
       }
 
+      // Get user's clinicId for affiliate analytics
+      const affiliateUser = await User.findByPk(userId);
+      const affiliateClinicId = affiliateUser?.clinicId;
+
+      if (!affiliateClinicId) {
+        return res.status(400).json({
+          success: false,
+          error: "Affiliate clinic ID not found",
+        });
+      }
+
+      console.log("🔍 [AFFILIATE ANALYTICS] User info:", {
+        userId,
+        affiliateClinicId,
+      });
+
       const endDate = new Date();
       const startDate = new Date();
 
@@ -832,7 +922,7 @@ router.get(
         conversionRate: `${conversionRate.toFixed(2)}%`,
       });
 
-      // Get all orders where affiliateId matches the current user
+      // Get all orders where affiliateId matches the current user  
       const orders = await Order.findAll({
         where: {
           affiliateId: userId,
@@ -861,7 +951,7 @@ router.get(
           {
             model: TenantProduct,
             as: "tenantProduct",
-            attributes: ["id"],
+            attributes: ["id", "clinicId"],
             include: [
               {
                 model: Product,
@@ -880,6 +970,8 @@ router.get(
         totalAmount: o.totalAmount,
         createdAt: o.createdAt,
         customerEmail: o.user?.email,
+        tenantProductId: o.tenantProductId,
+        clinicId: (o as any).tenantProduct?.clinicId,
       })));
 
       console.log("📊 [AFFILIATE ANALYTICS] Order status breakdown:", {
@@ -889,6 +981,37 @@ router.get(
         amount_capturable: orders.filter(o => o.status === "amount_capturable_updated").length,
         other: orders.filter(o => !["paid", "pending", "amount_capturable_updated"].includes(o.status)).length,
       });
+
+      // Get unique clinicIds from orders to find all brand products
+      const orderClinicIds = [...new Set(
+        orders
+          .map(o => (o as any).tenantProduct?.clinicId)
+          .filter((id): id is string => !!id)
+      )];
+
+      console.log(`🏥 [AFFILIATE ANALYTICS] Found ${orderClinicIds.length} unique clinic(s) from orders:`, orderClinicIds);
+
+      // Get all tenant products from those clinics
+      const allBrandProducts = orderClinicIds.length > 0 
+        ? await TenantProduct.findAll({
+            where: { clinicId: { [Op.in]: orderClinicIds } },
+            include: [
+              {
+                model: Product,
+                attributes: ["id", "name"],
+              },
+            ],
+            attributes: ["id", "clinicId"],
+          })
+        : [];
+
+      console.log(`📦 [AFFILIATE ANALYTICS] Found ${allBrandProducts.length} products from brand(s):`, 
+        allBrandProducts.map(p => ({
+          id: p.id,
+          clinicId: p.clinicId,
+          productName: (p as any).product?.name,
+        }))
+      );
 
       // Format orders for the response
       const formattedOrders = orders.map((order) => {
@@ -943,6 +1066,64 @@ router.get(
         affiliateRevenue: `$${Number(totalRevenue).toFixed(2)}`,
       });
 
+      // Build products array with analytics (views, conversions, orders, and likes)
+      const productsWithAnalytics = await Promise.all(
+        allBrandProducts.map(async (tp) => {
+          const tenantProductId = tp.id;
+          const productData = tp.toJSON() as any;
+
+          // Get analytics for this product (views, conversions) from affiliate
+          // Note: TenantAnalyticsEvents uses 'productId' to store the TenantProduct ID
+          const productEvents = analyticsEvents.filter(
+            e => e.productId === tenantProductId
+          );
+          const productViews = productEvents.filter(e => e.eventType === 'view').length;
+          const productConversions = productEvents.filter(e => e.eventType === 'conversion').length;
+          const productConversionRate = productViews > 0 ? (productConversions / productViews) * 100 : 0;
+
+          // Get orders for this product by this affiliate
+          const productOrders = orders.filter(
+            o => o.tenantProductId === tenantProductId
+          );
+          const productPaidOrders = productOrders.filter(o => o.status === "paid");
+          const productRevenue = productPaidOrders.reduce((sum, o) => {
+            const amount = Number(o.totalAmount) || 0;
+            return sum + amount;
+          }, 0) * affiliateRevenuePercentage;
+
+          // Get likes for this product from this affiliate only (by clinicId, not userId)
+          const productLikes = await Like.count({
+            where: { 
+              tenantProductId,
+              liked: true,
+              sourceType: 'affiliate',
+              affiliateId: affiliateClinicId,
+            },
+          });
+
+          return {
+            id: tenantProductId,
+            name: productData.product?.name || "Unknown Product",
+            views: productViews,
+            conversions: productConversions,
+            conversionRate: productConversionRate,
+            orders: productOrders.length,
+            revenue: productRevenue,
+            likes: productLikes,
+          };
+        })
+      );
+
+      console.log(`📦 [AFFILIATE ANALYTICS] Products with analytics:`, 
+        productsWithAnalytics.map(p => ({
+          name: p.name,
+          views: p.views,
+          conversions: p.conversions,
+          orders: p.orders,
+          likes: p.likes,
+        }))
+      );
+
       return res.json({
         success: true,
         data: {
@@ -954,9 +1135,10 @@ router.get(
             totalConversions,
             conversionRate,
             totalOrders,
-            paidOrders,
+            paidOrders: paidOrders.length,
             totalRevenue,
           },
+          products: productsWithAnalytics,
           orders: formattedOrders,
         },
       });
@@ -1191,6 +1373,7 @@ router.get(
         success: true,
         data: {
           productId,
+          tenantProductId: productId, // This is actually the tenant product ID
           timeRange,
           startDate: startDate.toISOString(),
           endDate: endDate.toISOString(),

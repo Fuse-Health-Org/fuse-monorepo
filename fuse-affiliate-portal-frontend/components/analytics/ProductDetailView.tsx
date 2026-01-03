@@ -1,5 +1,12 @@
-import { Card, CardBody, CardHeader, Button } from "@heroui/react"
+import { Card, CardBody, CardHeader, Button, Spinner } from "@heroui/react"
 import { Icon } from "@iconify/react"
+
+interface LikesAnalytics {
+  totalLikes: number
+  userLikes: number
+  anonymousLikes: number
+  dailyLikes: { date: string; count: number }[]
+}
 
 interface FormAnalytics {
   formId: string
@@ -46,10 +53,12 @@ interface ProductDetailAnalytics {
 
 interface ProductDetailViewProps {
   productDetails: ProductDetailAnalytics
+  likesAnalytics?: LikesAnalytics | null
+  likesLoading?: boolean
   onBack: () => void
 }
 
-export function ProductDetailView({ productDetails, onBack }: ProductDetailViewProps) {
+export function ProductDetailView({ productDetails, likesAnalytics, likesLoading, onBack }: ProductDetailViewProps) {
   const formatNumber = (num: number) => {
     return new Intl.NumberFormat().format(num)
   }
@@ -183,22 +192,96 @@ export function ProductDetailView({ productDetails, onBack }: ProductDetailViewP
         <CardHeader className="flex flex-col items-start">
           <h2 className="text-xl font-semibold">Product Likes</h2>
           <p className="text-sm text-muted-foreground mt-1">
-            Total likes from customers viewing this product
+            Customer engagement and likes analytics
           </p>
         </CardHeader>
         <CardBody>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <Icon icon="lucide:heart" className="text-2xl text-red-500" />
-              <div>
-                <div className="text-2xl font-bold">0</div>
-                <div className="text-xs text-muted-foreground">Total Likes</div>
+          {likesLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Spinner size="lg" />
+            </div>
+          ) : likesAnalytics ? (
+            <div className="space-y-6">
+              {/* Likes Summary Cards */}
+              <div className="grid grid-cols-3 gap-4">
+                <div className="p-4 border rounded-lg bg-gradient-to-br from-red-50 to-pink-50 dark:from-red-950/20 dark:to-pink-950/20">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Icon icon="lucide:heart" className="text-base text-red-500" />
+                    <span className="text-xs font-medium text-muted-foreground">Total Likes</span>
+                  </div>
+                  <div className="text-2xl font-bold text-red-600 dark:text-red-400">
+                    {formatNumber(likesAnalytics.totalLikes)}
+                  </div>
+                </div>
+
+                <div className="p-4 border rounded-lg bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Icon icon="lucide:heart" className="text-base text-blue-500" />
+                    <span className="text-xs font-medium text-muted-foreground">Logged-in Users</span>
+                  </div>
+                  <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                    {formatNumber(likesAnalytics.userLikes)}
+                  </div>
+                </div>
+
+                <div className="p-4 border rounded-lg bg-gradient-to-br from-gray-50 to-slate-50 dark:from-gray-950/20 dark:to-slate-950/20">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Icon icon="lucide:heart" className="text-base text-gray-500" />
+                    <span className="text-xs font-medium text-muted-foreground">Anonymous Visitors</span>
+                  </div>
+                  <div className="text-2xl font-bold text-gray-600 dark:text-gray-400">
+                    {formatNumber(likesAnalytics.anonymousLikes)}
+                  </div>
+                </div>
               </div>
+
+              {/* Daily Likes Chart */}
+              {likesAnalytics.dailyLikes && likesAnalytics.dailyLikes.length > 0 && (
+                <div className="border rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Icon icon="lucide:trending-up" className="text-base text-muted-foreground" />
+                    <span className="text-sm font-medium">Likes Over Last 30 Days</span>
+                  </div>
+                  <div className="h-48 flex items-end gap-1">
+                    {(() => {
+                      const maxCount = Math.max(...likesAnalytics.dailyLikes.map(d => d.count), 1)
+                      return likesAnalytics.dailyLikes.map((day) => (
+                        <div
+                          key={day.date}
+                          className="flex-1 bg-gradient-to-t from-red-500 to-pink-400 rounded-t hover:from-red-600 hover:to-pink-500 transition-colors cursor-pointer group relative"
+                          style={{ height: `${(day.count / maxCount) * 100}%`, minHeight: day.count > 0 ? '4px' : '0' }}
+                          title={`${day.date}: ${day.count} likes`}
+                        >
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 opacity-0 group-hover:opacity-100 transition-opacity bg-foreground text-background text-xs px-2 py-1 rounded whitespace-nowrap z-10">
+                            {day.date}: {day.count}
+                          </div>
+                        </div>
+                      ))
+                    })()}
+                  </div>
+                </div>
+              )}
+
+              {/* Conversion Insight */}
+              {likesAnalytics.totalLikes > 0 && productDetails.summary.totalConversions > 0 && (
+                <div className="p-4 border rounded-lg bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Icon icon="lucide:trending-up" className="text-base text-green-600" />
+                    <span className="text-sm font-medium text-green-800 dark:text-green-300">Engagement Insight</span>
+                  </div>
+                  <p className="text-sm text-green-700 dark:text-green-400">
+                    {((productDetails.summary.totalConversions / likesAnalytics.totalLikes) * 100).toFixed(1)}% of users who liked this product have placed an order.
+                  </p>
+                </div>
+              )}
             </div>
-            <div className="text-xs text-muted-foreground">
-              (Likes tracking coming soon)
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              <Icon icon="lucide:heart" className="text-5xl mx-auto mb-3 text-muted-foreground/30" />
+              <p className="text-sm">No likes data available yet</p>
+              <p className="text-xs mt-1">Likes will appear here once customers start liking this product</p>
             </div>
-          </div>
+          )}
         </CardBody>
       </Card>
 
