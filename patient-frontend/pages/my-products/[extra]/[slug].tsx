@@ -120,7 +120,6 @@ export default function PublicProductPage() {
 
             console.log('[PublicProduct] Program loaded:', programData.name)
             console.log('[PublicProduct] Products:', programData.products?.length)
-            console.log('[PublicProduct] Non-medical services fee:', programData.nonMedicalServicesFee)
 
             setProgram({
                 id: programData.id,
@@ -133,6 +132,8 @@ export default function PublicProductPage() {
                 products: programData.products || [],
                 nonMedicalServices: programData.nonMedicalServices,
                 nonMedicalServicesFee: programData.nonMedicalServicesFee || 0,
+                productOfferType: programData.productOfferType,
+                hasPerProductPricing: programData.hasPerProductPricing || false,
             })
             setIsModalOpen(true)
         } catch (err) {

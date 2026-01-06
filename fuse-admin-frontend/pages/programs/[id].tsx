@@ -15,7 +15,11 @@ import {
     DollarSign,
     Sparkles,
     Copy,
-    Pill
+    Pill,
+    X,
+    Settings2,
+    ExternalLink,
+    AlertTriangle
 } from 'lucide-react'
 
 interface TemplateProduct {
@@ -51,6 +55,24 @@ interface EnabledForm {
     id: string
     productId: string
     globalFormStructureId?: string
+}
+
+// Configuration for individual product programs
+interface IndividualProductProgram {
+    productId: string
+    programName: string
+    hasPatientPortal: boolean
+    patientPortalPrice: number
+    hasBmiCalculator: boolean
+    bmiCalculatorPrice: number
+    hasProteinIntakeCalculator: boolean
+    proteinIntakeCalculatorPrice: number
+    hasCalorieDeficitCalculator: boolean
+    calorieDeficitCalculatorPrice: number
+    hasEasyShopping: boolean
+    easyShoppingPrice: number
+    // If this individual program already exists in DB, store its ID
+    existingProgramId?: string
 }
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
@@ -103,6 +125,20 @@ export default function ProgramEditor() {
     // Enabled forms for each product
     const [enabledForms, setEnabledForms] = useState<EnabledForm[]>([])
     const [copiedUrl, setCopiedUrl] = useState<string | null>(null)
+
+    // Program mode: 'unified' = one program for all products, 'per_product' = unique program per product
+    const [programMode, setProgramMode] = useState<'unified' | 'per_product'>('unified')
+    
+    // Individual product program configurations (when mode is 'per_product')
+    const [individualProductPrograms, setIndividualProductPrograms] = useState<Record<string, IndividualProductProgram>>({})
+    
+    // Warning dialog for switching to unified mode
+    const [showUnifiedWarning, setShowUnifiedWarning] = useState(false)
+    
+    // Modal state for configuring individual product program
+    const [configModalOpen, setConfigModalOpen] = useState(false)
+    const [configModalProductId, setConfigModalProductId] = useState<string | null>(null)
+    const [configModalData, setConfigModalData] = useState<IndividualProductProgram | null>(null)
 
     // Load existing program if editing
     useEffect(() => {
@@ -212,6 +248,9 @@ export default function ProgramEditor() {
                     setCalorieDeficitCalculatorPrice(parseFloat(program.calorieDeficitCalculatorPrice) || 0)
                     setHasEasyShopping(program.hasEasyShopping || false)
                     setEasyShoppingPrice(parseFloat(program.easyShoppingPrice) || 0)
+                    
+                    // Fetch individual product programs (children) for this program
+                    await fetchIndividualProductPrograms(program.id)
                 }
             } else {
                 setError('Failed to load program')
@@ -221,6 +260,49 @@ export default function ProgramEditor() {
             setError('Failed to load program')
         } finally {
             setLoading(false)
+        }
+    }
+    
+    // Fetch individual product programs that belong to this parent program
+    const fetchIndividualProductPrograms = async (parentId: string) => {
+        try {
+            // Use parentProgramId to get child programs, and includeChildren to bypass the default filter
+            const response = await fetch(`${API_URL}/programs?parentProgramId=${parentId}&includeChildren=true`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+            
+            if (response.ok) {
+                const data = await response.json()
+                if (data.success && Array.isArray(data.data)) {
+                    // These are child programs with individualProductId set
+                    const individualPrograms = data.data.filter((p: any) => p.individualProductId)
+                    
+                    if (individualPrograms.length > 0) {
+                        setProgramMode('per_product')
+                        const programsMap: Record<string, IndividualProductProgram> = {}
+                        individualPrograms.forEach((p: any) => {
+                            programsMap[p.individualProductId] = {
+                                productId: p.individualProductId,
+                                programName: p.name,
+                                hasPatientPortal: p.hasPatientPortal || false,
+                                patientPortalPrice: parseFloat(p.patientPortalPrice) || 0,
+                                hasBmiCalculator: p.hasBmiCalculator || false,
+                                bmiCalculatorPrice: parseFloat(p.bmiCalculatorPrice) || 0,
+                                hasProteinIntakeCalculator: p.hasProteinIntakeCalculator || false,
+                                proteinIntakeCalculatorPrice: parseFloat(p.proteinIntakeCalculatorPrice) || 0,
+                                hasCalorieDeficitCalculator: p.hasCalorieDeficitCalculator || false,
+                                calorieDeficitCalculatorPrice: parseFloat(p.calorieDeficitCalculatorPrice) || 0,
+                                hasEasyShopping: p.hasEasyShopping || false,
+                                easyShoppingPrice: parseFloat(p.easyShoppingPrice) || 0,
+                                existingProgramId: p.id,
+                            }
+                        })
+                        setIndividualProductPrograms(programsMap)
+                    }
+                }
+            }
+        } catch (err) {
+            console.error('Error fetching individual product programs:', err)
         }
     }
 
@@ -244,6 +326,25 @@ export default function ProgramEditor() {
         }
     }
 
+    // Handle switching to unified mode with warning
+    const handleSwitchToUnified = () => {
+        // Check if there are existing per-product programs
+        const hasExistingPrograms = Object.values(individualProductPrograms).some(p => p.existingProgramId)
+        
+        if (programMode === 'per_product' && hasExistingPrograms) {
+            // Show warning dialog
+            setShowUnifiedWarning(true)
+        } else {
+            // No existing programs to delete, just switch
+            setProgramMode('unified')
+        }
+    }
+
+    const confirmSwitchToUnified = () => {
+        setProgramMode('unified')
+        setShowUnifiedWarning(false)
+    }
+
     const handleSave = async () => {
         if (!name.trim()) {
             setError('Program name is required')
@@ -259,17 +360,17 @@ export default function ProgramEditor() {
                 description: description.trim() || undefined,
                 medicalTemplateId: medicalTemplateId || undefined,
                 frontendDisplayProductId: frontendDisplayProductId || null,
-                // Non-medical services
-                hasPatientPortal,
-                patientPortalPrice,
-                hasBmiCalculator,
-                bmiCalculatorPrice,
-                hasProteinIntakeCalculator,
-                proteinIntakeCalculatorPrice,
-                hasCalorieDeficitCalculator,
-                calorieDeficitCalculatorPrice,
-                hasEasyShopping,
-                easyShoppingPrice,
+                // Non-medical services (for unified mode)
+                hasPatientPortal: programMode === 'unified' ? hasPatientPortal : false,
+                patientPortalPrice: programMode === 'unified' ? patientPortalPrice : 0,
+                hasBmiCalculator: programMode === 'unified' ? hasBmiCalculator : false,
+                bmiCalculatorPrice: programMode === 'unified' ? bmiCalculatorPrice : 0,
+                hasProteinIntakeCalculator: programMode === 'unified' ? hasProteinIntakeCalculator : false,
+                proteinIntakeCalculatorPrice: programMode === 'unified' ? proteinIntakeCalculatorPrice : 0,
+                hasCalorieDeficitCalculator: programMode === 'unified' ? hasCalorieDeficitCalculator : false,
+                calorieDeficitCalculatorPrice: programMode === 'unified' ? calorieDeficitCalculatorPrice : 0,
+                hasEasyShopping: programMode === 'unified' ? hasEasyShopping : false,
+                easyShoppingPrice: programMode === 'unified' ? easyShoppingPrice : 0,
                 isActive,
             }
 
@@ -288,6 +389,74 @@ export default function ProgramEditor() {
             const data = await response.json()
 
             if (response.ok && data.success) {
+                const mainProgramId = isCreateMode ? data.data.id : id
+                
+                // If in per_product mode, save/update individual product programs
+                if (programMode === 'per_product' && Object.keys(individualProductPrograms).length > 0) {
+                    for (const [productId, config] of Object.entries(individualProductPrograms)) {
+                        const individualPayload = {
+                            name: config.programName,
+                            medicalTemplateId: medicalTemplateId,
+                            individualProductId: productId,
+                            parentProgramId: mainProgramId, // Link child program to parent
+                            hasPatientPortal: config.hasPatientPortal,
+                            patientPortalPrice: config.patientPortalPrice,
+                            hasBmiCalculator: config.hasBmiCalculator,
+                            bmiCalculatorPrice: config.bmiCalculatorPrice,
+                            hasProteinIntakeCalculator: config.hasProteinIntakeCalculator,
+                            proteinIntakeCalculatorPrice: config.proteinIntakeCalculatorPrice,
+                            hasCalorieDeficitCalculator: config.hasCalorieDeficitCalculator,
+                            calorieDeficitCalculatorPrice: config.calorieDeficitCalculatorPrice,
+                            hasEasyShopping: config.hasEasyShopping,
+                            easyShoppingPrice: config.easyShoppingPrice,
+                            isActive,
+                        }
+                        
+                        const individualUrl = config.existingProgramId 
+                            ? `${API_URL}/programs/${config.existingProgramId}`
+                            : `${API_URL}/programs`
+                        const individualMethod = config.existingProgramId ? 'PUT' : 'POST'
+                        
+                        await fetch(individualUrl, {
+                            method: individualMethod,
+                            headers: {
+                                'Authorization': `Bearer ${token}`,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(individualPayload)
+                        })
+                    }
+                } else if (programMode === 'unified' && !isCreateMode) {
+                    // If switching to unified mode, delete any existing child programs
+                    // First, fetch all child programs for this parent
+                    const childProgramsResponse = await fetch(
+                        `${API_URL}/programs?parentProgramId=${mainProgramId}&includeChildren=true`,
+                        {
+                            headers: {
+                                'Authorization': `Bearer ${token}`,
+                            }
+                        }
+                    )
+                    
+                    if (childProgramsResponse.ok) {
+                        const childProgramsData = await childProgramsResponse.json()
+                        if (childProgramsData.success && Array.isArray(childProgramsData.data)) {
+                            // Delete each child program
+                            for (const childProgram of childProgramsData.data) {
+                                await fetch(`${API_URL}/programs/${childProgram.id}`, {
+                                    method: 'DELETE',
+                                    headers: {
+                                        'Authorization': `Bearer ${token}`,
+                                    }
+                                })
+                            }
+                        }
+                    }
+                    
+                    // Clear the local state
+                    setIndividualProductPrograms({})
+                }
+                
                 router.push('/programs')
             } else {
                 setError(data.error || 'Failed to save program')
@@ -344,6 +513,49 @@ export default function ProgramEditor() {
             style: 'currency',
             currency: 'USD'
         }).format(price)
+    }
+    
+    // Open modal to configure individual product program
+    const openProductConfigModal = (product: TemplateProduct) => {
+        const existingConfig = individualProductPrograms[product.id]
+        setConfigModalProductId(product.id)
+        setConfigModalData(existingConfig || {
+            productId: product.id,
+            programName: `${name} - ${product.name}`,
+            hasPatientPortal: hasPatientPortal,
+            patientPortalPrice: patientPortalPrice,
+            hasBmiCalculator: hasBmiCalculator,
+            bmiCalculatorPrice: bmiCalculatorPrice,
+            hasProteinIntakeCalculator: hasProteinIntakeCalculator,
+            proteinIntakeCalculatorPrice: proteinIntakeCalculatorPrice,
+            hasCalorieDeficitCalculator: hasCalorieDeficitCalculator,
+            calorieDeficitCalculatorPrice: calorieDeficitCalculatorPrice,
+            hasEasyShopping: hasEasyShopping,
+            easyShoppingPrice: easyShoppingPrice,
+        })
+        setConfigModalOpen(true)
+    }
+    
+    // Save individual product program configuration
+    const saveProductConfig = () => {
+        if (!configModalProductId || !configModalData) return
+        
+        setIndividualProductPrograms(prev => ({
+            ...prev,
+            [configModalProductId]: configModalData
+        }))
+        setConfigModalOpen(false)
+        setConfigModalProductId(null)
+        setConfigModalData(null)
+    }
+    
+    // Remove individual product program configuration
+    const removeProductConfig = (productId: string) => {
+        setIndividualProductPrograms(prev => {
+            const newMap = { ...prev }
+            delete newMap[productId]
+            return newMap
+        })
     }
 
     const filteredTemplates = templates
@@ -995,54 +1207,69 @@ export default function ProgramEditor() {
                                             </div>
 
                                             {/* Form URLs */}
-                                            <div className="bg-card border border-border rounded-lg p-3">
-                                                <div className="space-y-3">
-                                                    {/* Subdomain URL */}
-                                                    <div>
-                                                        <div className="text-xs font-medium text-muted-foreground mb-1">
-                                                            Subdomain URL:
-                                                        </div>
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="text-xs truncate flex-1 font-mono bg-muted px-2 py-1 rounded">
-                                                                {programUrl}
-                                                            </div>
-                                                            <Button size="sm" variant="outline" onClick={() => window.open(programUrl, '_blank')}>
-                                                                Preview
-                                                            </Button>
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                {/* Subdomain URL */}
+                                                <div className="relative group">
+                                                    <Button 
+                                                        size="sm" 
+                                                        variant="outline" 
+                                                        onClick={() => window.open(programUrl, '_blank')}
+                                                        className="gap-1.5"
+                                                    >
+                                                        <ExternalLink className="h-3.5 w-3.5" />
+                                                        Preview Subdomain
+                                                    </Button>
+                                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 bg-foreground text-background text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50 max-w-xs truncate">
+                                                        {programUrl}
+                                                    </div>
+                                                </div>
+                                                <Button 
+                                                    size="sm" 
+                                                    variant="ghost" 
+                                                    onClick={() => handleCopyUrl(programUrl, 'program-subdomain')}
+                                                    className="h-8 w-8 p-0"
+                                                    title="Copy subdomain URL"
+                                                >
+                                                    {copiedUrl === 'program-subdomain' ? (
+                                                        <Check className="h-3.5 w-3.5 text-green-500" />
+                                                    ) : (
+                                                        <Copy className="h-3.5 w-3.5" />
+                                                    )}
+                                                </Button>
+
+                                                {/* Custom Domain URL */}
+                                                {customProgramUrl && (
+                                                    <>
+                                                        <div className="w-px h-6 bg-border mx-1" />
+                                                        <div className="relative group">
                                                             <Button 
                                                                 size="sm" 
                                                                 variant="outline" 
-                                                                onClick={() => handleCopyUrl(programUrl, 'program-subdomain')}
+                                                                onClick={() => window.open(customProgramUrl, '_blank')}
+                                                                className="gap-1.5"
                                                             >
-                                                                {copiedUrl === 'program-subdomain' ? 'Copied!' : 'Copy'}
+                                                                <ExternalLink className="h-3.5 w-3.5" />
+                                                                Preview Custom Domain
                                                             </Button>
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Custom Domain URL */}
-                                                    {customProgramUrl && (
-                                                        <div>
-                                                            <div className="text-xs font-medium text-muted-foreground mb-1">
-                                                                Custom Domain URL:
-                                                            </div>
-                                                            <div className="flex items-center gap-2">
-                                                                <div className="text-xs truncate flex-1 font-mono bg-muted px-2 py-1 rounded">
-                                                                    {customProgramUrl}
-                                                                </div>
-                                                                <Button size="sm" variant="outline" onClick={() => window.open(customProgramUrl, '_blank')}>
-                                                                    Preview
-                                                                </Button>
-                                                                <Button 
-                                                                    size="sm" 
-                                                                    variant="outline" 
-                                                                    onClick={() => handleCopyUrl(customProgramUrl, 'program-custom')}
-                                                                >
-                                                                    {copiedUrl === 'program-custom' ? 'Copied!' : 'Copy'}
-                                                                </Button>
+                                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 bg-foreground text-background text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50 max-w-xs truncate">
+                                                                {customProgramUrl}
                                                             </div>
                                                         </div>
-                                                    )}
-                                                </div>
+                                                        <Button 
+                                                            size="sm" 
+                                                            variant="ghost" 
+                                                            onClick={() => handleCopyUrl(customProgramUrl, 'program-custom')}
+                                                            className="h-8 w-8 p-0"
+                                                            title="Copy custom domain URL"
+                                                        >
+                                                            {copiedUrl === 'program-custom' ? (
+                                                                <Check className="h-3.5 w-3.5 text-green-500" />
+                                                            ) : (
+                                                                <Copy className="h-3.5 w-3.5" />
+                                                            )}
+                                                        </Button>
+                                                    </>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
@@ -1063,6 +1290,63 @@ export default function ProgramEditor() {
                                 <br />
                                 <span className="text-xs">Click the circle next to a product to use its image as the program's display image on the frontend.</span>
                             </p>
+                            
+                            {/* Program Mode Toggle */}
+                            <div className="bg-muted/50 rounded-lg p-4 mb-6">
+                                <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                                    <Settings2 className="h-4 w-4" />
+                                    Program Pricing Mode
+                                </h4>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={handleSwitchToUnified}
+                                        className={`p-4 rounded-lg border-2 text-left transition-all ${
+                                            programMode === 'unified'
+                                                ? 'border-primary bg-primary/5'
+                                                : 'border-border hover:border-primary/50'
+                                        }`}
+                                    >
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                                                programMode === 'unified' ? 'border-primary bg-primary' : 'border-muted-foreground/50'
+                                            }`}>
+                                                {programMode === 'unified' && <Check className="h-3 w-3 text-white" />}
+                                            </div>
+                                            <span className="font-medium">Unified Program</span>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground ml-6">
+                                            One set of non-medical services and prices for all products
+                                        </p>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setProgramMode('per_product')}
+                                        className={`p-4 rounded-lg border-2 text-left transition-all ${
+                                            programMode === 'per_product'
+                                                ? 'border-primary bg-primary/5'
+                                                : 'border-border hover:border-primary/50'
+                                        }`}
+                                    >
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                                                programMode === 'per_product' ? 'border-primary bg-primary' : 'border-muted-foreground/50'
+                                            }`}>
+                                                {programMode === 'per_product' && <Check className="h-3 w-3 text-white" />}
+                                            </div>
+                                            <span className="font-medium">Per-Product Programs</span>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground ml-6">
+                                            Unique program name, services, and prices for each product
+                                        </p>
+                                    </button>
+                                </div>
+                                {programMode === 'per_product' && (
+                                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-3 bg-amber-50 dark:bg-amber-950/30 p-2 rounded">
+                                        💡 Click "Configure" on each product below to set individual program name and pricing
+                                    </p>
+                                )}
+                            </div>
 
                             <div className="space-y-4">
                                 {selectedTemplateDetails.formProducts
@@ -1116,12 +1400,36 @@ export default function ProgramEditor() {
                                                                     Frontend Display Image
                                                                 </Badge>
                                                             )}
+                                                            {/* Show individual program config summary */}
+                                                            {programMode === 'per_product' && individualProductPrograms[product.id] && (
+                                                                <div className="mt-2 text-xs bg-primary/10 text-primary px-2 py-1 rounded inline-flex items-center gap-1">
+                                                                    <Check className="h-3 w-3" />
+                                                                    Configured: {individualProductPrograms[product.id].programName}
+                                                                </div>
+                                                            )}
                                                         </div>
-                                                        <div className="text-right">
-                                                            <div className="text-xs text-muted-foreground uppercase tracking-wide">Wholesale Cost</div>
-                                                            <div className="text-lg font-semibold text-foreground">
-                                                                {formatPrice(product.pharmacyWholesaleCost || product.price || 0)}
+                                                        <div className="text-right flex flex-col items-end gap-2">
+                                                            <div>
+                                                                <div className="text-xs text-muted-foreground uppercase tracking-wide">Wholesale Cost</div>
+                                                                <div className="text-lg font-semibold text-foreground">
+                                                                    {formatPrice(product.pharmacyWholesaleCost || product.price || 0)}
+                                                                </div>
                                                             </div>
+                                                            {/* Configure button for per-product mode */}
+                                                            {programMode === 'per_product' && (
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant={individualProductPrograms[product.id] ? 'outline' : 'default'}
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation()
+                                                                        openProductConfigModal(product)
+                                                                    }}
+                                                                    className="text-xs"
+                                                                >
+                                                                    <Settings2 className="h-3 w-3 mr-1" />
+                                                                    {individualProductPrograms[product.id] ? 'Edit' : 'Configure'}
+                                                                </Button>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 </div>
@@ -1179,54 +1487,69 @@ export default function ProgramEditor() {
 
                                                             {/* Form URLs */}
                                                             {urls ? (
-                                                                <div className="bg-card border border-border rounded-lg p-3">
-                                                                    <div className="space-y-3">
-                                                                        {/* Standard Subdomain URL */}
-                                                                        <div>
-                                                                            <div className="text-xs font-medium text-muted-foreground mb-1">
-                                                                                Subdomain URL:
-                                                                            </div>
-                                                                            <div className="flex items-center gap-2">
-                                                                                <div className="text-xs truncate flex-1 font-mono bg-muted px-2 py-1 rounded">
-                                                                                    {urls.subdomainUrl}
-                                                                                </div>
-                                                                                <Button size="sm" variant="outline" onClick={() => window.open(urls.subdomainUrl, '_blank')}>
-                                                                                    Preview
-                                                                                </Button>
+                                                                <div className="flex items-center gap-2 flex-wrap">
+                                                                    {/* Subdomain URL */}
+                                                                    <div className="relative group">
+                                                                        <Button 
+                                                                            size="sm" 
+                                                                            variant="outline" 
+                                                                            onClick={() => window.open(urls.subdomainUrl, '_blank')}
+                                                                            className="gap-1.5"
+                                                                        >
+                                                                            <ExternalLink className="h-3.5 w-3.5" />
+                                                                            Preview Subdomain
+                                                                        </Button>
+                                                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 bg-foreground text-background text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50 max-w-xs truncate">
+                                                                            {urls.subdomainUrl}
+                                                                        </div>
+                                                                    </div>
+                                                                    <Button 
+                                                                        size="sm" 
+                                                                        variant="ghost" 
+                                                                        onClick={() => handleCopyUrl(urls.subdomainUrl, `${product.id}-subdomain`)}
+                                                                        className="h-8 w-8 p-0"
+                                                                        title="Copy subdomain URL"
+                                                                    >
+                                                                        {copiedUrl === `${product.id}-subdomain` ? (
+                                                                            <Check className="h-3.5 w-3.5 text-green-500" />
+                                                                        ) : (
+                                                                            <Copy className="h-3.5 w-3.5" />
+                                                                        )}
+                                                                    </Button>
+
+                                                                    {/* Custom Domain URL (if configured) */}
+                                                                    {urls.customDomainUrl && (
+                                                                        <>
+                                                                            <div className="w-px h-6 bg-border mx-1" />
+                                                                            <div className="relative group">
                                                                                 <Button 
                                                                                     size="sm" 
                                                                                     variant="outline" 
-                                                                                    onClick={() => handleCopyUrl(urls.subdomainUrl, `${product.id}-subdomain`)}
+                                                                                    onClick={() => urls.customDomainUrl && window.open(urls.customDomainUrl, '_blank')}
+                                                                                    className="gap-1.5"
                                                                                 >
-                                                                                    {copiedUrl === `${product.id}-subdomain` ? 'Copied!' : 'Copy'}
+                                                                                    <ExternalLink className="h-3.5 w-3.5" />
+                                                                                    Preview Custom Domain
                                                                                 </Button>
-                                                                            </div>
-                                                                        </div>
-
-                                                                        {/* Custom Domain URL (if configured) */}
-                                                                        {urls.customDomainUrl && (
-                                                                            <div>
-                                                                                <div className="text-xs font-medium text-muted-foreground mb-1">
-                                                                                    Custom Domain URL:
-                                                                                </div>
-                                                                                <div className="flex items-center gap-2">
-                                                                                    <div className="text-xs truncate flex-1 font-mono bg-muted px-2 py-1 rounded">
-                                                                                        {urls.customDomainUrl}
-                                                                                    </div>
-                                                                                    <Button size="sm" variant="outline" onClick={() => urls.customDomainUrl && window.open(urls.customDomainUrl, '_blank')}>
-                                                                                        Preview
-                                                                                    </Button>
-                                                                                    <Button 
-                                                                                        size="sm" 
-                                                                                        variant="outline" 
-                                                                                        onClick={() => urls.customDomainUrl && handleCopyUrl(urls.customDomainUrl, `${product.id}-custom`)}
-                                                                                    >
-                                                                                        {copiedUrl === `${product.id}-custom` ? 'Copied!' : 'Copy'}
-                                                                                    </Button>
+                                                                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 bg-foreground text-background text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50 max-w-xs truncate">
+                                                                                    {urls.customDomainUrl}
                                                                                 </div>
                                                                             </div>
-                                                                        )}
-                                                                    </div>
+                                                                            <Button 
+                                                                                size="sm" 
+                                                                                variant="ghost" 
+                                                                                onClick={() => urls.customDomainUrl && handleCopyUrl(urls.customDomainUrl, `${product.id}-custom`)}
+                                                                                className="h-8 w-8 p-0"
+                                                                                title="Copy custom domain URL"
+                                                                            >
+                                                                                {copiedUrl === `${product.id}-custom` ? (
+                                                                                    <Check className="h-3.5 w-3.5 text-green-500" />
+                                                                                ) : (
+                                                                                    <Copy className="h-3.5 w-3.5" />
+                                                                                )}
+                                                                            </Button>
+                                                                        </>
+                                                                    )}
                                                                 </div>
                                                             ) : (
                                                                 <div className="text-xs text-muted-foreground bg-amber-50 dark:bg-amber-950/20 p-3 rounded">
@@ -1263,8 +1586,8 @@ export default function ProgramEditor() {
                         </div>
                     )}
 
-                    {/* Edit Mode: Non-Medical Services */}
-                    {!isCreateMode && (
+                    {/* Edit Mode: Non-Medical Services (only shown in unified mode) */}
+                    {!isCreateMode && programMode === 'unified' && (
                         <div className="bg-card rounded-2xl shadow-sm border border-border p-6 mt-6">
                             <div className="flex items-center gap-2 mb-2">
                                 <Sparkles className="h-5 w-5 text-primary" />
@@ -1360,6 +1683,290 @@ export default function ProgramEditor() {
                     )}
                 </div>
             </div>
+            
+            {/* Warning Dialog for Switching to Unified Mode */}
+            {showUnifiedWarning && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <div className="bg-card rounded-2xl shadow-xl border border-border w-full max-w-md mx-4">
+                        <div className="p-6">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                                    <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-semibold">Switch to Unified Pricing?</h3>
+                                </div>
+                            </div>
+                            <p className="text-sm text-muted-foreground mb-6">
+                                Switching to unified pricing mode will <span className="font-medium text-foreground">permanently delete</span> all 
+                                individual product programs and their custom pricing configurations. 
+                                The unified non-medical services pricing will apply to all products.
+                            </p>
+                            <div className="flex gap-3">
+                                <Button
+                                    variant="outline"
+                                    onClick={() => setShowUnifiedWarning(false)}
+                                    className="flex-1"
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    variant="destructive"
+                                    onClick={confirmSwitchToUnified}
+                                    className="flex-1"
+                                >
+                                    Delete & Switch
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+            
+            {/* Individual Product Program Configuration Modal */}
+            {configModalOpen && configModalData && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <div className="bg-card rounded-2xl shadow-xl border border-border w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+                        <div className="p-6">
+                            {/* Modal Header */}
+                            <div className="flex items-center justify-between mb-6">
+                                <div>
+                                    <h3 className="text-lg font-semibold">Configure Product Program</h3>
+                                    <p className="text-sm text-muted-foreground">
+                                        Set unique pricing for this product
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={() => {
+                                        setConfigModalOpen(false)
+                                        setConfigModalProductId(null)
+                                        setConfigModalData(null)
+                                    }}
+                                    className="p-2 hover:bg-muted rounded-lg transition-colors"
+                                >
+                                    <X className="h-5 w-5" />
+                                </button>
+                            </div>
+
+                            {/* Program Name */}
+                            <div className="mb-6">
+                                <label className="block text-sm font-medium mb-2">
+                                    Program Name for this Product
+                                </label>
+                                <Input
+                                    value={configModalData.programName}
+                                    onChange={(e) => setConfigModalData(prev => prev ? { ...prev, programName: e.target.value } : null)}
+                                    placeholder="e.g., NAD+ Wellness Program"
+                                />
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    This name will be shown to customers for this specific product
+                                </p>
+                            </div>
+
+                            {/* Non-Medical Services */}
+                            <div className="space-y-3 mb-6">
+                                <h4 className="text-sm font-semibold flex items-center gap-2">
+                                    <Sparkles className="h-4 w-4 text-primary" />
+                                    Non-Medical Services & Pricing
+                                </h4>
+
+                                {/* Patient Portal */}
+                                <div className={`p-3 border rounded-lg transition-all ${configModalData.hasPatientPortal ? 'border-primary bg-primary/5' : 'border-border'}`}>
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <input
+                                                type="checkbox"
+                                                checked={configModalData.hasPatientPortal}
+                                                onChange={(e) => setConfigModalData(prev => prev ? { ...prev, hasPatientPortal: e.target.checked } : null)}
+                                                className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                            />
+                                            <span className="text-sm font-medium">Patient Portal</span>
+                                        </div>
+                                        {configModalData.hasPatientPortal && (
+                                            <div className="flex items-center gap-1">
+                                                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                                                <Input
+                                                    type="number"
+                                                    min="0"
+                                                    step="0.01"
+                                                    value={configModalData.patientPortalPrice}
+                                                    onChange={(e) => setConfigModalData(prev => prev ? { ...prev, patientPortalPrice: parseFloat(e.target.value) || 0 } : null)}
+                                                    className="w-20 text-right text-sm"
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* BMI Calculator */}
+                                <div className={`p-3 border rounded-lg transition-all ${configModalData.hasBmiCalculator ? 'border-primary bg-primary/5' : 'border-border'}`}>
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <input
+                                                type="checkbox"
+                                                checked={configModalData.hasBmiCalculator}
+                                                onChange={(e) => setConfigModalData(prev => prev ? { ...prev, hasBmiCalculator: e.target.checked } : null)}
+                                                className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                            />
+                                            <span className="text-sm font-medium">BMI Calculator</span>
+                                        </div>
+                                        {configModalData.hasBmiCalculator && (
+                                            <div className="flex items-center gap-1">
+                                                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                                                <Input
+                                                    type="number"
+                                                    min="0"
+                                                    step="0.01"
+                                                    value={configModalData.bmiCalculatorPrice}
+                                                    onChange={(e) => setConfigModalData(prev => prev ? { ...prev, bmiCalculatorPrice: parseFloat(e.target.value) || 0 } : null)}
+                                                    className="w-20 text-right text-sm"
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Protein Intake Calculator */}
+                                <div className={`p-3 border rounded-lg transition-all ${configModalData.hasProteinIntakeCalculator ? 'border-primary bg-primary/5' : 'border-border'}`}>
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <input
+                                                type="checkbox"
+                                                checked={configModalData.hasProteinIntakeCalculator}
+                                                onChange={(e) => setConfigModalData(prev => prev ? { ...prev, hasProteinIntakeCalculator: e.target.checked } : null)}
+                                                className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                            />
+                                            <span className="text-sm font-medium">Protein Intake Calculator</span>
+                                        </div>
+                                        {configModalData.hasProteinIntakeCalculator && (
+                                            <div className="flex items-center gap-1">
+                                                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                                                <Input
+                                                    type="number"
+                                                    min="0"
+                                                    step="0.01"
+                                                    value={configModalData.proteinIntakeCalculatorPrice}
+                                                    onChange={(e) => setConfigModalData(prev => prev ? { ...prev, proteinIntakeCalculatorPrice: parseFloat(e.target.value) || 0 } : null)}
+                                                    className="w-20 text-right text-sm"
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Calorie Deficit Calculator */}
+                                <div className={`p-3 border rounded-lg transition-all ${configModalData.hasCalorieDeficitCalculator ? 'border-primary bg-primary/5' : 'border-border'}`}>
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <input
+                                                type="checkbox"
+                                                checked={configModalData.hasCalorieDeficitCalculator}
+                                                onChange={(e) => setConfigModalData(prev => prev ? { ...prev, hasCalorieDeficitCalculator: e.target.checked } : null)}
+                                                className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                            />
+                                            <span className="text-sm font-medium">Calorie Deficit Calculator</span>
+                                        </div>
+                                        {configModalData.hasCalorieDeficitCalculator && (
+                                            <div className="flex items-center gap-1">
+                                                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                                                <Input
+                                                    type="number"
+                                                    min="0"
+                                                    step="0.01"
+                                                    value={configModalData.calorieDeficitCalculatorPrice}
+                                                    onChange={(e) => setConfigModalData(prev => prev ? { ...prev, calorieDeficitCalculatorPrice: parseFloat(e.target.value) || 0 } : null)}
+                                                    className="w-20 text-right text-sm"
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Easy Shopping */}
+                                <div className={`p-3 border rounded-lg transition-all ${configModalData.hasEasyShopping ? 'border-primary bg-primary/5' : 'border-border'}`}>
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <input
+                                                type="checkbox"
+                                                checked={configModalData.hasEasyShopping}
+                                                onChange={(e) => setConfigModalData(prev => prev ? { ...prev, hasEasyShopping: e.target.checked } : null)}
+                                                className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                            />
+                                            <span className="text-sm font-medium">Easy Shopping</span>
+                                        </div>
+                                        {configModalData.hasEasyShopping && (
+                                            <div className="flex items-center gap-1">
+                                                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                                                <Input
+                                                    type="number"
+                                                    min="0"
+                                                    step="0.01"
+                                                    value={configModalData.easyShoppingPrice}
+                                                    onChange={(e) => setConfigModalData(prev => prev ? { ...prev, easyShoppingPrice: parseFloat(e.target.value) || 0 } : null)}
+                                                    className="w-20 text-right text-sm"
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Summary */}
+                            {(configModalData.hasPatientPortal || configModalData.hasBmiCalculator || configModalData.hasProteinIntakeCalculator || configModalData.hasCalorieDeficitCalculator || configModalData.hasEasyShopping) && (
+                                <div className="bg-muted/50 rounded-lg p-4 mb-6">
+                                    <h4 className="text-sm font-medium mb-2">Total Non-Medical Fee</h4>
+                                    <div className="text-2xl font-bold text-primary">
+                                        {formatPrice(
+                                            (configModalData.hasPatientPortal ? configModalData.patientPortalPrice : 0) +
+                                            (configModalData.hasBmiCalculator ? configModalData.bmiCalculatorPrice : 0) +
+                                            (configModalData.hasProteinIntakeCalculator ? configModalData.proteinIntakeCalculatorPrice : 0) +
+                                            (configModalData.hasCalorieDeficitCalculator ? configModalData.calorieDeficitCalculatorPrice : 0) +
+                                            (configModalData.hasEasyShopping ? configModalData.easyShoppingPrice : 0)
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Actions */}
+                            <div className="flex gap-3">
+                                {configModalData.existingProgramId && (
+                                    <Button
+                                        variant="destructive"
+                                        onClick={() => {
+                                            if (configModalProductId) {
+                                                removeProductConfig(configModalProductId)
+                                            }
+                                            setConfigModalOpen(false)
+                                            setConfigModalProductId(null)
+                                            setConfigModalData(null)
+                                        }}
+                                        className="flex-1"
+                                    >
+                                        Remove Configuration
+                                    </Button>
+                                )}
+                                <Button
+                                    variant="outline"
+                                    onClick={() => {
+                                        setConfigModalOpen(false)
+                                        setConfigModalProductId(null)
+                                        setConfigModalData(null)
+                                    }}
+                                    className={configModalData.existingProgramId ? '' : 'flex-1'}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    onClick={saveProductConfig}
+                                    className="flex-1"
+                                >
+                                    Save Configuration
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </Layout>
     )
 }

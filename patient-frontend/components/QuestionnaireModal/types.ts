@@ -86,6 +86,13 @@ export interface ProgramProductWithPricing {
         price: number;
         isActive: boolean;
     };
+    /** Per-product program with individual non-medical services pricing */
+    perProductProgram?: {
+        programId: string;
+        programName: string;
+        nonMedicalServices: ProgramNonMedicalServices;
+        nonMedicalServicesFee: number;
+    };
 }
 
 export interface NonMedicalService {
@@ -119,6 +126,8 @@ export interface ProgramData {
     nonMedicalServicesFee: number;
     /** Controls whether user can select one or multiple products */
     productOfferType?: 'single_choice' | 'multiple_choice';
+    /** Whether this program has per-product pricing (child programs) */
+    hasPerProductPricing?: boolean;
 }
 
 export interface QuestionnaireModalProps {

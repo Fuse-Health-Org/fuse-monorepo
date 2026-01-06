@@ -159,6 +159,65 @@ router.get('/public/programs/:id', async (req: Request, res: Response) => {
       });
     }
 
+    // Fetch child programs (per-product programs) for this parent program
+    const childPrograms = await Program.findAll({
+      where: {
+        parentProgramId: program.id,
+        isActive: true,
+      },
+      attributes: [
+        'id', 'name', 'individualProductId',
+        'hasPatientPortal', 'patientPortalPrice',
+        'hasBmiCalculator', 'bmiCalculatorPrice',
+        'hasProteinIntakeCalculator', 'proteinIntakeCalculatorPrice',
+        'hasCalorieDeficitCalculator', 'calorieDeficitCalculatorPrice',
+        'hasEasyShopping', 'easyShoppingPrice',
+      ],
+    });
+
+    // Build a map of productId -> child program's non-medical services
+    const perProductPrograms: Record<string, any> = {};
+    for (const childProg of childPrograms) {
+      if (childProg.individualProductId) {
+        const childNonMedicalServices = {
+          patientPortal: {
+            enabled: childProg.hasPatientPortal,
+            price: parseFloat(String(childProg.patientPortalPrice)) || 0,
+          },
+          bmiCalculator: {
+            enabled: childProg.hasBmiCalculator,
+            price: parseFloat(String(childProg.bmiCalculatorPrice)) || 0,
+          },
+          proteinIntakeCalculator: {
+            enabled: childProg.hasProteinIntakeCalculator,
+            price: parseFloat(String(childProg.proteinIntakeCalculatorPrice)) || 0,
+          },
+          calorieDeficitCalculator: {
+            enabled: childProg.hasCalorieDeficitCalculator,
+            price: parseFloat(String(childProg.calorieDeficitCalculatorPrice)) || 0,
+          },
+          easyShopping: {
+            enabled: childProg.hasEasyShopping,
+            price: parseFloat(String(childProg.easyShoppingPrice)) || 0,
+          },
+        };
+        
+        const childNonMedicalServicesFee = Object.values(childNonMedicalServices)
+          .filter((s: any) => s.enabled)
+          .reduce((sum: number, s: any) => sum + s.price, 0);
+        
+        perProductPrograms[childProg.individualProductId] = {
+          programId: childProg.id,
+          programName: childProg.name,
+          nonMedicalServices: childNonMedicalServices,
+          nonMedicalServicesFee: childNonMedicalServicesFee,
+        };
+      }
+    }
+
+    // Determine if this is a per-product pricing program
+    const hasPerProductPricing = Object.keys(perProductPrograms).length > 0;
+
     // Get all products from the program's template with their tenant pricing
     const formProducts = (program.medicalTemplate as any)?.formProducts || [];
     const productsWithPricing: any[] = [];
@@ -190,6 +249,9 @@ router.get('/public/programs/:id', async (req: Request, res: Response) => {
 
       const displayPrice = tenantProductInfo ? tenantProductInfo.price : (product.price || 0);
 
+      // Get per-product program info if available
+      const perProductProgram = perProductPrograms[product.id] || null;
+
       productsWithPricing.push({
         id: product.id,
         name: product.name,
@@ -199,10 +261,12 @@ router.get('/public/programs/:id', async (req: Request, res: Response) => {
         categories: product.categories,
         tenantProduct: tenantProductInfo,
         displayPrice,
+        // Include per-product program's non-medical services if available
+        perProductProgram,
       });
     }
 
-    // Build non-medical services info from program
+    // Build non-medical services info from parent program (used for unified pricing)
     const nonMedicalServices = {
       patientPortal: {
         enabled: program.hasPatientPortal,
@@ -226,7 +290,7 @@ router.get('/public/programs/:id', async (req: Request, res: Response) => {
       },
     };
 
-    // Calculate total non-medical services fee
+    // Calculate total non-medical services fee for unified pricing
     const nonMedicalServicesFee = Object.values(nonMedicalServices)
       .filter((s: any) => s.enabled)
       .reduce((sum: number, s: any) => sum + s.price, 0);
@@ -248,13 +312,15 @@ router.get('/public/programs/:id', async (req: Request, res: Response) => {
         productOfferType: (program.medicalTemplate as any).productOfferType,
       } : null,
       isActive: program.isActive,
-      // All products with pricing
+      // All products with pricing (includes per-product program info if available)
       products: productsWithPricing,
-      // Non-medical services
+      // Non-medical services (parent program - used for unified pricing)
       nonMedicalServices,
       nonMedicalServicesFee,
       // Product offer type (single_choice or multiple_choice)
       productOfferType,
+      // Whether this program has per-product pricing
+      hasPerProductPricing,
     };
 
     return res.json({
@@ -273,6 +339,10 @@ router.get('/public/programs/:id', async (req: Request, res: Response) => {
 /**
  * Get all programs for the current clinic
  * GET /programs
+ * Query params:
+ *   - medicalTemplateId: Filter by medical template ID (to get individual product programs)
+ *   - parentProgramId: Filter by parent program ID (to get child programs)
+ *   - includeChildren: If 'true', include child programs; otherwise only parent programs are returned
  */
 router.get('/programs', authenticateJWT, async (req: Request, res: Response) => {
   try {
@@ -292,13 +362,36 @@ router.get('/programs', authenticateJWT, async (req: Request, res: Response) => 
       });
     }
 
+    const { medicalTemplateId, parentProgramId, includeChildren } = req.query;
+    
+    const whereClause: any = { clinicId };
+    
+    // Filter by medical template if provided
+    if (medicalTemplateId && typeof medicalTemplateId === 'string') {
+      whereClause.medicalTemplateId = medicalTemplateId;
+    }
+    
+    // Filter by parent program if provided
+    if (parentProgramId && typeof parentProgramId === 'string') {
+      whereClause.parentProgramId = parentProgramId;
+    } else if (includeChildren !== 'true') {
+      // By default, only return parent programs (those without parentProgramId)
+      whereClause.parentProgramId = null;
+    }
+
     const programs = await Program.findAll({
-      where: { clinicId },
+      where: whereClause,
       include: [
         {
           model: Questionnaire,
           as: 'medicalTemplate',
           attributes: ['id', 'title', 'description', 'formTemplateType'],
+        },
+        {
+          model: Product,
+          as: 'individualProduct',
+          attributes: ['id', 'name', 'slug', 'imageUrl'],
+          required: false,
         },
       ],
       order: [['createdAt', 'DESC']],
@@ -368,7 +461,10 @@ router.get('/programs/:id', authenticateJWT, async (req: Request, res: Response)
 /**
  * Create a new program
  * POST /programs
- * Body: { name, description?, medicalTemplateId?, isActive?, hasPatientPortal?, patientPortalPrice?, ... }
+ * Body: { name, description?, medicalTemplateId?, individualProductId?, isActive?, hasPatientPortal?, patientPortalPrice?, ... }
+ * 
+ * individualProductId: When set, this program is specific to one product from the form.
+ * This allows different pricing/services for different products within the same medical template.
  */
 router.post('/programs', authenticateJWT, async (req: Request, res: Response) => {
   try {
@@ -392,6 +488,8 @@ router.post('/programs', authenticateJWT, async (req: Request, res: Response) =>
       name,
       description,
       medicalTemplateId,
+      individualProductId,
+      parentProgramId,
       isActive,
       // Non-medical services
       hasPatientPortal,
@@ -424,11 +522,35 @@ router.post('/programs', authenticateJWT, async (req: Request, res: Response) =>
       }
     }
 
+    // Verify individual product exists if provided
+    if (individualProductId) {
+      const product = await Product.findByPk(individualProductId);
+      if (!product) {
+        return res.status(404).json({
+          success: false,
+          error: 'Individual product not found',
+        });
+      }
+    }
+
+    // Verify parent program exists if provided
+    if (parentProgramId) {
+      const parentProgram = await Program.findByPk(parentProgramId);
+      if (!parentProgram) {
+        return res.status(404).json({
+          success: false,
+          error: 'Parent program not found',
+        });
+      }
+    }
+
     const program = await Program.create({
       name,
       description,
       clinicId,
       medicalTemplateId: medicalTemplateId || null,
+      individualProductId: individualProductId || null,
+      parentProgramId: parentProgramId || null,
       isActive: isActive !== undefined ? isActive : true,
       // Non-medical services
       hasPatientPortal: hasPatientPortal || false,
@@ -451,6 +573,12 @@ router.post('/programs', authenticateJWT, async (req: Request, res: Response) =>
           as: 'medicalTemplate',
           attributes: ['id', 'title', 'description', 'formTemplateType'],
         },
+        {
+          model: Product,
+          as: 'individualProduct',
+          attributes: ['id', 'name', 'slug', 'imageUrl'],
+          required: false,
+        },
       ],
     });
 
@@ -470,7 +598,7 @@ router.post('/programs', authenticateJWT, async (req: Request, res: Response) =>
 /**
  * Update a program
  * PUT /programs/:id
- * Body: { name?, description?, medicalTemplateId?, isActive? }
+ * Body: { name?, description?, medicalTemplateId?, individualProductId?, isActive?, ... }
  */
 router.put('/programs/:id', authenticateJWT, async (req: Request, res: Response) => {
   try {
@@ -488,6 +616,8 @@ router.put('/programs/:id', authenticateJWT, async (req: Request, res: Response)
       name,
       description,
       medicalTemplateId,
+      individualProductId,
+      parentProgramId,
       isActive,
       frontendDisplayProductId,
       // Non-medical services
@@ -525,10 +655,34 @@ router.put('/programs/:id', authenticateJWT, async (req: Request, res: Response)
       }
     }
 
+    // Verify individual product exists if provided
+    if (individualProductId) {
+      const product = await Product.findByPk(individualProductId);
+      if (!product) {
+        return res.status(404).json({
+          success: false,
+          error: 'Individual product not found',
+        });
+      }
+    }
+
+    // Verify parent program exists if provided
+    if (parentProgramId) {
+      const parentProgram = await Program.findByPk(parentProgramId);
+      if (!parentProgram) {
+        return res.status(404).json({
+          success: false,
+          error: 'Parent program not found',
+        });
+      }
+    }
+
     // Update fields
     if (name !== undefined) program.name = name;
     if (description !== undefined) program.description = description;
     if (medicalTemplateId !== undefined) program.medicalTemplateId = medicalTemplateId;
+    if (individualProductId !== undefined) program.individualProductId = individualProductId || null;
+    if (parentProgramId !== undefined) program.parentProgramId = parentProgramId || null;
     if (isActive !== undefined) program.isActive = isActive;
     if (frontendDisplayProductId !== undefined) program.frontendDisplayProductId = frontendDisplayProductId || null;
 
@@ -553,6 +707,12 @@ router.put('/programs/:id', authenticateJWT, async (req: Request, res: Response)
           model: Questionnaire,
           as: 'medicalTemplate',
           attributes: ['id', 'title', 'description', 'formTemplateType'],
+        },
+        {
+          model: Product,
+          as: 'individualProduct',
+          attributes: ['id', 'name', 'slug', 'imageUrl'],
+          required: false,
         },
       ],
     });
