@@ -556,4 +556,212 @@ export class MailsSender {
       return false;
     }
   }
+
+  /**
+   * Send email to doctor when they sign up, notifying them their application is under review
+   */
+  static async sendDoctorApplicationPendingEmail(
+    email: string,
+    firstName: string
+  ): Promise<boolean> {
+    const msg: any = {
+      to: email,
+      from: this.FROM_EMAIL,
+      subject: "Doctor Application Received - Under Review",
+      text: `Hello ${firstName},\n\nThank you for applying to join the Fuse ecosystem as a healthcare provider.\n\nWe have received your application and it is currently under review. Our team will carefully verify your credentials to ensure the highest level of care for our patients.\n\nOnce your application is approved, you will receive an email granting you access to the Doctor Portal where you can start managing patient care, prescriptions, and consultations.\n\nThis verification process typically takes 24-48 hours. If you have any questions, please don't hesitate to contact our support team.\n\nBest regards,\nThe Fuse Team`,
+      trackingSettings: {
+        clickTracking: {
+          enable: false,
+        },
+        openTracking: {
+          enable: false,
+        },
+      },
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); padding: 30px; text-align: center;">
+            <h1 style="color: white; margin: 0; font-size: 28px;">🏥 Application Received</h1>
+          </div>
+          
+          <div style="padding: 40px 30px; background-color: #f8f9fa;">
+            <h2 style="color: #333; margin-top: 0;">Hello ${firstName},</h2>
+            
+            <p style="color: #666; font-size: 16px; line-height: 1.6;">
+              Thank you for applying to join the <strong>Fuse ecosystem</strong> as a healthcare provider.
+            </p>
+            
+            <div style="background-color: #dbeafe; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #3b82f6;">
+              <p style="color: #1e40af; font-size: 15px; margin: 0; line-height: 1.6;">
+                <strong>📋 Your Application Status: Under Review</strong><br><br>
+                We have received your application and it is currently being reviewed by our team. We carefully verify all doctor credentials to ensure the highest level of care and security for our patients.
+              </p>
+            </div>
+            
+            <h3 style="color: #333; margin-top: 30px;">What Happens Next?</h3>
+            
+            <ul style="color: #666; font-size: 15px; line-height: 1.8;">
+              <li><strong>Verification:</strong> Our team will review your credentials and application details</li>
+              <li><strong>Timeline:</strong> This process typically takes 24-48 hours</li>
+              <li><strong>Approval:</strong> Once approved, you'll receive full access to the Doctor Portal</li>
+              <li><strong>Portal Access:</strong> Manage patient care, prescriptions, and consultations</li>
+            </ul>
+            
+            <div style="background-color: #fef3c7; padding: 15px; border-radius: 8px; margin-top: 25px; border-left: 4px solid #f59e0b;">
+              <p style="color: #92400e; font-size: 14px; margin: 0;">
+                <strong>⚕️ Important:</strong> Only licensed healthcare providers will be approved. Approving someone as a doctor gives them significant permissions within the Fuse ecosystem to prescribe medications, access patient data, and provide medical consultations.
+              </p>
+            </div>
+            
+            <p style="color: #666; font-size: 15px; line-height: 1.6; margin-top: 25px;">
+              If you have any questions about your application status, please contact our support team.
+            </p>
+          </div>
+          
+          <div style="background-color: #333; padding: 20px; text-align: center;">
+            <p style="color: #ccc; margin: 0; font-size: 14px;">
+              Best regards,<br>
+              The Fuse Team
+            </p>
+            <p style="color: #999; margin: 10px 0 0 0; font-size: 12px;">
+              This is an automated message regarding your doctor application.
+            </p>
+          </div>
+        </div>
+      `,
+    };
+
+    try {
+      await sgMail.send(msg);
+      console.log("✅ Doctor application pending email sent");
+      return true;
+    } catch (error) {
+      if (process.env.NODE_ENV === "development") {
+        console.error("❌ Failed to send doctor application pending email:", error);
+      } else {
+        console.error("❌ Failed to send doctor application pending email");
+      }
+      return false;
+    }
+  }
+
+  /**
+   * Send email to doctor when their application is approved, granting access to the portal
+   */
+  static async sendDoctorApprovedEmail(
+    email: string,
+    firstName: string,
+    frontendOrigin?: string
+  ): Promise<boolean> {
+    // Determine the doctor portal URL
+    const getDoctorPortalUrl = () => {
+      if (process.env.DOCTOR_PORTAL_URL) {
+        return process.env.DOCTOR_PORTAL_URL;
+      }
+
+      if (process.env.NODE_ENV === "production") {
+        return "https://doctor.fuse.health";
+      }
+
+      return "http://localhost:3003";
+    };
+
+    const portalUrl = frontendOrigin || getDoctorPortalUrl();
+    const loginUrl = `${portalUrl}/signin`;
+
+    const msg: any = {
+      to: email,
+      from: this.FROM_EMAIL,
+      subject: "🎉 Doctor Application Approved - Welcome to Fuse!",
+      text: `Hello Dr. ${firstName},\n\nCongratulations! Your doctor application has been approved.\n\nYou now have full access to the Fuse Doctor Portal where you can:\n\n• Manage patient consultations and care\n• Review and approve prescriptions\n• Access patient medical histories\n• Communicate securely with patients\n• Coordinate with pharmacies and care teams\n\nAccess your portal here: ${loginUrl}\n\nAs a verified healthcare provider on Fuse, you play a crucial role in delivering high-quality care to our patients. We're excited to have you as part of our medical team.\n\nIf you have any questions or need assistance getting started, our support team is here to help.\n\nBest regards,\nThe Fuse Team`,
+      trackingSettings: {
+        clickTracking: {
+          enable: false,
+        },
+        openTracking: {
+          enable: false,
+        },
+      },
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 30px; text-align: center;">
+            <h1 style="color: white; margin: 0; font-size: 32px;">🎉 Welcome to Fuse!</h1>
+            <p style="color: #d1fae5; margin: 10px 0 0 0; font-size: 16px;">Your Doctor Application has been Approved</p>
+          </div>
+          
+          <div style="padding: 40px 30px; background-color: #f8f9fa;">
+            <h2 style="color: #333; margin-top: 0;">Hello Dr. ${firstName},</h2>
+            
+            <p style="color: #666; font-size: 16px; line-height: 1.6;">
+              Congratulations! Your doctor application has been <strong style="color: #10b981;">approved</strong>. You now have full access to the Fuse Doctor Portal.
+            </p>
+            
+            <div style="background-color: #d1fae5; padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #10b981;">
+              <p style="color: #065f46; font-size: 15px; margin: 0; line-height: 1.6;">
+                <strong>✅ You're all set!</strong><br><br>
+                As a verified healthcare provider, you can now access all features of the Doctor Portal and begin providing care to patients.
+              </p>
+            </div>
+            
+            <h3 style="color: #333; margin-top: 30px;">What You Can Do Now:</h3>
+            
+            <ul style="color: #666; font-size: 15px; line-height: 1.8;">
+              <li><strong>Patient Care:</strong> Manage consultations and patient relationships</li>
+              <li><strong>Prescriptions:</strong> Review, approve, and manage prescriptions</li>
+              <li><strong>Medical Records:</strong> Securely access patient medical histories</li>
+              <li><strong>Communication:</strong> Connect with patients through secure messaging</li>
+              <li><strong>Coordination:</strong> Work seamlessly with pharmacies and care teams</li>
+            </ul>
+            
+            <div style="text-align: center; margin: 35px 0;">
+              <a href="${loginUrl}" 
+                 style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); 
+                        color: white; 
+                        padding: 16px 36px; 
+                        text-decoration: none; 
+                        border-radius: 8px; 
+                        font-weight: bold; 
+                        font-size: 16px;
+                        display: inline-block;
+                        box-shadow: 0 4px 6px rgba(16, 185, 129, 0.2);">
+                🏥 Access Doctor Portal
+              </a>
+            </div>
+            
+            <div style="background-color: #e0f2fe; padding: 15px; border-radius: 8px; margin-top: 25px; border-left: 4px solid #0284c7;">
+              <p style="color: #075985; font-size: 14px; margin: 0;">
+                <strong>🔐 Security & Compliance:</strong> As a healthcare provider on Fuse, you have access to protected health information (PHI). Please ensure you follow all HIPAA guidelines and security best practices when using the platform.
+              </p>
+            </div>
+            
+            <p style="color: #666; font-size: 15px; line-height: 1.6; margin-top: 25px;">
+              We're excited to have you as part of the Fuse medical team. If you need any assistance getting started or have questions, our support team is here to help.
+            </p>
+          </div>
+          
+          <div style="background-color: #333; padding: 20px; text-align: center;">
+            <p style="color: #ccc; margin: 0; font-size: 14px;">
+              Best regards,<br>
+              The Fuse Team
+            </p>
+            <p style="color: #999; margin: 10px 0 0 0; font-size: 12px;">
+              You're receiving this email because your doctor application was approved.
+            </p>
+          </div>
+        </div>
+      `,
+    };
+
+    try {
+      await sgMail.send(msg);
+      console.log("✅ Doctor approved email sent");
+      return true;
+    } catch (error) {
+      if (process.env.NODE_ENV === "development") {
+        console.error("❌ Failed to send doctor approved email:", error);
+      } else {
+        console.error("❌ Failed to send doctor approved email");
+      }
+      return false;
+    }
+  }
 }

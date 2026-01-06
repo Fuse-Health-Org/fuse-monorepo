@@ -144,6 +144,19 @@ export default class User extends Entity {
   declare activated: boolean;
 
   @Column({
+    type: DataType.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+  })
+  declare isApprovedDoctor: boolean;
+
+  @Column({
+    type: DataType.STRING(50),
+    allowNull: true,
+  })
+  declare npiNumber?: string;
+
+  @Column({
     type: DataType.STRING,
     allowNull: true,
   })

@@ -14,6 +14,7 @@ interface FormData {
     password: string
     confirmPassword: string
     phoneNumber: string
+    npiNumber: string
 }
 
 export default function SignUp() {
@@ -23,7 +24,8 @@ export default function SignUp() {
         email: '',
         password: '',
         confirmPassword: '',
-        phoneNumber: ''
+        phoneNumber: '',
+        npiNumber: ''
     })
     const [showPassword, setShowPassword] = useState(false)
     const [showConfirmPassword, setShowConfirmPassword] = useState(false)
@@ -63,12 +65,18 @@ export default function SignUp() {
 
     const validateForm = (): string | null => {
         // Required fields validation
-        const requiredFields = ['firstName', 'lastName', 'email', 'password', 'confirmPassword', 'phoneNumber']
+        const requiredFields = ['firstName', 'lastName', 'email', 'password', 'confirmPassword', 'phoneNumber', 'npiNumber']
 
         for (const field of requiredFields) {
-            if (!formData[field as keyof FormData]) {
+            const value = formData[field as keyof FormData]
+            if (!value || (typeof value === 'string' && value.trim() === '')) {
                 return `${field.replace(/([A-Z])/g, ' $1').toLowerCase().replace(/^./, str => str.toUpperCase())} is required`
             }
+        }
+
+        // NPI number validation (must be exactly 10 digits)
+        if (!/^\d{10}$/.test(formData.npiNumber.trim())) {
+            return 'NPI number must be exactly 10 digits'
         }
 
         // Email validation
@@ -121,19 +129,28 @@ export default function SignUp() {
                     email: formData.email,
                     password: formData.password,
                     role: 'doctor',
-                    phoneNumber: formData.phoneNumber
+                    phoneNumber: formData.phoneNumber,
+                    npiNumber: formData.npiNumber
                 }),
             })
 
             const data = await response.json()
 
             if (response.ok && data.success) {
-                router.push('/?message=Account created successfully! Welcome to the Doctor Portal.')
+                router.push('/signin?message=Account created successfully! Your application is under review and you will receive an email once approved.')
             } else {
                 let errorMessage = 'Signup failed'
 
                 if (response.status === 409) {
                     errorMessage = 'An account with this email already exists. Please use a different email or try signing in.'
+                } else if (response.status === 400 && data.message === 'Validation failed') {
+                    // More detailed error for validation failures
+                    if (data.errors && data.errors.length > 0) {
+                        const errorDetails = data.errors.map((err: any) => err.message).join(', ')
+                        errorMessage = `Validation failed: ${errorDetails}`
+                    } else {
+                        errorMessage = 'Please check all required fields: First Name, Last Name, Email, Phone Number, and Password (must be at least 8 characters with uppercase, lowercase, number, and special character)'
+                    }
                 } else if (data.message) {
                     errorMessage = data.message
                 }
@@ -265,6 +282,34 @@ export default function SignUp() {
                                     </div>
                                 </div>
 
+                                {/* NPI Number */}
+                                <div className="space-y-2">
+                                    <label htmlFor="npiNumber" className="text-sm font-medium text-foreground">
+                                        NPI Number *
+                                    </label>
+                                    <div className="relative">
+                                        <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                        <input
+                                            id="npiNumber"
+                                            type="text"
+                                            value={formData.npiNumber}
+                                            onChange={(e) => {
+                                                // Only allow digits
+                                                const value = e.target.value.replace(/\D/g, '').slice(0, 10)
+                                                handleInputChange('npiNumber', value)
+                                            }}
+                                            className="w-full pl-10 pr-3 py-2 border border-input rounded-md bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                                            placeholder="1234567890"
+                                            maxLength={10}
+                                            pattern="\d{10}"
+                                            required
+                                        />
+                                    </div>
+                                    <p className="text-xs text-muted-foreground">
+                                        10-digit National Provider Identifier for healthcare providers
+                                    </p>
+                                </div>
+
                                 {/* Password */}
                                 <div className="space-y-2">
                                     <label htmlFor="password" className="text-sm font-medium text-foreground">
@@ -363,7 +408,7 @@ export default function SignUp() {
                                 <Button
                                     type="submit"
                                     className="w-full"
-                                    disabled={isLoading || !agreedToTerms}
+                                    disabled={isLoading || !agreedToTerms || !formData.npiNumber || formData.npiNumber.length !== 10}
                                 >
                                     {isLoading ? 'Creating account...' : 'Create Doctor Account'}
                                 </Button>

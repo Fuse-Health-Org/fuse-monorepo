@@ -152,7 +152,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 setIsLoading(false)
                 return true
             } else {
-                setError(data.message || 'Login failed')
+                // Check if it's a pending approval error
+                if (data.pendingApproval) {
+                    setError(data.message || 'Your doctor application is under review.')
+                } else {
+                    setError(data.message || 'Login failed')
+                }
                 setIsLoading(false)
                 return false
             }

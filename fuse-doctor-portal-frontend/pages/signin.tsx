@@ -29,8 +29,15 @@ export default function SignIn() {
     useEffect(() => {
         if (router.query.message && typeof router.query.message === 'string') {
             setSuccessMessage(router.query.message)
+            // Clear the message from URL after showing it
+            router.replace('/signin', undefined, { shallow: true })
+            // Auto-hide message after 5 seconds
+            const timer = setTimeout(() => {
+                setSuccessMessage(null)
+            }, 5000)
+            return () => clearTimeout(timer)
         }
-    }, [router.query.message])
+    }, [router.query.message, router])
 
     // Resend cooldown timer
     useEffect(() => {
@@ -249,8 +256,26 @@ export default function SignIn() {
                         <CardContent>
                             <form onSubmit={handleSubmit} className="space-y-4">
                                 {error && (
-                                    <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">
-                                        {error}
+                                    <div className={`p-4 text-sm rounded-md ${
+                                        error.includes('under review') || error.includes('pending')
+                                            ? 'text-blue-800 bg-blue-50 border border-blue-200'
+                                            : 'text-red-600 bg-red-50 border border-red-200'
+                                    }`}>
+                                        <div className="flex items-start gap-2">
+                                            {error.includes('under review') || error.includes('pending') ? (
+                                                <span className="text-lg">⏳</span>
+                                            ) : (
+                                                <span className="text-lg">⚠️</span>
+                                            )}
+                                            <div>
+                                                <p className="font-medium">{error}</p>
+                                                {(error.includes('under review') || error.includes('pending')) && (
+                                                    <p className="mt-2 text-xs opacity-80">
+                                                        Our team reviews all doctor applications to ensure compliance and security. You will receive an email notification once your account is approved.
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
                                     </div>
                                 )}
 
