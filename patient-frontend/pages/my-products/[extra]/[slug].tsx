@@ -229,10 +229,10 @@ export default function PublicProductPage() {
     }
 
     // Determine page title
-    const pageTitle = program 
-        ? `${program.name} - Fuse` 
-        : product 
-            ? `${product.name} - Fuse` 
+    const pageTitle = program
+        ? `${program.name} - Fuse`
+        : product
+            ? `${product.name} - Fuse`
             : 'Product Intake'
 
     return (
