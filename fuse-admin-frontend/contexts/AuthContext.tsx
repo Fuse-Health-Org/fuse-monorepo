@@ -59,6 +59,7 @@ interface AuthContextType {
   refreshSubscription: () => Promise<void>
   authenticatedFetch: (input: RequestInfo | URL, init?: RequestInit & { skipLogoutOn401?: boolean }) => Promise<Response>
   isLoading: boolean
+  isSubscriptionLoading: boolean
   error: string | null
 }
 
@@ -69,6 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null)
   const [subscription, setSubscription] = useState<Subscription | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isSubscriptionLoading, setIsSubscriptionLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [mfa, setMfa] = useState<MfaState>({ required: false, token: null, resendsRemaining: 3 })
   const router = useRouter()
@@ -213,6 +215,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       refreshSubscription()
     } else {
       setSubscription(null)
+      setIsSubscriptionLoading(false)
     }
   }, [user, token])
 
@@ -222,6 +225,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+      console.log('🔐 [AuthContext] Starting login for:', email)
+      console.log('🔐 [AuthContext] API URL:', `${apiUrl}/auth/signin`)
+      
       const response = await fetch(`${apiUrl}/auth/signin`, {
         method: 'POST',
         headers: {
@@ -230,17 +236,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         body: JSON.stringify({ email, password }),
       })
 
+      console.log('🔐 [AuthContext] Response status:', response.status, response.statusText)
+      
       const data = await response.json()
+      console.log('🔐 [AuthContext] Response data:', {
+        success: data.success,
+        requiresMfa: data.requiresMfa,
+        hasMfaToken: !!data.mfaToken,
+        message: data.message,
+      })
 
       if (response.ok && data.success) {
         // Check if MFA is required
         if (data.requiresMfa && data.mfaToken) {
+          console.log('✅ [AuthContext] MFA required - verification email should have been sent!')
           setMfa({ required: true, token: data.mfaToken, resendsRemaining: 3 })
           setIsLoading(false)
           return 'mfa_required'
         }
 
         // Direct login (no MFA) - shouldn't happen with new flow but kept for compatibility
+        console.log('✅ [AuthContext] Direct login (no MFA)')
         const { token: authToken, user: userData } = data
 
         localStorage.setItem('admin_token', authToken)
@@ -252,11 +268,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsLoading(false)
         return true
       } else {
+        console.error('❌ [AuthContext] Login failed:', data.message)
         setError(data.message || 'Login failed')
         setIsLoading(false)
         return false
       }
     } catch (error) {
+      console.error('❌ [AuthContext] Network error:', error)
       setError('Network error. Please try again.')
       setIsLoading(false)
       return false
@@ -415,6 +433,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refreshSubscription = async () => {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
 
+    setIsSubscriptionLoading(true)
     try {
       const response = await authenticatedFetch(`${apiUrl}/subscriptions/current`, {
         method: 'GET',
@@ -438,6 +457,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       console.error('Error fetching subscription:', error)
       setSubscription(null)
+    } finally {
+      setIsSubscriptionLoading(false)
     }
   }
 
@@ -460,6 +481,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         refreshSubscription,
         authenticatedFetch,
         isLoading,
+        isSubscriptionLoading,
         error,
       }}
     >

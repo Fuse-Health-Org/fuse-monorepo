@@ -139,6 +139,9 @@ export default function SignIn() {
                 We sent a 6-digit verification code to<br />
                 <span className="font-medium text-foreground">{email}</span>
               </p>
+              <p className="text-sm text-muted-foreground mt-2">
+                (Please check your spam folder)
+              </p>
             </div>
 
             {/* MFA Form */}

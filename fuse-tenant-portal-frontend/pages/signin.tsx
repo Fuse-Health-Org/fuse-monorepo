@@ -124,6 +124,9 @@ export default function SignIn() {
                 We sent a 6-digit verification code to<br />
                 <span className="font-medium text-[#1F2937]">{email}</span>
               </p>
+              <p className="text-sm text-[#6B7280] mt-2">
+                (Please check your spam folder)
+              </p>
             </div>
 
             <div className="bg-white rounded-2xl shadow-sm border border-[#E5E7EB] overflow-hidden">
