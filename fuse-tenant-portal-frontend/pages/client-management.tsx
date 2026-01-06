@@ -161,7 +161,7 @@ export default function ClientManagement() {
     console.log('👤 [Client Mgmt Frontend] Selected user:', user)
     console.log('📋 [Client Mgmt Frontend] User subscription:', user.brandSubscriptions?.[0])
     console.log('📦 [Client Mgmt Frontend] Subscription plan:', user.brandSubscriptions?.[0]?.plan)
-    console.log('🎨 [Client Mgmt Frontend] Custom features:', user.tenantCustomFeatures?.[0])
+    console.log('🎨 [Client Mgmt Frontend] Custom features:', Array.isArray(user.tenantCustomFeatures) ? user.tenantCustomFeatures[0] : user.tenantCustomFeatures)
     setSelectedUser(user)
     const subscription = user.brandSubscriptions?.[0]
     if (subscription) {

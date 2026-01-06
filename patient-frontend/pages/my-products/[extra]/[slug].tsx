@@ -67,6 +67,8 @@ interface ProgramData {
     // Non-medical services
     nonMedicalServices: ProgramNonMedicalServices
     nonMedicalServicesFee: number
+    productOfferType?: 'single_choice' | 'multiple_choice'
+    hasPerProductPricing?: boolean
 }
 
 export default function PublicProductPage() {

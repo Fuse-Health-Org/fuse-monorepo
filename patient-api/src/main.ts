@@ -1391,13 +1391,13 @@ app.post("/auth/signin", async (req, res) => {
       mfaToken: mfaSessionToken,
       message: "Verification code sent to your email",
     });
-  } catch (error) {
-    // HIPAA: Do not log detailed errors in production
-    if (process.env.NODE_ENV === "development") {
-      console.error("❌ Authentication error occurred:", error);
-    } else {
-      console.error("❌ Authentication error occurred");
-    }
+  } catch (error: any) {
+    // Temporarily log detailed error for debugging
+    console.error("❌ Authentication error occurred:", {
+      message: error?.message,
+      name: error?.name,
+      stack: error?.stack?.split('\n').slice(0, 5).join('\n'),
+    });
     res.status(500).json({
       success: false,
       message: "Authentication failed. Please try again.",
