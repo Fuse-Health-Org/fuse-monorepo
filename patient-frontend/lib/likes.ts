@@ -71,28 +71,72 @@ interface MigrateLikesResponse {
 }
 
 /**
+ * Get the affiliate ID from localStorage if user came from affiliate link
+ */
+function getAffiliateId(): string | null {
+  if (typeof window === 'undefined') {
+    console.log('💗 [GET AFFILIATE ID] Window is undefined (SSR)');
+    return null;
+  }
+  
+  const affiliateId = localStorage.getItem('affiliateId');
+  console.log('💗 [GET AFFILIATE ID] Reading from localStorage:', {
+    affiliateId: affiliateId || 'null',
+    localStorageKeys: Object.keys(localStorage),
+    hasAffiliateId: !!affiliateId,
+  });
+  
+  return affiliateId;
+}
+
+/**
  * Toggle like for a product
  */
 export async function toggleLike(tenantProductId: string): Promise<LikeToggleResponse> {
   try {
     const anonymousId = getOrCreateAnonymousId();
+    const affiliateId = getAffiliateId();
+    const sourceType = affiliateId ? 'affiliate' : 'brand';
+    
+    console.log('💗 [LIKE TOGGLE] Starting like toggle:', {
+      tenantProductId,
+      anonymousId: anonymousId.substring(0, 8) + '...',
+      affiliateId: affiliateId || 'null (direct brand)',
+      sourceType,
+      timestamp: new Date().toISOString(),
+    });
+    
+    const requestBody = { 
+      tenantProductId, 
+      anonymousId,
+      sourceType,
+      affiliateId: affiliateId || null,
+    };
+    
+    console.log('💗 [LIKE TOGGLE] Request body:', requestBody);
     
     const response = await apiCall('/likes/toggle', {
       method: 'POST',
-      body: JSON.stringify({ tenantProductId, anonymousId }),
+      body: JSON.stringify(requestBody),
     });
+    
+    console.log('💗 [LIKE TOGGLE] Response:', response);
     
     // Handle nested data structure if present
     const data = response?.data || response;
     
-    return {
+    const result = {
       success: data?.success || false,
       liked: data?.liked || false,
       likeCount: data?.likeCount || 0,
       error: data?.error,
     };
+    
+    console.log('💗 [LIKE TOGGLE] Final result:', result);
+    
+    return result;
   } catch (error) {
-    console.error('Error toggling like:', error);
+    console.error('❌ [LIKE TOGGLE] Error toggling like:', error);
     return {
       success: false,
       liked: false,
@@ -108,9 +152,16 @@ export async function toggleLike(tenantProductId: string): Promise<LikeToggleRes
 export async function getLikeStatus(tenantProductId: string): Promise<LikeStatusResponse> {
   try {
     const anonymousId = getAnonymousId();
-    const queryParams = anonymousId ? `?anonymousId=${encodeURIComponent(anonymousId)}` : '';
+    const affiliateId = getAffiliateId();
+    const sourceType = affiliateId ? 'affiliate' : 'brand';
     
-    const response = await apiCall(`/likes/${tenantProductId}${queryParams}`);
+    const params = new URLSearchParams();
+    if (anonymousId) params.append('anonymousId', anonymousId);
+    params.append('sourceType', sourceType);
+    params.append('affiliateId', affiliateId || 'null');
+    const queryString = params.toString();
+    
+    const response = await apiCall(`/likes/${tenantProductId}?${queryString}`);
     
     // Handle nested data structure if present
     const data = response?.data || response;
@@ -138,10 +189,17 @@ export async function getLikeStatus(tenantProductId: string): Promise<LikeStatus
 export async function getBatchLikes(tenantProductIds: string[]): Promise<BatchLikesResponse> {
   try {
     const anonymousId = getAnonymousId();
+    const affiliateId = getAffiliateId();
+    const sourceType = affiliateId ? 'affiliate' : 'brand';
     
     const response = await apiCall('/likes/batch', {
       method: 'POST',
-      body: JSON.stringify({ tenantProductIds, anonymousId }),
+      body: JSON.stringify({ 
+        tenantProductIds, 
+        anonymousId,
+        sourceType,
+        affiliateId: affiliateId || null,
+      }),
     });
     
     // Handle nested data structure if present

@@ -161,7 +161,10 @@ export default function ClientManagement() {
     console.log('👤 [Client Mgmt Frontend] Selected user:', user)
     console.log('📋 [Client Mgmt Frontend] User subscription:', user.brandSubscriptions?.[0])
     console.log('📦 [Client Mgmt Frontend] Subscription plan:', user.brandSubscriptions?.[0]?.plan)
-    console.log('🎨 [Client Mgmt Frontend] Custom features:', Array.isArray(user.tenantCustomFeatures) ? user.tenantCustomFeatures[0] : user.tenantCustomFeatures)
+    const customFeaturesToLog = Array.isArray(user.tenantCustomFeatures)
+      ? user.tenantCustomFeatures[0]
+      : user.tenantCustomFeatures
+    console.log('🎨 [Client Mgmt Frontend] Custom features:', customFeaturesToLog)
     setSelectedUser(user)
     const subscription = user.brandSubscriptions?.[0]
     if (subscription) {
@@ -184,8 +187,8 @@ export default function ClientManagement() {
 
     // Load custom features
     // tenantCustomFeatures can be an object (from @HasOne) or array (legacy), handle both
-    const customFeatures = Array.isArray(user.tenantCustomFeatures) 
-      ? user.tenantCustomFeatures[0] 
+    const customFeatures = Array.isArray(user.tenantCustomFeatures)
+      ? user.tenantCustomFeatures[0]
       : user.tenantCustomFeatures
     if (customFeatures) {
       setCustomFeaturesData({

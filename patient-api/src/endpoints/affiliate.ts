@@ -1752,6 +1752,8 @@ The Fuse Team`,
     try {
       const { slug } = req.params;
 
+      console.log('🔍 [AFFILIATE BY SLUG] Looking for affiliate with slug:', slug);
+
       if (!slug || typeof slug !== "string") {
         return res.status(400).json({
           success: false,
@@ -1766,15 +1768,15 @@ The Fuse Team`,
         },
       });
 
-      if (!affiliateClinic) {
-        return res.status(404).json({
-          success: false,
-          message: "Affiliate not found",
-        });
-      }
+      console.log('🔍 [AFFILIATE BY SLUG] Clinic found:', affiliateClinic ? {
+        id: affiliateClinic.id,
+        slug: affiliateClinic.slug,
+        name: affiliateClinic.name,
+        affiliateOwnerClinicId: affiliateClinic.affiliateOwnerClinicId || 'null',
+      } : 'NOT FOUND');
 
-      // Verify this is an affiliate clinic (has a parent)
-      if (!affiliateClinic.affiliateOwnerClinicId) {
+      if (!affiliateClinic) {
+        console.warn('⚠️ [AFFILIATE BY SLUG] Clinic not found for slug:', slug);
         return res.status(404).json({
           success: false,
           message: "Affiliate not found",
@@ -1793,10 +1795,33 @@ The Fuse Team`,
         ],
       });
 
+      console.log('🔍 [AFFILIATE BY SLUG] User found:', affiliateUser ? {
+        id: affiliateUser.id,
+        email: affiliateUser.email,
+        role: affiliateUser.role,
+        clinicId: affiliateUser.clinicId,
+        hasAffiliateRole: affiliateUser.userRoles?.affiliate || false,
+      } : 'NOT FOUND');
+
+      if (!affiliateUser) {
+        console.warn('⚠️ [AFFILIATE BY SLUG] No user found for clinic');
+        return res.status(404).json({
+          success: false,
+          message: "Affiliate user not found",
+        });
+      }
+
+      console.log('✅ [AFFILIATE BY SLUG] Affiliate found successfully:', {
+        userId: affiliateUser.id,
+        clinicId: affiliateClinic.id,
+        slug: affiliateClinic.slug,
+        hasAffiliateOwnerClinicId: !!affiliateClinic.affiliateOwnerClinicId,
+      });
+
       res.status(200).json({
         success: true,
         data: {
-          id: affiliateUser?.id || null,
+          id: affiliateUser.id,
           clinicId: affiliateClinic.id,
           firstName: affiliateUser?.firstName || affiliateClinic.name,
           email: affiliateUser?.email || null,

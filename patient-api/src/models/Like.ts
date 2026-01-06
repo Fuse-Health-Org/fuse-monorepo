@@ -44,5 +44,22 @@ export default class Like extends Entity {
         defaultValue: true,
     })
     declare liked: boolean;
+
+    @Index
+    @Column({
+        type: DataType.STRING,
+        allowNull: true,
+        defaultValue: 'brand',
+        comment: 'Source of the like: brand or affiliate',
+    })
+    declare sourceType: string;
+
+    @Index
+    @Column({
+        type: DataType.UUID,
+        allowNull: true,
+        comment: 'Clinic ID of the affiliate (if sourceType is affiliate)',
+    })
+    declare affiliateId: string | null;
 }
 

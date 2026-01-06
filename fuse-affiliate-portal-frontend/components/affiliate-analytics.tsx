@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Spinner, Card, CardBody, Button } from "@heroui/react"
 import { apiCall } from "../lib/api"
+import { useAuth } from "../contexts/AuthContext"
 import { AnalyticsSummaryCards } from "./analytics/AnalyticsSummaryCards"
 import { ProductPerformanceCard } from "./analytics/ProductPerformanceCard"
 import { ProductDetailView } from "./analytics/ProductDetailView"
@@ -18,11 +19,14 @@ interface AffiliateOrder {
 }
 
 interface ProductStats {
-  productId: string
-  productName: string
+  id: string
+  name: string
+  views: number
+  conversions: number
+  conversionRate: number
   orders: number
   revenue: number
-  customers: number
+  likes: number
 }
 
 interface AnalyticsOverview {
@@ -37,6 +41,7 @@ interface AnalyticsOverview {
     paidOrders: number
     totalRevenue: number
   }
+  products: ProductStats[]
   orders: AffiliateOrder[]
 }
 
@@ -59,8 +64,16 @@ interface FormAnalytics {
   }
 }
 
+interface LikesAnalytics {
+  totalLikes: number
+  userLikes: number
+  anonymousLikes: number
+  dailyLikes: { date: string; count: number }[]
+}
+
 interface ProductDetailAnalytics {
   productId: string
+  tenantProductId?: string
   timeRange: string
   startDate: string
   endDate: string
@@ -94,19 +107,16 @@ const TIME_RANGES = [
 
 
 export function AffiliateAnalytics() {
+  const { user } = useAuth()
   const [overview, setOverview] = useState<AnalyticsOverview | null>(null)
   const [selectedProduct, setSelectedProduct] = useState<ProductDetailAnalytics | null>(null)
+  const [likesAnalytics, setLikesAnalytics] = useState<LikesAnalytics | null>(null)
+  const [likesLoading, setLikesLoading] = useState(false)
   const [timeRange, setTimeRange] = useState<string>('30d')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (!selectedProduct) {
-      fetchOverview()
-    }
-  }, [timeRange, selectedProduct])
-
-  const fetchOverview = async () => {
+  const fetchOverview = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
@@ -124,8 +134,9 @@ export function AffiliateAnalytics() {
         
         console.log('📊 [FRONTEND] Extracted data:', {
           summary: data.summary,
+          productsLength: data.products?.length,
+          products: data.products,
           ordersLength: data.orders?.length,
-          orders: data.orders
         })
 
         // Ensure the data structure is correct
@@ -141,6 +152,7 @@ export function AffiliateAnalytics() {
             paidOrders: data.summary?.paidOrders || 0,
             totalRevenue: data.summary?.totalRevenue || 0,
           },
+          products: data.products || [],
           orders: data.orders || [],
         }
         
@@ -155,9 +167,46 @@ export function AffiliateAnalytics() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [timeRange])
 
-  const fetchProductDetails = async (productId: string) => {
+  useEffect(() => {
+    if (!selectedProduct) {
+      fetchOverview()
+    }
+  }, [timeRange, selectedProduct, fetchOverview])
+
+  const fetchProductLikes = useCallback(async (tenantProductId: string) => {
+    if (!user?.clinicId) {
+      console.warn('⚠️ No clinic ID available for fetching likes')
+      return
+    }
+
+    setLikesLoading(true)
+    try {
+      console.log('💗 [FRONTEND] Fetching likes for tenantProductId:', tenantProductId, 'affiliateId (clinicId):', user.clinicId)
+      const response = await apiCall(
+        `/likes/public/analytics/${tenantProductId}?affiliateId=${user.clinicId}`,
+        { method: 'GET' }
+      )
+
+      console.log('💗 [FRONTEND] Likes response:', response)
+      console.log('💗 [FRONTEND] response.data:', response.data)
+      console.log('💗 [FRONTEND] response.data.data:', response.data?.data)
+
+      if (response.success && response.data) {
+        // Handle potential double nesting
+        const likesData = response.data.data || response.data
+        console.log('💗 [FRONTEND] Setting likesAnalytics:', likesData)
+        setLikesAnalytics(likesData)
+      }
+    } catch (err) {
+      console.error('Error fetching product likes:', err)
+    } finally {
+      setLikesLoading(false)
+    }
+  }, [user?.clinicId])
+
+  const fetchProductDetails = useCallback(async (productId: string) => {
     setLoading(true)
     setError(null)
     try {
@@ -174,6 +223,11 @@ export function AffiliateAnalytics() {
         const productData = response.data.data || response.data
         console.log('📊 [FRONTEND] Setting selected product:', productData)
         setSelectedProduct(productData)
+        
+        // Fetch likes for this specific product
+        if (productData.tenantProductId) {
+          fetchProductLikes(productData.tenantProductId)
+        }
       } else {
         setError(response.error || 'Failed to fetch product analytics')
       }
@@ -183,7 +237,7 @@ export function AffiliateAnalytics() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [timeRange, fetchProductLikes])
 
   const handleProductClick = (productId: string) => {
     fetchProductDetails(productId)
@@ -191,53 +245,7 @@ export function AffiliateAnalytics() {
 
   const handleBackToOverview = () => {
     setSelectedProduct(null)
-  }
-
-  const getProductStats = (orders: AffiliateOrder[]): ProductStats[] => {
-    const productMap = new Map<string, ProductStats>()
-    // Affiliate gets 1% commission (can be configured via env var in backend)
-    const affiliateRevenuePercentage = 0.01;
-
-    orders.forEach((order) => {
-      const productName = order.productName || 'Unknown Product'
-      const productId = order.productId || order.orderId // Fallback to orderId if no productId
-      
-      console.log('🔍 [FRONTEND] Processing order:', {
-        productName,
-        productId: order.productId,
-        orderId: order.orderId,
-        usingProductId: productId,
-      })
-      
-      if (!productMap.has(productName)) {
-        productMap.set(productName, {
-          productId,
-          productName,
-          orders: 0,
-          revenue: 0,
-          customers: 0,
-        })
-      }
-
-      const stats = productMap.get(productName)!
-      stats.orders += 1
-      if (order.status === 'paid') {
-        // Calculate affiliate commission (1% of total sale)
-        stats.revenue += order.totalAmount * affiliateRevenuePercentage
-      }
-    })
-
-    // Count unique customers per product
-    orders.forEach((order) => {
-      const productName = order.productName || 'Unknown Product'
-      const stats = productMap.get(productName)!
-      // Simple approach: count unique emails (in real scenario you'd track this better)
-      const productOrders = orders.filter(o => (o.productName || 'Unknown Product') === productName)
-      const uniqueCustomers = new Set(productOrders.map(o => o.customerEmail)).size
-      stats.customers = uniqueCustomers
-    })
-
-    return Array.from(productMap.values()).sort((a, b) => b.orders - a.orders)
+    setLikesAnalytics(null)
   }
 
   return (
@@ -305,7 +313,7 @@ export function AffiliateAnalytics() {
           />
 
           <ProductPerformanceCard 
-            productStats={overview.orders ? getProductStats(overview.orders) : []}
+            productStats={overview.products || []}
             onProductClick={handleProductClick}
           />
         </>
@@ -314,6 +322,8 @@ export function AffiliateAnalytics() {
       {selectedProduct && (
         <ProductDetailView
           productDetails={selectedProduct}
+          likesAnalytics={likesAnalytics}
+          likesLoading={likesLoading}
           onBack={handleBackToOverview}
         />
       )}

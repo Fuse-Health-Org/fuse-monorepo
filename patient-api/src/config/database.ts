@@ -754,17 +754,17 @@ export async function initializeDatabase() {
         console.log('🔄 Ensuring Likes table unique indexes...');
       }
 
-      // Create partial unique index for logged-in users
+      // Create partial unique index for logged-in users (includes sourceType and affiliateId for brand/affiliate separation)
       await sequelize.query(`
         CREATE UNIQUE INDEX IF NOT EXISTS "likes_tenant_product_user_unique"
-        ON "likes" ("tenantProductId", "userId")
+        ON "likes" ("tenantProductId", "userId", "sourceType", "affiliateId")
         WHERE "userId" IS NOT NULL;
       `);
 
-      // Create partial unique index for anonymous users
+      // Create partial unique index for anonymous users (includes sourceType and affiliateId for brand/affiliate separation)
       await sequelize.query(`
         CREATE UNIQUE INDEX IF NOT EXISTS "likes_tenant_product_anonymous_unique"
-        ON "likes" ("tenantProductId", "anonymousId")
+        ON "likes" ("tenantProductId", "anonymousId", "sourceType", "affiliateId")
         WHERE "anonymousId" IS NOT NULL;
       `);
 

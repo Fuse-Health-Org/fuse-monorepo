@@ -79,7 +79,7 @@ export function Sidebar() {
   })
 
   // Check if user has access to analytics based on tier or custom features
-  const hasAccessToAnalytics =
+  const hasAccessToAnalytics = 
     subscription?.customFeatures?.hasAccessToAnalytics ||
     subscription?.tierConfig?.hasAccessToAnalytics ||
     false;
