@@ -300,10 +300,7 @@ export default function SignIn() {
 
               <div className="mt-6 text-center">
                 <p className="text-sm text-[#6B7280]">
-                  Don't have an account?{' '}
-                  <Link href="/signup" className="text-[#4FA59C] hover:text-[#478F87] font-medium transition-colors">
-                    Sign up
-                  </Link>
+                  Tenant accounts are managed by administrators. Contact your administrator for access.
                 </p>
               </div>
             </div>

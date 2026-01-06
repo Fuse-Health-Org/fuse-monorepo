@@ -23,7 +23,6 @@ interface AuthContextType {
   resendMfaCode: () => Promise<boolean>
   cancelMfa: () => void
   mfa: MfaState
-  signup: (email: string, password: string, name: string, organization: string) => Promise<boolean>
   logout: () => void
   isLoading: boolean
   error: string | null
@@ -207,47 +206,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError(null)
   }
 
-  const signup = async (email: string, password: string, name: string, organization: string): Promise<boolean> => {
-    setIsLoading(true)
-    setError(null)
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/auth/signup`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password, name, organization }),
-      })
-
-      const data = await response.json()
-
-      if (response.ok && data.success && data.token && data.user) {
-        const authToken = data.token as string
-        const userData = data.user as User
-
-        // Store in localStorage
-        localStorage.setItem('tenant_token', authToken)
-        localStorage.setItem('tenant_user', JSON.stringify(userData))
-
-        // Update state
-        setToken(authToken)
-        setUser(userData)
-
-        setIsLoading(false)
-        return true
-      } else {
-        setError(data.message || 'Signup failed')
-        setIsLoading(false)
-        return false
-      }
-    } catch (error) {
-      setError('Network error. Please try again.')
-      setIsLoading(false)
-      return false
-    }
-  }
-
   const logout = () => {
     // Clear localStorage
     localStorage.removeItem('tenant_token')
@@ -271,7 +229,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       resendMfaCode,
       cancelMfa,
       mfa,
-      signup,
       logout,
       isLoading,
       error
