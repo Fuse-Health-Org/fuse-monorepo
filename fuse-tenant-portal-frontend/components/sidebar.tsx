@@ -12,6 +12,7 @@ import {
   DollarSign,
   MessageSquare,
   Shield,
+  UserCheck,
 } from "lucide-react"
 
 const navigation = [
@@ -19,6 +20,7 @@ const navigation = [
   { name: "Products", icon: Package, href: "/products" },
   { name: "Forms", icon: FileText, href: "/forms" },
   { name: "Client Management", icon: Users, href: "/client-management" },
+  { name: "Doctor Applications", icon: UserCheck, href: "/doctor-applications" },
   { name: "Tier Management", icon: Settings, href: "/tier-management" },
   { name: "Global Fees", icon: DollarSign, href: "/global-fees" },
   { name: "Audit Logs", icon: Shield, href: "/audit-logs" },

@@ -763,6 +763,7 @@ app.post("/auth/signup", async (req, res) => {
       clinicId,
       website,
       businessType,
+      npiNumber,
     } = validation.data;
 
     // Validate clinic name for providers/brands (both require clinics)
@@ -827,7 +828,7 @@ app.post("/auth/signup", async (req, res) => {
 
     // Map frontend role to backend role
     let mappedRole: "patient" | "doctor" | "admin" | "brand" = "patient"; // default
-    if (role === "provider") {
+    if (role === "provider" || role === "doctor") {
       mappedRole = "doctor";
     } else if (role === "admin") {
       mappedRole = "admin";
@@ -851,6 +852,12 @@ app.post("/auth/signup", async (req, res) => {
       website,
       businessType,
     });
+
+    // Set NPI number for doctors if provided
+    if (npiNumber && mappedRole === "doctor") {
+      user.npiNumber = npiNumber;
+      await user.save();
+    }
 
     const isDevelopment = process.env.NODE_ENV === "development";
 
@@ -891,18 +898,32 @@ app.post("/auth/signup", async (req, res) => {
       console.log("🌐 Frontend origin detected");
     }
 
-    // Send verification email
-    const emailSent = await MailsSender.sendVerificationEmail(
-      user.email,
-      activationToken,
-      user.firstName,
-      frontendOrigin
-    );
-
-    if (emailSent) {
-      console.log("📧 Verification email sent successfully");
+    // Send different emails based on role
+    let emailSent = false;
+    if (mappedRole === "doctor") {
+      // Doctors get a "pending review" email instead of activation email
+      emailSent = await MailsSender.sendDoctorApplicationPendingEmail(
+        user.email,
+        user.firstName
+      );
+      if (emailSent) {
+        console.log("📧 Doctor application pending email sent successfully");
+      } else {
+        console.log("❌ Failed to send doctor application pending email, but user was created");
+      }
     } else {
-      console.log("❌ Failed to send verification email, but user was created");
+      // Other roles get standard verification email
+      emailSent = await MailsSender.sendVerificationEmail(
+        user.email,
+        activationToken,
+        user.firstName,
+        frontendOrigin
+      );
+      if (emailSent) {
+        console.log("📧 Verification email sent successfully");
+      } else {
+        console.log("❌ Failed to send verification email, but user was created");
+      }
     }
 
     // HIPAA Audit: Log account creation
@@ -1312,6 +1333,18 @@ app.post("/auth/signin", async (req, res) => {
       });
     }
 
+    // Check if doctor is approved
+    if (user.role === "doctor" && !user.isApprovedDoctor) {
+      // HIPAA Audit: Log failed login attempt (doctor not approved)
+      await AuditService.logLoginFailed(req, email, "Doctor account pending approval");
+      return res.status(403).json({
+        success: false,
+        message:
+          "Your doctor application is currently under review. You will receive an email once your account is approved and you can access the Doctor Portal.",
+        pendingApproval: true,
+      });
+    }
+
     // SuperAdmin bypass: Skip MFA entirely for superAdmin users
     if (user.userRoles?.superAdmin === true) {
       // Update last login time
@@ -1652,6 +1685,332 @@ app.post("/auth/mfa/resend", async (req, res) => {
     });
   }
 });
+
+// ========================================
+// Doctor Applications Management Endpoints
+// ========================================
+
+// Verify NPI number using NPPES API
+app.get("/admin/verify-npi/:npi", authenticateJWT, async (req, res) => {
+  try {
+    const currentUser = (req as any).user;
+
+    if (!currentUser) {
+      return res.status(401).json({
+        success: false,
+        message: "Not authenticated",
+      });
+    }
+
+    // Load full user with roles
+    const user = await User.findByPk(currentUser.userId, {
+      include: [{ model: UserRoles, as: "userRoles" }],
+    });
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Only admin, superAdmin, or brand can verify NPIs
+    if (!user.hasAnyRoleSync(["admin", "superAdmin", "brand"])) {
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    const { npi } = req.params;
+
+    if (!npi || !/^\d{10}$/.test(npi)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid NPI format. Must be 10 digits",
+        isValid: false,
+      });
+    }
+
+    // Call NPPES API to verify NPI
+    try {
+      const nppesUrl = `https://npiregistry.cms.hhs.gov/api/?version=2.1&number=${npi}`;
+      const nppesResponse = await fetch(nppesUrl, {
+        method: "GET",
+        headers: {
+          "Accept": "application/json",
+        },
+      });
+
+      if (!nppesResponse.ok) {
+        return res.status(200).json({
+          success: true,
+          isValid: false,
+          message: "Unable to verify NPI at this time",
+        });
+      }
+
+      const nppesData = await nppesResponse.json() as any;
+
+      // Check if NPI exists in the registry
+      const isValid = nppesData.result_count > 0 && nppesData.results && nppesData.results.length > 0;
+
+      if (isValid) {
+        const provider = nppesData.results[0] as any;
+        const basicInfo = provider.basic || {};
+        const addresses = provider.addresses || [];
+        const taxonomies = provider.taxonomies || [];
+
+        return res.status(200).json({
+          success: true,
+          isValid: true,
+          message: "NPI is valid",
+          providerInfo: {
+            name: basicInfo.organization_name || 
+                  `${basicInfo.first_name || ""} ${basicInfo.last_name || ""}`.trim() ||
+                  "N/A",
+            credential: basicInfo.credential || "N/A",
+            primaryTaxonomy: taxonomies.find((t: any) => t.primary)?.desc || "N/A",
+            primaryLocation: addresses.find((a: any) => a.address_purpose === "LOCATION")?.city || "N/A",
+            state: basicInfo.state || "N/A",
+          },
+        });
+      } else {
+        return res.status(200).json({
+          success: true,
+          isValid: false,
+          message: "NPI not found in NPPES registry",
+        });
+      }
+    } catch (error) {
+      // If NPPES API fails, return unknown status
+      if (process.env.NODE_ENV === "development") {
+        console.error("❌ Error verifying NPI:", error);
+      }
+      return res.status(200).json({
+        success: true,
+        isValid: false,
+        message: "Unable to verify NPI at this time",
+        error: "NPPES API unavailable",
+      });
+    }
+  } catch (error) {
+    // HIPAA: Do not log detailed errors in production
+    if (process.env.NODE_ENV === "development") {
+      console.error("❌ Error in NPI verification:", error);
+    } else {
+      console.error("❌ Error in NPI verification");
+    }
+    res.status(500).json({
+      success: false,
+      message: "Failed to verify NPI",
+    });
+  }
+});
+
+// Get all pending doctor applications
+app.get("/admin/doctor-applications", authenticateJWT, async (req, res) => {
+  try {
+    const currentUser = (req as any).user;
+
+    if (!currentUser) {
+      return res.status(401).json({
+        success: false,
+        message: "Not authenticated",
+      });
+    }
+
+    // Load full user with roles
+    const user = await User.findByPk(currentUser.userId, {
+      include: [{ model: UserRoles, as: "userRoles" }],
+    });
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Only admin, superAdmin, or brand can access doctor applications
+    if (!user.hasAnyRoleSync(["admin", "superAdmin", "brand"])) {
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized: Only admins or brand users can view doctor applications",
+      });
+    }
+
+    // Get all users with doctor role who are not approved yet
+    const doctorApplications = await User.findAll({
+      where: {
+        role: "doctor",
+        isApprovedDoctor: false,
+      },
+      attributes: [
+        "id",
+        "firstName",
+        "lastName",
+        "email",
+        "phoneNumber",
+        "npiNumber",
+        "createdAt",
+        "activated",
+        "website",
+        "businessType",
+        "city",
+        "state",
+        "isApprovedDoctor",
+      ],
+      order: [["createdAt", "DESC"]],
+    });
+
+    if (process.env.NODE_ENV === "development") {
+      console.log(`📋 Found ${doctorApplications.length} pending doctor applications`);
+    }
+
+    res.status(200).json({
+      success: true,
+      data: doctorApplications,
+      count: doctorApplications.length,
+    });
+  } catch (error) {
+    // HIPAA: Do not log detailed errors in production
+    if (process.env.NODE_ENV === "development") {
+      console.error("❌ Error fetching doctor applications:", error);
+    } else {
+      console.error("❌ Error fetching doctor applications");
+    }
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch doctor applications",
+    });
+  }
+});
+
+// Approve a doctor application
+app.post(
+  "/admin/doctor-applications/:userId/approve",
+  authenticateJWT,
+  async (req, res) => {
+    try {
+      const currentUser = (req as any).user;
+      const { userId } = req.params;
+
+      if (!currentUser) {
+        return res.status(401).json({
+          success: false,
+          message: "Not authenticated",
+        });
+      }
+
+      // Load full user with roles
+      const adminUser = await User.findByPk(currentUser.userId, {
+        include: [{ model: UserRoles, as: "userRoles" }],
+      });
+
+      if (!adminUser) {
+        return res.status(401).json({
+          success: false,
+          message: "User not found",
+        });
+      }
+
+      // Only admin, superAdmin, or brand can approve doctors
+      if (!adminUser.hasAnyRoleSync(["admin", "superAdmin", "brand"])) {
+        return res.status(403).json({
+          success: false,
+          message: "Unauthorized: Only admins or brand users can approve doctor applications",
+        });
+      }
+
+      // Find the doctor to approve
+      const doctor = await User.findByPk(userId);
+
+      if (!doctor) {
+        return res.status(404).json({
+          success: false,
+          message: "Doctor not found",
+        });
+      }
+
+      // Verify the user is actually a doctor
+      if (doctor.role !== "doctor") {
+        return res.status(400).json({
+          success: false,
+          message: "User is not a doctor",
+        });
+      }
+
+      // Check if already approved
+      if (doctor.isApprovedDoctor) {
+        return res.status(400).json({
+          success: false,
+          message: "Doctor is already approved",
+        });
+      }
+
+      // Approve the doctor
+      doctor.isApprovedDoctor = true;
+      await doctor.save();
+
+      if (process.env.NODE_ENV === "development") {
+        console.log(`✅ Doctor ${doctor.id} approved by admin ${adminUser.id}`);
+      }
+
+      // Send approval email to the doctor
+      const emailSent = await MailsSender.sendDoctorApprovedEmail(
+        doctor.email,
+        doctor.firstName
+      );
+
+      if (emailSent) {
+        console.log("📧 Doctor approval email sent successfully");
+      } else {
+        console.log("❌ Failed to send doctor approval email, but doctor was approved");
+      }
+
+      // HIPAA Audit: Log doctor approval
+      await AuditService.log({
+        userId: adminUser.id,
+        userEmail: adminUser.email,
+        action: AuditAction.UPDATE,
+        resourceType: AuditResourceType.USER,
+        resourceId: doctor.id,
+        ipAddress: AuditService.getClientIp(req),
+        details: {
+          action: "doctor_approved",
+          approvedBy: adminUser.id,
+          doctorEmail: doctor.email,
+        },
+        success: true,
+      });
+
+      res.status(200).json({
+        success: true,
+        message: "Doctor application approved successfully",
+        emailSent,
+        doctor: {
+          id: doctor.id,
+          firstName: doctor.firstName,
+          lastName: doctor.lastName,
+          email: doctor.email,
+          isApprovedDoctor: doctor.isApprovedDoctor,
+        },
+      });
+    } catch (error) {
+      // HIPAA: Do not log detailed errors in production
+      if (process.env.NODE_ENV === "development") {
+        console.error("❌ Error approving doctor application:", error);
+      } else {
+        console.error("❌ Error approving doctor application");
+      }
+      res.status(500).json({
+        success: false,
+        message: "Failed to approve doctor application",
+      });
+    }
+  }
+);
 
 // In-memory store for email verification codes
 // Format: { email: { code: string, expiresAt: number, firstName?: string } }

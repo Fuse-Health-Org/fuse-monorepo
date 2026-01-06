@@ -7,9 +7,6 @@ import { ApiClient } from "@/lib/api"
 import {
     BarChart3,
     Users,
-    Calendar,
-    FileText,
-    Settings,
     LogOut,
     ClipboardList,
     FileQuestion,
@@ -20,14 +17,8 @@ const navigation = [
     { name: "Dashboard", icon: BarChart3, current: true, href: "/" },
     { name: "Requests", icon: ClipboardList, current: false, href: "/requests", badge: true },
     { name: "Patients", icon: Users, current: false, href: "/patients" },
-    { name: "Appointments", icon: Calendar, current: false, href: "/appointments" },
-    { name: "Records", icon: FileText, current: false, href: "/records" },
     { name: "Medical Question Templates", icon: FileQuestion, current: false, href: "/forms" },
     { name: "Multi-Choice Forms", icon: Package, current: false, href: "/multi-choice-forms" },
-]
-
-const configuration = [
-    { name: "Settings", icon: Settings, current: false, href: "/settings" }
 ]
 
 export function Sidebar() {
@@ -104,16 +95,6 @@ export function Sidebar() {
                 {/* Main Navigation */}
                 <div className="space-y-1">
                     {navigation.map((item) => renderSidebarItem(item))}
-                </div>
-
-                {/* Configuration Section */}
-                <div className="pt-6">
-                    <h3 className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                        Configuration
-                    </h3>
-                    <div className="space-y-1">
-                        {configuration.map((item) => renderSidebarItem(item))}
-                    </div>
                 </div>
             </nav>
 
