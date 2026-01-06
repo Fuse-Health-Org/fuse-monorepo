@@ -112,10 +112,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   ): Promise<Response> => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
     console.log('🔐 [Auth] authenticatedFetch called for:', url)
-    
+
     const activeToken = token || (typeof window !== 'undefined' ? localStorage.getItem('admin_token') : null)
     console.log('🔐 [Auth] Token present:', !!activeToken)
-    
+
     const headers = new Headers(init.headers || {})
 
     if (activeToken && !headers.has('Authorization')) {
@@ -149,7 +149,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (impersonateToken) {
         console.log('🎭 [Impersonation] Token found in URL, fetching user data...')
-        
+
         try {
           const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
           const response = await fetch(`${apiUrl}/auth/me`, {
@@ -162,26 +162,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const data = await response.json()
             if (data.success && data.user) {
               console.log('✅ [Impersonation] User data fetched successfully')
-              
+
               // Store token and user data
               localStorage.setItem('admin_token', impersonateToken)
               localStorage.setItem('admin_user', JSON.stringify(data.user))
-              
+
               setToken(impersonateToken)
               setUser(data.user)
 
               // Clean up URL by removing the impersonateToken parameter
               urlParams.delete('impersonateToken')
-              const newUrl = urlParams.toString() 
+              const newUrl = urlParams.toString()
                 ? `${window.location.pathname}?${urlParams.toString()}`
                 : window.location.pathname
               window.history.replaceState({}, '', newUrl)
-              
+
               setIsLoading(false)
               return
             }
           }
-          
+
           console.error('❌ [Impersonation] Failed to fetch user data with impersonation token')
         } catch (error) {
           console.error('❌ [Impersonation] Error:', error)
@@ -189,21 +189,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       // Fallback to checking for stored token
-    const storedToken = typeof window !== 'undefined' ? localStorage.getItem('admin_token') : null
-    const storedUser = typeof window !== 'undefined' ? localStorage.getItem('admin_user') : null
+      const storedToken = typeof window !== 'undefined' ? localStorage.getItem('admin_token') : null
+      const storedUser = typeof window !== 'undefined' ? localStorage.getItem('admin_user') : null
 
-    if (storedToken && storedUser) {
-      try {
-        const userData = JSON.parse(storedUser)
-        setToken(storedToken)
-        setUser(userData)
-      } catch (error) {
-        localStorage.removeItem('admin_token')
-        localStorage.removeItem('admin_user')
+      if (storedToken && storedUser) {
+        try {
+          const userData = JSON.parse(storedUser)
+          setToken(storedToken)
+          setUser(userData)
+        } catch (error) {
+          localStorage.removeItem('admin_token')
+          localStorage.removeItem('admin_user')
+        }
       }
-    }
 
-    setIsLoading(false)
+      setIsLoading(false)
     }
 
     checkAuth()
@@ -227,7 +227,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
       console.log('🔐 [AuthContext] Starting login for:', email)
       console.log('🔐 [AuthContext] API URL:', `${apiUrl}/auth/signin`)
-      
+
       const response = await fetch(`${apiUrl}/auth/signin`, {
         method: 'POST',
         headers: {
@@ -237,7 +237,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
 
       console.log('🔐 [AuthContext] Response status:', response.status, response.statusText)
-      
+
       const data = await response.json()
       console.log('🔐 [AuthContext] Response data:', {
         success: data.success,
