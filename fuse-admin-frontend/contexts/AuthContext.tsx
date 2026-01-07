@@ -31,11 +31,14 @@ interface Subscription {
   tierConfig?: {
     canAddCustomProducts?: boolean
     hasAccessToAnalytics?: boolean
+    hasCustomPortal?: boolean
+    hasPrograms?: boolean
   } | null
   customFeatures?: {
     canAddCustomProducts?: boolean
     hasAccessToAnalytics?: boolean
     hasCustomPortal?: boolean
+    hasPrograms?: boolean
   } | null
 }
 

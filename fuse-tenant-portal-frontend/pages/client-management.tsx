@@ -23,6 +23,7 @@ interface TenantCustomFeatures {
   hasAccessToAnalytics: boolean
   canUploadCustomProductImages: boolean
   hasCustomPortal: boolean
+  hasPrograms: boolean
   createdAt: string
   updatedAt: string
 }
@@ -99,6 +100,7 @@ export default function ClientManagement() {
     hasAccessToAnalytics: false,
     canUploadCustomProductImages: false,
     hasCustomPortal: false,
+    hasPrograms: false,
   })
 
   // User roles state
@@ -198,6 +200,7 @@ export default function ClientManagement() {
         hasAccessToAnalytics: customFeatures.hasAccessToAnalytics || false,
         canUploadCustomProductImages: customFeatures.canUploadCustomProductImages || false,
         hasCustomPortal: customFeatures.hasCustomPortal || false,
+        hasPrograms: customFeatures.hasPrograms || false,
       })
     } else {
       setCustomFeaturesData({
@@ -205,6 +208,7 @@ export default function ClientManagement() {
         hasAccessToAnalytics: false,
         canUploadCustomProductImages: false,
         hasCustomPortal: false,
+        hasPrograms: false,
       })
     }
 
@@ -877,6 +881,29 @@ export default function ClientManagement() {
                                     </span>
                                     <p className="text-xs text-[#6B7280]">
                                       Allow this user to customize their portal (normally restricted to Standard+ plans)
+                                    </p>
+                                  </div>
+                                </label>
+                              </div>
+
+                              {/* Has Programs */}
+                              <div>
+                                <label className="flex items-center space-x-3 cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={customFeaturesData.hasPrograms}
+                                    onChange={(e) => setCustomFeaturesData({
+                                      ...customFeaturesData,
+                                      hasPrograms: e.target.checked
+                                    })}
+                                    className="w-4 h-4 text-[#4FA59C] border-[#D1D5DB] rounded focus:ring-[#4FA59C]"
+                                  />
+                                  <div>
+                                    <span className="text-sm font-medium text-[#374151]">
+                                      Has Programs
+                                    </span>
+                                    <p className="text-xs text-[#6B7280]">
+                                      Allow this user to access and manage Programs
                                     </p>
                                   </div>
                                 </label>

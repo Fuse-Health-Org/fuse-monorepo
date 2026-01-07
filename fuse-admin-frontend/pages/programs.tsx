@@ -10,7 +10,8 @@ import {
     Plus,
     Edit,
     Trash2,
-    FileText
+    FileText,
+    Crown
 } from 'lucide-react'
 
 interface Program {
@@ -36,12 +37,28 @@ export default function Programs() {
     const [programs, setPrograms] = useState<Program[]>([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
-    const { token, user } = useAuth()
+    const { token, user, subscription } = useAuth()
     const router = useRouter()
 
+    // Check if user has access to Programs based on tier or custom features
+    const hasAccessToPrograms =
+        subscription?.customFeatures?.hasPrograms ||
+        subscription?.tierConfig?.hasPrograms ||
+        false
+
+    // Redirect if user doesn't have programs access
     useEffect(() => {
-        fetchPrograms()
-    }, [token])
+        // Wait for subscription to be loaded before checking access
+        if (subscription !== null && !hasAccessToPrograms) {
+            router.replace('/plans?message=Upgrade your plan to access Programs.')
+        }
+    }, [subscription, hasAccessToPrograms, router])
+
+    useEffect(() => {
+        if (hasAccessToPrograms) {
+            fetchPrograms()
+        }
+    }, [token, hasAccessToPrograms])
 
     const fetchPrograms = async () => {
         if (!token) return
@@ -97,6 +114,28 @@ export default function Programs() {
             console.error('Error deleting program:', err)
             setError('Failed to delete program')
         }
+    }
+
+    // Show upgrade required message if user doesn't have access
+    if (subscription !== null && !hasAccessToPrograms) {
+        return (
+            <Layout>
+                <div className="flex flex-col items-center justify-center h-96 gap-6">
+                    <div className="p-4 rounded-full bg-amber-100">
+                        <Crown className="h-12 w-12 text-amber-600" />
+                    </div>
+                    <div className="text-center">
+                        <h2 className="text-2xl font-bold mb-2">Upgrade Required</h2>
+                        <p className="text-muted-foreground mb-4">
+                            Programs feature is available on higher tier plans.
+                        </p>
+                        <Button onClick={() => router.push('/plans')}>
+                            View Plans
+                        </Button>
+                    </div>
+                </div>
+            </Layout>
+        )
     }
 
     if (loading) {

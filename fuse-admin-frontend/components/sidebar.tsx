@@ -89,7 +89,14 @@ export function Sidebar() {
   const PORTAL_ALLOWED_PLAN_TYPES = ['standard', 'professional', 'enterprise'];
   const hasAccessToPortal =
     subscription?.customFeatures?.hasCustomPortal ||
+    subscription?.tierConfig?.hasCustomPortal ||
     (subscription?.plan?.type && PORTAL_ALLOWED_PLAN_TYPES.includes(subscription.plan.type));
+
+  // Check if user has access to Programs based on tier or custom features
+  const hasAccessToPrograms =
+    subscription?.customFeatures?.hasPrograms ||
+    subscription?.tierConfig?.hasPrograms ||
+    false;
   const fetchSubscriptionBasicInfo = async () => {
     try {
       const response = await authenticatedFetch(`${API_URL}/brand-subscriptions/basic-info`, {
@@ -142,6 +149,11 @@ export function Sidebar() {
       return !hasAccessToPortal
     }
 
+    // Programs requires specific access
+    if (itemName === 'Programs') {
+      return !hasAccessToPrograms
+    }
+
     // If no active subscription, disable everything except Plans and Settings
     if (!hasActiveSubscription) {
       return itemName !== 'Settings'
@@ -163,6 +175,12 @@ export function Sidebar() {
     // Portal requires Standard tier or higher - redirect to plans page
     if (itemName === 'Portal' && !hasAccessToPortal) {
       router.push('/plans?message=Upgrade to Standard or higher to access Portal customization.')
+      return
+    }
+
+    // Programs requires specific access - redirect to plans page
+    if (itemName === 'Programs' && !hasAccessToPrograms) {
+      router.push('/plans?message=Upgrade your plan to access Programs.')
       return
     }
 
@@ -198,7 +216,7 @@ export function Sidebar() {
           <div
             className={cn(
               "group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-all cursor-pointer",
-              (item.name === 'Analytics' && !hasAccessToAnalytics) || (item.name === 'Portal' && !hasAccessToPortal)
+              (item.name === 'Analytics' && !hasAccessToAnalytics) || (item.name === 'Portal' && !hasAccessToPortal) || (item.name === 'Programs' && !hasAccessToPrograms)
                 ? "opacity-70 text-muted-foreground/70 hover:bg-sidebar-accent/20 hover:opacity-80"
                 : "opacity-60 grayscale text-muted-foreground/60 hover:bg-sidebar-accent/30 hover:opacity-70",
               isActive
@@ -212,13 +230,13 @@ export function Sidebar() {
             <div className="flex items-center">
               <item.icon className={cn(
                 "mr-3 h-4 w-4",
-                (item.name === 'Analytics' && !hasAccessToAnalytics) || (item.name === 'Portal' && !hasAccessToPortal) ? "opacity-70" : "opacity-50"
+                (item.name === 'Analytics' && !hasAccessToAnalytics) || (item.name === 'Portal' && !hasAccessToPortal) || (item.name === 'Programs' && !hasAccessToPrograms) ? "opacity-70" : "opacity-50"
               )} />
               <span className={cn(
-                (item.name === 'Analytics' && !hasAccessToAnalytics) || (item.name === 'Portal' && !hasAccessToPortal) ? "opacity-90" : "opacity-75"
+                (item.name === 'Analytics' && !hasAccessToAnalytics) || (item.name === 'Portal' && !hasAccessToPortal) || (item.name === 'Programs' && !hasAccessToPrograms) ? "opacity-90" : "opacity-75"
               )}>{item.name}</span>
             </div>
-            {(item.name === 'Analytics' && !hasAccessToAnalytics) || (item.name === 'Portal' && !hasAccessToPortal) ? (
+            {(item.name === 'Analytics' && !hasAccessToAnalytics) || (item.name === 'Portal' && !hasAccessToPortal) || (item.name === 'Programs' && !hasAccessToPrograms) ? (
               <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-100 to-orange-100 text-orange-700 border border-orange-200 font-medium">
                 Upgrade
               </span>
@@ -252,7 +270,9 @@ export function Sidebar() {
               ? '✨ Upgrade to access Analytics'
               : item.name === 'Portal' && !hasAccessToPortal
                 ? '✨ Upgrade to Standard to customize your Portal'
-                : 'Subscription Required'}
+                : item.name === 'Programs' && !hasAccessToPrograms
+                  ? '✨ Upgrade to access Programs'
+                  : 'Subscription Required'}
           </div>
         )}
       </div>

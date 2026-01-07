@@ -10,6 +10,9 @@ interface TierConfig {
   brandSubscriptionPlanId: string;
   canAddCustomProducts: boolean;
   hasAccessToAnalytics: boolean;
+  canUploadCustomProductImages: boolean;
+  hasCustomPortal: boolean;
+  hasPrograms: boolean;
 }
 
 interface Plan {
@@ -71,7 +74,7 @@ export default function TierManagement() {
     }
   };
 
-  const handleToggleFeature = async (planId: string, featureName: 'canAddCustomProducts' | 'hasAccessToAnalytics', currentValue: boolean) => {
+  const handleToggleFeature = async (planId: string, featureName: 'canAddCustomProducts' | 'hasAccessToAnalytics' | 'canUploadCustomProductImages' | 'hasCustomPortal' | 'hasPrograms', currentValue: boolean) => {
     if (!token) return;
 
     setSaving(planId);
@@ -248,6 +251,80 @@ export default function TierManagement() {
                                 `}
                             >
                               {tier.config?.hasAccessToAnalytics ? (
+                                <Check className="h-3 w-3 text-[#4FA59C]" />
+                              ) : (
+                                <X className="h-3 w-3 text-[#9CA3AF]" />
+                              )}
+                            </span>
+                          </button>
+                        </div>
+
+                        {/* Has Custom Portal Toggle */}
+                        <div className="flex items-center space-x-3">
+                          <span className="text-sm text-[#6B7280]">
+                            Has Custom Portal
+                          </span>
+                          <button
+                            onClick={() => handleToggleFeature(
+                              tier.plan.id,
+                              'hasCustomPortal',
+                              tier.config?.hasCustomPortal || false
+                            )}
+                            disabled={saving === tier.plan.id}
+                            className={`
+                                relative inline-flex h-7 w-12 items-center rounded-full transition-colors
+                                ${tier.config?.hasCustomPortal
+                                ? 'bg-[#4FA59C]'
+                                : 'bg-[#D1D5DB]'
+                              }
+                                ${saving === tier.plan.id ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+                              `}
+                          >
+                            <span
+                              className={`
+                                  inline-block h-5 w-5 transform rounded-full bg-white transition-transform shadow-sm
+                                  flex items-center justify-center
+                                  ${tier.config?.hasCustomPortal ? 'translate-x-6' : 'translate-x-1'}
+                                `}
+                            >
+                              {tier.config?.hasCustomPortal ? (
+                                <Check className="h-3 w-3 text-[#4FA59C]" />
+                              ) : (
+                                <X className="h-3 w-3 text-[#9CA3AF]" />
+                              )}
+                            </span>
+                          </button>
+                        </div>
+
+                        {/* Has Programs Toggle */}
+                        <div className="flex items-center space-x-3">
+                          <span className="text-sm text-[#6B7280]">
+                            Has Programs
+                          </span>
+                          <button
+                            onClick={() => handleToggleFeature(
+                              tier.plan.id,
+                              'hasPrograms',
+                              tier.config?.hasPrograms || false
+                            )}
+                            disabled={saving === tier.plan.id}
+                            className={`
+                                relative inline-flex h-7 w-12 items-center rounded-full transition-colors
+                                ${tier.config?.hasPrograms
+                                ? 'bg-[#4FA59C]'
+                                : 'bg-[#D1D5DB]'
+                              }
+                                ${saving === tier.plan.id ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+                              `}
+                          >
+                            <span
+                              className={`
+                                  inline-block h-5 w-5 transform rounded-full bg-white transition-transform shadow-sm
+                                  flex items-center justify-center
+                                  ${tier.config?.hasPrograms ? 'translate-x-6' : 'translate-x-1'}
+                                `}
+                            >
+                              {tier.config?.hasPrograms ? (
                                 <Check className="h-3 w-3 text-[#4FA59C]" />
                               ) : (
                                 <X className="h-3 w-3 text-[#9CA3AF]" />
