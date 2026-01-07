@@ -7656,6 +7656,10 @@ app.post("/stripe/connect/session", authenticateJWT, async (req, res) => {
       validMerchantModel
     );
 
+    if (!clientSecret) {
+      throw new Error("Client secret was not generated");
+    }
+
     res.status(200).json({
       success: true,
       data: {
@@ -7663,14 +7667,14 @@ app.post("/stripe/connect/session", authenticateJWT, async (req, res) => {
       },
     });
   } catch (error: any) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("❌ Error creating Stripe Connect session:", error);
-    } else {
-      console.error("❌ Error creating Stripe Connect session");
+    console.error("❌ Error creating Stripe Connect session:", error);
+    if (error.type === 'StripeInvalidRequestError') {
+      console.error("❌ Stripe error details:", JSON.stringify(error.raw, null, 2));
     }
     res.status(500).json({
       success: false,
       message: error.message || "Failed to create Connect session",
+      error: process.env.NODE_ENV === "development" ? error.stack : undefined,
     });
   }
 });
@@ -7975,19 +7979,31 @@ app.get("/users/by-clinic/:clinicId", authenticateJWT, async (req, res) => {
         });
 
         // Check for active subscription
-        const subscription = await Subscription.findOne({
-          where: {
-            userId,
-            status: "active",
-          },
-        });
+        // Subscription has orderId, not userId, so we need to check through orders
+        // An active subscription is one that is "paid" or "processing"
+        const orderIds = customerOrders.map(order => order.id);
+        let hasActiveSubscription = false;
+        
+        if (orderIds.length > 0) {
+          const subscription = await Subscription.findOne({
+            where: {
+              orderId: {
+                [Op.in]: orderIds,
+              },
+              status: {
+                [Op.in]: ["paid", "processing"],
+              },
+            },
+          });
+          hasActiveSubscription = !!subscription;
+        }
 
         return {
           ...customer.toJSON(),
           orderCount: customerOrders.length,
           totalRevenue: Math.round(totalRevenue * 100) / 100,
           categories: Array.from(categories),
-          hasActiveSubscription: !!subscription,
+          hasActiveSubscription,
         };
       })
     );

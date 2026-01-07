@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Head from 'next/head'
 import { useAuth } from '@/contexts/AuthContext'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -788,14 +788,12 @@ export default function Orders() {
                                             </div>
 
                                             {/* Stripe Connect Component Container */}
-                                            <div id="stripe-connect-container" className="min-h-[400px]">
-                                                {connectInstance && (
-                                                    <StripeConnectAccountOnboarding
-                                                        stripeConnectInstance={connectInstance}
-                                                        onExit={closeConnectModal}
-                                                    />
-                                                )}
-                                            </div>
+                                            {connectInstance && (
+                                                <StripeConnectAccountOnboarding
+                                                    stripeConnectInstance={connectInstance}
+                                                    onExit={closeConnectModal}
+                                                />
+                                            )}
                                         </div>
                                     )}
                                 </div>
@@ -816,25 +814,79 @@ function StripeConnectAccountOnboarding({
     stripeConnectInstance: any,
     onExit: () => void
 }) {
+    const containerRef = useRef<HTMLDivElement>(null)
+
     useEffect(() => {
-        if (stripeConnectInstance) {
-            const accountOnboarding = stripeConnectInstance.create('account-onboarding')
+        if (!stripeConnectInstance) {
+            console.error('Stripe Connect instance is not available')
+            return
+        }
 
-            // Mount the component
-            const container = document.getElementById('stripe-connect-container')
-            if (container && accountOnboarding) {
-                container.innerHTML = '' // Clear any existing content
-                container.appendChild(accountOnboarding)
+        if (!containerRef.current) {
+            console.error('Container ref is not available')
+            return
+        }
 
-                // Listen for exit event
-                accountOnboarding.setOnExit(() => {
-                    console.log('User exited onboarding')
-                    onExit()
-                })
+        let accountOnboarding: any = null
+        let mounted = false
+
+        const mountComponent = async () => {
+            try {
+                // Wait for next frame to ensure DOM is fully rendered
+                await new Promise(resolve => requestAnimationFrame(resolve))
+                await new Promise(resolve => setTimeout(resolve, 100))
+
+                const container = containerRef.current
+                if (!container) {
+                    console.error('❌ Container element not found')
+                    return
+                }
+
+                // Clear any existing content
+                container.innerHTML = ''
+
+                console.log('🔄 Creating account-onboarding component...')
+                accountOnboarding = stripeConnectInstance.create('account-onboarding')
+
+                if (!accountOnboarding) {
+                    console.error('❌ Failed to create account-onboarding component')
+                    return
+                }
+
+                // Verify container still exists
+                if (!containerRef.current) {
+                    console.error('❌ Container disappeared before mounting')
+                    return
+                }
+                
+                // Mount the component - create() returns a DOM element
+                containerRef.current.appendChild(accountOnboarding)
+                mounted = true
+                console.log('✅ Account onboarding component mounted')
+
+            } catch (error: any) {
+                console.error('❌ Error mounting Stripe Connect component:', error)
+            }
+        }
+
+        mountComponent()
+
+        // Cleanup
+        return () => {
+            if (mounted && accountOnboarding && containerRef.current) {
+                try {
+                    // Remove the element from DOM
+                    if (accountOnboarding.parentNode) {
+                        accountOnboarding.parentNode.removeChild(accountOnboarding)
+                    }
+                    console.log('🧹 Unmounted Stripe Connect component')
+                } catch (error) {
+                    console.error('Error unmounting component:', error)
+                }
             }
         }
     }, [stripeConnectInstance, onExit])
 
-    return null
+    return <div ref={containerRef} id="stripe-connect-container" className="min-h-[400px]" />
 }
 
