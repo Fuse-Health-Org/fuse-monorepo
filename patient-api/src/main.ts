@@ -8630,6 +8630,7 @@ app.post(
         currency: "usd",
         stripeMetadata: {
           userId: currentUser.id,
+          brandSubscriptionPlanId: brandSubscriptionPlanId,
           stripePriceId: selectedPlan.stripePriceId,
           amount: amount.toString(),
         },
