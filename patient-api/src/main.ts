@@ -1766,9 +1766,9 @@ app.get("/admin/verify-npi/:npi", authenticateJWT, async (req, res) => {
           isValid: true,
           message: "NPI is valid",
           providerInfo: {
-            name: basicInfo.organization_name || 
-                  `${basicInfo.first_name || ""} ${basicInfo.last_name || ""}`.trim() ||
-                  "N/A",
+            name: basicInfo.organization_name ||
+              `${basicInfo.first_name || ""} ${basicInfo.last_name || ""}`.trim() ||
+              "N/A",
             credential: basicInfo.credential || "N/A",
             primaryTaxonomy: taxonomies.find((t: any) => t.primary)?.desc || "N/A",
             primaryLocation: addresses.find((a: any) => a.address_purpose === "LOCATION")?.city || "N/A",
