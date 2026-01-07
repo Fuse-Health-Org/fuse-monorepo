@@ -466,7 +466,7 @@ export function registerClientManagementEndpoints(
         }
 
         const { userId } = req.params;
-        const { canAddCustomProducts, hasAccessToAnalytics, canUploadCustomProductImages } = req.body;
+        const { canAddCustomProducts, hasAccessToAnalytics, canUploadCustomProductImages, hasCustomPortal } = req.body;
 
         // Find or create custom features for this user
         let customFeatures = await TenantCustomFeatures.findOne({
@@ -489,6 +489,10 @@ export function registerClientManagementEndpoints(
               typeof canUploadCustomProductImages === "boolean"
                 ? canUploadCustomProductImages
                 : false,
+            hasCustomPortal:
+              typeof hasCustomPortal === "boolean"
+                ? hasCustomPortal
+                : false,
           });
           console.log(
             "✅ [Client Mgmt] Created custom features for user:",
@@ -508,6 +512,10 @@ export function registerClientManagementEndpoints(
 
           if (typeof canUploadCustomProductImages === "boolean") {
             updates.canUploadCustomProductImages = canUploadCustomProductImages;
+          }
+
+          if (typeof hasCustomPortal === "boolean") {
+            updates.hasCustomPortal = hasCustomPortal;
           }
 
           await customFeatures.update(updates);

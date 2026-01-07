@@ -79,7 +79,7 @@ export function Sidebar() {
   })
 
   // Check if user has access to analytics based on tier or custom features
-  const hasAccessToAnalytics = 
+  const hasAccessToAnalytics =
     subscription?.customFeatures?.hasAccessToAnalytics ||
     subscription?.tierConfig?.hasAccessToAnalytics ||
     false;
@@ -251,8 +251,8 @@ export function Sidebar() {
             {item.name === 'Analytics' && !hasAccessToAnalytics
               ? '✨ Upgrade to access Analytics'
               : item.name === 'Portal' && !hasAccessToPortal
-              ? '✨ Upgrade to Standard to customize your Portal'
-              : 'Subscription Required'}
+                ? '✨ Upgrade to Standard to customize your Portal'
+                : 'Subscription Required'}
           </div>
         )}
       </div>

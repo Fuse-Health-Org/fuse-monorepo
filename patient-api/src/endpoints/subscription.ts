@@ -21,17 +21,27 @@ export function registerSubscriptionEndpoints(app: Express, authenticateJWT: any
       order: [['createdAt', 'DESC']]
     });
 
-    if (!subscription) {
-      console.log('⚠️ [Subscription] No active subscription found');
-      return res.json(null);
-    }
-
-    // Get custom features
+    // Get custom features (always fetch, even without active subscription)
     const customFeatures = await TenantCustomFeatures.findOne({
       where: { userId: currentUser.id }
     });
     
     console.log('🎨 [Subscription] Custom features:', customFeatures ? customFeatures.toJSON() : null);
+
+    if (!subscription) {
+      console.log('⚠️ [Subscription] No active subscription found');
+      // Still return custom features even without active subscription
+      if (customFeatures) {
+        return res.json({
+          id: null,
+          status: null,
+          plan: null,
+          customFeatures: customFeatures.toJSON(),
+          tierConfig: null
+        });
+      }
+      return res.json(null);
+    }
 
       console.log('📋 [Subscription] Found subscription:', {
         id: subscription.id,

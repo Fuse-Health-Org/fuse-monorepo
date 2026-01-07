@@ -62,8 +62,10 @@ export default function PortalPage() {
   const [customDomain, setCustomDomain] = useState<string | null>(null)
   const [isCustomDomain, setIsCustomDomain] = useState(false)
 
-  // Check if user has access to Portal based on their subscription plan
-  const hasPortalAccess = subscription?.plan?.type && PORTAL_ALLOWED_PLAN_TYPES.includes(subscription.plan.type)
+  // Check if user has access to Portal based on their subscription plan or custom feature override
+  const hasPortalAccess = 
+    subscription?.customFeatures?.hasCustomPortal ||
+    (subscription?.plan?.type && PORTAL_ALLOWED_PLAN_TYPES.includes(subscription.plan.type))
 
   // Redirect if user doesn't have portal access
   useEffect(() => {
