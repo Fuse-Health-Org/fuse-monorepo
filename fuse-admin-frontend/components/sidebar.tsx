@@ -84,11 +84,12 @@ export function Sidebar() {
     subscription?.tierConfig?.hasAccessToAnalytics ||
     false;
 
-  // Check if user has access to Portal (Standard tier or higher)
+  // Check if user has access to Portal (Standard tier or higher, or custom feature override)
   // Plan types hierarchy: starter < standard < professional
   const PORTAL_ALLOWED_PLAN_TYPES = ['standard', 'professional', 'enterprise'];
   const hasAccessToPortal =
-    subscription?.plan?.type && PORTAL_ALLOWED_PLAN_TYPES.includes(subscription.plan.type);
+    subscription?.customFeatures?.hasCustomPortal ||
+    (subscription?.plan?.type && PORTAL_ALLOWED_PLAN_TYPES.includes(subscription.plan.type));
   const fetchSubscriptionBasicInfo = async () => {
     try {
       const response = await authenticatedFetch(`${API_URL}/brand-subscriptions/basic-info`, {

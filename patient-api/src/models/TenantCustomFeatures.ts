@@ -36,6 +36,13 @@ export default class TenantCustomFeatures extends Entity {
   })
   declare canUploadCustomProductImages: boolean;
 
+  @Column({
+    type: DataType.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+  })
+  declare hasCustomPortal: boolean;
+
   @BelongsTo(() => User)
   declare user?: User;
 
@@ -45,6 +52,7 @@ export default class TenantCustomFeatures extends Entity {
       canAddCustomProducts: this.canAddCustomProducts,
       hasAccessToAnalytics: this.hasAccessToAnalytics,
       canUploadCustomProductImages: this.canUploadCustomProductImages,
+      hasCustomPortal: this.hasCustomPortal,
     };
   }
 }

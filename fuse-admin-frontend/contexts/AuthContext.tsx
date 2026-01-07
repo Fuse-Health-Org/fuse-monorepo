@@ -35,6 +35,7 @@ interface Subscription {
   customFeatures?: {
     canAddCustomProducts?: boolean
     hasAccessToAnalytics?: boolean
+    hasCustomPortal?: boolean
   } | null
 }
 
