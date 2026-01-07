@@ -714,9 +714,8 @@ export default function PortalPage() {
                           if (isCustomDomain && customDomain) {
                             return `https://${customDomain}`
                           }
-                          // Use NEXT_PUBLIC_PATIENT_FRONTEND_URL directly (it already has the full URL)
-                          const baseUrl = process.env.NEXT_PUBLIC_PATIENT_FRONTEND_URL || 'https://checkhealth.fusehealthstaging.xyz'
-                          return baseUrl
+                          // Construct URL with clinic slug using production domain
+                          return `https://${clinicSlug}.fusehealth.com`
                         })()}
                       </p>
                       {typeof window !== 'undefined' && window.location.hostname.includes('localhost') && (
@@ -735,8 +734,8 @@ export default function PortalPage() {
                       } else if (isCustomDomain && customDomain) {
                         url = `https://${customDomain}`
                       } else {
-                        // Use NEXT_PUBLIC_PATIENT_FRONTEND_URL directly (it already has the full URL)
-                        url = process.env.NEXT_PUBLIC_PATIENT_FRONTEND_URL || 'https://checkhealth.fusehealthstaging.xyz'
+                        // Construct URL with clinic slug using production domain
+                        url = `https://${clinicSlug}.fusehealth.com`
                       }
                       window.open(url, '_blank')
                     }}

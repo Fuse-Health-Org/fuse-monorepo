@@ -69,14 +69,14 @@ export function registerClientManagementEndpoints(
 
       await user.getUserRoles();
       const roleParam = req.query.role as string;
-      
+
       // Allow admins/superAdmins full access
       // Allow brand users to access affiliates only
       if (!user.userRoles?.hasAnyRole(["admin", "superAdmin"])) {
         if (roleParam !== "affiliate" || !user.userRoles?.hasRole("brand")) {
-          return res.status(403).json({ 
-            success: false, 
-            message: "Forbidden. Only admins can access all users, or brand users can access affiliates only." 
+          return res.status(403).json({
+            success: false,
+            message: "Forbidden. Only admins can access all users, or brand users can access affiliates only."
           });
         }
       }
@@ -586,7 +586,7 @@ export function registerClientManagementEndpoints(
       }
 
       // Get or create UserRoles
-      let userRoles = await UserRoles.findOne({ 
+      let userRoles = await UserRoles.findOne({
         where: { userId }
       });
 
@@ -690,7 +690,7 @@ export function registerClientManagementEndpoints(
       }
 
       // Update UserRoles table - set only the specified role to true, others to false
-      let userRoles = await UserRoles.findOne({ 
+      let userRoles = await UserRoles.findOne({
         where: { userId }
       });
 
