@@ -12,24 +12,27 @@ const Tutorial = ({
   setRunTutorial,
   endLabel,
   onFinish,
+  initialStep,
 }: {
   runTutorial: boolean;
   steps?: any;
   onFinish?: () => void;
   setRunTutorial?: (runTutorial: boolean) => void;
   endLabel?: string;
+  initialStep?: number;
 }) => {
   const router = useRouter();
   const { authenticatedFetch } = useAuth();
   
-  const handleTutorialFinish = async () => {
+  const handleTutorialFinish = async (step?: number) => {
     try {
-        console.log('🔍 Marking tutorial as finished')
+        console.log('🔍 Marking tutorial as finished', step ? `at step ${step}` : '')
         const response = await authenticatedFetch(`${API_URL}/brand-subscriptions/mark-tutorial-finished`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
-            }
+            },
+            body: JSON.stringify({ step })
         })
 
         if (response.ok) {
@@ -40,10 +43,35 @@ const Tutorial = ({
     } catch (error) {
         console.error('❌ Error marking tutorial as finished:', error)
     }
-}
+  }
+
+  const handleUpdateStep = async (step: number) => {
+    try {
+        const response = await authenticatedFetch(`${API_URL}/brand-subscriptions/tutorial-step`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ step })
+        })
+
+        if (response.ok) {
+            console.log(`✅ Tutorial step updated to ${step}`)
+        } else {
+            console.error('❌ Failed to update tutorial step')
+        }
+    } catch (error) {
+        console.error('❌ Error updating tutorial step:', error)
+    }
+  }
 
   const handleJoyrideCallback = (data: any) => {
-    const { status, action, index } = data;
+    const { status, action, index, type } = data;
+
+    // Update step in DB when moving to next step
+    if (action === "next" && type === "step:after") {
+      handleUpdateStep(index);
+    }
 
     if (action === "next" && index === 2) {
       router.push("/products");
@@ -62,12 +90,11 @@ const Tutorial = ({
       return;
     }
 
-    if (status === "finished" || status === "skipped") {
+    // When tutorial is finished, skipped, or closed, mark as finished with current step
+    if (status === "finished" || status === "skipped" || status === "closed") {
       setRunTutorial?.(false);
-      handleTutorialFinish();
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('tutorialCompleted', 'true');
-      }
+      // Use the current index (step) when closing/skipping
+      handleTutorialFinish(index);
     }
   };
 
@@ -79,8 +106,9 @@ const Tutorial = ({
       continuous={true}
       showProgress={true}
       showSkipButton={true}
-      disableCloseOnEsc={true}
-      disableOverlayClose={true}
+      disableCloseOnEsc={false}
+      disableOverlayClose={false}
+      stepIndex={initialStep !== undefined ? initialStep : undefined}
       locale={{
         close: "Close",
         last: endLabel || "End",

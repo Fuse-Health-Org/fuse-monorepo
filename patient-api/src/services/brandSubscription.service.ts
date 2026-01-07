@@ -428,17 +428,18 @@ class BrandSubscriptionService {
   }
 
   /**
-   * Get basic subscription info (status, tutorialFinished, stripeCustomerId)
+   * Get basic subscription info (status, tutorialFinished, tutorialStep, stripeCustomerId)
    */
   async getBasicSubscriptionInfo(userId: string): Promise<{
     status: string;
     tutorialFinished: boolean;
+    tutorialStep: number;
     stripeCustomerId: string | null;
   } | null> {
     try {
       const subscription = await BrandSubscription.findOne({
         where: { userId },
-        attributes: ["status", "tutorialFinished", "stripeCustomerId"],
+        attributes: ["status", "tutorialFinished", "tutorialStep", "stripeCustomerId"],
       });
 
       if (!subscription) {
@@ -448,6 +449,7 @@ class BrandSubscriptionService {
       return {
         status: subscription.status,
         tutorialFinished: subscription.tutorialFinished,
+        tutorialStep: subscription.tutorialStep || 0,
         stripeCustomerId: subscription.stripeCustomerId || null,
       };
     } catch (error) {
@@ -463,7 +465,42 @@ class BrandSubscriptionService {
   /**
    * Mark tutorial as finished for user's brand subscription
    */
-  async markTutorialFinished(userId: string): Promise<boolean> {
+  async markTutorialFinished(userId: string, step?: number): Promise<boolean> {
+    try {
+      const subscription = await BrandSubscription.findOne({
+        where: { userId },
+      });
+
+      if (!subscription) {
+        return false;
+      }
+
+      const updateData: { tutorialFinished: boolean; tutorialStep?: number } = {
+        tutorialFinished: true,
+      };
+
+      // If step is provided, update it as well
+      if (step !== undefined) {
+        updateData.tutorialStep = step;
+      }
+
+      await subscription.update(updateData);
+
+      return true;
+    } catch (error) {
+      if (process.env.NODE_ENV === "development") {
+        console.error("❌ Error marking tutorial as finished:", error);
+      } else {
+        console.error("❌ Error marking tutorial as finished");
+      }
+      return false;
+    }
+  }
+
+  /**
+   * Update tutorial step for user's brand subscription
+   */
+  async updateTutorialStep(userId: string, step: number): Promise<boolean> {
     try {
       const subscription = await BrandSubscription.findOne({
         where: { userId },
@@ -474,15 +511,15 @@ class BrandSubscriptionService {
       }
 
       await subscription.update({
-        tutorialFinished: true,
+        tutorialStep: step,
       });
 
       return true;
     } catch (error) {
       if (process.env.NODE_ENV === "development") {
-        console.error("❌ Error marking tutorial as finished:", error);
+        console.error("❌ Error updating tutorial step:", error);
       } else {
-        console.error("❌ Error marking tutorial as finished");
+        console.error("❌ Error updating tutorial step");
       }
       return false;
     }

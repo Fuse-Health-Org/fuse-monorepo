@@ -8460,9 +8460,11 @@ app.post(
         });
       }
 
+      const { step } = req.body;
       const brandSubscriptionService = new BrandSubscriptionService();
       const success = await brandSubscriptionService.markTutorialFinished(
-        currentUser.id
+        currentUser.id,
+        step
       );
 
       if (!success) {
@@ -8481,6 +8483,60 @@ app.post(
         console.error("❌ Error marking tutorial as finished:", error);
       } else {
         console.error("❌ Error marking tutorial as finished");
+      }
+      return res.status(500).json({
+        success: false,
+        message: "Internal server error",
+      });
+    }
+  }
+);
+
+// Update tutorial step
+app.put(
+  "/brand-subscriptions/tutorial-step",
+  authenticateJWT,
+  async (req, res) => {
+    try {
+      const currentUser = getCurrentUser(req);
+      if (!currentUser) {
+        return res.status(401).json({
+          success: false,
+          message: "Unauthorized",
+        });
+      }
+
+      const { step } = req.body;
+      
+      if (step === undefined || step === null) {
+        return res.status(400).json({
+          success: false,
+          message: "Step is required",
+        });
+      }
+
+      const brandSubscriptionService = new BrandSubscriptionService();
+      const success = await brandSubscriptionService.updateTutorialStep(
+        currentUser.id,
+        step
+      );
+
+      if (!success) {
+        return res.status(404).json({
+          success: false,
+          message: "No subscription found",
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: "Tutorial step updated",
+      });
+    } catch (error) {
+      if (process.env.NODE_ENV === "development") {
+        console.error("❌ Error updating tutorial step:", error);
+      } else {
+        console.error("❌ Error updating tutorial step");
       }
       return res.status(500).json({
         success: false,

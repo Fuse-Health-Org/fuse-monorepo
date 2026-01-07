@@ -40,14 +40,8 @@ export default function CreateProduct() {
     const [uploadingImage, setUploadingImage] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [imageFile, setImageFile] = useState<File | null>(null)
-    const [runTutorial, setRunTutorial] = useState(() => {
-        // Check if tutorial has been completed before
-        if (typeof window !== 'undefined') {
-            const tutorialCompleted = localStorage.getItem('tutorialCompleted');
-            return tutorialCompleted !== 'true';
-        }
-        return false;
-    })
+    // Tutorial is now managed from the sidebar using DB
+    const [runTutorial, setRunTutorial] = useState(false)
     const [imagePreview, setImagePreview] = useState<string | null>(null)
     const [imageConfirmed, setImageConfirmed] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
