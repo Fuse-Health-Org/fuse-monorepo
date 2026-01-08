@@ -3,7 +3,7 @@ import { Header } from "@/components/header";
 import { Sidebar } from "@/components/sidebar";
 import { Card } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
-import { Settings, Check, X, Plus, Trash2, Save } from 'lucide-react';
+import { Settings, Check, X, Plus, Trash2, Save, Edit2 } from 'lucide-react';
 
 interface TierConfig {
   id: string;
@@ -41,6 +41,8 @@ export default function TierManagement() {
   const [saving, setSaving] = useState<string | null>(null);
   const [editingCustomText, setEditingCustomText] = useState<string | null>(null);
   const [customTextDraft, setCustomTextDraft] = useState<string[]>([]);
+  const [editingMaxProducts, setEditingMaxProducts] = useState<string | null>(null);
+  const [maxProductsDraft, setMaxProductsDraft] = useState<number>(0);
 
   useEffect(() => {
     if (token) {
@@ -191,6 +193,62 @@ export default function TierManagement() {
     setCustomTextDraft([]);
   };
 
+  const handleStartEditingMaxProducts = (planId: string, currentMaxProducts: number) => {
+    setEditingMaxProducts(planId);
+    setMaxProductsDraft(currentMaxProducts);
+  };
+
+  const handleSaveMaxProducts = async (planId: string) => {
+    if (!token) return;
+
+    setSaving(planId);
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/plans/${planId}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          maxProducts: maxProductsDraft,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update max products');
+      }
+
+      const result = await response.json();
+      console.log('✅ Updated plan:', result.data);
+
+      // Update local state
+      setTiers(prevTiers => prevTiers.map(tier => {
+        if (tier.plan.id === planId) {
+          return {
+            ...tier,
+            plan: {
+              ...tier.plan,
+              maxProducts: maxProductsDraft,
+            },
+          };
+        }
+        return tier;
+      }));
+
+      setEditingMaxProducts(null);
+    } catch (error) {
+      console.error('Error updating max products:', error);
+      alert('Failed to update max products');
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  const handleCancelEditingMaxProducts = () => {
+    setEditingMaxProducts(null);
+    setMaxProductsDraft(0);
+  };
+
   return (
     <div className="flex h-screen bg-[#F9FAFB]">
       <Sidebar />
@@ -246,11 +304,48 @@ export default function TierManagement() {
                               ${tier.plan.monthlyPrice}/month
                             </span>
                           </div>
-                          <div>
+                          <div className="flex items-center gap-2">
                             <span className="text-[#9CA3AF]">Max Products:</span>{' '}
-                            <span className="font-semibold text-[#1F2937]">
-                              {tier.plan.maxProducts === -1 ? 'Unlimited' : tier.plan.maxProducts}
-                            </span>
+                            {editingMaxProducts === tier.plan.id ? (
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="number"
+                                  value={maxProductsDraft}
+                                  onChange={(e) => setMaxProductsDraft(parseInt(e.target.value) || 0)}
+                                  className="w-20 px-2 py-1 text-sm border border-[#E5E7EB] rounded focus:outline-none focus:ring-2 focus:ring-[#4FA59C]"
+                                  placeholder="-1 for unlimited"
+                                />
+                                <button
+                                  onClick={() => handleSaveMaxProducts(tier.plan.id)}
+                                  disabled={saving === tier.plan.id}
+                                  className="p-1 text-[#4FA59C] hover:bg-[#E5F5F3] rounded transition-colors disabled:opacity-50"
+                                  title="Save"
+                                >
+                                  <Save className="h-4 w-4" />
+                                </button>
+                                <button
+                                  onClick={handleCancelEditingMaxProducts}
+                                  className="p-1 text-[#9CA3AF] hover:bg-gray-100 rounded transition-colors"
+                                  title="Cancel"
+                                >
+                                  <X className="h-4 w-4" />
+                                </button>
+                              </div>
+                            ) : (
+                              <>
+                                <span className="font-semibold text-[#1F2937]">
+                                  {tier.plan.maxProducts === -1 ? 'Unlimited' : tier.plan.maxProducts}
+                                </span>
+                                <button
+                                  onClick={() => handleStartEditingMaxProducts(tier.plan.id, tier.plan.maxProducts)}
+                                  className="p-1 text-[#9CA3AF] hover:text-[#4FA59C] hover:bg-[#E5F5F3] rounded transition-colors"
+                                  title="Edit max products"
+                                >
+                                  <Edit2 className="h-3 w-3" />
+                                </button>
+                              </>
+                            )}
+                            <span className="text-xs text-[#9CA3AF]">(-1 = unlimited)</span>
                           </div>
                         </div>
                       </div>

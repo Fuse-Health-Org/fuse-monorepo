@@ -9,6 +9,58 @@ export function registerTierManagementEndpoints(
   authenticateJWT: any,
   getCurrentUser: any
 ) {
+  // Update a subscription plan (e.g., maxProducts)
+  app.patch("/admin/plans/:planId", authenticateJWT, async (req, res) => {
+    try {
+      const currentUser = getCurrentUser(req);
+      if (!currentUser) {
+        return res
+          .status(401)
+          .json({ success: false, message: "Not authenticated" });
+      }
+
+      const user = await User.findByPk(currentUser.id, {
+        include: [{ model: UserRoles, as: 'userRoles' }]
+      });
+      if (!user || !user.hasAnyRoleSync(['admin', 'superAdmin'])) {
+        return res.status(403).json({ success: false, message: "Forbidden" });
+      }
+
+      const { planId } = req.params;
+      const { maxProducts } = req.body;
+
+      const plan = await BrandSubscriptionPlans.findByPk(planId);
+      if (!plan) {
+        return res.status(404).json({ success: false, message: "Plan not found" });
+      }
+
+      const updates: any = {};
+
+      if (typeof maxProducts === "number") {
+        updates.maxProducts = maxProducts;
+      }
+
+      if (Object.keys(updates).length === 0) {
+        return res.status(400).json({ success: false, message: "No valid fields to update" });
+      }
+
+      await plan.update(updates);
+      console.log(`✅ Updated plan ${plan.name}:`, updates);
+
+      res.status(200).json({
+        success: true,
+        message: "Plan updated successfully",
+        data: plan.toJSON(),
+      });
+    } catch (error) {
+      console.error(
+        "❌ Error updating plan:",
+        error instanceof Error ? error.message : String(error)
+      );
+      res.status(500).json({ success: false, message: "Failed to update plan" });
+    }
+  });
+
   // Get all tiers with their configurations
   app.get("/admin/tiers", authenticateJWT, async (req, res) => {
     try {
