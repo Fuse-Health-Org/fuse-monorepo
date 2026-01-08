@@ -8463,9 +8463,10 @@ app.post(
 
       const { step } = req.body;
       const brandSubscriptionService = new BrandSubscriptionService();
+      // step is optional, so only pass it if it's defined
       const success = await brandSubscriptionService.markTutorialFinished(
         currentUser.id,
-        step
+        step !== undefined ? step : undefined
       );
 
       if (!success) {
@@ -8517,9 +8518,11 @@ app.put(
       }
 
       const brandSubscriptionService = new BrandSubscriptionService();
+      // Ensure step is a number
+      const stepNumber = typeof step === 'number' ? step : parseInt(String(step), 10);
       const success = await brandSubscriptionService.updateTutorialStep(
         currentUser.id,
-        step
+        stepNumber
       );
 
       if (!success) {
