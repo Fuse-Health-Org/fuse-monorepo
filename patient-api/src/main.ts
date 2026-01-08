@@ -9454,17 +9454,17 @@ app.post("/questionnaires/templates", authenticateJWT, async (req, res) => {
     }
 
     res.status(201).json({ success: true, data: template });
-  } catch (error) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("❌ Error creating questionnaire template:", error);
-    } else {
-      console.error("❌ Error creating questionnaire template");
+  } catch (error: any) {
+    // Always log errors for debugging questionnaire creation issues
+    console.error("❌ Error creating questionnaire template:", error?.message || error);
+    if (error?.parent) {
+      console.error("❌ Database error details:", error.parent?.message || error.parent);
     }
     res
       .status(500)
       .json({
         success: false,
-        message: "Failed to create questionnaire template",
+        message: error?.message || "Failed to create questionnaire template",
       });
   }
 });

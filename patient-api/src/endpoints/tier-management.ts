@@ -100,6 +100,7 @@ export function registerTierManagementEndpoints(
           canUploadCustomProductImages,
           hasCustomPortal,
           hasPrograms,
+          canCustomizeFormStructure,
         } = req.body;
 
         // Check if plan exists
@@ -138,6 +139,10 @@ export function registerTierManagementEndpoints(
               typeof hasPrograms === "boolean"
                 ? hasPrograms
                 : false,
+            canCustomizeFormStructure:
+              typeof canCustomizeFormStructure === "boolean"
+                ? canCustomizeFormStructure
+                : false,
           });
           console.log(`✅ Created TierConfiguration for plan: ${plan.name}`);
         } else {
@@ -161,6 +166,10 @@ export function registerTierManagementEndpoints(
 
           if (typeof hasPrograms === "boolean") {
             updates.hasPrograms = hasPrograms;
+          }
+
+          if (typeof canCustomizeFormStructure === "boolean") {
+            updates.canCustomizeFormStructure = canCustomizeFormStructure;
           }
 
           await config.update(updates);

@@ -33,12 +33,14 @@ interface Subscription {
     hasAccessToAnalytics?: boolean
     hasCustomPortal?: boolean
     hasPrograms?: boolean
+    canCustomizeFormStructure?: boolean
   } | null
   customFeatures?: {
     canAddCustomProducts?: boolean
     hasAccessToAnalytics?: boolean
     hasCustomPortal?: boolean
     hasPrograms?: boolean
+    canCustomizeFormStructure?: boolean
   } | null
 }
 

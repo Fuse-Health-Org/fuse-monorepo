@@ -24,6 +24,7 @@ interface TenantCustomFeatures {
   canUploadCustomProductImages: boolean
   hasCustomPortal: boolean
   hasPrograms: boolean
+  canCustomizeFormStructure: boolean
   createdAt: string
   updatedAt: string
 }
@@ -101,6 +102,7 @@ export default function ClientManagement() {
     canUploadCustomProductImages: false,
     hasCustomPortal: false,
     hasPrograms: false,
+    canCustomizeFormStructure: false,
   })
 
   // User roles state
@@ -201,6 +203,7 @@ export default function ClientManagement() {
         canUploadCustomProductImages: customFeatures.canUploadCustomProductImages || false,
         hasCustomPortal: customFeatures.hasCustomPortal || false,
         hasPrograms: customFeatures.hasPrograms || false,
+        canCustomizeFormStructure: customFeatures.canCustomizeFormStructure || false,
       })
     } else {
       setCustomFeaturesData({
@@ -209,6 +212,7 @@ export default function ClientManagement() {
         canUploadCustomProductImages: false,
         hasCustomPortal: false,
         hasPrograms: false,
+        canCustomizeFormStructure: false,
       })
     }
 
@@ -904,6 +908,29 @@ export default function ClientManagement() {
                                     </span>
                                     <p className="text-xs text-[#6B7280]">
                                       Allow this user to access and manage Programs
+                                    </p>
+                                  </div>
+                                </label>
+                              </div>
+
+                              {/* Can Customize Form Structure */}
+                              <div>
+                                <label className="flex items-center space-x-3 cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={customFeaturesData.canCustomizeFormStructure}
+                                    onChange={(e) => setCustomFeaturesData({
+                                      ...customFeaturesData,
+                                      canCustomizeFormStructure: e.target.checked
+                                    })}
+                                    className="w-4 h-4 text-[#4FA59C] border-[#D1D5DB] rounded focus:ring-[#4FA59C]"
+                                  />
+                                  <div>
+                                    <span className="text-sm font-medium text-[#374151]">
+                                      Can Customize Form Structure
+                                    </span>
+                                    <p className="text-xs text-[#6B7280]">
+                                      Allow this user to customize product form structures (add/edit form layouts)
                                     </p>
                                   </div>
                                 </label>

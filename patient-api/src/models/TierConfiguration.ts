@@ -50,6 +50,13 @@ export default class TierConfiguration extends Entity {
   })
   declare hasPrograms: boolean;
 
+  @Column({
+    type: DataType.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+  })
+  declare canCustomizeFormStructure: boolean;
+
   @BelongsTo(() => BrandSubscriptionPlans)
   declare plan?: BrandSubscriptionPlans;
 
@@ -61,6 +68,7 @@ export default class TierConfiguration extends Entity {
       canUploadCustomProductImages: this.canUploadCustomProductImages,
       hasCustomPortal: this.hasCustomPortal,
       hasPrograms: this.hasPrograms,
+      canCustomizeFormStructure: this.canCustomizeFormStructure,
     };
   }
 }

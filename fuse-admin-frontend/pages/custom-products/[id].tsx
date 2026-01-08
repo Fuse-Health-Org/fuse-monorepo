@@ -73,8 +73,13 @@ interface Product {
 export default function CustomProductEditor() {
     const router = useRouter()
     const { id: productId } = router.query
-    const { token, user } = useAuth()
+    const { token, user, subscription } = useAuth()
     const baseUrl = useMemo(() => process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001", [])
+
+    // Check if user can customize form structure based on tier or custom features
+    const canCustomizeFormStructure =
+        subscription?.customFeatures?.canCustomizeFormStructure === true ||
+        subscription?.tierConfig?.canCustomizeFormStructure === true
 
     // Product state
     const [product, setProduct] = useState<Product | null>(null)
@@ -267,6 +272,8 @@ export default function CustomProductEditor() {
                             const primaryCategoryForTemplate = Array.isArray(data.data?.categories) && data.data.categories.length > 0
                                 ? data.data.categories[0]
                                 : data.data?.category || null
+                            // Include short product ID suffix to ensure uniqueness when products have same name
+                            const shortId = typeof productId === 'string' ? productId.slice(-8) : Date.now().toString(36)
                             const createRes = await fetch(`${baseUrl}/questionnaires/templates`, {
                                 method: "POST",
                                 headers: {
@@ -274,7 +281,7 @@ export default function CustomProductEditor() {
                                     Authorization: `Bearer ${token}`,
                                 },
                                 body: JSON.stringify({
-                                    title: `${data.data.name} Brand Questions Form`,
+                                    title: `${data.data.name} Brand Questions Form (${shortId})`,
                                     description: `Questionnaire for ${data.data.name}`,
                                     category: primaryCategoryForTemplate,
                                     formTemplateType: 'brand_questions',
@@ -294,7 +301,7 @@ export default function CustomProductEditor() {
                                 console.error('Status:', createRes.status, createRes.statusText)
                                 console.error('Error data:', errorData)
                                 console.error('Request payload:', {
-                                    title: `${data.data.name} Brand Questions Form`,
+                                    title: `${data.data.name} Brand Questions Form (${shortId})`,
                                     description: `Questionnaire for ${data.data.name}`,
                                     category: primaryCategoryForTemplate || 'General',
                                     formTemplateType: 'brand_questions',
@@ -792,6 +799,8 @@ export default function CustomProductEditor() {
 
         try {
             setCreatingForm(true)
+            // Include short product ID suffix to ensure uniqueness when products have same name
+            const shortId = typeof productId === 'string' ? productId.slice(-8) : Date.now().toString(36)
             const response = await fetch(`${baseUrl}/questionnaires/templates`, {
                 method: "POST",
                 headers: {
@@ -799,7 +808,7 @@ export default function CustomProductEditor() {
                     Authorization: `Bearer ${token}`,
                 },
                 body: JSON.stringify({
-                    title: `${product?.name} Brand Questions Form`,
+                    title: `${product?.name} Brand Questions Form (${shortId})`,
                     description: `Questionnaire for ${product?.name}`,
                     category: product?.category || null,
                     formTemplateType: 'brand_questions',
@@ -2661,17 +2670,62 @@ export default function CustomProductEditor() {
                     <div className="bg-white rounded-2xl shadow-sm border border-[#E5E7EB] p-6 mb-6">
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="text-sm font-semibold text-[#1F2937]">Product Forms</h3>
-                            <button
-                                onClick={() => {
-                                    setStructureToEdit(null)
-                                    setShowStructureModal(true)
-                                }}
-                                className="flex items-center gap-2 px-6 py-3 rounded-full bg-[#10B981] hover:bg-[#059669] text-white font-medium shadow-sm transition-all"
-                            >
-                                <Plus className="h-5 w-5" />
-                                Add New Structure
-                            </button>
+                            {canCustomizeFormStructure ? (
+                                <button
+                                    onClick={() => {
+                                        setStructureToEdit(null)
+                                        setShowStructureModal(true)
+                                    }}
+                                    className="flex items-center gap-2 px-6 py-3 rounded-full bg-[#10B981] hover:bg-[#059669] text-white font-medium shadow-sm transition-all"
+                                >
+                                    <Plus className="h-5 w-5" />
+                                    Add New Structure
+                                </button>
+                            ) : (
+                                <TooltipProvider>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <button
+                                                disabled
+                                                className="flex items-center gap-2 px-6 py-3 rounded-full bg-gray-300 text-gray-500 font-medium cursor-not-allowed"
+                                            >
+                                                <Plus className="h-5 w-5" />
+                                                Add New Structure
+                                            </button>
+                                        </TooltipTrigger>
+                                        <TooltipContent side="bottom" className="max-w-xs">
+                                            <p className="font-semibold mb-1">Feature Not Available</p>
+                                            <p className="text-sm">Customizing form structures is not available on your current plan. <a href="/plans" className="underline text-indigo-400 hover:text-indigo-300">Upgrade now</a></p>
+                                        </TooltipContent>
+                                    </Tooltip>
+                                </TooltipProvider>
+                            )}
                         </div>
+                        
+                        {/* Show upgrade notice if user cannot customize forms */}
+                        {!canCustomizeFormStructure && (
+                            <div className="mb-6 px-5 py-4 rounded-lg border-2 border-amber-200 bg-amber-50">
+                                <div className="flex items-start gap-4">
+                                    <div className="flex-shrink-0">
+                                        <Layers className="h-6 w-6 text-amber-600" />
+                                    </div>
+                                    <div className="flex-1">
+                                        <h4 className="text-sm font-semibold text-amber-800 mb-1">
+                                            Unlock Form Customization
+                                        </h4>
+                                        <p className="text-sm text-amber-700">
+                                            Customizing form structures is not available on your current plan. Contact support or upgrade to customize product intake forms.
+                                        </p>
+                                    </div>
+                                    <a
+                                        href="/plans"
+                                        className="flex-shrink-0 px-4 py-2 rounded-full bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium transition-colors"
+                                    >
+                                        View Plans & Upgrade
+                                    </a>
+                                </div>
+                            </div>
+                        )}
                         {templates.length === 0 ? (
                             <div className="p-8 border-2 border-dashed border-[#E5E7EB] rounded-2xl text-center bg-[#F9FAFB]/50">
                                 <FileText className="h-10 w-10 text-[#9CA3AF] mx-auto mb-3" />
@@ -2712,16 +2766,35 @@ export default function CustomProductEditor() {
                                                                         'Standard Form'}
                                                             </p>
                                                         </div>
-                                                        <button
-                                                            onClick={() => {
-                                                                setStructureToEdit(structure)
-                                                                setShowStructureModal(true)
-                                                            }}
-                                                            className="flex items-center gap-2 px-4 py-2 rounded-full bg-[#10B981] hover:bg-[#059669] text-white text-sm font-medium shadow-sm transition-all"
-                                                        >
-                                                            <Edit className="h-4 w-4" />
-                                                            Edit Form Structure
-                                                        </button>
+                                                        {canCustomizeFormStructure ? (
+                                                            <button
+                                                                onClick={() => {
+                                                                    setStructureToEdit(structure)
+                                                                    setShowStructureModal(true)
+                                                                }}
+                                                                className="flex items-center gap-2 px-4 py-2 rounded-full bg-[#10B981] hover:bg-[#059669] text-white text-sm font-medium shadow-sm transition-all"
+                                                            >
+                                                                <Edit className="h-4 w-4" />
+                                                                Edit Form Structure
+                                                            </button>
+                                                        ) : (
+                                                            <TooltipProvider>
+                                                                <Tooltip>
+                                                                    <TooltipTrigger asChild>
+                                                                        <button
+                                                                            disabled
+                                                                            className="flex items-center gap-2 px-4 py-2 rounded-full bg-gray-300 text-gray-500 text-sm font-medium cursor-not-allowed"
+                                                                        >
+                                                                            <Edit className="h-4 w-4" />
+                                                                            Edit Form Structure
+                                                                        </button>
+                                                                    </TooltipTrigger>
+                                                                    <TooltipContent side="bottom">
+                                                                        <p>Upgrade to customize form structures</p>
+                                                                    </TooltipContent>
+                                                                </Tooltip>
+                                                            </TooltipProvider>
+                                                        )}
                                                     </div>
 
                                                     {/* Center: Form Flow Preview (Inline) */}

@@ -13,6 +13,7 @@ interface TierConfig {
   canUploadCustomProductImages: boolean;
   hasCustomPortal: boolean;
   hasPrograms: boolean;
+  canCustomizeFormStructure: boolean;
 }
 
 interface Plan {
@@ -74,7 +75,7 @@ export default function TierManagement() {
     }
   };
 
-  const handleToggleFeature = async (planId: string, featureName: 'canAddCustomProducts' | 'hasAccessToAnalytics' | 'canUploadCustomProductImages' | 'hasCustomPortal' | 'hasPrograms', currentValue: boolean) => {
+  const handleToggleFeature = async (planId: string, featureName: 'canAddCustomProducts' | 'hasAccessToAnalytics' | 'canUploadCustomProductImages' | 'hasCustomPortal' | 'hasPrograms' | 'canCustomizeFormStructure', currentValue: boolean) => {
     if (!token) return;
 
     setSaving(planId);
@@ -325,6 +326,43 @@ export default function TierManagement() {
                                 `}
                             >
                               {tier.config?.hasPrograms ? (
+                                <Check className="h-3 w-3 text-[#4FA59C]" />
+                              ) : (
+                                <X className="h-3 w-3 text-[#9CA3AF]" />
+                              )}
+                            </span>
+                          </button>
+                        </div>
+
+                        {/* Can Customize Form Structure Toggle */}
+                        <div className="flex items-center space-x-3">
+                          <span className="text-sm text-[#6B7280]">
+                            Can Customize Form Structure
+                          </span>
+                          <button
+                            onClick={() => handleToggleFeature(
+                              tier.plan.id,
+                              'canCustomizeFormStructure',
+                              tier.config?.canCustomizeFormStructure || false
+                            )}
+                            disabled={saving === tier.plan.id}
+                            className={`
+                                relative inline-flex h-7 w-12 items-center rounded-full transition-colors
+                                ${tier.config?.canCustomizeFormStructure
+                                ? 'bg-[#4FA59C]'
+                                : 'bg-[#D1D5DB]'
+                              }
+                                ${saving === tier.plan.id ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+                              `}
+                          >
+                            <span
+                              className={`
+                                  inline-block h-5 w-5 transform rounded-full bg-white transition-transform shadow-sm
+                                  flex items-center justify-center
+                                  ${tier.config?.canCustomizeFormStructure ? 'translate-x-6' : 'translate-x-1'}
+                                `}
+                            >
+                              {tier.config?.canCustomizeFormStructure ? (
                                 <Check className="h-3 w-3 text-[#4FA59C]" />
                               ) : (
                                 <X className="h-3 w-3 text-[#9CA3AF]" />
