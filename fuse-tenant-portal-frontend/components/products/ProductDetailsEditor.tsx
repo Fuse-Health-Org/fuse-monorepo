@@ -205,10 +205,14 @@ export function ProductDetailsEditor({ product, onUpdate }: ProductDetailsEditor
             setError("Product name is required")
             return
         }
-        if (!formData.description || formData.description.trim() === "") {
+        
+        // Description validation - check after trimming
+        const trimmedDescription = formData.description.trim()
+        if (!trimmedDescription) {
             setError("Product description is required")
             return
         }
+        
         if (!formData.placeholderSig || formData.placeholderSig.trim() === "") {
             setError("Placeholder Sig is required")
             return
@@ -232,12 +236,12 @@ export function ProductDetailsEditor({ product, onUpdate }: ProductDetailsEditor
         setSaving(true)
         try {
             await onUpdate({
-                name: formData.name,
-                description: formData.description,
-                placeholderSig: formData.placeholderSig,
+                name: formData.name.trim(),
+                description: trimmedDescription,
+                placeholderSig: formData.placeholderSig.trim(),
                 categories: formData.categories,
                 category: formData.categories[0] || undefined,
-                medicationSize: formData.medicationSize || undefined,
+                medicationSize: formData.medicationSize?.trim() || undefined,
                 activeIngredients: activeIngredientsArray,
                 slug: formData.slug.trim() || undefined,
             })

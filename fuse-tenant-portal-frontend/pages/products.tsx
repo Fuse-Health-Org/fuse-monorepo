@@ -924,13 +924,14 @@ export default function Products() {
                       </div>
                       {product.pharmacyCoverages && product.pharmacyCoverages.length <= 1 && <div className="h-[32px]"></div>}
 
-                      <div className="space-y-1.5">
+                      <div className="space-y-1.5 relative z-10">
                         <label className="text-xs font-medium text-[#9CA3AF] uppercase tracking-wide">Medical Questions</label>
                         <select
                           value=""
                           onChange={(e) => handleAttachFormToProduct(product.id, e.target.value)}
                           disabled={attachingFormToProduct === product.id}
                           className="w-full rounded-xl border border-[#E5E7EB] bg-white px-3 py-2 text-sm text-[#1F2937] hover:border-[#4FA59C] transition-all focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                          style={{ zIndex: 1000 }}
                         >
                           <option value="" disabled>
                             {attachingFormToProduct === product.id ? 'Attaching...' : 'Choose Template...'}

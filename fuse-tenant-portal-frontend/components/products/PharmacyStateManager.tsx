@@ -827,7 +827,12 @@ export function PharmacyStateManager({ productId }: PharmacyStateManagerProps) {
               <div className="bg-[#F3F4F6] rounded-xl p-2">
                 <MapPin className="h-5 w-5 text-[#4FA59C]" />
               </div>
-              <h2 className="text-xl font-semibold text-[#1F2937]">Pharmacy & State Coverage</h2>
+              <div>
+                <h2 className="text-xl font-semibold text-[#1F2937] mb-2">Pharmacy & State Coverage</h2>
+                <p className="text-sm text-[#6B7280]">
+                  Configure which pharmacies can fulfill this product in each state. This determines where patients can get their medication based on their location. Each coverage entry links a pharmacy, product details, and the states where it's available.
+                </p>
+              </div>
             </div>
             <button
               onClick={() => {

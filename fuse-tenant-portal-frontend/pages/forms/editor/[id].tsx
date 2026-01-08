@@ -3651,7 +3651,7 @@ export default function TemplateEditor() {
                                       </div>
                                       <div className="space-y-1">
                                         <label className="block text-[10px] font-medium text-muted-foreground">
-                                          Value <span className="opacity-70">(for logic)</span>
+                                          Value <span className="opacity-70" title="Used to identify this option in conditional logic rules">(Used in conditional rules)</span>
                                         </label>
                                         <input
                                           type="text"

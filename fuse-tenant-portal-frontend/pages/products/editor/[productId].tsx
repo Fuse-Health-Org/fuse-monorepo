@@ -2227,7 +2227,7 @@ export default function ProductEditor() {
                           />
 
                           {/* Dropdown Menu */}
-                          <div className="absolute right-0 z-50 mt-2 w-80 bg-white rounded-2xl shadow-xl border border-[#E5E7EB] overflow-hidden">
+                          <div className="absolute right-0 z-[100] mt-2 w-80 bg-white rounded-2xl shadow-xl border border-[#E5E7EB] overflow-visible">
                             <div className="p-4 border-b border-[#E5E7EB]">
                               <input
                                 type="text"
@@ -2237,7 +2237,7 @@ export default function ProductEditor() {
                                 className="w-full px-3 py-2 rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] text-sm focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50"
                               />
                             </div>
-                            <div className="max-h-64 overflow-y-auto">
+                            <div className="max-h-64 overflow-y-auto" style={{ zIndex: 101 }}>
                               {availableForms
                                 .filter(form =>
                                   form.title.toLowerCase().includes(formSearchQuery.toLowerCase()) ||

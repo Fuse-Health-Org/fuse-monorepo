@@ -78,7 +78,10 @@ export function QuestionEditor({
     const isBMIType = question.questionSubtype === 'bmi'
     const isTextArea = answerType === 'textarea' || question.answerType === 'textarea'
     const isNumberInput = answerType === 'number' || question.answerType === 'number'
+    // Restrict editing text/value for Yes/No and BMI, but allow risk level changes
     const restrictOptionEdits = restrictStructuralEdits || isYesNoType || isBMIType
+    // Allow risk level editing even for Yes/No questions
+    const allowRiskLevelEdits = true
 
     useEffect(() => {
         if (autoEdit) {
@@ -632,7 +635,7 @@ export function QuestionEditor({
                                         </div>
                                         <div className="space-y-1">
                                             <label className="block text-[10px] font-medium text-muted-foreground">
-                                                Value <span className="opacity-70">(for logic)</span>
+                                                Value <span className="opacity-70" title="Used to identify this option in conditional logic rules">(Used in conditional rules)</span>
                                             </label>
                                             <Input
                                                 value={option.optionValue}
@@ -644,7 +647,7 @@ export function QuestionEditor({
                                         </div>
                                         <div className="space-y-1">
                                             <label className="block text-[10px] font-medium text-muted-foreground">
-                                                Risk Level <span className="opacity-70">(for workflow automation)</span>
+                                                Risk Level <span className="opacity-70" title="Determines how this answer is handled: Safe = auto-approved, Review = needs doctor review, Reject = automatically rejected">(Controls how this answer is processed: Safe = auto-approved, Review = needs doctor review, Reject = auto-rejected)</span>
                                             </label>
                                             <div className="flex gap-1">
                                                 <Button
@@ -653,7 +656,7 @@ export function QuestionEditor({
                                                     variant={option.riskLevel === 'safe' ? 'default' : 'outline'}
                                                     onClick={() => handleRiskLevelChange(option.localKey, option.riskLevel === 'safe' ? null : 'safe')}
                                                     className={`flex-1 h-7 text-[10px] ${option.riskLevel === 'safe' ? 'bg-green-500 hover:bg-green-600 text-white' : 'border-green-300 text-green-700 hover:bg-green-50'}`}
-                                                    disabled={restrictOptionEdits}
+                                                    disabled={!allowRiskLevelEdits}
                                                 >
                                                     ✓ Safe
                                                 </Button>
@@ -663,7 +666,7 @@ export function QuestionEditor({
                                                     variant={option.riskLevel === 'review' ? 'default' : 'outline'}
                                                     onClick={() => handleRiskLevelChange(option.localKey, option.riskLevel === 'review' ? null : 'review')}
                                                     className={`flex-1 h-7 text-[10px] ${option.riskLevel === 'review' ? 'bg-yellow-500 hover:bg-yellow-600 text-white' : 'border-yellow-300 text-yellow-700 hover:bg-yellow-50'}`}
-                                                    disabled={restrictOptionEdits}
+                                                    disabled={!allowRiskLevelEdits}
                                                 >
                                                     ⚠ Review
                                                 </Button>
@@ -673,7 +676,7 @@ export function QuestionEditor({
                                                     variant={option.riskLevel === 'reject' ? 'default' : 'outline'}
                                                     onClick={() => handleRiskLevelChange(option.localKey, option.riskLevel === 'reject' ? null : 'reject')}
                                                     className={`flex-1 h-7 text-[10px] ${option.riskLevel === 'reject' ? 'bg-red-500 hover:bg-red-600 text-white' : 'border-red-300 text-red-700 hover:bg-red-50'}`}
-                                                    disabled={restrictOptionEdits}
+                                                    disabled={!allowRiskLevelEdits}
                                                 >
                                                     ✕ Reject
                                                 </Button>
