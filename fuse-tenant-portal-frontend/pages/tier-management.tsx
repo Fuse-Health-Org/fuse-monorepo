@@ -3,7 +3,7 @@ import { Header } from "@/components/header";
 import { Sidebar } from "@/components/sidebar";
 import { Card } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
-import { Settings, Check, X } from 'lucide-react';
+import { Settings, Check, X, Plus, Trash2, Save } from 'lucide-react';
 
 interface TierConfig {
   id: string;
@@ -14,6 +14,7 @@ interface TierConfig {
   hasCustomPortal: boolean;
   hasPrograms: boolean;
   canCustomizeFormStructure: boolean;
+  customTierCardText: string[] | null;
 }
 
 interface Plan {
@@ -37,6 +38,8 @@ export default function TierManagement() {
   const [tiers, setTiers] = useState<TierWithConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
+  const [editingCustomText, setEditingCustomText] = useState<string | null>(null);
+  const [customTextDraft, setCustomTextDraft] = useState<string[]>([]);
 
   useEffect(() => {
     if (token) {
@@ -114,6 +117,77 @@ export default function TierManagement() {
     } finally {
       setSaving(null);
     }
+  };
+
+  const handleStartEditingCustomText = (planId: string, currentText: string[] | null) => {
+    setEditingCustomText(planId);
+    setCustomTextDraft(currentText || []);
+  };
+
+  const handleAddCustomTextLine = () => {
+    setCustomTextDraft([...customTextDraft, '']);
+  };
+
+  const handleUpdateCustomTextLine = (index: number, value: string) => {
+    const newDraft = [...customTextDraft];
+    newDraft[index] = value;
+    setCustomTextDraft(newDraft);
+  };
+
+  const handleRemoveCustomTextLine = (index: number) => {
+    setCustomTextDraft(customTextDraft.filter((_, i) => i !== index));
+  };
+
+  const handleSaveCustomText = async (planId: string) => {
+    if (!token) return;
+
+    setSaving(planId);
+    try {
+      // Filter out empty strings
+      const cleanedText = customTextDraft.filter(line => line.trim() !== '');
+      
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/tiers/${planId}/config`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          customTierCardText: cleanedText.length > 0 ? cleanedText : null,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update custom text');
+      }
+
+      const result = await response.json();
+      console.log('✅ Updated tier config:', result.data);
+
+      // Update local state
+      setTiers(prevTiers => prevTiers.map(tier => {
+        if (tier.plan.id === planId) {
+          return {
+            ...tier,
+            config: result.data,
+          };
+        }
+        return tier;
+      }));
+      
+      setEditingCustomText(null);
+      setCustomTextDraft([]);
+    } catch (error) {
+      console.error('Error updating custom text:', error);
+      alert('Failed to update custom text');
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  const handleCancelEditingCustomText = () => {
+    setEditingCustomText(null);
+    setCustomTextDraft([]);
   };
 
   return (
@@ -371,6 +445,80 @@ export default function TierManagement() {
                           </button>
                         </div>
                       </div>
+                    </div>
+
+                    {/* Custom Plan Card Text Section */}
+                    <div className="mt-6 pt-6 border-t border-[#E5E7EB]">
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <h4 className="text-sm font-semibold text-[#1F2937]">Custom Plan Card Text</h4>
+                          <p className="text-xs text-[#9CA3AF]">Custom bullet points shown on the plans page (overrides auto-generated text)</p>
+                        </div>
+                        {editingCustomText !== tier.plan.id && (
+                          <button
+                            onClick={() => handleStartEditingCustomText(tier.plan.id, tier.config?.customTierCardText || null)}
+                            className="px-3 py-1.5 text-xs font-medium text-[#4FA59C] bg-[#E5F5F3] rounded-lg hover:bg-[#d0ebe8] transition-colors"
+                          >
+                            {tier.config?.customTierCardText?.length ? 'Edit Text' : 'Add Custom Text'}
+                          </button>
+                        )}
+                      </div>
+
+                      {editingCustomText === tier.plan.id ? (
+                        <div className="space-y-2">
+                          {customTextDraft.map((line, index) => (
+                            <div key={index} className="flex items-center gap-2">
+                              <input
+                                type="text"
+                                value={line}
+                                onChange={(e) => handleUpdateCustomTextLine(index, e.target.value)}
+                                placeholder="Enter bullet point text..."
+                                className="flex-1 px-3 py-2 text-sm border border-[#E5E7EB] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:border-transparent"
+                              />
+                              <button
+                                onClick={() => handleRemoveCustomTextLine(index)}
+                                className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          ))}
+                          <button
+                            onClick={handleAddCustomTextLine}
+                            className="flex items-center gap-1 px-3 py-2 text-sm text-[#6B7280] hover:text-[#1F2937] hover:bg-[#F3F4F6] rounded-lg transition-colors"
+                          >
+                            <Plus className="h-4 w-4" />
+                            Add Line
+                          </button>
+                          <div className="flex items-center gap-2 pt-2">
+                            <button
+                              onClick={() => handleSaveCustomText(tier.plan.id)}
+                              disabled={saving === tier.plan.id}
+                              className="flex items-center gap-1 px-4 py-2 text-sm font-medium text-white bg-[#4FA59C] hover:bg-[#3d8580] rounded-lg transition-colors disabled:opacity-50"
+                            >
+                              <Save className="h-4 w-4" />
+                              Save
+                            </button>
+                            <button
+                              onClick={handleCancelEditingCustomText}
+                              className="px-4 py-2 text-sm font-medium text-[#6B7280] hover:text-[#1F2937] hover:bg-[#F3F4F6] rounded-lg transition-colors"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : tier.config?.customTierCardText?.length ? (
+                        <ul className="space-y-1">
+                          {tier.config.customTierCardText.map((line, index) => (
+                            <li key={index} className="flex items-center gap-2 text-sm text-[#6B7280]">
+                              <Check className="h-3 w-3 text-[#4FA59C] flex-shrink-0" />
+                              {line}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-sm text-[#9CA3AF] italic">No custom text configured. Features will be auto-generated from toggles above.</p>
+                      )}
                     </div>
                   </Card>
                 ))}

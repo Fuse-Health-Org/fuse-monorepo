@@ -57,6 +57,15 @@ export default class TierConfiguration extends Entity {
   })
   declare canCustomizeFormStructure: boolean;
 
+  // Custom text to display on the plan card (JSON array of strings)
+  // If provided, these will be shown instead of/in addition to auto-generated feature text
+  @Column({
+    type: DataType.JSONB,
+    allowNull: true,
+    defaultValue: null,
+  })
+  declare customTierCardText: string[] | null;
+
   @BelongsTo(() => BrandSubscriptionPlans)
   declare plan?: BrandSubscriptionPlans;
 
@@ -69,6 +78,7 @@ export default class TierConfiguration extends Entity {
       hasCustomPortal: this.hasCustomPortal,
       hasPrograms: this.hasPrograms,
       canCustomizeFormStructure: this.canCustomizeFormStructure,
+      customTierCardText: this.customTierCardText,
     };
   }
 }

@@ -8342,15 +8342,25 @@ app.get("/brand-subscriptions/plans", async (req, res) => {
   try {
     const plans = await BrandSubscriptionPlans.getActivePlans();
 
-    const formattedPlans = plans.map((plan) => ({
-      id: plan.id,
-      name: plan.name,
-      description: plan.description || "",
-      monthlyPrice: Number(plan.monthlyPrice),
-      planType: plan.planType,
-      stripePriceId: plan.stripePriceId,
-      features: plan.getFeatures(),
-    }));
+    // Fetch tier configurations for all plans
+    const formattedPlans = await Promise.all(
+      plans.map(async (plan) => {
+        const tierConfig = await TierConfiguration.findOne({
+          where: { brandSubscriptionPlanId: plan.id },
+        });
+
+        return {
+          id: plan.id,
+          name: plan.name,
+          description: plan.description || "",
+          monthlyPrice: Number(plan.monthlyPrice),
+          planType: plan.planType,
+          stripePriceId: plan.stripePriceId,
+          features: plan.getFeatures(),
+          tierConfig: tierConfig ? tierConfig.toJSON() : null,
+        };
+      })
+    );
 
     res.json({ success: true, plans: formattedPlans });
   } catch (error) {

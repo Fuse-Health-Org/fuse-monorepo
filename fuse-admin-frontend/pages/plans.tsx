@@ -29,6 +29,16 @@ interface PlanFeatures {
   customIntegrations?: boolean
 }
 
+interface TierConfig {
+  canAddCustomProducts: boolean
+  hasAccessToAnalytics: boolean
+  canUploadCustomProductImages: boolean
+  hasCustomPortal: boolean
+  hasPrograms: boolean
+  canCustomizeFormStructure: boolean
+  customTierCardText: string[] | null
+}
+
 interface Plan {
   name: string
   price: number
@@ -36,6 +46,7 @@ interface Plan {
   features: PlanFeatures
   stripePriceId: string
   id?: string
+  tierConfig?: TierConfig | null
 }
 
 interface PlansResponse {
@@ -53,6 +64,18 @@ interface Subscription {
   isActive: boolean
   isTrialing: boolean
   planDetails: Plan
+}
+
+// Generate feature text from TierConfig
+function generateFeatureText(plan: Plan): string[] {
+  // If custom text is provided, use it exclusively
+  if (plan.tierConfig?.customTierCardText?.length) {
+    return plan.tierConfig.customTierCardText
+  }
+
+  // No custom text - return empty array (no features shown)
+  // The tenant admin should configure customTierCardText for each plan
+  return []
 }
 
 export default function Plans() {
@@ -132,7 +155,8 @@ export default function Plans() {
                 planType: plan.planType,
                 features: plan.features,
                 stripePriceId: plan.stripePriceId,
-                id: plan.id
+                id: plan.id,
+                tierConfig: plan.tierConfig || null
               }
               return acc
             }, {} as PlansResponse)
@@ -394,85 +418,12 @@ export default function Plans() {
 
                     <CardContent className="flex flex-col h-full">
                       <ul className="space-y-3 mb-8 flex-grow">
-                        {plan.planType == 'entry' && (
-                          <>
-                            <li className="flex items-start gap-2 text-sm">
-                              <Check className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-                              <span>
-                                Up to 25 products
-                              </span>
-                            </li>
-                            <li className="flex items-start gap-2 text-sm">
-                              <Check className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-                              <span>
-                                Template forms (default structure, custom branding)
-                              </span>
-                            </li>
-                            <li className="flex items-start gap-2 text-sm">
-                              <Check className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-                              <span>
-                                Instant setup
-                              </span>
-                            </li>
-                          </>
-                        )}
-
-                        {plan.planType == 'standard' && (
-                          <>
-                            <li className="flex items-start gap-2 text-sm">
-                              <Check className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-                              <span>
-                                Everything in Starter
-                              </span>
-                            </li>
-                            <li className="flex items-start gap-2 text-sm">
-                              <Check className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-                              <span>
-                                Template forms with customer branding
-                              </span>
-                            </li>
-                            <li className="flex items-start gap-2 text-sm">
-                              <Check className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-                              <span>
-                                Customize forms structure
-                              </span>
-                            </li>
-                            <li className="flex items-start gap-2 text-sm">
-                              <Check className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-                              <span>
-                                Instant setup
-                              </span>
-                            </li>
-                          </>
-                        )}
-                        {plan.planType == 'premium' && (
-                          <>
-                            <li className="flex items-start gap-2 text-sm">
-                              <Check className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-                              <span>
-                                Unlimited products
-                              </span>
-                            </li>
-                            <li className="flex items-start gap-2 text-sm">
-                              <Check className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-                              <span>
-                                Custom website
-                              </span>
-                            </li>
-                            <li className="flex items-start gap-2 text-sm">
-                              <Check className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-                              <span>
-                                Done-for-you setup
-                              </span>
-                            </li>
-                            <li className="flex items-start gap-2 text-sm">
-                              <Check className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-                              <span>
-                                Custom forms
-                              </span>
-                            </li>
-                          </>
-                        )}
+                        {generateFeatureText(plan).map((feature, featureIndex) => (
+                          <li key={featureIndex} className="flex items-start gap-2 text-sm">
+                            <Check className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                            <span>{feature}</span>
+                          </li>
+                        ))}
                       </ul>
 
                       <Button
