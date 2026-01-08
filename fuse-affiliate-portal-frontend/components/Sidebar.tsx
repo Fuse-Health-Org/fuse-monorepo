@@ -6,6 +6,7 @@ import { Icon } from "@iconify/react";
 const navigation = [
     { name: "Analytics", icon: "lucide:bar-chart-3", href: "/analytics" },
     { name: "Revenue", icon: "lucide:dollar-sign", href: "/revenue" },
+    { name: "Payouts", icon: "lucide:credit-card", href: "/payouts" },
     { name: "Products", icon: "lucide:package", href: "/products" },
     { name: "Branding", icon: "lucide:palette", href: "/branding" },
     { name: "Settings", icon: "lucide:settings", href: "/settings" },
