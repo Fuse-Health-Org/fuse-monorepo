@@ -105,6 +105,11 @@ export function TenantSelector() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="font-medium text-sm truncate">{tenant.name}</div>
+                  {tenant.slug && (
+                    <div className="text-xs text-purple-600 dark:text-purple-400 font-mono truncate">
+                      /{tenant.slug}
+                    </div>
+                  )}
                   <div className="text-xs text-muted-foreground truncate">
                     {tenant.businessType || 'Clinic'}
                   </div>

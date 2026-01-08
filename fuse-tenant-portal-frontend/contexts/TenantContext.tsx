@@ -69,7 +69,8 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     setError(null)
 
     try {
-      const response = await fetch(`${API_BASE_URL}/tenants`, {
+      // Request a higher limit to get all tenants (up to 100)
+      const response = await fetch(`${API_BASE_URL}/tenants?limit=200`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,

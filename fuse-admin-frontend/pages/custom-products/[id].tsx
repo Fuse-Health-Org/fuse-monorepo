@@ -2701,7 +2701,7 @@ export default function CustomProductEditor() {
                                 </TooltipProvider>
                             )}
                         </div>
-                        
+
                         {/* Show upgrade notice if user cannot customize forms */}
                         {!canCustomizeFormStructure && (
                             <div className="mb-6 px-5 py-4 rounded-lg border-2 border-amber-200 bg-amber-50">
