@@ -854,6 +854,7 @@ export default function Products() {
                                 <X className="h-4 w-4 mr-1.5" />
                                 Delete All from IronSail
                             </Button>
+                            {/* COMMENTED OUT: Add Product button
                             {(() => {
                                 // Check tier configuration first, then custom features, then default to false
                                 const tierConfigAllows = subscription?.tierConfig?.canAddCustomProducts === true
@@ -883,10 +884,11 @@ export default function Products() {
                                     </div>
                                 )
                             })()}
+                            */}
                         </div>
                     </div>
 
-                    {/* Custom Products Feature Notice */}
+                    {/* COMMENTED OUT: Custom Products Feature Notice
                     {(() => {
                         // Check tier configuration first, then custom features
                         const tierConfigAllows = subscription?.tierConfig?.canAddCustomProducts === true
@@ -920,6 +922,7 @@ export default function Products() {
                         }
                         return null
                     })()}
+                    */}
 
                     {/* Subscription/product limit summary - Compact */}
                     <div className="mb-6 px-4 py-3 rounded-lg border border-border bg-card">
