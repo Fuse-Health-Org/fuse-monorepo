@@ -60,6 +60,7 @@ import User from "./models/User";
 import UserRoles from "./models/UserRoles";
 import MfaToken from "./models/MfaToken";
 import Clinic from "./models/Clinic";
+import Physician from "./models/Physician";
 import { Op } from "sequelize";
 import QuestionnaireStepService from "./services/questionnaireStep.service";
 import QuestionService from "./services/question.service";
@@ -12463,7 +12464,14 @@ app.get("/payouts/tenant", authenticateJWT, async (req, res) => {
     const limitNum = parseInt(limit as string) || 50;
     const offset = (pageNum - 1) * limitNum;
 
-    const { rows: orders, count: total } = await Order.findAndCountAll({
+    // Get count separately to avoid issues with multiple User associations
+    const total = await Order.count({
+      where: whereClause,
+      distinct: true,
+      col: "id",
+    });
+
+    const orders = await Order.findAll({
       where: whereClause,
       attributes: [
         "id",
@@ -12476,7 +12484,6 @@ app.get("/payouts/tenant", authenticateJWT, async (req, res) => {
         "brandAmount",
         "stripeAmount",
         "createdAt",
-        "paidAt",
         "clinicId",
         "physicianId",
         "affiliateId",
@@ -12486,27 +12493,30 @@ app.get("/payouts/tenant", authenticateJWT, async (req, res) => {
           model: Clinic,
           as: "clinic",
           attributes: ["id", "name", "slug"],
+          required: false,
         },
         {
-          model: User,
+          model: Physician,
           as: "physician",
           attributes: ["id", "firstName", "lastName", "email"],
+          required: false,
         },
         {
           model: User,
           as: "affiliate",
           attributes: ["id", "firstName", "lastName", "email"],
+          required: false,
         },
         {
           model: Payment,
           as: "payment",
           attributes: ["status", "paidAt"],
+          required: false,
         },
       ],
       order: [["createdAt", "DESC"]],
       limit: limitNum,
       offset,
-      distinct: true,
     });
 
     // Aggregate payouts by recipient type
@@ -12608,8 +12618,13 @@ app.get("/payouts/tenant", authenticateJWT, async (req, res) => {
 
       // Affiliate payouts
       if (orderData.affiliateId) {
-        // Calculate affiliate amount (this would need to be calculated based on affiliate commission)
-        // For now, we'll show orders with affiliateId
+        // Calculate affiliate commission using AFFILIATE_REVENUE_PERCENTAGE
+        const affiliateRevenuePercentage = parseFloat(
+          process.env.AFFILIATE_REVENUE_PERCENTAGE || process.env["AFFILIATE-REVENUE-PERCENTAJE"] || "1"
+        ) / 100;
+        const orderTotal = parseFloat(orderData.totalAmount) || 0;
+        const affiliateAmount = orderTotal * affiliateRevenuePercentage;
+
         const affiliateKey = orderData.affiliateId;
         if (!payouts.affiliates[affiliateKey]) {
           payouts.affiliates[affiliateKey] = {
@@ -12623,17 +12638,17 @@ app.get("/payouts/tenant", authenticateJWT, async (req, res) => {
             orders: [],
           };
         }
-        // Note: Affiliate amount calculation would need to be added to Order model
-        // For now, we track orders but amount would be 0 or calculated separately
+        payouts.affiliates[affiliateKey].totalAmount += Math.round(affiliateAmount * 100) / 100; // Round to 2 decimal places
         payouts.affiliates[affiliateKey].orderCount += 1;
         payouts.affiliates[affiliateKey].orders.push({
           orderId: orderData.id,
           orderNumber: orderData.orderNumber,
-          amount: 0, // TODO: Add affiliateAmount to Order model
+          amount: Math.round(affiliateAmount * 100) / 100,
           date: orderData.createdAt,
           status: orderData.status,
           paymentStatus: orderData.payment?.status,
         });
+        payouts.totals.totalAffiliateAmount += Math.round(affiliateAmount * 100) / 100;
       }
 
       payouts.totals.totalPlatformFee += parseFloat(orderData.platformFeeAmount) || 0;
@@ -12868,18 +12883,22 @@ app.get("/payouts/affiliate", authenticateJWT, async (req, res) => {
       distinct: true,
     });
 
-    // Note: Affiliate commission amount would need to be stored in Order model
-    // For now, we'll calculate a placeholder or use 0
+    // Calculate affiliate commission using AFFILIATE_REVENUE_PERCENTAGE
+    const affiliateRevenuePercentage = parseFloat(
+      process.env.AFFILIATE_REVENUE_PERCENTAGE || process.env["AFFILIATE-REVENUE-PERCENTAJE"] || "1"
+    ) / 100;
+
     const payouts = orders.map((order: any) => {
       const orderData = order.toJSON();
-      // TODO: Calculate actual affiliate commission from order
-      const affiliateAmount = 0; // This should be calculated based on affiliate commission rate
+      // Calculate affiliate commission as percentage of order total
+      const orderTotal = parseFloat(orderData.totalAmount) || 0;
+      const affiliateAmount = orderTotal * affiliateRevenuePercentage;
       
       return {
         orderId: orderData.id,
         orderNumber: orderData.orderNumber,
-        amount: affiliateAmount,
-        totalAmount: parseFloat(orderData.totalAmount) || 0,
+        amount: Math.round(affiliateAmount * 100) / 100, // Round to 2 decimal places
+        totalAmount: orderTotal,
         date: orderData.createdAt,
         status: orderData.status,
         paymentStatus: orderData.payment?.status,
