@@ -119,28 +119,36 @@ export default function Orders() {
             const instance = loadConnectAndInitialize({
                 publishableKey: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '',
                 fetchClientSecret: async () => {
-                    const response = await fetch(
-                        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/stripe/connect/session`,
-                        {
-                            method: 'POST',
-                            headers: {
-                                'Authorization': `Bearer ${token}`,
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify({
-                                merchantModel: merchantModel
-                            })
+                    try {
+                        const response = await fetch(
+                            `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/stripe/connect/session`,
+                            {
+                                method: 'POST',
+                                headers: {
+                                    'Authorization': `Bearer ${token}`,
+                                    'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify({
+                                    merchantModel: merchantModel
+                                })
+                            }
+                        )
+
+                        if (!response.ok) {
+                            const errorData = await response.json().catch(() => ({}))
+                            console.error('Failed to fetch client secret:', response.status, errorData)
+                            throw new Error(errorData.message || 'Failed to fetch client secret')
                         }
-                    )
 
-                    if (!response.ok) {
-                        const errorData = await response.json().catch(() => ({}))
-                        console.error('Failed to fetch client secret:', response.status, errorData)
-                        throw new Error(errorData.message || 'Failed to fetch client secret')
+                        const data = await response.json()
+                        if (!data.data?.client_secret) {
+                            throw new Error('Client secret not returned from server')
+                        }
+                        return data.data.client_secret
+                    } catch (error: any) {
+                        console.error('Error in fetchClientSecret:', error)
+                        throw error
                     }
-
-                    const data = await response.json()
-                    return data.data.client_secret
                 },
                 appearance: {
                     variables: {
@@ -834,7 +842,7 @@ function StripeConnectAccountOnboarding({
             try {
                 // Wait for next frame to ensure DOM is fully rendered
                 await new Promise(resolve => requestAnimationFrame(resolve))
-                await new Promise(resolve => setTimeout(resolve, 100))
+                await new Promise(resolve => setTimeout(resolve, 200))
 
                 const container = containerRef.current
                 if (!container) {
@@ -846,26 +854,62 @@ function StripeConnectAccountOnboarding({
                 container.innerHTML = ''
 
                 console.log('🔄 Creating account-onboarding component...')
-                accountOnboarding = stripeConnectInstance.create('account-onboarding')
-
-                if (!accountOnboarding) {
-                    console.error('❌ Failed to create account-onboarding component')
-                    return
-                }
-
-                // Verify container still exists
-                if (!containerRef.current) {
-                    console.error('❌ Container disappeared before mounting')
-                    return
-                }
                 
-                // Mount the component - create() returns a DOM element
-                containerRef.current.appendChild(accountOnboarding)
-                mounted = true
-                console.log('✅ Account onboarding component mounted')
+                // Create the component - check if create returns an element or a component instance
+                try {
+                    accountOnboarding = stripeConnectInstance.create('account-onboarding', {
+                        onExit: () => {
+                            console.log('Account onboarding exited')
+                            onExit()
+                        }
+                    })
+
+                    if (!accountOnboarding) {
+                        console.error('❌ Failed to create account-onboarding component')
+                        return
+                    }
+
+                    // Verify container still exists
+                    if (!containerRef.current) {
+                        console.error('❌ Container disappeared before mounting')
+                        return
+                    }
+                    
+                    // Try mounting - check if it has a mount method or if it's already a DOM element
+                    if (typeof accountOnboarding.mount === 'function') {
+                        // It's a component instance with mount method
+                        accountOnboarding.mount(containerRef.current)
+                    } else if (accountOnboarding instanceof HTMLElement) {
+                        // It's a DOM element directly
+                        containerRef.current.appendChild(accountOnboarding)
+                    } else {
+                        console.error('❌ Unexpected component type:', typeof accountOnboarding)
+                        return
+                    }
+                    
+                    mounted = true
+                    console.log('✅ Account onboarding component mounted')
+
+                } catch (createError: any) {
+                    console.error('❌ Error creating Stripe Connect component:', createError)
+                    // Try alternative approach - create without options first
+                    if (createError.message?.includes('CORS') || createError.message?.includes('fetch')) {
+                        console.error('⚠️ CORS or fetch error detected. This may be due to client secret not being available.')
+                    }
+                    throw createError
+                }
 
             } catch (error: any) {
                 console.error('❌ Error mounting Stripe Connect component:', error)
+                // Show user-friendly error message
+                if (containerRef.current) {
+                    containerRef.current.innerHTML = `
+                        <div class="p-4 border border-red-200 rounded-lg bg-red-50">
+                            <p class="text-red-800 text-sm font-medium">Error loading Stripe Connect</p>
+                            <p class="text-red-600 text-xs mt-1">${error.message || 'Please try again or contact support.'}</p>
+                        </div>
+                    `
+                }
             }
         }
 
@@ -873,11 +917,11 @@ function StripeConnectAccountOnboarding({
 
         // Cleanup
         return () => {
-            if (mounted && accountOnboarding && containerRef.current) {
+            if (mounted && accountOnboarding) {
                 try {
-                    // Remove the element from DOM
-                    if (accountOnboarding.parentNode) {
-                        accountOnboarding.parentNode.removeChild(accountOnboarding)
+                    // Unmount the component using the unmount method
+                    if (typeof accountOnboarding.unmount === 'function') {
+                        accountOnboarding.unmount()
                     }
                     console.log('🧹 Unmounted Stripe Connect component')
                 } catch (error) {

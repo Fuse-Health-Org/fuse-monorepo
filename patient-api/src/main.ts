@@ -60,6 +60,7 @@ import User from "./models/User";
 import UserRoles from "./models/UserRoles";
 import MfaToken from "./models/MfaToken";
 import Clinic from "./models/Clinic";
+import Physician from "./models/Physician";
 import { Op } from "sequelize";
 import QuestionnaireStepService from "./services/questionnaireStep.service";
 import QuestionService from "./services/question.service";
@@ -12483,6 +12484,545 @@ app.get("/orders/by-clinic/:clinicId", authenticateJWT, async (req, res) => {
       console.error("❌ Error listing orders by clinic:", error);
     } else {
       console.error("❌ Error listing orders by clinic");
+    }
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+});
+
+// Payouts endpoints
+// Get all payouts tracking (for tenant management portal)
+app.get("/payouts/tenant", authenticateJWT, async (req, res) => {
+  try {
+    const currentUser = getCurrentUser(req);
+    if (!currentUser) {
+      return res.status(401).json({
+        success: false,
+        message: "Not authenticated",
+      });
+    }
+
+    // Only tenant managers should access this endpoint
+    // Check if user has tenant management role
+    const user = await User.findByPk(currentUser.id, {
+      include: [{ model: UserRoles, as: "userRoles" }],
+    });
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // For now, allow access to any authenticated user
+    // TODO: Add proper tenant management role check
+
+    const { dateFrom, dateTo, page = "1", limit = "50" } = req.query;
+
+    const whereClause: any = {
+      status: {
+        [Op.in]: ["paid", "processing", "shipped", "delivered"],
+      },
+    };
+
+    if (dateFrom) {
+      whereClause.createdAt = {
+        ...whereClause.createdAt,
+        [Op.gte]: new Date(dateFrom as string),
+      };
+    }
+
+    if (dateTo) {
+      whereClause.createdAt = {
+        ...whereClause.createdAt,
+        [Op.lte]: new Date(dateTo as string),
+      };
+    }
+
+    const pageNum = parseInt(page as string) || 1;
+    const limitNum = parseInt(limit as string) || 50;
+    const offset = (pageNum - 1) * limitNum;
+
+    // Get count separately to avoid issues with multiple User associations
+    const total = await Order.count({
+      where: whereClause,
+      distinct: true,
+      col: "id",
+    });
+
+    const orders = await Order.findAll({
+      where: whereClause,
+      attributes: [
+        "id",
+        "orderNumber",
+        "status",
+        "totalAmount",
+        "platformFeeAmount",
+        "doctorAmount",
+        "pharmacyWholesaleAmount",
+        "brandAmount",
+        "stripeAmount",
+        "createdAt",
+        "clinicId",
+        "physicianId",
+        "affiliateId",
+      ],
+      include: [
+        {
+          model: Clinic,
+          as: "clinic",
+          attributes: ["id", "name", "slug"],
+          required: false,
+        },
+        {
+          model: Physician,
+          as: "physician",
+          attributes: ["id", "firstName", "lastName", "email"],
+          required: false,
+        },
+        {
+          model: User,
+          as: "affiliate",
+          attributes: ["id", "firstName", "lastName", "email"],
+          required: false,
+        },
+        {
+          model: Payment,
+          as: "payment",
+          attributes: ["status", "paidAt"],
+          required: false,
+        },
+      ],
+      order: [["createdAt", "DESC"]],
+      limit: limitNum,
+      offset,
+    });
+
+    // Aggregate payouts by recipient type
+    const payouts = {
+      brands: {} as Record<string, any>,
+      doctors: {} as Record<string, any>,
+      pharmacies: {} as Record<string, any>,
+      affiliates: {} as Record<string, any>,
+      totals: {
+        totalBrandAmount: 0,
+        totalDoctorAmount: 0,
+        totalPharmacyAmount: 0,
+        totalAffiliateAmount: 0,
+        totalPlatformFee: 0,
+      },
+    };
+
+    orders.forEach((order: any) => {
+      const orderData = order.toJSON();
+
+      // Brand payouts
+      if (orderData.brandAmount > 0 && orderData.clinicId) {
+        const clinicKey = orderData.clinicId;
+        if (!payouts.brands[clinicKey]) {
+          payouts.brands[clinicKey] = {
+            clinicId: clinicKey,
+            clinicName: orderData.clinic?.name || "Unknown",
+            clinicSlug: orderData.clinic?.slug || "",
+            totalAmount: 0,
+            orderCount: 0,
+            orders: [],
+          };
+        }
+        payouts.brands[clinicKey].totalAmount += parseFloat(orderData.brandAmount) || 0;
+        payouts.brands[clinicKey].orderCount += 1;
+        payouts.brands[clinicKey].orders.push({
+          orderId: orderData.id,
+          orderNumber: orderData.orderNumber,
+          amount: parseFloat(orderData.brandAmount) || 0,
+          date: orderData.createdAt,
+          status: orderData.status,
+          paymentStatus: orderData.payment?.status,
+        });
+        payouts.totals.totalBrandAmount += parseFloat(orderData.brandAmount) || 0;
+      }
+
+      // Doctor payouts
+      if (orderData.doctorAmount > 0 && orderData.physicianId) {
+        const doctorKey = orderData.physicianId;
+        if (!payouts.doctors[doctorKey]) {
+          payouts.doctors[doctorKey] = {
+            doctorId: doctorKey,
+            doctorName: orderData.physician
+              ? `${orderData.physician.firstName || ""} ${orderData.physician.lastName || ""}`.trim()
+              : "Unknown",
+            doctorEmail: orderData.physician?.email || "",
+            totalAmount: 0,
+            orderCount: 0,
+            orders: [],
+          };
+        }
+        payouts.doctors[doctorKey].totalAmount += parseFloat(orderData.doctorAmount) || 0;
+        payouts.doctors[doctorKey].orderCount += 1;
+        payouts.doctors[doctorKey].orders.push({
+          orderId: orderData.id,
+          orderNumber: orderData.orderNumber,
+          amount: parseFloat(orderData.doctorAmount) || 0,
+          date: orderData.createdAt,
+          status: orderData.status,
+          paymentStatus: orderData.payment?.status,
+        });
+        payouts.totals.totalDoctorAmount += parseFloat(orderData.doctorAmount) || 0;
+      }
+
+      // Pharmacy payouts
+      if (orderData.pharmacyWholesaleAmount > 0) {
+        const pharmacyKey = "pharmacy"; // Since we don't have pharmacyId in Order
+        if (!payouts.pharmacies[pharmacyKey]) {
+          payouts.pharmacies[pharmacyKey] = {
+            pharmacyId: pharmacyKey,
+            pharmacyName: "Pharmacy",
+            totalAmount: 0,
+            orderCount: 0,
+            orders: [],
+          };
+        }
+        payouts.pharmacies[pharmacyKey].totalAmount += parseFloat(orderData.pharmacyWholesaleAmount) || 0;
+        payouts.pharmacies[pharmacyKey].orderCount += 1;
+        payouts.pharmacies[pharmacyKey].orders.push({
+          orderId: orderData.id,
+          orderNumber: orderData.orderNumber,
+          amount: parseFloat(orderData.pharmacyWholesaleAmount) || 0,
+          date: orderData.createdAt,
+          status: orderData.status,
+          paymentStatus: orderData.payment?.status,
+        });
+        payouts.totals.totalPharmacyAmount += parseFloat(orderData.pharmacyWholesaleAmount) || 0;
+      }
+
+      // Affiliate payouts
+      if (orderData.affiliateId) {
+        // Calculate affiliate commission using AFFILIATE_REVENUE_PERCENTAGE
+        const affiliateRevenuePercentage = parseFloat(
+          process.env.AFFILIATE_REVENUE_PERCENTAGE || process.env["AFFILIATE-REVENUE-PERCENTAJE"] || "1"
+        ) / 100;
+        const orderTotal = parseFloat(orderData.totalAmount) || 0;
+        const affiliateAmount = orderTotal * affiliateRevenuePercentage;
+
+        const affiliateKey = orderData.affiliateId;
+        if (!payouts.affiliates[affiliateKey]) {
+          payouts.affiliates[affiliateKey] = {
+            affiliateId: affiliateKey,
+            affiliateName: orderData.affiliate
+              ? `${orderData.affiliate.firstName || ""} ${orderData.affiliate.lastName || ""}`.trim()
+              : "Unknown",
+            affiliateEmail: orderData.affiliate?.email || "",
+            totalAmount: 0,
+            orderCount: 0,
+            orders: [],
+          };
+        }
+        payouts.affiliates[affiliateKey].totalAmount += Math.round(affiliateAmount * 100) / 100; // Round to 2 decimal places
+        payouts.affiliates[affiliateKey].orderCount += 1;
+        payouts.affiliates[affiliateKey].orders.push({
+          orderId: orderData.id,
+          orderNumber: orderData.orderNumber,
+          amount: Math.round(affiliateAmount * 100) / 100,
+          date: orderData.createdAt,
+          status: orderData.status,
+          paymentStatus: orderData.payment?.status,
+        });
+        payouts.totals.totalAffiliateAmount += Math.round(affiliateAmount * 100) / 100;
+      }
+
+      payouts.totals.totalPlatformFee += parseFloat(orderData.platformFeeAmount) || 0;
+    });
+
+    // Convert objects to arrays
+    const result = {
+      brands: Object.values(payouts.brands),
+      doctors: Object.values(payouts.doctors),
+      pharmacies: Object.values(payouts.pharmacies),
+      affiliates: Object.values(payouts.affiliates),
+      totals: payouts.totals,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages: Math.ceil(total / limitNum),
+      },
+    };
+
+    res.status(200).json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    if (process.env.NODE_ENV === "development") {
+      console.error("❌ Error fetching tenant payouts:", error);
+    } else {
+      console.error("❌ Error fetching tenant payouts");
+    }
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+});
+
+// Get payouts for a specific brand (for brand portal)
+app.get("/payouts/brand", authenticateJWT, async (req, res) => {
+  try {
+    const currentUser = getCurrentUser(req);
+    if (!currentUser) {
+      return res.status(401).json({
+        success: false,
+        message: "Not authenticated",
+      });
+    }
+
+    const user = await User.findByPk(currentUser.id);
+    if (!user || !user.clinicId) {
+      return res.status(403).json({
+        success: false,
+        message: "User does not have a clinic associated",
+      });
+    }
+
+    const { dateFrom, dateTo, page = "1", limit = "50" } = req.query;
+
+    const whereClause: any = {
+      clinicId: user.clinicId,
+      status: {
+        [Op.in]: ["paid", "processing", "shipped", "delivered"],
+      },
+    };
+
+    if (dateFrom) {
+      whereClause.createdAt = {
+        ...whereClause.createdAt,
+        [Op.gte]: new Date(dateFrom as string),
+      };
+    }
+
+    if (dateTo) {
+      whereClause.createdAt = {
+        ...whereClause.createdAt,
+        [Op.lte]: new Date(dateTo as string),
+      };
+    }
+
+    const pageNum = parseInt(page as string) || 1;
+    const limitNum = parseInt(limit as string) || 50;
+    const offset = (pageNum - 1) * limitNum;
+
+    const { rows: orders, count: total } = await Order.findAndCountAll({
+      where: whereClause,
+      attributes: [
+        "id",
+        "orderNumber",
+        "status",
+        "totalAmount",
+        "brandAmount",
+        "createdAt",
+      ],
+      include: [
+        {
+          model: Payment,
+          as: "payment",
+          attributes: ["status", "paidAt"],
+        },
+        {
+          model: User,
+          as: "user",
+          attributes: ["id", "firstName", "lastName", "email"],
+        },
+      ],
+      order: [["createdAt", "DESC"]],
+      limit: limitNum,
+      offset,
+      distinct: true,
+    });
+
+    const payouts = orders
+      .filter((order: any) => parseFloat(order.brandAmount) > 0)
+      .map((order: any) => {
+        const orderData = order.toJSON();
+        return {
+          orderId: orderData.id,
+          orderNumber: orderData.orderNumber,
+          amount: parseFloat(orderData.brandAmount) || 0,
+          totalAmount: parseFloat(orderData.totalAmount) || 0,
+          date: orderData.createdAt,
+          status: orderData.status,
+          paymentStatus: orderData.payment?.status,
+          paidAt: orderData.payment?.paidAt,
+          customer: orderData.user
+            ? {
+                name: `${orderData.user.firstName || ""} ${orderData.user.lastName || ""}`.trim(),
+                email: orderData.user.email,
+              }
+            : null,
+        };
+      });
+
+    const totalAmount = payouts.reduce((sum, p) => sum + p.amount, 0);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        payouts,
+        summary: {
+          totalAmount,
+          totalOrders: payouts.length,
+        },
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total,
+          totalPages: Math.ceil(total / limitNum),
+        },
+      },
+    });
+  } catch (error) {
+    if (process.env.NODE_ENV === "development") {
+      console.error("❌ Error fetching brand payouts:", error);
+    } else {
+      console.error("❌ Error fetching brand payouts");
+    }
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+});
+
+// Get payouts for a specific affiliate (for affiliate portal)
+app.get("/payouts/affiliate", authenticateJWT, async (req, res) => {
+  try {
+    const currentUser = getCurrentUser(req);
+    if (!currentUser) {
+      return res.status(401).json({
+        success: false,
+        message: "Not authenticated",
+      });
+    }
+
+    const { dateFrom, dateTo, page = "1", limit = "50" } = req.query;
+
+    const whereClause: any = {
+      affiliateId: currentUser.id,
+      status: {
+        [Op.in]: ["paid", "processing", "shipped", "delivered"],
+      },
+    };
+
+    if (dateFrom) {
+      whereClause.createdAt = {
+        ...whereClause.createdAt,
+        [Op.gte]: new Date(dateFrom as string),
+      };
+    }
+
+    if (dateTo) {
+      whereClause.createdAt = {
+        ...whereClause.createdAt,
+        [Op.lte]: new Date(dateTo as string),
+      };
+    }
+
+    const pageNum = parseInt(page as string) || 1;
+    const limitNum = parseInt(limit as string) || 50;
+    const offset = (pageNum - 1) * limitNum;
+
+    const { rows: orders, count: total } = await Order.findAndCountAll({
+      where: whereClause,
+      attributes: [
+        "id",
+        "orderNumber",
+        "status",
+        "totalAmount",
+        "createdAt",
+      ],
+      include: [
+        {
+          model: Payment,
+          as: "payment",
+          attributes: ["status", "paidAt"],
+        },
+        {
+          model: Clinic,
+          as: "clinic",
+          attributes: ["id", "name", "slug"],
+        },
+        {
+          model: User,
+          as: "user",
+          attributes: ["id", "firstName", "lastName", "email"],
+        },
+      ],
+      order: [["createdAt", "DESC"]],
+      limit: limitNum,
+      offset,
+      distinct: true,
+    });
+
+    // Calculate affiliate commission using AFFILIATE_REVENUE_PERCENTAGE
+    const affiliateRevenuePercentage = parseFloat(
+      process.env.AFFILIATE_REVENUE_PERCENTAGE || process.env["AFFILIATE-REVENUE-PERCENTAJE"] || "1"
+    ) / 100;
+
+    const payouts = orders.map((order: any) => {
+      const orderData = order.toJSON();
+      // Calculate affiliate commission as percentage of order total
+      const orderTotal = parseFloat(orderData.totalAmount) || 0;
+      const affiliateAmount = orderTotal * affiliateRevenuePercentage;
+      
+      return {
+        orderId: orderData.id,
+        orderNumber: orderData.orderNumber,
+        amount: Math.round(affiliateAmount * 100) / 100, // Round to 2 decimal places
+        totalAmount: orderTotal,
+        date: orderData.createdAt,
+        status: orderData.status,
+        paymentStatus: orderData.payment?.status,
+        paidAt: orderData.payment?.paidAt,
+        brand: orderData.clinic
+          ? {
+              name: orderData.clinic.name,
+              slug: orderData.clinic.slug,
+            }
+          : null,
+        customer: orderData.user
+          ? {
+              name: `${orderData.user.firstName || ""} ${orderData.user.lastName || ""}`.trim(),
+              email: orderData.user.email,
+            }
+          : null,
+      };
+    });
+
+    const totalAmount = payouts.reduce((sum, p) => sum + p.amount, 0);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        payouts,
+        summary: {
+          totalAmount,
+          totalOrders: payouts.length,
+        },
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total,
+          totalPages: Math.ceil(total / limitNum),
+        },
+      },
+    });
+  } catch (error) {
+    if (process.env.NODE_ENV === "development") {
+      console.error("❌ Error fetching affiliate payouts:", error);
+    } else {
+      console.error("❌ Error fetching affiliate payouts");
     }
     res.status(500).json({
       success: false,
