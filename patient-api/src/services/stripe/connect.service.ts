@@ -46,36 +46,44 @@ export class StripeConnectService {
       capabilities.card_payments = { requested: true };
     }
 
-    const account = await stripe.accounts.create({
-      type: 'express',
-      country: 'US',
-      email: clinic.name ? `${clinic.slug}@fuse-brands.com` : undefined,
-      capabilities,
-      controller: {
-        stripe_dashboard: { type: 'express' },        // Express dashboard access
-        fees: { payer: 'application' },                // Platform pays Stripe fees
-        losses: { payments: 'application' },           // Platform liable for disputes/losses
-        requirement_collection: 'stripe',              // Stripe handles compliance/requirements
-      },
-      business_type: 'company',
-      metadata: {
-        clinicId: clinic.id,
-        clinicName: clinic.name,
-        clinicSlug: clinic.slug,
-        merchantModel: merchantModel,
+    try {
+      const account = await stripe.accounts.create({
+        country: 'US',
+        email: clinic.name ? `${clinic.slug}@fuse-brands.com` : undefined,
+        capabilities,
+        controller: {
+          stripe_dashboard: { type: 'express' },        // Express dashboard access
+          fees: { payer: 'application' },                // Platform pays Stripe fees
+          losses: { payments: 'application' },           // Platform liable for disputes/losses
+          requirement_collection: 'stripe',              // Stripe handles compliance/requirements
+        },
+        business_type: 'company',
+        metadata: {
+          clinicId: clinic.id,
+          clinicName: clinic.name,
+          clinicSlug: clinic.slug,
+          merchantModel: merchantModel,
+        }
+      });
+
+      // Save account ID and merchant model to clinic
+      await clinic.update({
+        stripeAccountId: account.id,
+        stripeAccountType: 'express',
+        merchantOfRecord: merchantModel === 'direct' ? 'myself' : 'fuse',
+      });
+
+      console.log(`✅ Stripe Connect account created: ${account.id} for clinic ${clinicId} (${merchantModel} model)`);
+
+      return account.id;
+    } catch (error: any) {
+      console.error(`❌ Error creating Stripe Connect account:`, error.message);
+      if (error.type === 'StripeInvalidRequestError') {
+        console.error(`❌ Stripe error details:`, error.raw);
       }
-    });
+      throw error;
+    }
 
-    // Save account ID and merchant model to clinic
-    await clinic.update({
-      stripeAccountId: account.id,
-      stripeAccountType: 'express',
-      merchantOfRecord: merchantModel === 'direct' ? 'myself' : 'fuse',
-    });
-
-    console.log(`✅ Stripe Connect account created: ${account.id} for clinic ${clinicId} (${merchantModel} model)`);
-
-    return account.id;
   }
 
   /**
@@ -126,44 +134,62 @@ export class StripeConnectService {
     if (!accountId) {
       accountId = await this.createOrGetConnectAccount(clinicId, merchantModel);
     } else {
-      // Update existing account to ensure it has the right capabilities
-      await this.updateAccountCapabilities(accountId, merchantModel);
+      // Verify the account exists and is accessible
+      try {
+        const account = await stripe.accounts.retrieve(accountId);
+        console.log(`✅ Account ${accountId} verified, type: ${account.type}`);
+        
+        // Update existing account to ensure it has the right capabilities
+        await this.updateAccountCapabilities(accountId, merchantModel);
+      } catch (error: any) {
+        console.error(`❌ Error retrieving account ${accountId}:`, error.message);
+        // If account doesn't exist or is invalid, create a new one
+        accountId = await this.createOrGetConnectAccount(clinicId, merchantModel);
+      }
     }
 
     console.log(`🔄 Creating Account Session for clinic ${clinicId}, account ${accountId}`);
 
-    // Create the account session with embedded components configuration
-    const accountSession = await stripe.accountSessions.create({
-      account: accountId,
-      components: {
-        account_onboarding: { enabled: true },
-        payments: {
-          enabled: true,
-          features: {
-            refund_management: true,
-            dispute_management: true,
-            capture_payments: true,
-          }
+    try {
+      // Create the account session with embedded components configuration
+      const accountSession = await stripe.accountSessions.create({
+        account: accountId,
+        components: {
+          account_onboarding: { enabled: true },
+          payments: {
+            enabled: true,
+            features: {
+              refund_management: true,
+              dispute_management: true,
+              capture_payments: true,
+            }
+          },
+          payouts: {
+            enabled: true,
+            features: {
+              standard_payouts: true,
+            }
+          },
+          balances: {
+            enabled: true,
+            features: {
+              standard_payouts: true,
+            }
+          },
+          notification_banner: { enabled: true },
         },
-        payouts: {
-          enabled: true,
-          features: {
-            standard_payouts: true,
-          }
-        },
-        balances: {
-          enabled: true,
-          features: {
-            standard_payouts: true,
-          }
-        },
-        notification_banner: { enabled: true },
-      },
-    });
+      });
 
-    console.log(`✅ Account Session created for clinic ${clinicId}`);
+      console.log(`✅ Account Session created for clinic ${clinicId}`);
 
-    return accountSession.client_secret;
+      return accountSession.client_secret;
+    } catch (error: any) {
+      console.error(`❌ Error creating Account Session:`, error.message);
+      if (error.type === 'StripeInvalidRequestError') {
+        console.error(`❌ Stripe error details:`, error.raw);
+      }
+      throw error;
+    }
   }
 
   /**

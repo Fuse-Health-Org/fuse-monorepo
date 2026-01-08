@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import Layout from '@/components/Layout'
-import { Users, Mail, Phone, Calendar, ShoppingCart, User, Search } from 'lucide-react'
+import { Users, Mail, Phone, Calendar, ShoppingCart, User, Search, AlertTriangle } from 'lucide-react'
 
 interface Customer {
     id: string
@@ -108,7 +108,11 @@ export default function Customers() {
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const [searchTerm, setSearchTerm] = useState('')
+    const [isUsingMockData, setIsUsingMockData] = useState(false)
     const { user, token } = useAuth()
+
+    // Detect environment
+    const isProduction = process.env.NODE_ENV === 'production'
 
     useEffect(() => {
         fetchCustomers()
@@ -119,6 +123,7 @@ export default function Customers() {
 
         try {
             setLoading(true)
+            setError(null) // Clear any previous errors
             const userWithClinic: any = user
             const clinicId = userWithClinic?.clinicId
 
@@ -141,21 +146,58 @@ export default function Customers() {
             if (response.ok) {
                 const data = await response.json()
                 if (data.success) {
+                    // API call successful, clear any errors
+                    setError(null)
                     const realCustomers = data.data || []
-                    // Use mock data if no real customers exist
-                    setCustomers(realCustomers.length > 0 ? realCustomers : MOCK_CUSTOMERS)
+                    if (realCustomers.length > 0) {
+                        // Real data available
+                        setCustomers(realCustomers)
+                        setIsUsingMockData(false)
+                    } else {
+                        // No real customers - this is OK, not an error
+                        if (isProduction) {
+                            // In production: show empty state
+                            setCustomers([])
+                            setIsUsingMockData(false)
+                        } else {
+                            // In dev/staging: use mock data with warning
+                            setCustomers(MOCK_CUSTOMERS)
+                            setIsUsingMockData(true)
+                        }
+                    }
                 } else {
-                    // On error, use mock data
-                    setCustomers(MOCK_CUSTOMERS)
+                    // API returned error (success: false)
+                    setError('Failed to fetch customers')
+                    if (isProduction) {
+                        setCustomers([])
+                        setIsUsingMockData(false)
+                    } else {
+                        setCustomers(MOCK_CUSTOMERS)
+                        setIsUsingMockData(true)
+                    }
                 }
             } else {
-                // On error, use mock data
-                setCustomers(MOCK_CUSTOMERS)
+                // HTTP error (response not ok)
+                setError('Failed to fetch customers')
+                if (isProduction) {
+                    setCustomers([])
+                    setIsUsingMockData(false)
+                } else {
+                    setCustomers(MOCK_CUSTOMERS)
+                    setIsUsingMockData(true)
+                }
             }
         } catch (err) {
+            // Network error or exception
             console.error('Error fetching customers:', err)
-            // On error, use mock data
-            setCustomers(MOCK_CUSTOMERS)
+            setError('An error occurred while fetching customers')
+            if (isProduction) {
+                setCustomers([])
+                setIsUsingMockData(false)
+            } else {
+                setCustomers(MOCK_CUSTOMERS)
+                setIsUsingMockData(true)
+            }
         } finally {
             setLoading(false)
         }
@@ -282,10 +324,29 @@ export default function Customers() {
                         </div>
                     </div>
 
+                    {/* Mock Data Warning (only in dev/staging) */}
+                    {isUsingMockData && (
+                        <Card className="mb-6 border-yellow-200 bg-yellow-50 dark:bg-yellow-900/20">
+                            <CardContent className="p-4">
+                                <div className="flex items-start gap-3">
+                                    <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
+                                    <div className="flex-1">
+                                        <h4 className="text-sm font-semibold text-yellow-900 dark:text-yellow-200 mb-1">
+                                            Mock Data Displayed
+                                        </h4>
+                                        <p className="text-sm text-yellow-800 dark:text-yellow-300">
+                                            You are currently viewing sample data for development purposes. Real customer data will appear here once customers place orders.
+                                        </p>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
+
                     {/* Error Message */}
                     {error && (
-                        <div className="mb-6 p-4 border border-red-200 rounded-md bg-background">
-                            <p className="text-red-600 text-sm">{error}</p>
+                        <div className="mb-6 p-4 border border-red-200 rounded-md bg-red-50 dark:bg-red-900/20">
+                            <p className="text-red-600 dark:text-red-400 text-sm">{error}</p>
                         </div>
                     )}
 
@@ -298,9 +359,15 @@ export default function Customers() {
                             {filteredCustomers.length === 0 ? (
                                 <div className="p-12 text-center">
                                     <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                                    <h3 className="text-lg font-medium text-foreground mb-2">No customers found</h3>
+                                    <h3 className="text-lg font-medium text-foreground mb-2">
+                                        {searchTerm ? 'No customers found' : 'No customers yet'}
+                                    </h3>
                                     <p className="text-sm text-muted-foreground">
-                                        {searchTerm ? 'Try adjusting your search' : 'Customers will appear here once they sign up'}
+                                        {searchTerm 
+                                            ? 'Try adjusting your search terms' 
+                                            : isProduction
+                                                ? 'Customers will appear here once they place orders with your clinic'
+                                                : 'No real customers found. Mock data is shown in development mode when available.'}
                                     </p>
                                 </div>
                             ) : (
