@@ -1,5 +1,6 @@
 import { Express } from "express";
 import User from "../models/User";
+import UserRoles from "../models/UserRoles";
 import BrandSubscriptionPlans from "../models/BrandSubscriptionPlans";
 import TierConfiguration from "../models/TierConfiguration";
 
@@ -18,8 +19,10 @@ export function registerTierManagementEndpoints(
           .json({ success: false, message: "Not authenticated" });
       }
 
-      const user = await User.findByPk(currentUser.id);
-      if (!user || user.role !== "admin") {
+      const user = await User.findByPk(currentUser.id, {
+        include: [{ model: UserRoles, as: 'userRoles' }]
+      });
+      if (!user || !user.hasAnyRoleSync(['admin', 'superAdmin'])) {
         return res.status(403).json({ success: false, message: "Forbidden" });
       }
 
@@ -84,8 +87,10 @@ export function registerTierManagementEndpoints(
             .json({ success: false, message: "Not authenticated" });
         }
 
-        const user = await User.findByPk(currentUser.id);
-        if (!user || user.role !== "admin") {
+        const user = await User.findByPk(currentUser.id, {
+          include: [{ model: UserRoles, as: 'userRoles' }]
+        });
+        if (!user || !user.hasAnyRoleSync(['admin', 'superAdmin'])) {
           return res.status(403).json({ success: false, message: "Forbidden" });
         }
 
