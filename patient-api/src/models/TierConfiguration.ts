@@ -66,6 +66,14 @@ export default class TierConfiguration extends Entity {
   })
   declare customTierCardText: string[] | null;
 
+  // Toggle to control whether custom text is active or auto-generated text is used
+  @Column({
+    type: DataType.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+  })
+  declare isCustomTierCardTextActive: boolean;
+
   @BelongsTo(() => BrandSubscriptionPlans)
   declare plan?: BrandSubscriptionPlans;
 
@@ -79,6 +87,7 @@ export default class TierConfiguration extends Entity {
       hasPrograms: this.hasPrograms,
       canCustomizeFormStructure: this.canCustomizeFormStructure,
       customTierCardText: this.customTierCardText,
+      isCustomTierCardTextActive: this.isCustomTierCardTextActive,
     };
   }
 }

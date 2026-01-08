@@ -107,6 +107,7 @@ export function registerTierManagementEndpoints(
           hasPrograms,
           canCustomizeFormStructure,
           customTierCardText,
+          isCustomTierCardTextActive,
         } = req.body;
 
         // Check if plan exists
@@ -153,6 +154,10 @@ export function registerTierManagementEndpoints(
               Array.isArray(customTierCardText)
                 ? customTierCardText
                 : null,
+            isCustomTierCardTextActive:
+              typeof isCustomTierCardTextActive === "boolean"
+                ? isCustomTierCardTextActive
+                : false,
           });
           console.log(`✅ Created TierConfiguration for plan: ${plan.name}`);
         } else {
@@ -186,6 +191,10 @@ export function registerTierManagementEndpoints(
             updates.customTierCardText = Array.isArray(customTierCardText)
               ? customTierCardText
               : null;
+          }
+
+          if (typeof isCustomTierCardTextActive === "boolean") {
+            updates.isCustomTierCardTextActive = isCustomTierCardTextActive;
           }
 
           await config.update(updates);

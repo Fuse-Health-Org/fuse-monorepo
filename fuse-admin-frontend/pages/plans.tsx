@@ -37,6 +37,7 @@ interface TierConfig {
   hasPrograms: boolean
   canCustomizeFormStructure: boolean
   customTierCardText: string[] | null
+  isCustomTierCardTextActive: boolean
 }
 
 interface Plan {
@@ -68,14 +69,48 @@ interface Subscription {
 
 // Generate feature text from TierConfig
 function generateFeatureText(plan: Plan): string[] {
-  // If custom text is provided, use it exclusively
-  if (plan.tierConfig?.customTierCardText?.length) {
+  // If custom text is active and provided, use it exclusively
+  if (plan.tierConfig?.isCustomTierCardTextActive && plan.tierConfig?.customTierCardText?.length) {
     return plan.tierConfig.customTierCardText
   }
 
-  // No custom text - return empty array (no features shown)
-  // The tenant admin should configure customTierCardText for each plan
-  return []
+  // Auto-generate based on tier config toggles (only show what's explicitly enabled)
+  const features: string[] = []
+  const tierConfig = plan.tierConfig
+
+  // Max products (from plan features, not tier config)
+  if (plan.features?.maxProducts === -1) {
+    features.push('Unlimited products')
+  } else if (plan.features?.maxProducts) {
+    features.push(`Up to ${plan.features.maxProducts} products`)
+  }
+
+  // Only add features that are explicitly enabled in tier config
+  if (tierConfig?.hasCustomPortal) {
+    features.push('Custom portal')
+  }
+
+  if (tierConfig?.canCustomizeFormStructure) {
+    features.push('Custom form structures')
+  }
+
+  if (tierConfig?.hasPrograms) {
+    features.push('Programs & bundles')
+  }
+
+  if (tierConfig?.hasAccessToAnalytics) {
+    features.push('Advanced analytics')
+  }
+
+  if (tierConfig?.canAddCustomProducts) {
+    features.push('Create custom products')
+  }
+
+  if (tierConfig?.canUploadCustomProductImages) {
+    features.push('Custom product images')
+  }
+
+  return features
 }
 
 export default function Plans() {

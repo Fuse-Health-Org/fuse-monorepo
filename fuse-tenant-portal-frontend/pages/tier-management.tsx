@@ -15,6 +15,7 @@ interface TierConfig {
   hasPrograms: boolean;
   canCustomizeFormStructure: boolean;
   customTierCardText: string[] | null;
+  isCustomTierCardTextActive: boolean;
 }
 
 interface Plan {
@@ -78,7 +79,7 @@ export default function TierManagement() {
     }
   };
 
-  const handleToggleFeature = async (planId: string, featureName: 'canAddCustomProducts' | 'hasAccessToAnalytics' | 'canUploadCustomProductImages' | 'hasCustomPortal' | 'hasPrograms' | 'canCustomizeFormStructure', currentValue: boolean) => {
+  const handleToggleFeature = async (planId: string, featureName: 'canAddCustomProducts' | 'hasAccessToAnalytics' | 'canUploadCustomProductImages' | 'hasCustomPortal' | 'hasPrograms' | 'canCustomizeFormStructure' | 'isCustomTierCardTextActive', currentValue: boolean) => {
     if (!token) return;
 
     setSaving(planId);
@@ -450,18 +451,47 @@ export default function TierManagement() {
                     {/* Custom Plan Card Text Section */}
                     <div className="mt-6 pt-6 border-t border-[#E5E7EB]">
                       <div className="flex items-center justify-between mb-3">
-                        <div>
+                        <div className="flex-1">
                           <h4 className="text-sm font-semibold text-[#1F2937]">Custom Plan Card Text</h4>
                           <p className="text-xs text-[#9CA3AF]">Custom bullet points shown on the plans page (overrides auto-generated text)</p>
                         </div>
-                        {editingCustomText !== tier.plan.id && (
-                          <button
-                            onClick={() => handleStartEditingCustomText(tier.plan.id, tier.config?.customTierCardText || null)}
-                            className="px-3 py-1.5 text-xs font-medium text-[#4FA59C] bg-[#E5F5F3] rounded-lg hover:bg-[#d0ebe8] transition-colors"
-                          >
-                            {tier.config?.customTierCardText?.length ? 'Edit Text' : 'Add Custom Text'}
-                          </button>
-                        )}
+                        <div className="flex items-center gap-4">
+                          {/* Toggle for using custom text */}
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-[#6B7280]">Use Custom Text</span>
+                            <button
+                              onClick={() => handleToggleFeature(
+                                tier.plan.id,
+                                'isCustomTierCardTextActive',
+                                tier.config?.isCustomTierCardTextActive || false
+                              )}
+                              disabled={saving === tier.plan.id}
+                              className={`
+                                relative inline-flex h-6 w-10 items-center rounded-full transition-colors
+                                ${tier.config?.isCustomTierCardTextActive
+                                  ? 'bg-[#4FA59C]'
+                                  : 'bg-[#D1D5DB]'
+                                }
+                                ${saving === tier.plan.id ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+                              `}
+                            >
+                              <span
+                                className={`
+                                  inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow-sm
+                                  ${tier.config?.isCustomTierCardTextActive ? 'translate-x-5' : 'translate-x-1'}
+                                `}
+                              />
+                            </button>
+                          </div>
+                          {editingCustomText !== tier.plan.id && (
+                            <button
+                              onClick={() => handleStartEditingCustomText(tier.plan.id, tier.config?.customTierCardText || null)}
+                              className="px-3 py-1.5 text-xs font-medium text-[#4FA59C] bg-[#E5F5F3] rounded-lg hover:bg-[#d0ebe8] transition-colors"
+                            >
+                              {tier.config?.customTierCardText?.length ? 'Edit Text' : 'Add Custom Text'}
+                            </button>
+                          )}
+                        </div>
                       </div>
 
                       {editingCustomText === tier.plan.id ? (
@@ -508,14 +538,21 @@ export default function TierManagement() {
                           </div>
                         </div>
                       ) : tier.config?.customTierCardText?.length ? (
-                        <ul className="space-y-1">
-                          {tier.config.customTierCardText.map((line, index) => (
-                            <li key={index} className="flex items-center gap-2 text-sm text-[#6B7280]">
-                              <Check className="h-3 w-3 text-[#4FA59C] flex-shrink-0" />
-                              {line}
-                            </li>
-                          ))}
-                        </ul>
+                        <div>
+                          {!tier.config?.isCustomTierCardTextActive && (
+                            <p className="text-xs text-amber-600 mb-2 italic">
+                              ⚠️ Custom text is saved but not active. Toggle "Use Custom Text" to display it on the plans page.
+                            </p>
+                          )}
+                          <ul className="space-y-1">
+                            {tier.config.customTierCardText.map((line, index) => (
+                              <li key={index} className="flex items-center gap-2 text-sm text-[#6B7280]">
+                                <Check className="h-3 w-3 text-[#4FA59C] flex-shrink-0" />
+                                {line}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
                       ) : (
                         <p className="text-sm text-[#9CA3AF] italic">No custom text configured. Features will be auto-generated from toggles above.</p>
                       )}
