@@ -174,6 +174,13 @@ export default class BrandSubscription extends Entity {
   })
   declare tutorialFinished: boolean;
 
+  @Column({
+    type: DataType.INTEGER,
+    allowNull: true,
+    defaultValue: 0,
+  })
+  declare tutorialStep?: number;
+
   @BelongsTo(() => User)
   declare user?: User;
 

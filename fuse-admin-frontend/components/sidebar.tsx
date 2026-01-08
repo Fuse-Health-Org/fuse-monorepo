@@ -36,7 +36,7 @@ const allOperations = [
   { name: "Programs", icon: Stethoscope, current: false, href: "/programs" },
   // { name: "Offerings", icon: Gift, current: false, href: "/offerings" },
   { name: "Products", icon: Package, current: false, href: "/products", id: "tutorial-step-3" },
-  { name: "Orders", icon: ShoppingCart, current: false, href: "/orders", hasSubmenu: true },
+  { name: "Orders", icon: ShoppingCart, current: false, href: "/orders" },
   { name: "Analytics", icon: TrendingUp, current: false, href: "/analytics" },
   { name: "Sequences", icon: Workflow, current: false, href: "/sequences" },
   { name: "Templates", icon: FileText, current: false, href: "/templates" },
@@ -44,9 +44,9 @@ const allOperations = [
   { name: "Tags", icon: Tag, current: false, href: "/tags" },
 ]
 
-const services: { name: string; icon: any; current: boolean; href?: string; hasSubmenu?: boolean; comingSoon?: boolean }[] = [
-  // Add services here when needed
-]
+// const services: { name: string; icon: any; current: boolean; href?: string; hasSubmenu?: boolean; comingSoon?: boolean }[] = [
+//   // Add services here when needed
+// ]
 
 const configuration = [
   { name: "Portal", icon: Globe, current: false, href: "/portal" },
@@ -61,14 +61,8 @@ export function Sidebar() {
   const router = useRouter()
   const [hoveredItem, setHoveredItem] = useState<string | null>(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
-  const [runTutorial, setRunTutorial] = useState(() => {
-    // Check if tutorial has been completed before
-    if (typeof window !== 'undefined') {
-      const tutorialCompleted = localStorage.getItem('tutorialCompleted');
-      return tutorialCompleted !== 'true';
-    }
-    return false;
-  });
+  const [runTutorial, setRunTutorial] = useState(false)
+  const [tutorialStep, setTutorialStep] = useState<number>(0)
 
   // Filter out Sequences, Templates, Contacts, and Tags in production
   const operations = allOperations.filter(item => {
@@ -111,6 +105,8 @@ export function Sidebar() {
           const needsTutorial = data.data.tutorialFinished === false && data.data.status === "active" && data.data.stripeCustomerId !== null;
           console.log("needsTutorial", needsTutorial);
           setRunTutorial(needsTutorial);
+          // Set tutorial step from DB, default to 0 if not set
+          setTutorialStep(data.data.tutorialStep || 0);
         }
       }
     } catch (error) {
@@ -281,7 +277,7 @@ export function Sidebar() {
 
   return (
     <div className="w-64 bg-sidebar border-r border-sidebar-border flex flex-col">
-      <Tutorial runTutorial={runTutorial} setRunTutorial={setRunTutorial} />
+      <Tutorial runTutorial={runTutorial} setRunTutorial={setRunTutorial} initialStep={tutorialStep} />
       {/* Logo */}
       <div className="p-6">
         <h1 className="text-xl font-bold text-sidebar-foreground">Fuse</h1>
@@ -315,12 +311,12 @@ export function Sidebar() {
         </div>
 
         {/* Services Section */}
-        <div className="pt-6">
+        {/* <div className="pt-6">
           <h3 className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Services</h3>
           <div className="space-y-1">
             {services.map((item) => renderSidebarItem(item, 'services'))}
           </div>
-        </div>
+        </div> */}
 
         {/* Configuration Section */}
         <div className="pt-6">
