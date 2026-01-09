@@ -422,45 +422,45 @@ export function OrderDetailModal({ order, isOpen, onClose, onApprove, onCancel, 
                                 )}
 
                                 {/* Non-Medical Services */}
-                                {(order.program.hasPatientPortal || order.program.hasBmiCalculator || 
-                                  order.program.hasProteinIntakeCalculator || order.program.hasCalorieDeficitCalculator || 
-                                  order.program.hasEasyShopping) && (
-                                    <div>
-                                        <h4 className="font-medium text-gray-900 mb-2">Non-Medical Services Included</h4>
-                                        <div className="space-y-1 text-sm">
-                                            {order.program.hasPatientPortal && (
-                                                <div className="flex justify-between">
-                                                    <span className="text-gray-700">✓ Patient Portal</span>
-                                                    <span className="font-medium">${Number(order.program.patientPortalPrice || 0).toFixed(2)}</span>
-                                                </div>
-                                            )}
-                                            {order.program.hasBmiCalculator && (
-                                                <div className="flex justify-between">
-                                                    <span className="text-gray-700">✓ BMI Calculator</span>
-                                                    <span className="font-medium">${Number(order.program.bmiCalculatorPrice || 0).toFixed(2)}</span>
-                                                </div>
-                                            )}
-                                            {order.program.hasProteinIntakeCalculator && (
-                                                <div className="flex justify-between">
-                                                    <span className="text-gray-700">✓ Protein Intake Calculator</span>
-                                                    <span className="font-medium">${Number(order.program.proteinIntakeCalculatorPrice || 0).toFixed(2)}</span>
-                                                </div>
-                                            )}
-                                            {order.program.hasCalorieDeficitCalculator && (
-                                                <div className="flex justify-between">
-                                                    <span className="text-gray-700">✓ Calorie Deficit Calculator</span>
-                                                    <span className="font-medium">${Number(order.program.calorieDeficitCalculatorPrice || 0).toFixed(2)}</span>
-                                                </div>
-                                            )}
-                                            {order.program.hasEasyShopping && (
-                                                <div className="flex justify-between">
-                                                    <span className="text-gray-700">✓ Easy Shopping</span>
-                                                    <span className="font-medium">${Number(order.program.easyShoppingPrice || 0).toFixed(2)}</span>
-                                                </div>
-                                            )}
+                                {(order.program.hasPatientPortal || order.program.hasBmiCalculator ||
+                                    order.program.hasProteinIntakeCalculator || order.program.hasCalorieDeficitCalculator ||
+                                    order.program.hasEasyShopping) && (
+                                        <div>
+                                            <h4 className="font-medium text-gray-900 mb-2">Non-Medical Services Included</h4>
+                                            <div className="space-y-1 text-sm">
+                                                {order.program.hasPatientPortal && (
+                                                    <div className="flex justify-between">
+                                                        <span className="text-gray-700">✓ Patient Portal</span>
+                                                        <span className="font-medium">${Number(order.program.patientPortalPrice || 0).toFixed(2)}</span>
+                                                    </div>
+                                                )}
+                                                {order.program.hasBmiCalculator && (
+                                                    <div className="flex justify-between">
+                                                        <span className="text-gray-700">✓ BMI Calculator</span>
+                                                        <span className="font-medium">${Number(order.program.bmiCalculatorPrice || 0).toFixed(2)}</span>
+                                                    </div>
+                                                )}
+                                                {order.program.hasProteinIntakeCalculator && (
+                                                    <div className="flex justify-between">
+                                                        <span className="text-gray-700">✓ Protein Intake Calculator</span>
+                                                        <span className="font-medium">${Number(order.program.proteinIntakeCalculatorPrice || 0).toFixed(2)}</span>
+                                                    </div>
+                                                )}
+                                                {order.program.hasCalorieDeficitCalculator && (
+                                                    <div className="flex justify-between">
+                                                        <span className="text-gray-700">✓ Calorie Deficit Calculator</span>
+                                                        <span className="font-medium">${Number(order.program.calorieDeficitCalculatorPrice || 0).toFixed(2)}</span>
+                                                    </div>
+                                                )}
+                                                {order.program.hasEasyShopping && (
+                                                    <div className="flex justify-between">
+                                                        <span className="text-gray-700">✓ Easy Shopping</span>
+                                                        <span className="font-medium">${Number(order.program.easyShoppingPrice || 0).toFixed(2)}</span>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
-                                    </div>
-                                )}
+                                    )}
                             </div>
                         </section>
                     )}
