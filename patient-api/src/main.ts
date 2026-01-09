@@ -15083,6 +15083,12 @@ async function startServer() {
   );
   registerSubscriptionEndpoints(app, authenticateJWT, getCurrentUser);
 
+  // ============= ORDER SUBSCRIPTION ENDPOINTS =============
+  const { registerOrderSubscriptionEndpoints } = await import(
+    "./endpoints/order-subscription"
+  );
+  registerOrderSubscriptionEndpoints(app, authenticateJWT, getCurrentUser);
+
   // ============= TIER MANAGEMENT ENDPOINTS =============
   const { registerTierManagementEndpoints } = await import(
     "./endpoints/tier-management"

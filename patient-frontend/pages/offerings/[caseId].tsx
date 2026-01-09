@@ -1,8 +1,19 @@
 import React from "react";
 import { useRouter } from "next/router";
-import { Card, CardBody, Button, Chip, Spinner, Divider } from "@heroui/react";
+import { Card, CardBody, Button, Chip, Spinner, Divider, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, useDisclosure } from "@heroui/react";
 import { Icon } from "@iconify/react";
-import { fetchWithAuth } from "../../lib/api";
+import { fetchWithAuth, apiCall } from "../../lib/api";
+
+interface SubscriptionInfo {
+    id: string;
+    stripeSubscriptionId: string;
+    localStatus: string;
+    stripeStatus: string;
+    currentPeriodStart: string | null;
+    currentPeriodEnd: string | null;
+    cancelAtPeriodEnd: boolean;
+    canceledAt: string | null;
+}
 
 export default function OfferingDetailsPage() {
     const router = useRouter();
@@ -10,7 +21,12 @@ export default function OfferingDetailsPage() {
     const [loading, setLoading] = React.useState(true);
     const [error, setError] = React.useState<string | null>(null);
     const [order, setOrder] = React.useState<any>(null);
+    const [subscription, setSubscription] = React.useState<SubscriptionInfo | null>(null);
+    const [subscriptionLoading, setSubscriptionLoading] = React.useState(false);
+    const [cancelLoading, setCancelLoading] = React.useState(false);
+    const { isOpen, onOpen, onClose } = useDisclosure();
 
+    // Fetch order details
     React.useEffect(() => {
         if (!orderId) return;
         (async () => {
@@ -27,6 +43,77 @@ export default function OfferingDetailsPage() {
             }
         })();
     }, [orderId]);
+
+    // Fetch subscription status from Stripe
+    React.useEffect(() => {
+        if (!orderId || !order) return;
+        (async () => {
+            try {
+                setSubscriptionLoading(true);
+                const res: any = await fetchWithAuth(`/orders/${orderId}/subscription`);
+                if (res?.data) {
+                    setSubscription(res.data);
+                }
+            } catch (e) {
+                // Silently fail - subscription info is optional
+                console.error("Failed to fetch subscription status");
+            } finally {
+                setSubscriptionLoading(false);
+            }
+        })();
+    }, [orderId, order]);
+
+    // Handle cancel subscription
+    const handleCancelSubscription = async () => {
+        if (!orderId) return;
+        try {
+            setCancelLoading(true);
+            const res = await apiCall(`/orders/${orderId}/subscription/cancel`, {
+                method: "POST",
+            });
+            if (res.success) {
+                // Refresh subscription status
+                const subRes: any = await fetchWithAuth(`/orders/${orderId}/subscription`);
+                if (subRes?.data) {
+                    setSubscription(subRes.data);
+                }
+                onClose();
+            } else {
+                alert(res.error || "Failed to cancel subscription");
+            }
+        } catch (e) {
+            alert("Failed to cancel subscription");
+        } finally {
+            setCancelLoading(false);
+        }
+    };
+
+    // Get subscription status display info
+    const getSubscriptionStatusInfo = (status: string) => {
+        switch (status) {
+            case "active":
+                return { color: "success" as const, label: "Active" };
+            case "canceled":
+            case "cancelled":
+                return { color: "danger" as const, label: "Cancelled" };
+            case "past_due":
+                return { color: "warning" as const, label: "Past Due" };
+            case "unpaid":
+                return { color: "danger" as const, label: "Unpaid" };
+            case "trialing":
+                return { color: "primary" as const, label: "Trial" };
+            case "incomplete":
+                return { color: "warning" as const, label: "Incomplete" };
+            case "incomplete_expired":
+                return { color: "danger" as const, label: "Expired" };
+            case "paused":
+                return { color: "warning" as const, label: "Paused" };
+            case "deleted":
+                return { color: "danger" as const, label: "Deleted" };
+            default:
+                return { color: "default" as const, label: status };
+        }
+    };
 
     return (
         <div className="p-4 md:p-6 space-y-5">
@@ -84,6 +171,77 @@ export default function OfferingDetailsPage() {
                             </div>
                         </CardBody>
                     </Card>
+
+                    {/* Subscription Card */}
+                    {(subscription || subscriptionLoading) && (
+                        <Card className="transition-shadow hover:shadow-md border-2 border-secondary-200">
+                            <CardBody>
+                                <div className="flex items-center gap-2 mb-3">
+                                    <Icon icon="lucide:repeat" className="text-secondary" width={20} />
+                                    <div className="font-medium text-foreground text-lg">Subscription</div>
+                                </div>
+                                <Divider className="my-3" />
+                                {subscriptionLoading ? (
+                                    <div className="flex items-center justify-center py-4">
+                                        <Spinner size="sm" label="Loading subscription info..." />
+                                    </div>
+                                ) : subscription ? (
+                                    <div className="space-y-4">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-foreground-500">Status:</span>
+                                            <Chip
+                                                size="sm"
+                                                variant="flat"
+                                                color={getSubscriptionStatusInfo(subscription.stripeStatus).color}
+                                            >
+                                                {getSubscriptionStatusInfo(subscription.stripeStatus).label}
+                                            </Chip>
+                                        </div>
+                                        
+                                        {subscription.currentPeriodEnd && subscription.stripeStatus === "active" && (
+                                            <div className="flex items-center justify-between text-sm">
+                                                <span className="text-foreground-500">Next Billing Date:</span>
+                                                <span className="text-foreground-700">
+                                                    {new Date(subscription.currentPeriodEnd).toLocaleDateString()}
+                                                </span>
+                                            </div>
+                                        )}
+
+                                        {subscription.canceledAt && (
+                                            <div className="flex items-center justify-between text-sm">
+                                                <span className="text-foreground-500">Cancelled At:</span>
+                                                <span className="text-foreground-700">
+                                                    {new Date(subscription.canceledAt).toLocaleDateString()}
+                                                </span>
+                                            </div>
+                                        )}
+
+                                        {subscription.cancelAtPeriodEnd && !subscription.canceledAt && (
+                                            <div className="bg-warning-50 p-3 rounded-md text-sm text-warning-700">
+                                                <Icon icon="lucide:alert-circle" className="inline mr-1" width={14} />
+                                                Subscription will be cancelled at end of billing period
+                                            </div>
+                                        )}
+
+                                        {/* Cancel Button - only show if subscription is active */}
+                                        {subscription.stripeStatus === "active" && !subscription.cancelAtPeriodEnd && (
+                                            <div className="pt-2">
+                                                <Button
+                                                    color="danger"
+                                                    variant="flat"
+                                                    size="sm"
+                                                    startContent={<Icon icon="lucide:x-circle" width={16} />}
+                                                    onPress={onOpen}
+                                                >
+                                                    Cancel Subscription
+                                                </Button>
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : null}
+                            </CardBody>
+                        </Card>
+                    )}
 
                     {/* Questionnaire Answers Card */}
                     {order.questionnaireAnswers && (
@@ -212,8 +370,39 @@ export default function OfferingDetailsPage() {
 
                 </div>
             )}
+
+            {/* Cancel Subscription Confirmation Modal */}
+            <Modal isOpen={isOpen} onClose={onClose}>
+                <ModalContent>
+                    <ModalHeader className="flex flex-col gap-1">
+                        <div className="flex items-center gap-2">
+                            <Icon icon="lucide:alert-triangle" className="text-danger" width={24} />
+                            Cancel Subscription
+                        </div>
+                    </ModalHeader>
+                    <ModalBody>
+                        <p className="text-foreground-600">
+                            Are you sure you want to cancel this subscription? This action cannot be undone.
+                        </p>
+                        <p className="text-sm text-foreground-500 mt-2">
+                            Your subscription will be cancelled immediately and you will no longer be billed.
+                        </p>
+                    </ModalBody>
+                    <ModalFooter>
+                        <Button variant="light" onPress={onClose} isDisabled={cancelLoading}>
+                            Keep Subscription
+                        </Button>
+                        <Button
+                            color="danger"
+                            onPress={handleCancelSubscription}
+                            isLoading={cancelLoading}
+                            startContent={!cancelLoading && <Icon icon="lucide:x-circle" width={16} />}
+                        >
+                            Cancel Subscription
+                        </Button>
+                    </ModalFooter>
+                </ModalContent>
+            </Modal>
         </div>
     );
 }
-
-
