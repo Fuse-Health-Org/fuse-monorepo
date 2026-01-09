@@ -53,6 +53,10 @@ export function registerOrderSubscriptionEndpoints(
           subscription.stripeSubscriptionId
         )) as any;
 
+        // Use billing_cycle_anchor as fallback for next charge date if current_period_end is not set
+        // (Stripe doesn't populate current_period_end for subscriptions with future billing anchors)
+        const nextChargeTimestamp = stripeSubscription.current_period_end || stripeSubscription.billing_cycle_anchor;
+
         return res.status(200).json({
           success: true,
           data: {
@@ -63,8 +67,8 @@ export function registerOrderSubscriptionEndpoints(
             currentPeriodStart: stripeSubscription.current_period_start
               ? new Date(stripeSubscription.current_period_start * 1000)
               : null,
-            currentPeriodEnd: stripeSubscription.current_period_end
-              ? new Date(stripeSubscription.current_period_end * 1000)
+            currentPeriodEnd: nextChargeTimestamp
+              ? new Date(nextChargeTimestamp * 1000)
               : null,
             cancelAtPeriodEnd: stripeSubscription.cancel_at_period_end,
             canceledAt: stripeSubscription.canceled_at

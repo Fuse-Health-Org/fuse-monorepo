@@ -200,8 +200,8 @@ export default function OfferingDetailsPage() {
                                         
                                         {subscription.currentPeriodEnd && subscription.stripeStatus === "active" && (
                                             <div className="flex items-center justify-between text-sm">
-                                                <span className="text-foreground-500">Next Billing Date:</span>
-                                                <span className="text-foreground-700">
+                                                <span className="text-foreground-500">Next Charge Date:</span>
+                                                <span className="text-foreground-700 font-medium">
                                                     {new Date(subscription.currentPeriodEnd).toLocaleDateString()}
                                                 </span>
                                             </div>
@@ -213,6 +213,14 @@ export default function OfferingDetailsPage() {
                                                 <span className="text-foreground-700">
                                                     {new Date(subscription.canceledAt).toLocaleDateString()}
                                                 </span>
+                                            </div>
+                                        )}
+
+                                        {/* Refill note - only show if subscription is active */}
+                                        {subscription.stripeStatus === "active" && !subscription.cancelAtPeriodEnd && (
+                                            <div className="bg-secondary-50 p-3 rounded-md text-sm text-secondary-700">
+                                                <Icon icon="lucide:info" className="inline mr-1" width={14} />
+                                                Refills will be purchased automatically unless your prescription expires or your subscription is cancelled.
                                             </div>
                                         )}
 
