@@ -14,6 +14,7 @@ import PharmacyProduct from "../models/PharmacyProduct";
 import PharmacyCoverage from "../models/PharmacyCoverage";
 import Pharmacy from "../models/Pharmacy";
 import Program from "../models/Program";
+import Prescription from "../models/Prescription";
 import IronSailOrderService from "../services/pharmacy/ironsail-order";
 import {
   AuditService,
@@ -568,6 +569,104 @@ export function registerDoctorEndpoints(
         res
           .status(500)
           .json({ success: false, message: "Failed to bulk approve orders" });
+      }
+    }
+  );
+
+  // Get prescription info for an order
+  app.get(
+    "/doctor/orders/:orderId/prescription-info",
+    authenticateJWT,
+    async (req: any, res: any) => {
+      try {
+        const currentUser = getCurrentUser(req);
+        if (!currentUser) {
+          return res
+            .status(401)
+            .json({ success: false, message: "Unauthorized" });
+        }
+
+        const user = await User.findByPk(currentUser.id, {
+          include: [{ model: UserRoles, as: "userRoles" }],
+        });
+        if (!user) {
+          return res
+            .status(401)
+            .json({ success: false, message: "User not found" });
+        }
+
+        if (!user.hasAnyRoleSync(["doctor", "admin"])) {
+          return res.status(403).json({
+            success: false,
+            message: "Access denied. Doctor or admin role required.",
+          });
+        }
+
+        const { orderId } = req.params;
+
+        // Find the order to get its order number
+        const order = await Order.findByPk(orderId);
+        if (!order) {
+          return res.status(404).json({
+            success: false,
+            message: "Order not found",
+          });
+        }
+
+        // Find prescriptions that match this order (by order number in name)
+        // Prescription names are formatted as: "{medicationName} - {orderNumber}"
+        const prescriptions = await Prescription.findAll({
+          where: {
+            name: {
+              [Op.like]: `% - ${order.orderNumber}`,
+            },
+          },
+          order: [["createdAt", "DESC"]],
+        });
+
+        if (prescriptions.length === 0) {
+          return res.json({
+            success: true,
+            data: {
+              hasPrescription: false,
+              prescriptionDays: null,
+              prescriptions: [],
+            },
+          });
+        }
+
+        // Calculate prescription days from the first prescription (they should all have the same duration)
+        const firstPrescription = prescriptions[0];
+        const writtenAt = new Date(firstPrescription.writtenAt);
+        const expiresAt = new Date(firstPrescription.expiresAt);
+        const prescriptionDays = Math.round(
+          (expiresAt.getTime() - writtenAt.getTime()) / (1000 * 60 * 60 * 24)
+        );
+
+        return res.json({
+          success: true,
+          data: {
+            hasPrescription: true,
+            prescriptionDays,
+            writtenAt: firstPrescription.writtenAt,
+            expiresAt: firstPrescription.expiresAt,
+            prescriptions: prescriptions.map((p) => ({
+              id: p.id,
+              name: p.name,
+              writtenAt: p.writtenAt,
+              expiresAt: p.expiresAt,
+            })),
+          },
+        });
+      } catch (error) {
+        console.error(
+          "❌ Error fetching prescription info:",
+          error instanceof Error ? error.message : String(error)
+        );
+        res.status(500).json({
+          success: false,
+          message: "Failed to fetch prescription info",
+        });
       }
     }
   );

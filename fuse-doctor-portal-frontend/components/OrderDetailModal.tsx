@@ -33,6 +33,15 @@ export function OrderDetailModal({ order, isOpen, onClose, onApprove, onCancel, 
     const [prescriptionMonths, setPrescriptionMonths] = useState(6);
     const [customDays, setCustomDays] = useState('');
 
+    // Existing prescription info (for already approved orders)
+    const [existingPrescription, setExistingPrescription] = useState<{
+        hasPrescription: boolean;
+        prescriptionDays: number | null;
+        writtenAt: string | null;
+        expiresAt: string | null;
+    } | null>(null);
+    const [loadingPrescription, setLoadingPrescription] = useState(false);
+
     // Pre-populate notes when order changes
     useEffect(() => {
         if (order?.doctorNotes) {
@@ -42,10 +51,19 @@ export function OrderDetailModal({ order, isOpen, onClose, onApprove, onCancel, 
         }
     }, [order?.id]);
 
-    // Fetch pharmacy coverage when order changes
+    // Reset prescription state when order changes
+    useEffect(() => {
+        setExistingPrescription(null);
+        setPrescriptionLengthMode('months');
+        setPrescriptionMonths(6);
+        setCustomDays('');
+    }, [order?.id]);
+
+    // Fetch pharmacy coverage and prescription info when order changes
     useEffect(() => {
         if (order?.id && isOpen) {
             fetchPharmacyCoverage();
+            fetchPrescriptionInfo();
         }
     }, [order?.id, isOpen]);
 
@@ -71,6 +89,25 @@ export function OrderDetailModal({ order, isOpen, onClose, onApprove, onCancel, 
             setPharmacyCoverages([]);
         } finally {
             setLoadingCoverage(false);
+        }
+    };
+
+    const fetchPrescriptionInfo = async () => {
+        if (!order?.id) return;
+
+        setLoadingPrescription(true);
+
+        try {
+            const response = await authenticatedFetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/doctor/orders/${order.id}/prescription-info`);
+            const data = await response.json();
+
+            if (data.success && data.data) {
+                setExistingPrescription(data.data);
+            }
+        } catch (error) {
+            console.error('Failed to fetch prescription info:', error);
+        } finally {
+            setLoadingPrescription(false);
         }
     };
 
@@ -591,87 +628,138 @@ export function OrderDetailModal({ order, isOpen, onClose, onApprove, onCancel, 
                     {/* Prescription Length */}
                     <section>
                         <h3 className="text-lg font-semibold mb-3">Prescription Length</h3>
-                        <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg space-y-4">
-                            {/* Mode Toggle */}
-                            <div className="flex items-center gap-4">
-                                <label className="flex items-center gap-2 cursor-pointer">
-                                    <input
-                                        type="radio"
-                                        name="prescriptionMode"
-                                        checked={prescriptionLengthMode === 'months'}
-                                        onChange={() => setPrescriptionLengthMode('months')}
-                                        className="w-4 h-4 text-blue-600"
-                                    />
-                                    <span className="text-sm font-medium">Use months slider</span>
-                                </label>
-                                <label className="flex items-center gap-2 cursor-pointer">
-                                    <input
-                                        type="radio"
-                                        name="prescriptionMode"
-                                        checked={prescriptionLengthMode === 'custom'}
-                                        onChange={() => setPrescriptionLengthMode('custom')}
-                                        className="w-4 h-4 text-blue-600"
-                                    />
-                                    <span className="text-sm font-medium">Custom days</span>
-                                </label>
+
+                        {/* Loading state */}
+                        {loadingPrescription && (
+                            <div className="bg-gray-50 border border-gray-200 p-4 rounded-lg">
+                                <p className="text-gray-600 text-sm">Loading prescription info...</p>
                             </div>
+                        )}
 
-                            {/* Months Slider */}
-                            {prescriptionLengthMode === 'months' && (
-                                <div className="space-y-2">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-sm text-gray-600">Duration:</span>
-                                        <span className="text-lg font-bold text-blue-700">
-                                            {prescriptionMonths} {prescriptionMonths === 1 ? 'month' : 'months'}
+                        {/* Existing prescription - read-only display */}
+                        {!loadingPrescription && existingPrescription?.hasPrescription && (
+                            <div className="bg-green-50 border border-green-200 p-4 rounded-lg space-y-3">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                    <span className="text-green-800 font-semibold">Prescription Already Approved</span>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4 text-sm">
+                                    <div>
+                                        <span className="text-gray-600">Duration:</span>
+                                        <p className="font-bold text-green-700 text-lg">
+                                            {existingPrescription.prescriptionDays} days
                                             <span className="text-sm font-normal text-gray-500 ml-2">
-                                                (~{prescriptionMonths * 30} days)
+                                                (~{(existingPrescription.prescriptionDays! / 30).toFixed(1)} months)
                                             </span>
-                                        </span>
-                                    </div>
-                                    <input
-                                        type="range"
-                                        min="1"
-                                        max="12"
-                                        value={prescriptionMonths}
-                                        onChange={(e) => setPrescriptionMonths(parseInt(e.target.value, 10))}
-                                        className="w-full h-2 bg-blue-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
-                                    />
-                                    <div className="flex justify-between text-xs text-gray-500">
-                                        <span>1 month</span>
-                                        <span>6 months</span>
-                                        <span>12 months</span>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Custom Days Input */}
-                            {prescriptionLengthMode === 'custom' && (
-                                <div className="space-y-2">
-                                    <label className="block text-sm text-gray-600">Enter number of days:</label>
-                                    <div className="flex items-center gap-2">
-                                        <input
-                                            type="number"
-                                            min="1"
-                                            max="365"
-                                            value={customDays}
-                                            onChange={(e) => setCustomDays(e.target.value)}
-                                            placeholder="e.g., 90"
-                                            className="w-32 px-3 py-2 border rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                        />
-                                        <span className="text-sm text-gray-600">days</span>
-                                    </div>
-                                    {customDays && parseInt(customDays, 10) > 0 && (
-                                        <p className="text-sm text-blue-700">
-                                            ≈ {(parseInt(customDays, 10) / 30).toFixed(1)} months
                                         </p>
-                                    )}
+                                    </div>
+                                    <div>
+                                        <span className="text-gray-600">Written:</span>
+                                        <p className="font-medium text-gray-900">
+                                            {existingPrescription.writtenAt
+                                                ? new Date(existingPrescription.writtenAt).toLocaleDateString()
+                                                : 'N/A'}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <span className="text-gray-600">Expires:</span>
+                                        <p className="font-medium text-gray-900">
+                                            {existingPrescription.expiresAt
+                                                ? new Date(existingPrescription.expiresAt).toLocaleDateString()
+                                                : 'N/A'}
+                                        </p>
+                                    </div>
                                 </div>
-                            )}
+                                <p className="text-xs text-green-700 mt-2">
+                                    This prescription has already been approved. Refills will continue until expiration.
+                                </p>
+                            </div>
+                        )}
 
-                            <p className="text-xs text-gray-500 mt-2">
-                                This determines how long the prescription is valid. Refills will be processed automatically until the prescription expires.
-                            </p>
-                        </div>
+                        {/* No prescription yet - editable form */}
+                        {!loadingPrescription && (!existingPrescription || !existingPrescription.hasPrescription) && (
+                            <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg space-y-4">
+                                {/* Mode Toggle */}
+                                <div className="flex items-center gap-4">
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                            type="radio"
+                                            name="prescriptionMode"
+                                            checked={prescriptionLengthMode === 'months'}
+                                            onChange={() => setPrescriptionLengthMode('months')}
+                                            className="w-4 h-4 text-blue-600"
+                                        />
+                                        <span className="text-sm font-medium">Use months slider</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                            type="radio"
+                                            name="prescriptionMode"
+                                            checked={prescriptionLengthMode === 'custom'}
+                                            onChange={() => setPrescriptionLengthMode('custom')}
+                                            className="w-4 h-4 text-blue-600"
+                                        />
+                                        <span className="text-sm font-medium">Custom days</span>
+                                    </label>
+                                </div>
+
+                                {/* Months Slider */}
+                                {prescriptionLengthMode === 'months' && (
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-sm text-gray-600">Duration:</span>
+                                            <span className="text-lg font-bold text-blue-700">
+                                                {prescriptionMonths} {prescriptionMonths === 1 ? 'month' : 'months'}
+                                                <span className="text-sm font-normal text-gray-500 ml-2">
+                                                    (~{prescriptionMonths * 30} days)
+                                                </span>
+                                            </span>
+                                        </div>
+                                        <input
+                                            type="range"
+                                            min="1"
+                                            max="12"
+                                            value={prescriptionMonths}
+                                            onChange={(e) => setPrescriptionMonths(parseInt(e.target.value, 10))}
+                                            className="w-full h-2 bg-blue-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                                        />
+                                        <div className="flex justify-between text-xs text-gray-500">
+                                            <span>1 month</span>
+                                            <span>6 months</span>
+                                            <span>12 months</span>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Custom Days Input */}
+                                {prescriptionLengthMode === 'custom' && (
+                                    <div className="space-y-2">
+                                        <label className="block text-sm text-gray-600">Enter number of days:</label>
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                max="365"
+                                                value={customDays}
+                                                onChange={(e) => setCustomDays(e.target.value)}
+                                                placeholder="e.g., 90"
+                                                className="w-32 px-3 py-2 border rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                            />
+                                            <span className="text-sm text-gray-600">days</span>
+                                        </div>
+                                        {customDays && parseInt(customDays, 10) > 0 && (
+                                            <p className="text-sm text-blue-700">
+                                                ≈ {(parseInt(customDays, 10) / 30).toFixed(1)} months
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
+
+                                <p className="text-xs text-gray-500 mt-2">
+                                    This determines how long the prescription is valid. Refills will be processed automatically until the prescription expires.
+                                </p>
+                            </div>
+                        )}
                     </section>
 
                     {/* Doctor Notes */}
