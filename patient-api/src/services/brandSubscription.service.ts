@@ -437,10 +437,24 @@ class BrandSubscriptionService {
     stripeCustomerId: string | null;
   } | null> {
     try {
-      const subscription = await BrandSubscription.findOne({
-        where: { userId },
+      // First try to get an active subscription (most recent)
+      let subscription = await BrandSubscription.findOne({
+        where: { 
+          userId,
+          status: BrandSubscriptionStatus.ACTIVE,
+        },
         attributes: ["status", "tutorialFinished", "tutorialStep", "stripeCustomerId"],
+        order: [["createdAt", "DESC"]],
       });
+
+      // If no active subscription, get the most recent one regardless of status
+      if (!subscription) {
+        subscription = await BrandSubscription.findOne({
+          where: { userId },
+          attributes: ["status", "tutorialFinished", "tutorialStep", "stripeCustomerId"],
+          order: [["createdAt", "DESC"]],
+        });
+      }
 
       if (!subscription) {
         return null;
