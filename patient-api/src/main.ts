@@ -7984,7 +7984,7 @@ app.get("/users/by-clinic/:clinicId", authenticateJWT, async (req, res) => {
         // An active subscription is one that is "paid" or "processing"
         const orderIds = customerOrders.map(order => order.id);
         let hasActiveSubscription = false;
-        
+
         if (orderIds.length > 0) {
           const subscription = await Subscription.findOne({
             where: {
@@ -8519,7 +8519,7 @@ app.put(
       }
 
       const { step } = req.body;
-      
+
       if (step === undefined || step === null) {
         return res.status(400).json({
           success: false,
@@ -12860,9 +12860,9 @@ app.get("/payouts/brand", authenticateJWT, async (req, res) => {
           paidAt: orderData.payment?.paidAt,
           customer: orderData.user
             ? {
-                name: `${orderData.user.firstName || ""} ${orderData.user.lastName || ""}`.trim(),
-                email: orderData.user.email,
-              }
+              name: `${orderData.user.firstName || ""} ${orderData.user.lastName || ""}`.trim(),
+              email: orderData.user.email,
+            }
             : null,
         };
       });
@@ -12978,7 +12978,7 @@ app.get("/payouts/affiliate", authenticateJWT, async (req, res) => {
       // Calculate affiliate commission as percentage of order total
       const orderTotal = parseFloat(orderData.totalAmount) || 0;
       const affiliateAmount = orderTotal * affiliateRevenuePercentage;
-      
+
       return {
         orderId: orderData.id,
         orderNumber: orderData.orderNumber,
@@ -12990,15 +12990,15 @@ app.get("/payouts/affiliate", authenticateJWT, async (req, res) => {
         paidAt: orderData.payment?.paidAt,
         brand: orderData.clinic
           ? {
-              name: orderData.clinic.name,
-              slug: orderData.clinic.slug,
-            }
+            name: orderData.clinic.name,
+            slug: orderData.clinic.slug,
+          }
           : null,
         customer: orderData.user
           ? {
-              name: `${orderData.user.firstName || ""} ${orderData.user.lastName || ""}`.trim(),
-              email: orderData.user.email,
-            }
+            name: `${orderData.user.firstName || ""} ${orderData.user.lastName || ""}`.trim(),
+            email: orderData.user.email,
+          }
           : null,
       };
     });
