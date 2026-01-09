@@ -480,7 +480,7 @@ export function registerDoctorEndpoints(
           });
         }
 
-        const { orderIds } = req.body;
+        const { orderIds, prescriptionDays } = req.body;
         if (!Array.isArray(orderIds) || orderIds.length === 0) {
           return res
             .status(400)
@@ -489,6 +489,7 @@ export function registerDoctorEndpoints(
 
         console.log("✅ Bulk approve request received", {
           orderCount: orderIds.length,
+          prescriptionDays: prescriptionDays || 'default (30 days)',
         });
 
         // Fetch all orders - doctors and admins can approve any order
@@ -515,7 +516,7 @@ export function registerDoctorEndpoints(
 
         for (const order of orders) {
           try {
-            const result = await orderService.approveOrder(order.id);
+            const result = await orderService.approveOrder(order.id, prescriptionDays);
             results.push({
               orderId: order.id,
               orderNumber: order.orderNumber,

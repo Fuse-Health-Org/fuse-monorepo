@@ -154,7 +154,7 @@ export class ApiClient {
         return response.json();
     }
 
-    async bulkApproveOrders(orderIds: string[]): Promise<{
+    async bulkApproveOrders(orderIds: string[], prescriptionDays?: number): Promise<{
         success: boolean;
         message: string;
         data: {
@@ -171,7 +171,7 @@ export class ApiClient {
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ orderIds }),
+            body: JSON.stringify({ orderIds, prescriptionDays }),
         });
 
         if (!response.ok) {
