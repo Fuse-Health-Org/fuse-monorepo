@@ -622,7 +622,7 @@ export default function ProgramEditor() {
                                     {currentStep > 1 ? <Check className="h-4 w-4" /> : '1'}
                                 </div>
                                 <span className={`text-sm font-medium hidden sm:inline ${currentStep === 1 ? 'text-foreground' : 'text-muted-foreground'}`}>
-                                    Program Details
+                                    Medical Template
                                 </span>
                             </div>
                             <div className="w-8 h-px bg-border"></div>
@@ -632,7 +632,7 @@ export default function ProgramEditor() {
                                     {currentStep > 2 ? <Check className="h-4 w-4" /> : '2'}
                                 </div>
                                 <span className={`text-sm font-medium hidden sm:inline ${currentStep === 2 ? 'text-foreground' : 'text-muted-foreground'}`}>
-                                    Medical Template
+                                    Services
                                 </span>
                             </div>
                             <div className="w-8 h-px bg-border"></div>
@@ -642,26 +642,26 @@ export default function ProgramEditor() {
                                     3
                                 </div>
                                 <span className={`text-sm font-medium hidden sm:inline ${currentStep === 3 ? 'text-foreground' : 'text-muted-foreground'}`}>
-                                    Services
+                                    Program Details
                                 </span>
                             </div>
                         </div>
                     )}
 
-                    {/* Step 1: Program Details (or Edit Mode) */}
-                    {(currentStep === 1 || !isCreateMode) && (
+                    {/* Step 3: Program Details (or Edit Mode) */}
+                    {(currentStep === 3 || !isCreateMode) && (
                         <div className="bg-card rounded-2xl shadow-sm border border-border p-6 mb-6">
                             <h3 className="text-lg font-semibold mb-4">Program Details</h3>
 
                             <div className="space-y-4">
                                 <div>
                                     <label className="block text-sm font-medium mb-2">
-                                        Program Name <span className="text-red-500">*</span>
+                                        Catalog Name <span className="text-red-500">*</span>
                                     </label>
                                     <Input
                                         value={name}
                                         onChange={(e) => setName(e.target.value)}
-                                        placeholder="e.g., Weight Loss Program, Wellness Program"
+                                        placeholder="e.g., Weight Loss Catalog, Wellness Catalog"
                                         className="w-full"
                                     />
                                 </div>
@@ -697,13 +697,22 @@ export default function ProgramEditor() {
 
                             <div className="flex gap-3 mt-6">
                                 {isCreateMode ? (
+                                    <>
                                     <Button
+                                            variant="outline"
                                         onClick={() => setCurrentStep(2)}
-                                        disabled={!name.trim()}
                                         className="flex-1"
                                     >
-                                        Next: Choose Medical Template
+                                            Back
                                     </Button>
+                                        <Button
+                                            onClick={handleSave}
+                                            disabled={saving || !name.trim()}
+                                            className="flex-1"
+                                        >
+                                            {saving ? 'Creating Program...' : 'Create Program'}
+                                        </Button>
+                                    </>
                                 ) : (
                                     <>
                                         <Button
@@ -725,8 +734,8 @@ export default function ProgramEditor() {
                         </div>
                     )}
 
-                    {/* Step 2: Choose Medical Template (Create Mode Only) */}
-                    {isCreateMode && currentStep === 2 && (
+                    {/* Step 1: Choose Medical Template (Create Mode Only) */}
+                    {isCreateMode && currentStep === 1 && (
                         <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
                             <h3 className="text-lg font-semibold mb-4">Choose Medical Template Form</h3>
                             <p className="text-sm text-muted-foreground mb-6">
@@ -849,14 +858,7 @@ export default function ProgramEditor() {
                                     {/* Navigation Buttons */}
                                     <div className="flex gap-3">
                                         <Button
-                                            variant="outline"
-                                            onClick={() => setCurrentStep(1)}
-                                            className="flex-1"
-                                        >
-                                            Back
-                                        </Button>
-                                        <Button
-                                            onClick={() => setCurrentStep(3)}
+                                            onClick={() => setCurrentStep(2)}
                                             className="flex-1"
                                         >
                                             Next: Non-Medical Services
@@ -867,15 +869,194 @@ export default function ProgramEditor() {
                         </div>
                     )}
 
-                    {/* Step 3: Non-Medical Services (Create Mode Only) */}
-                    {isCreateMode && currentStep === 3 && (
+                    {/* Step 2: Non-Medical Services (Create Mode Only) */}
+                    {isCreateMode && currentStep === 2 && (
                         <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
                             <div className="flex items-center gap-2 mb-2">
                                 <Sparkles className="h-5 w-5 text-primary" />
-                                <h3 className="text-lg font-semibold">Non-Medical Services</h3>
+                                <h3 className="text-lg font-semibold">Configure Program</h3>
                             </div>
                             <p className="text-sm text-muted-foreground mb-6">
-                                Select which non-medical services to offer in this program and set their prices.
+                                Choose your pricing mode and configure non-medical services for this program.
+                            </p>
+
+                            {/* Show Products from Selected Template */}
+                            {selectedTemplateDetails && selectedTemplateDetails.formProducts && selectedTemplateDetails.formProducts.length > 0 && (
+                                <div className="mb-6">
+                                    <div className="flex items-center gap-2 mb-4">
+                                        <Package className="h-5 w-5 text-blue-500" />
+                                        <h3 className="text-base font-semibold">Products ({selectedTemplateDetails.formProducts.filter(fp => fp.product).length})</h3>
+                                    </div>
+                                    <p className="text-sm text-muted-foreground mb-4">
+                                        Products from template: <span className="font-medium text-foreground">{selectedTemplateDetails.title}</span>
+                                        <br />
+                                        <span className="text-xs">Click the circle next to a product to use its image as the program's display image on the frontend.</span>
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* Program Pricing Mode - MOVED TO TOP */}
+                            <div className="bg-muted/50 rounded-lg p-4 mb-6">
+                                <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                                    <Settings2 className="h-4 w-4" />
+                                    Program Pricing Mode
+                                </h4>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={handleSwitchToUnified}
+                                        className={`p-4 rounded-lg border-2 text-left transition-all ${
+                                            programMode === 'unified'
+                                                ? 'border-primary bg-primary/5'
+                                                : 'border-border hover:border-primary/50'
+                                        }`}
+                                    >
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                                                programMode === 'unified' ? 'border-primary bg-primary' : 'border-muted-foreground/50'
+                                            }`}>
+                                                {programMode === 'unified' && <Check className="h-3 w-3 text-white" />}
+                                            </div>
+                                            <span className="font-medium">Unified Program</span>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground ml-6">
+                                            One set of non-medical services and prices for all products
+                                        </p>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setProgramMode('per_product')}
+                                        className={`p-4 rounded-lg border-2 text-left transition-all ${
+                                            programMode === 'per_product'
+                                                ? 'border-primary bg-primary/5'
+                                                : 'border-border hover:border-primary/50'
+                                        }`}
+                                    >
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                                                programMode === 'per_product' ? 'border-primary bg-primary' : 'border-muted-foreground/50'
+                                            }`}>
+                                                {programMode === 'per_product' && <Check className="h-3 w-3 text-white" />}
+                                            </div>
+                                            <span className="font-medium">Per-Product Programs</span>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground ml-6">
+                                            Unique program name, services, and prices for each product
+                                        </p>
+                                    </button>
+                                </div>
+                                {programMode === 'per_product' && (
+                                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-3 bg-amber-50 dark:bg-amber-950/30 p-2 rounded">
+                                        💡 Click "Configure" on each product below to set individual program name and pricing
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* Product Cards */}
+                            {selectedTemplateDetails && selectedTemplateDetails.formProducts && selectedTemplateDetails.formProducts.length > 0 && (
+                                <div className="space-y-4 mb-6">
+                                    {selectedTemplateDetails.formProducts
+                                        .filter(fp => fp.product)
+                                        .map((fp) => {
+                                            const product = fp.product!
+                                            const isDisplayProduct = frontendDisplayProductId === product.id
+                                            
+                                            return (
+                                                <div key={fp.id} className={`border rounded-xl overflow-hidden transition-all ${isDisplayProduct ? 'border-primary ring-2 ring-primary/20' : 'border-border'}`}>
+                                                    {/* Product Header */}
+                                                    <div className="bg-muted/30 p-4 border-b border-border">
+                                                        <div className="flex items-center gap-4">
+                                                            {/* Display Image Selection Radio */}
+                                                            <div className="flex flex-col items-center gap-1">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setFrontendDisplayProductId(isDisplayProduct ? null : product.id)}
+                                                                    className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
+                                                                        isDisplayProduct 
+                                                                            ? 'border-primary bg-primary' 
+                                                                            : 'border-muted-foreground/50 hover:border-primary/50'
+                                                                    }`}
+                                                                >
+                                                                    {isDisplayProduct && <Check className="h-4 w-4 text-white" />}
+                                                                </button>
+                                                                <span className="text-[10px] text-muted-foreground">Display</span>
+                                                            </div>
+
+                                                            {/* Product Image */}
+                                                            {product.imageUrl && (
+                                                                <img
+                                                                    src={product.imageUrl}
+                                                                    alt={product.name}
+                                                                    className="w-16 h-16 rounded-lg object-cover border border-border"
+                                                                />
+                                                            )}
+
+                                                            {/* Product Info */}
+                                                            <div className="flex-1">
+                                                                <div className="flex items-center gap-2 mb-1">
+                                                                    <h4 className="text-lg font-semibold">{product.name}</h4>
+                                                                    {isDisplayProduct && (
+                                                                        <Badge className="bg-black text-white text-xs">
+                                                                            Frontend Display Image
+                                                                        </Badge>
+                                                                    )}
+                                                                </div>
+                                                                {product.placeholderSig && (
+                                                                    <p className="text-sm text-muted-foreground">
+                                                                        <span className="font-medium">SIG:</span> {product.placeholderSig}
+                                                                    </p>
+                                                                )}
+                                                            </div>
+
+                                                            {/* Wholesale Cost */}
+                                                            <div className="text-right">
+                                                                <div className="text-xs text-muted-foreground uppercase mb-1">Wholesale Cost</div>
+                                                                <div className="text-xl font-bold">
+                                                                    ${product.price ? product.price.toFixed(2) : '0.00'}
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Configure button for per-product mode */}
+                                                            {programMode === 'per_product' && (
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant={individualProductPrograms[product.id] ? 'outline' : 'default'}
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation()
+                                                                        openProductConfigModal(product)
+                                                                    }}
+                                                                    className="text-xs"
+                                                                >
+                                                                    <Settings2 className="h-3 w-3 mr-1" />
+                                                                    {individualProductPrograms[product.id] ? 'Edit' : 'Configure'}
+                                                                </Button>
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Show configured status for per-product mode */}
+                                                    {programMode === 'per_product' && individualProductPrograms[product.id] && (
+                                                        <div className="p-4 bg-muted/10 border-t border-border">
+                                                            <div className="flex items-center gap-2 text-sm">
+                                                                <Check className="h-4 w-4 text-green-500" />
+                                                                <span className="text-muted-foreground">
+                                                                    Configured: <span className="font-medium text-foreground">{individualProductPrograms[product.id].programName}</span>
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )
+                                        })}
+                                </div>
+                            )}
+
+                            {/* Non-Medical Services - Only show if Unified mode */}
+                            {programMode === 'unified' && (
+                                <>
+                                    <h4 className="text-sm font-semibold mb-3">Non-Medical Services</h4>
+                                    <p className="text-sm text-muted-foreground mb-4">
+                                        Configure the services and prices that will apply to all products in this program.
                             </p>
 
                             {/* Services List */}
@@ -998,23 +1179,24 @@ export default function ProgramEditor() {
                                         )}
                                     </div>
                                 </div>
+                                    )}
+                                </>
                             )}
 
                             {/* Navigation Buttons */}
                             <div className="flex gap-3">
                                 <Button
                                     variant="outline"
-                                    onClick={() => setCurrentStep(2)}
+                                    onClick={() => setCurrentStep(1)}
                                     className="flex-1"
                                 >
                                     Back
                                 </Button>
                                 <Button
-                                    onClick={handleSave}
-                                    disabled={saving || !name.trim()}
+                                    onClick={() => setCurrentStep(3)}
                                     className="flex-1"
                                 >
-                                    {saving ? 'Creating Program...' : 'Create Program'}
+                                    Next: Catalog Name
                                 </Button>
                             </div>
                         </div>
