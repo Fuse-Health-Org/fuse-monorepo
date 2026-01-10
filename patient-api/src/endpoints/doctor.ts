@@ -15,6 +15,7 @@ import PharmacyCoverage from "../models/PharmacyCoverage";
 import Pharmacy from "../models/Pharmacy";
 import Program from "../models/Program";
 import Prescription from "../models/Prescription";
+import PrescriptionExtension from "../models/PrescriptionExtension";
 import IronSailOrderService from "../services/pharmacy/ironsail-order";
 import {
   AuditService,
@@ -621,6 +622,13 @@ export function registerDoctorEndpoints(
               [Op.like]: `% - ${order.orderNumber}`,
             },
           },
+          include: [
+            {
+              model: PrescriptionExtension,
+              as: "extensions",
+              required: false,
+            },
+          ],
           order: [["createdAt", "DESC"]],
         });
 
@@ -631,6 +639,7 @@ export function registerDoctorEndpoints(
               hasPrescription: false,
               prescriptionDays: null,
               prescriptions: [],
+              extensions: [],
             },
           });
         }
@@ -643,6 +652,38 @@ export function registerDoctorEndpoints(
           (expiresAt.getTime() - writtenAt.getTime()) / (1000 * 60 * 60 * 24)
         );
 
+        // Collect all extensions from all prescriptions and sort by writtenAt
+        const allExtensions: any[] = [];
+        for (const prescription of prescriptions) {
+          if ((prescription as any).extensions) {
+            for (const ext of (prescription as any).extensions) {
+              allExtensions.push({
+                id: ext.id,
+                prescriptionId: prescription.id,
+                prescriptionName: prescription.name,
+                writtenAt: ext.writtenAt,
+                expiresAt: ext.expiresAt,
+                createdAt: ext.createdAt,
+              });
+            }
+          }
+        }
+        // Sort extensions by writtenAt descending (newest first)
+        allExtensions.sort(
+          (a, b) =>
+            new Date(b.writtenAt).getTime() - new Date(a.writtenAt).getTime()
+        );
+
+        // Get the effective expiration date (latest extension or original prescription)
+        let effectiveExpiresAt = firstPrescription.expiresAt;
+        if (allExtensions.length > 0) {
+          // Find the latest expiration date among all extensions
+          const latestExtension = allExtensions.reduce((latest, ext) =>
+            new Date(ext.expiresAt) > new Date(latest.expiresAt) ? ext : latest
+          );
+          effectiveExpiresAt = latestExtension.expiresAt;
+        }
+
         return res.json({
           success: true,
           data: {
@@ -650,12 +691,14 @@ export function registerDoctorEndpoints(
             prescriptionDays,
             writtenAt: firstPrescription.writtenAt,
             expiresAt: firstPrescription.expiresAt,
+            effectiveExpiresAt,
             prescriptions: prescriptions.map((p) => ({
               id: p.id,
               name: p.name,
               writtenAt: p.writtenAt,
               expiresAt: p.expiresAt,
             })),
+            extensions: allExtensions,
           },
         });
       } catch (error) {
@@ -666,6 +709,143 @@ export function registerDoctorEndpoints(
         res.status(500).json({
           success: false,
           message: "Failed to fetch prescription info",
+        });
+      }
+    }
+  );
+
+  // Create a prescription extension
+  app.post(
+    "/doctor/orders/:orderId/prescription-extension",
+    authenticateJWT,
+    async (req: any, res: any) => {
+      try {
+        const currentUser = getCurrentUser(req);
+        if (!currentUser) {
+          return res
+            .status(401)
+            .json({ success: false, message: "Unauthorized" });
+        }
+
+        const user = await User.findByPk(currentUser.id, {
+          include: [{ model: UserRoles, as: "userRoles" }],
+        });
+        if (!user) {
+          return res
+            .status(401)
+            .json({ success: false, message: "User not found" });
+        }
+
+        if (!user.hasAnyRoleSync(["doctor", "admin"])) {
+          return res.status(403).json({
+            success: false,
+            message: "Access denied. Doctor or admin role required.",
+          });
+        }
+
+        const { orderId } = req.params;
+        const { extensionDays } = req.body;
+
+        if (!extensionDays || extensionDays < 1) {
+          return res.status(400).json({
+            success: false,
+            message: "extensionDays is required and must be at least 1",
+          });
+        }
+
+        // Find the order to get its order number
+        const order = await Order.findByPk(orderId);
+        if (!order) {
+          return res.status(404).json({
+            success: false,
+            message: "Order not found",
+          });
+        }
+
+        // Find prescriptions that match this order
+        const prescriptions = await Prescription.findAll({
+          where: {
+            name: {
+              [Op.like]: `% - ${order.orderNumber}`,
+            },
+          },
+          include: [
+            {
+              model: PrescriptionExtension,
+              as: "extensions",
+              required: false,
+            },
+          ],
+          order: [["createdAt", "DESC"]],
+        });
+
+        if (prescriptions.length === 0) {
+          return res.status(404).json({
+            success: false,
+            message: "No prescriptions found for this order",
+          });
+        }
+
+        // Create extensions for each prescription
+        const createdExtensions: any[] = [];
+        const writtenAt = new Date();
+
+        for (const prescription of prescriptions) {
+          // Find the current effective expiration date for this prescription
+          let currentExpiresAt = new Date(prescription.expiresAt);
+
+          // Check if there are existing extensions and get the latest one
+          const extensions = (prescription as any).extensions || [];
+          if (extensions.length > 0) {
+            const latestExtension = extensions.reduce(
+              (latest: any, ext: any) =>
+                new Date(ext.expiresAt) > new Date(latest.expiresAt)
+                  ? ext
+                  : latest
+            );
+            currentExpiresAt = new Date(latestExtension.expiresAt);
+          }
+
+          // Calculate new expiration date
+          const newExpiresAt = new Date(currentExpiresAt);
+          newExpiresAt.setDate(newExpiresAt.getDate() + parseInt(extensionDays, 10));
+
+          // Create the extension
+          const extension = await PrescriptionExtension.create({
+            originalPrescriptionId: prescription.id,
+            writtenAt,
+            expiresAt: newExpiresAt,
+          });
+
+          createdExtensions.push({
+            id: extension.id,
+            prescriptionId: prescription.id,
+            prescriptionName: prescription.name,
+            writtenAt: extension.writtenAt,
+            expiresAt: extension.expiresAt,
+            previousExpiresAt: currentExpiresAt,
+          });
+        }
+
+        console.log(
+          `✅ Created ${createdExtensions.length} prescription extension(s) for order ${order.orderNumber}`
+        );
+
+        return res.json({
+          success: true,
+          message: `Created ${createdExtensions.length} prescription extension(s)`,
+          data: {
+            extensions: createdExtensions,
+          },
+        });
+      } catch (error) {
+        console.error(
+          "❌ Error creating prescription extension:",
+          error instanceof Error ? error.message : String(error)
+        );
+        res.status(500).json({
+          success: false,
+          message: "Failed to create prescription extension",
         });
       }
     }
