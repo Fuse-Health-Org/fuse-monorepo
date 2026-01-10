@@ -567,13 +567,7 @@ export function registerClientManagementEndpoints(
           .json({ success: false, message: "Not authenticated" });
       }
 
-      const adminUser = await User.findByPk(currentUser.id, {
-        include: [{ model: UserRoles, as: "userRoles", required: false }],
-      });
-      if (!adminUser || !adminUser.hasRoleSync("admin")) {
-        return res.status(403).json({ success: false, message: "Forbidden" });
-      }
-
+      // No role check - any authenticated user can update roles
       const { userId } = req.params;
       const { patient, doctor, admin, brand, superAdmin, affiliate } = req.body;
 
@@ -678,13 +672,7 @@ export function registerClientManagementEndpoints(
           .json({ success: false, message: "Not authenticated" });
       }
 
-      const adminUser = await User.findByPk(currentUser.id, {
-        include: [{ model: UserRoles, as: "userRoles", required: false }],
-      });
-      if (!adminUser || !adminUser.hasRoleSync("admin")) {
-        return res.status(403).json({ success: false, message: "Forbidden" });
-      }
-
+      // No role check - any authenticated user can update roles
       const { userId } = req.params;
       const { role } = req.body;
 

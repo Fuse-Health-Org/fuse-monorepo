@@ -196,7 +196,7 @@ const Tutorial = ({
         progress: {
           accentColor: '#166534', // Dark green for progress
         },
-      }}
+      } as any}
       locale={{
         close: "Close",
         last: endLabel || "End",
