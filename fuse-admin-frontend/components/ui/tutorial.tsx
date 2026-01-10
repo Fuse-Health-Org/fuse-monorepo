@@ -25,45 +25,45 @@ const Tutorial = ({
   const { authenticatedFetch } = useAuth();
   // Track the current step index - only set on start, then update via callback
   const [currentStepIndex, setCurrentStepIndex] = React.useState<number | undefined>(undefined);
-  
+
   const handleTutorialFinish = async (step?: number) => {
     try {
-        console.log('🔍 Marking tutorial as finished', step ? `at step ${step}` : '')
-        const response = await authenticatedFetch(`${API_URL}/brand-subscriptions/mark-tutorial-finished`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ step })
-        })
+      console.log('🔍 Marking tutorial as finished', step ? `at step ${step}` : '')
+      const response = await authenticatedFetch(`${API_URL}/brand-subscriptions/mark-tutorial-finished`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ step })
+      })
 
-        if (response.ok) {
-            console.log('✅ Tutorial marked as finished')
-        } else {
-            console.error('❌ Failed to mark tutorial as finished')
-        }
+      if (response.ok) {
+        console.log('✅ Tutorial marked as finished')
+      } else {
+        console.error('❌ Failed to mark tutorial as finished')
+      }
     } catch (error) {
-        console.error('❌ Error marking tutorial as finished:', error)
+      console.error('❌ Error marking tutorial as finished:', error)
     }
   }
 
   const handleUpdateStep = async (step: number) => {
     try {
-        const response = await authenticatedFetch(`${API_URL}/brand-subscriptions/tutorial-step`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ step })
-        })
+      const response = await authenticatedFetch(`${API_URL}/brand-subscriptions/tutorial-step`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ step })
+      })
 
-        if (response.ok) {
-            console.log(`✅ Tutorial step updated to ${step}`)
-        } else {
-            console.error('❌ Failed to update tutorial step')
-        }
+      if (response.ok) {
+        console.log(`✅ Tutorial step updated to ${step}`)
+      } else {
+        console.error('❌ Failed to update tutorial step')
+      }
     } catch (error) {
-        console.error('❌ Error updating tutorial step:', error)
+      console.error('❌ Error updating tutorial step:', error)
     }
   }
 
