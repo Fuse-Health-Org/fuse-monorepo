@@ -318,59 +318,107 @@ export default function OfferingDetailsPage() {
                                 </div>
                                 <Divider className="my-3" />
                                 <div className="space-y-4">
-                                    {order.prescriptions.map((prescription: any, idx: number) => (
-                                        <div key={prescription.id} className="bg-success-50/50 p-4 rounded-md space-y-3">
-                                            <div className="flex items-start justify-between">
-                                                <div>
-                                                    <div className="font-medium text-foreground">{prescription.name}</div>
-                                                    {prescription.doctor && (
-                                                        <div className="text-xs text-foreground-500 mt-1">
-                                                            Prescribed by: Dr. {prescription.doctor.firstName} {prescription.doctor.lastName}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                <Chip size="sm" variant="flat" color="success">
-                                                    Active
-                                                </Chip>
-                                            </div>
-                                            
-                                            <div className="grid grid-cols-2 gap-3 text-sm">
-                                                <div>
-                                                    <span className="text-foreground-500">Written:</span>{' '}
-                                                    <span className="text-foreground-700">
-                                                        {new Date(prescription.writtenAt).toLocaleDateString()}
-                                                    </span>
-                                                </div>
-                                                <div>
-                                                    <span className="text-foreground-500">Expires:</span>{' '}
-                                                    <span className="text-foreground-700">
-                                                        {new Date(prescription.expiresAt).toLocaleDateString()}
-                                                    </span>
-                                                </div>
-                                            </div>
+                                    {order.prescriptions.map((prescription: any, idx: number) => {
+                                        // Calculate effective expiration date considering extensions
+                                        const extensions = prescription.extensions || [];
+                                        let effectiveExpiresAt = new Date(prescription.expiresAt);
+                                        if (extensions.length > 0) {
+                                            const latestExtension = extensions.reduce((latest: any, ext: any) =>
+                                                new Date(ext.expiresAt) > new Date(latest.expiresAt) ? ext : latest
+                                            );
+                                            effectiveExpiresAt = new Date(latestExtension.expiresAt);
+                                        }
+                                        const hasExtensions = extensions.length > 0;
 
-                                            {prescription.prescriptionProducts && prescription.prescriptionProducts.length > 0 && (
-                                                <div className="mt-3">
-                                                    <div className="text-xs font-medium text-foreground-500 mb-2">Medications:</div>
-                                                    <div className="space-y-2">
-                                                        {prescription.prescriptionProducts.map((pp: any, ppIdx: number) => (
-                                                            <div key={ppIdx} className="bg-white/60 p-3 rounded border border-success-200">
-                                                                <div className="flex items-center gap-2">
-                                                                    <Icon icon="lucide:pill" className="text-success-600" width={16} />
-                                                                    <span className="text-sm font-medium text-foreground">
-                                                                        {pp.product?.name || 'Medication'}
-                                                                    </span>
-                                                                </div>
-                                                                <div className="text-xs text-foreground-500 mt-1">
-                                                                    Quantity: {pp.quantity}
-                                                                </div>
+                                        return (
+                                            <div key={prescription.id} className="bg-success-50/50 p-4 rounded-md space-y-3">
+                                                <div className="flex items-start justify-between">
+                                                    <div>
+                                                        <div className="font-medium text-foreground">{prescription.name}</div>
+                                                        {prescription.doctor && (
+                                                            <div className="text-xs text-foreground-500 mt-1">
+                                                                Prescribed by: Dr. {prescription.doctor.firstName} {prescription.doctor.lastName}
                                                             </div>
-                                                        ))}
+                                                        )}
+                                                    </div>
+                                                    <Chip size="sm" variant="flat" color="success">
+                                                        Active
+                                                    </Chip>
+                                                </div>
+                                                
+                                                <div className="grid grid-cols-2 gap-3 text-sm">
+                                                    <div>
+                                                        <span className="text-foreground-500">Written:</span>{' '}
+                                                        <span className="text-foreground-700">
+                                                            {new Date(prescription.writtenAt).toLocaleDateString()}
+                                                        </span>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-foreground-500">
+                                                            {hasExtensions ? 'Original Expires:' : 'Expires:'}
+                                                        </span>{' '}
+                                                        <span className={hasExtensions ? "text-foreground-400 line-through" : "text-foreground-700"}>
+                                                            {new Date(prescription.expiresAt).toLocaleDateString()}
+                                                        </span>
                                                     </div>
                                                 </div>
-                                            )}
-                                        </div>
-                                    ))}
+
+                                                {/* Show effective expiration if there are extensions */}
+                                                {hasExtensions && (
+                                                    <div className="bg-secondary-100 p-3 rounded-md">
+                                                        <div className="flex items-center gap-2 mb-2">
+                                                            <Icon icon="lucide:calendar-plus" className="text-secondary" width={16} />
+                                                            <span className="text-sm font-medium text-secondary-700">
+                                                                Extended {extensions.length} time{extensions.length > 1 ? 's' : ''}
+                                                            </span>
+                                                        </div>
+                                                        <div className="text-sm">
+                                                            <span className="text-foreground-500">Effective Expires:</span>{' '}
+                                                            <span className="text-secondary-700 font-semibold">
+                                                                {effectiveExpiresAt.toLocaleDateString()}
+                                                            </span>
+                                                        </div>
+                                                        {/* Show extension history */}
+                                                        <div className="mt-2 space-y-1">
+                                                            {extensions
+                                                                .sort((a: any, b: any) => new Date(b.writtenAt).getTime() - new Date(a.writtenAt).getTime())
+                                                                .map((ext: any, extIdx: number) => (
+                                                                    <div key={ext.id} className="text-xs text-foreground-500 flex items-center gap-1">
+                                                                        <Icon icon="lucide:arrow-right" width={12} />
+                                                                        <span>
+                                                                            Extended on {new Date(ext.writtenAt).toLocaleDateString()} 
+                                                                            → {new Date(ext.expiresAt).toLocaleDateString()}
+                                                                        </span>
+                                                                    </div>
+                                                                ))
+                                                            }
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {prescription.prescriptionProducts && prescription.prescriptionProducts.length > 0 && (
+                                                    <div className="mt-3">
+                                                        <div className="text-xs font-medium text-foreground-500 mb-2">Medications:</div>
+                                                        <div className="space-y-2">
+                                                            {prescription.prescriptionProducts.map((pp: any, ppIdx: number) => (
+                                                                <div key={ppIdx} className="bg-white/60 p-3 rounded border border-success-200">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <Icon icon="lucide:pill" className="text-success-600" width={16} />
+                                                                        <span className="text-sm font-medium text-foreground">
+                                                                            {pp.product?.name || 'Medication'}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="text-xs text-foreground-500 mt-1">
+                                                                        Quantity: {pp.quantity}
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             </CardBody>
                         </Card>

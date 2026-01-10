@@ -17,6 +17,7 @@ import Pharmacy from "./models/Pharmacy";
 import PharmacyCoverage from "./models/PharmacyCoverage";
 import PharmacyProduct from "./models/PharmacyProduct";
 import Prescription from "./models/Prescription";
+import PrescriptionExtension from "./models/PrescriptionExtension";
 import PrescriptionProducts from "./models/PrescriptionProducts";
 import BrandSubscription, {
   BrandSubscriptionStatus,
@@ -8304,6 +8305,11 @@ app.get("/orders/:id", authenticateJWT, async (req, res) => {
           model: User,
           as: "doctor",
           attributes: ["id", "firstName", "lastName"],
+        },
+        {
+          model: PrescriptionExtension,
+          as: "extensions",
+          required: false,
         },
       ],
     });
