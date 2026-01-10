@@ -408,7 +408,12 @@ export function PharmacyStateManager({ productId }: PharmacyStateManagerProps) {
             <div className="bg-[#F3F4F6] rounded-xl p-2">
               <MapPin className="h-5 w-5 text-[#4FA59C]" />
             </div>
-            <h2 className="text-xl font-semibold text-[#1F2937]">Pharmacy & State Coverage</h2>
+            <div>
+              <h2 className="text-xl font-semibold text-[#1F2937]">Pharmacy & State Coverage</h2>
+              <p className="text-sm text-[#6B7280] mt-1">
+                Configure which pharmacies can fulfill orders for this product and in which states. This determines where customers can receive this product.
+              </p>
+            </div>
           </div>
           <button
             onClick={() => {
@@ -437,7 +442,12 @@ export function PharmacyStateManager({ productId }: PharmacyStateManagerProps) {
         {showAddForm && (
           <div className="p-6 border border-[#E5E7EB] rounded-2xl space-y-4 bg-[#F9FAFB]">
             <div>
-              <label className="text-sm font-medium text-[#4B5563] mb-2 block">Select Pharmacy</label>
+              <label className="text-sm font-medium text-[#4B5563] mb-2 block">
+                Select Pharmacy
+              </label>
+              <p className="text-xs text-[#9CA3AF] mb-2">
+                Choose the pharmacy partner that will fulfill orders for this product. Each pharmacy operates in specific states.
+              </p>
               <select
                 value={selectedPharmacy}
                 onChange={(e) => {
@@ -460,6 +470,9 @@ export function PharmacyStateManager({ productId }: PharmacyStateManagerProps) {
                 <label className="text-sm font-medium text-[#4B5563] mb-2 block">
                   Select States (available for this pharmacy)
                 </label>
+                <p className="text-xs text-[#9CA3AF] mb-2">
+                  Choose which US states this pharmacy can fulfill orders for. Only states where the pharmacy operates and that aren't already assigned will be shown.
+                </p>
                 <div className="max-h-48 overflow-y-auto border border-[#E5E7EB] rounded-xl p-3 bg-white">
                   {availableStatesForSelectedPharmacy.length === 0 ? (
                     <p className="text-sm text-[#6B7280] p-2">
@@ -513,6 +526,9 @@ export function PharmacyStateManager({ productId }: PharmacyStateManagerProps) {
                 <label className="text-sm font-medium text-[#4B5563] mb-2 block">
                   Select Pharmacy Product (Optional)
                 </label>
+                <p className="text-xs text-[#9CA3AF] mb-2">
+                  Link this coverage to a specific product in the pharmacy's inventory. This helps match the correct product, pricing, and dispensing instructions. You can skip this and enter custom information below if the product isn't in their system.
+                </p>
                 {loadingProducts ? (
                   <div className="flex items-center justify-center p-4 border border-[#E5E7EB] rounded-xl bg-white">
                     <Loader2 className="h-5 w-5 animate-spin text-[#4FA59C] mr-2" />
@@ -597,7 +613,7 @@ export function PharmacyStateManager({ productId }: PharmacyStateManagerProps) {
             <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <label className="text-sm font-medium text-[#4B5563] mb-2 block">
-                  Custom Product Name
+                  Custom Product Name <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -608,12 +624,12 @@ export function PharmacyStateManager({ productId }: PharmacyStateManagerProps) {
                   maxLength={120}
                 />
                 <p className="text-xs text-[#9CA3AF] mt-1">
-                  Displayed on the coverage card. Keep it short and descriptive.
+                  The name customers will see for this product coverage. This appears on coverage cards and order confirmations. Keep it short and descriptive (max 120 characters).
                 </p>
               </div>
               <div>
                 <label className="text-sm font-medium text-[#4B5563] mb-2 block">
-                  Custom SIG (Dispensing Instructions)
+                  Custom SIG (Dispensing Instructions) <span className="text-red-500">*</span>
                 </label>
                 <textarea
                   value={customSig}
@@ -624,7 +640,7 @@ export function PharmacyStateManager({ productId }: PharmacyStateManagerProps) {
                   maxLength={500}
                 />
                 <p className="text-xs text-[#9CA3AF] mt-1">
-                  This will appear on the coverage card and is saved with the assignment.
+                  SIG stands for "Signatura" (Latin for "let it be labeled"). This is the prescription instructions that appear on the product label and in pharmacy systems (e.g., "Take 1 capsule daily with food"). This will appear on coverage cards and order confirmations (max 500 characters).
                 </p>
               </div>
             </div>
@@ -665,7 +681,12 @@ export function PharmacyStateManager({ productId }: PharmacyStateManagerProps) {
 
         {/* Current Assignments */}
         <div className="space-y-3">
-          <h3 className="text-sm font-semibold text-[#9CA3AF] uppercase tracking-wider">Current Coverage</h3>
+          <div>
+            <h3 className="text-sm font-semibold text-[#9CA3AF] uppercase tracking-wider">Current Coverage</h3>
+            <p className="text-xs text-[#9CA3AF] mt-1">
+              Review all pharmacy assignments for this product. Each coverage group shows the pharmacy, states, product details, and wholesale pricing.
+            </p>
+          </div>
           {sortedCoverageGroups.length === 0 ? (
             <div className="text-center p-8 border-2 border-dashed border-[#E5E7EB] rounded-2xl bg-[#F9FAFB]">
               <div className="bg-white rounded-full p-4 mx-auto w-fit mb-3">
@@ -739,10 +760,11 @@ export function PharmacyStateManager({ productId }: PharmacyStateManagerProps) {
                                       handleUpdateCustomPrice(firstAssignment.id, customPrice)
                                     }
                                   }}
+                                  title="The cost you pay to the pharmacy for each unit. This is used to calculate your profit margin."
                                 />
                               </div>
                               {firstAssignment.pharmacyWholesaleCost && (
-                                <span className="inline-block px-2 py-0.5 bg-green-50 text-green-700 border border-green-200 rounded-full text-xs">From Spreadsheet</span>
+                                <span className="inline-block px-2 py-0.5 bg-green-50 text-green-700 border border-green-200 rounded-full text-xs" title="This price was automatically imported from the pharmacy's inventory spreadsheet">From Spreadsheet</span>
                               )}
                             </div>
                           )}

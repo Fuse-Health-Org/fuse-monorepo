@@ -2418,31 +2418,105 @@ export default function CustomProductEditor() {
         setSaveMessage(null)
 
         try {
-            // Save step titles/descriptions
-            await Promise.all(
+            const errors: string[] = []
+
+            // Save step titles/descriptions with individual error handling
+            const stepResults = await Promise.allSettled(
                 steps.map((s) =>
                     fetch(`${baseUrl}/questionnaires/step`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                        body: JSON.stringify({ stepId: s.id, title: s.title, description: s.description }),
+                        body: JSON.stringify({ 
+                            stepId: s.id, 
+                            title: s.title?.substring(0, 500) || s.title, // Limit title length
+                            description: s.description?.substring(0, 2000) || s.description // Limit description length
+                        }),
+                    }).then(async (res) => {
+                        if (!res.ok) {
+                            const errorData = await res.json().catch(() => ({}))
+                            throw new Error(errorData.message || `Failed to save step ${s.id}`)
+                        }
+                        return res.json()
                     })
                 )
             )
-            // Save questions/options for each step
+
+            stepResults.forEach((result, index) => {
+                if (result.status === 'rejected') {
+                    errors.push(`Step ${index + 1}: ${result.reason?.message || 'Failed to save'}`)
+                }
+            })
+
+            // Save questions/options for each step with individual error handling
             const questionUpdates: Promise<any>[] = []
             for (const s of steps) {
                 for (const q of s.questions || []) {
-                    const optionsPayload = (q.options || []).map((text, idx) => ({ optionText: text, optionValue: text, optionOrder: idx + 1 }))
+                    // Fix: properly map options with optionText and optionValue
+                    // Preserve existing optionValue to avoid breaking conditional logic references
+                    const optionsPayload = (q.options || []).map((opt: any, idx) => {
+                        if (typeof opt === 'string') {
+                            // Handle string format (legacy support)
+                            return {
+                                optionText: opt,
+                                optionValue: opt.toLowerCase().replace(/[^a-z0-9_]/g, '_'),
+                                optionOrder: idx + 1,
+                                riskLevel: undefined
+                            }
+                        }
+                        
+                        // Handle object format
+                        const optionText: string = opt?.optionText || ''
+                        // Preserve existing optionValue if it exists and is not empty, otherwise generate from optionText
+                        const optionValue: string = (opt?.optionValue !== undefined && opt?.optionValue !== null && opt?.optionValue !== '')
+                            ? String(opt.optionValue)
+                            : (optionText.toLowerCase().replace(/[^a-z0-9_]/g, '_') || `option_${idx + 1}`)
+                        
+                        return {
+                            optionText,
+                            optionValue,
+                            optionOrder: idx + 1,
+                            riskLevel: opt?.riskLevel || undefined
+                        }
+                    })
+
                     questionUpdates.push(
                         fetch(`${baseUrl}/questions/${q.id}`, {
                             method: 'PUT',
                             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                            body: JSON.stringify({ questionText: q.questionText, options: optionsPayload }),
+                            body: JSON.stringify({ 
+                                questionText: q.questionText?.substring(0, 1000) || q.questionText, // Limit question text length
+                                helpText: q.helpText?.substring(0, 1000) || q.helpText, // Limit help text length
+                                placeholder: q.placeholder?.substring(0, 500) || q.placeholder, // Limit placeholder length
+                                options: q.answerType !== 'textarea' ? optionsPayload : undefined, // Only send options for non-textarea questions
+                            }),
+                        }).then(async (res) => {
+                            if (!res.ok) {
+                                const errorData = await res.json().catch(() => ({}))
+                                throw new Error(errorData.message || `Failed to save question ${q.id}`)
+                            }
+                            return res.json()
+                        }).catch((err) => {
+                            errors.push(`Question "${q.questionText?.substring(0, 30)}...": ${err.message || 'Failed to save'}`)
+                            throw err
                         })
                     )
                 }
             }
-            await Promise.all(questionUpdates)
+
+            const questionResults = await Promise.allSettled(questionUpdates)
+            
+            questionResults.forEach((result) => {
+                if (result.status === 'rejected') {
+                    // Error already added in the catch block above
+                }
+            })
+
+            if (errors.length > 0) {
+                const errorMessage = errors.length === 1 
+                    ? errors[0] 
+                    : `Failed to save ${errors.length} items. ${errors.slice(0, 3).join('; ')}${errors.length > 3 ? '...' : ''}`
+                throw new Error(errorMessage)
+            }
 
             // NOTE: We do NOT update the source template when saving.
             // Templates should remain unchanged. Only "Save as Template" creates/updates templates.
@@ -2452,7 +2526,9 @@ export default function CustomProductEditor() {
             setTimeout(() => setSaveMessage(null), 3000)
         } catch (err: any) {
             console.error("Error saving template:", err)
-            setSaveMessage(`❌ ${err.message || "Failed to save changes"}`)
+            const errorMsg = err.message || "Failed to save changes"
+            setSaveMessage(`❌ ${errorMsg}`)
+            setTimeout(() => setSaveMessage(null), 5000)
         } finally {
             setSaving(false)
         }
@@ -3042,7 +3118,7 @@ export default function CustomProductEditor() {
                                         </button>
 
                                         {/* Choose Template Dropdown */}
-                                        <div className="relative">
+                                        <div className="relative" style={{ zIndex: showFormSelector ? 1000 : 'auto' }}>
                                             <button
                                                 onClick={() => setShowFormSelector(!showFormSelector)}
                                                 className="flex items-center gap-2 px-4 py-2.5 rounded-full border border-[#E5E7EB] bg-white text-[#4B5563] hover:bg-[#F3F4F6] transition-all text-sm font-medium"
@@ -3056,58 +3132,74 @@ export default function CustomProductEditor() {
                                                 <>
                                                     {/* Backdrop */}
                                                     <div
-                                                        className="fixed inset-0 z-40"
+                                                        className="fixed inset-0 bg-black/20 backdrop-blur-sm"
+                                                        style={{ zIndex: 999 }}
                                                         onClick={() => setShowFormSelector(false)}
                                                     />
 
-                                                    {/* Dropdown Menu */}
-                                                    <div className="absolute right-0 z-50 mt-2 w-80 bg-white rounded-2xl shadow-xl border border-[#E5E7EB] overflow-hidden">
-                                                        <div className="p-4 border-b border-[#E5E7EB]">
+                                                    {/* Dropdown Menu - Positioned absolutely but with high z-index */}
+                                                    <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-2xl shadow-xl border border-[#E5E7EB] overflow-hidden max-h-[70vh] flex flex-col" style={{ zIndex: 1000 }}>
+                                                        <div className="p-4 border-b border-[#E5E7EB] flex-shrink-0">
                                                             <input
                                                                 type="text"
                                                                 placeholder="Search templates..."
                                                                 value={formSearchQuery}
                                                                 onChange={(e) => setFormSearchQuery(e.target.value)}
+                                                                onClick={(e) => e.stopPropagation()}
+                                                                onKeyDown={(e) => e.stopPropagation()}
                                                                 className="w-full px-3 py-2 rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] text-sm focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50"
                                                             />
                                                         </div>
-                                                        <div className="max-h-64 overflow-y-auto">
-                                                            {availableForms
-                                                                .filter(form =>
+                                                        <div className="overflow-y-auto flex-1 min-h-0">
+                                                            {availableForms.length === 0 ? (
+                                                                <div className="p-4 text-center text-sm text-[#6B7280]">
+                                                                    No templates available
+                                                                </div>
+                                                            ) : (() => {
+                                                                const filteredForms = availableForms.filter(form =>
                                                                     form.title.toLowerCase().includes(formSearchQuery.toLowerCase()) ||
                                                                     form.description?.toLowerCase().includes(formSearchQuery.toLowerCase())
                                                                 )
-                                                                .map((form) => (
-                                                                    <button
-                                                                        key={form.id}
-                                                                        onClick={async () => {
-                                                                            await handleSwitchForm(form.id)
-                                                                        }}
-                                                                        disabled={attachingForm}
-                                                                        className="w-full text-left px-4 py-3 hover:bg-[#F9FAFB] border-b border-[#E5E7EB] last:border-b-0 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                                                    >
-                                                                        <div className="font-medium text-sm text-[#1F2937]">{form.title}</div>
-                                                                        {form.description && (
-                                                                            <div className="text-xs text-[#9CA3AF] mt-1">{form.description}</div>
-                                                                        )}
-                                                                        {attachingForm && (
-                                                                            <div className="text-xs text-[#4FA59C] mt-1">Switching template...</div>
-                                                                        )}
-                                                                    </button>
-                                                                ))}
-                                                            <div className="p-2 border-t-2 border-[#E5E7EB] bg-[#F9FAFB]">
-                                                                <button
-                                                                    onClick={() => {
-                                                                        handleCreateNewForm()
-                                                                        setShowFormSelector(false)
-                                                                    }}
-                                                                    disabled={creatingForm}
-                                                                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#4FA59C] hover:bg-[#478F87] text-white text-sm font-medium transition-all disabled:opacity-50"
-                                                                >
-                                                                    <Plus className="h-4 w-4" />
-                                                                    {creatingForm ? 'Creating...' : 'Create New Template'}
-                                                                </button>
-                                                            </div>
+                                                                return filteredForms.length === 0 ? (
+                                                                    <div className="p-4 text-center text-sm text-[#6B7280]">
+                                                                        No templates match your search
+                                                                    </div>
+                                                                ) : (
+                                                                    filteredForms.map((form) => (
+                                                                        <button
+                                                                            key={form.id}
+                                                                            onClick={async (e) => {
+                                                                                e.stopPropagation()
+                                                                                await handleSwitchForm(form.id)
+                                                                            }}
+                                                                            disabled={attachingForm}
+                                                                            className="w-full text-left px-4 py-3 hover:bg-[#F9FAFB] border-b border-[#E5E7EB] last:border-b-0 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                                        >
+                                                                            <div className="font-medium text-sm text-[#1F2937] truncate">{form.title}</div>
+                                                                            {form.description && (
+                                                                                <div className="text-xs text-[#9CA3AF] mt-1 line-clamp-2">{form.description}</div>
+                                                                            )}
+                                                                            {attachingForm && (
+                                                                                <div className="text-xs text-[#4FA59C] mt-1">Switching template...</div>
+                                                                            )}
+                                                                        </button>
+                                                                    ))
+                                                                )
+                                                            })()}
+                                                        </div>
+                                                        <div className="p-2 border-t-2 border-[#E5E7EB] bg-[#F9FAFB] flex-shrink-0">
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation()
+                                                                    handleCreateNewForm()
+                                                                    setShowFormSelector(false)
+                                                                }}
+                                                                disabled={creatingForm}
+                                                                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#4FA59C] hover:bg-[#478F87] text-white text-sm font-medium transition-all disabled:opacity-50"
+                                                            >
+                                                                <Plus className="h-4 w-4" />
+                                                                {creatingForm ? 'Creating...' : 'Create New Template'}
+                                                            </button>
                                                         </div>
                                                     </div>
                                                 </>
