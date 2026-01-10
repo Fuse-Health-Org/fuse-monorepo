@@ -76,8 +76,9 @@ export default function PortalPage() {
   const [customDomain, setCustomDomain] = useState<string | null>(null)
   const [isCustomDomain, setIsCustomDomain] = useState(false)
 
-  // Check if user has access to Portal based on their subscription plan or custom feature override
+  // Check if user has access to Portal based on tier config, custom features, or plan type
   const hasPortalAccess = 
+    subscription?.tierConfig?.hasCustomPortal ||
     subscription?.customFeatures?.hasCustomPortal ||
     (subscription?.plan?.type && PORTAL_ALLOWED_PLAN_TYPES.includes(subscription.plan.type))
 
