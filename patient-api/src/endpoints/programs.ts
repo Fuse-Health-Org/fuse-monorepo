@@ -69,6 +69,22 @@ router.get('/public/programs/by-clinic/:clinicSlug', async (req: Request, res: R
           model: Questionnaire,
           as: 'medicalTemplate',
           attributes: ['id', 'title', 'description', 'formTemplateType'],
+          include: [
+            {
+              model: FormProducts,
+              as: 'formProducts',
+              attributes: ['id', 'productId'],
+              required: false,
+              include: [
+                {
+                  model: Product,
+                  as: 'product',
+                  attributes: ['id', 'name', 'price'],
+                  required: false,
+                },
+              ],
+            },
+          ],
         },
         {
           model: Product,
@@ -80,26 +96,60 @@ router.get('/public/programs/by-clinic/:clinicSlug', async (req: Request, res: R
       order: [['createdAt', 'DESC']],
     });
 
-    // Build simplified response for frontend
-    const programsData = programs.map((program) => ({
-      id: program.id,
-      name: program.name,
-      description: program.description,
-      medicalTemplateId: program.medicalTemplateId,
-      medicalTemplate: program.medicalTemplate ? {
-        id: (program.medicalTemplate as any).id,
-        title: (program.medicalTemplate as any).title,
-        description: (program.medicalTemplate as any).description,
-      } : null,
-      isActive: program.isActive,
-      // Frontend display product - used for showing product image on program cards
-      frontendDisplayProductId: program.frontendDisplayProductId,
-      frontendDisplayProduct: program.frontendDisplayProduct ? {
-        id: (program.frontendDisplayProduct as any).id,
-        name: (program.frontendDisplayProduct as any).name,
-        imageUrl: (program.frontendDisplayProduct as any).imageUrl,
-        slug: (program.frontendDisplayProduct as any).slug,
-      } : null,
+    // Build simplified response for frontend with cheapest product price
+    const programsData = await Promise.all(programs.map(async (program) => {
+      let cheapestPrice: number | null = null;
+
+      // Get products from the program's medical template
+      const medicalTemplate = program.medicalTemplate as any;
+      if (medicalTemplate && medicalTemplate.formProducts) {
+        const formProducts = medicalTemplate.formProducts as any[];
+        
+        // Calculate cheapest price from tenant products
+        for (const fp of formProducts) {
+          if (!fp.product) continue;
+          
+          // Try to get tenant-specific pricing
+          const tenantProduct = await TenantProduct.findOne({
+            where: {
+              productId: fp.product.id,
+              clinicId: programClinicId,
+            },
+            attributes: ['price', 'isActive'],
+          });
+
+          const productPrice = tenantProduct && tenantProduct.isActive 
+            ? Number(tenantProduct.price) || 0 
+            : Number(fp.product.price) || 0;
+
+          if (productPrice > 0 && (cheapestPrice === null || productPrice < cheapestPrice)) {
+            cheapestPrice = productPrice;
+          }
+        }
+      }
+
+      return {
+        id: program.id,
+        name: program.name,
+        description: program.description,
+        medicalTemplateId: program.medicalTemplateId,
+        medicalTemplate: program.medicalTemplate ? {
+          id: medicalTemplate.id,
+          title: medicalTemplate.title,
+          description: medicalTemplate.description,
+        } : null,
+        isActive: program.isActive,
+        // Frontend display product - used for showing product image on program cards
+        frontendDisplayProductId: program.frontendDisplayProductId,
+        frontendDisplayProduct: program.frontendDisplayProduct ? {
+          id: (program.frontendDisplayProduct as any).id,
+          name: (program.frontendDisplayProduct as any).name,
+          imageUrl: (program.frontendDisplayProduct as any).imageUrl,
+          slug: (program.frontendDisplayProduct as any).slug,
+        } : null,
+        // Cheapest product price from the program
+        fromPrice: cheapestPrice,
+      };
     }));
 
     return res.json({

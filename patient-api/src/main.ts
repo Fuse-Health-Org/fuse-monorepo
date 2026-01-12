@@ -17,6 +17,7 @@ import Pharmacy from "./models/Pharmacy";
 import PharmacyCoverage from "./models/PharmacyCoverage";
 import PharmacyProduct from "./models/PharmacyProduct";
 import Prescription from "./models/Prescription";
+import PrescriptionExtension from "./models/PrescriptionExtension";
 import PrescriptionProducts from "./models/PrescriptionProducts";
 import BrandSubscription, {
   BrandSubscriptionStatus,
@@ -8013,7 +8014,7 @@ app.get("/users/by-clinic/:clinicId", authenticateJWT, async (req, res) => {
         // An active subscription is one that is "paid" or "processing"
         const orderIds = customerOrders.map(order => order.id);
         let hasActiveSubscription = false;
-        
+
         if (orderIds.length > 0) {
           const subscription = await Subscription.findOne({
             where: {
@@ -8334,6 +8335,11 @@ app.get("/orders/:id", authenticateJWT, async (req, res) => {
           as: "doctor",
           attributes: ["id", "firstName", "lastName"],
         },
+        {
+          model: PrescriptionExtension,
+          as: "extensions",
+          required: false,
+        },
       ],
     });
 
@@ -8502,9 +8508,10 @@ app.post(
 
       const { step } = req.body;
       const brandSubscriptionService = new BrandSubscriptionService();
+      // step is optional, so only pass it if it's defined
       const success = await brandSubscriptionService.markTutorialFinished(
         currentUser.id,
-        step
+        step !== undefined ? step : undefined
       );
 
       if (!success) {
@@ -8547,7 +8554,7 @@ app.put(
       }
 
       const { step } = req.body;
-      
+
       if (step === undefined || step === null) {
         return res.status(400).json({
           success: false,
@@ -8556,9 +8563,11 @@ app.put(
       }
 
       const brandSubscriptionService = new BrandSubscriptionService();
+      // Ensure step is a number
+      const stepNumber = typeof step === 'number' ? step : parseInt(String(step), 10);
       const success = await brandSubscriptionService.updateTutorialStep(
         currentUser.id,
-        step
+        stepNumber
       );
 
       if (!success) {
@@ -12886,9 +12895,9 @@ app.get("/payouts/brand", authenticateJWT, async (req, res) => {
           paidAt: orderData.payment?.paidAt,
           customer: orderData.user
             ? {
-                name: `${orderData.user.firstName || ""} ${orderData.user.lastName || ""}`.trim(),
-                email: orderData.user.email,
-              }
+              name: `${orderData.user.firstName || ""} ${orderData.user.lastName || ""}`.trim(),
+              email: orderData.user.email,
+            }
             : null,
         };
       });
@@ -13004,7 +13013,7 @@ app.get("/payouts/affiliate", authenticateJWT, async (req, res) => {
       // Calculate affiliate commission as percentage of order total
       const orderTotal = parseFloat(orderData.totalAmount) || 0;
       const affiliateAmount = orderTotal * affiliateRevenuePercentage;
-      
+
       return {
         orderId: orderData.id,
         orderNumber: orderData.orderNumber,
@@ -13016,15 +13025,15 @@ app.get("/payouts/affiliate", authenticateJWT, async (req, res) => {
         paidAt: orderData.payment?.paidAt,
         brand: orderData.clinic
           ? {
-              name: orderData.clinic.name,
-              slug: orderData.clinic.slug,
-            }
+            name: orderData.clinic.name,
+            slug: orderData.clinic.slug,
+          }
           : null,
         customer: orderData.user
           ? {
-              name: `${orderData.user.firstName || ""} ${orderData.user.lastName || ""}`.trim(),
-              email: orderData.user.email,
-            }
+            name: `${orderData.user.firstName || ""} ${orderData.user.lastName || ""}`.trim(),
+            email: orderData.user.email,
+          }
           : null,
       };
     });
@@ -15108,6 +15117,12 @@ async function startServer() {
     "./endpoints/subscription"
   );
   registerSubscriptionEndpoints(app, authenticateJWT, getCurrentUser);
+
+  // ============= ORDER SUBSCRIPTION ENDPOINTS =============
+  const { registerOrderSubscriptionEndpoints } = await import(
+    "./endpoints/order-subscription"
+  );
+  registerOrderSubscriptionEndpoints(app, authenticateJWT, getCurrentUser);
 
   // ============= TIER MANAGEMENT ENDPOINTS =============
   const { registerTierManagementEndpoints } = await import(

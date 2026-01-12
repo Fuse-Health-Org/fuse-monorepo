@@ -3,6 +3,7 @@ import Entity from './Entity';
 import User from './User';
 import Product from './Product';
 import PrescriptionProducts from './PrescriptionProducts';
+import PrescriptionExtension from './PrescriptionExtension';
 
 @Table({
     freezeTableName: true,
@@ -51,4 +52,7 @@ export default class Prescription extends Entity {
 
     @HasMany(() => PrescriptionProducts)
     declare prescriptionProducts: PrescriptionProducts[];
+
+    @HasMany(() => PrescriptionExtension)
+    declare extensions: PrescriptionExtension[];
 }

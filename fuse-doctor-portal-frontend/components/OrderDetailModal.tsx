@@ -28,6 +28,36 @@ export function OrderDetailModal({ order, isOpen, onClose, onApprove, onCancel, 
     const [retryingEmail, setRetryingEmail] = useState(false);
     const [retryingSpreadsheet, setRetryingSpreadsheet] = useState(false);
 
+    // Prescription length state
+    const [prescriptionLengthMode, setPrescriptionLengthMode] = useState<'months' | 'custom'>('months');
+    const [prescriptionMonths, setPrescriptionMonths] = useState(6);
+    const [customDays, setCustomDays] = useState('');
+
+    // Existing prescription info (for already approved orders)
+    const [existingPrescription, setExistingPrescription] = useState<{
+        hasPrescription: boolean;
+        prescriptionDays: number | null;
+        writtenAt: string | null;
+        expiresAt: string | null;
+        effectiveExpiresAt: string | null;
+        extensions: Array<{
+            id: string;
+            prescriptionId: string;
+            prescriptionName: string;
+            writtenAt: string;
+            expiresAt: string;
+            createdAt: string;
+        }>;
+    } | null>(null);
+    const [loadingPrescription, setLoadingPrescription] = useState(false);
+
+    // Extension form state
+    const [showExtendForm, setShowExtendForm] = useState(false);
+    const [extensionMode, setExtensionMode] = useState<'months' | 'custom'>('months');
+    const [extensionMonths, setExtensionMonths] = useState(6);
+    const [extensionCustomDays, setExtensionCustomDays] = useState('');
+    const [creatingExtension, setCreatingExtension] = useState(false);
+
     // Pre-populate notes when order changes
     useEffect(() => {
         if (order?.doctorNotes) {
@@ -37,10 +67,23 @@ export function OrderDetailModal({ order, isOpen, onClose, onApprove, onCancel, 
         }
     }, [order?.id]);
 
-    // Fetch pharmacy coverage when order changes
+    // Reset prescription state when order changes
+    useEffect(() => {
+        setExistingPrescription(null);
+        setPrescriptionLengthMode('months');
+        setPrescriptionMonths(6);
+        setCustomDays('');
+        setShowExtendForm(false);
+        setExtensionMode('months');
+        setExtensionMonths(6);
+        setExtensionCustomDays('');
+    }, [order?.id]);
+
+    // Fetch pharmacy coverage and prescription info when order changes
     useEffect(() => {
         if (order?.id && isOpen) {
             fetchPharmacyCoverage();
+            fetchPrescriptionInfo();
         }
     }, [order?.id, isOpen]);
 
@@ -69,6 +112,72 @@ export function OrderDetailModal({ order, isOpen, onClose, onApprove, onCancel, 
         }
     };
 
+    const fetchPrescriptionInfo = async () => {
+        if (!order?.id) return;
+
+        setLoadingPrescription(true);
+
+        try {
+            const response = await authenticatedFetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/doctor/orders/${order.id}/prescription-info`);
+            const data = await response.json();
+
+            if (data.success && data.data) {
+                setExistingPrescription(data.data);
+            }
+        } catch (error) {
+            console.error('Failed to fetch prescription info:', error);
+        } finally {
+            setLoadingPrescription(false);
+        }
+    };
+
+    const handleCreateExtension = async () => {
+        if (!order?.id) return;
+
+        // Calculate extension days
+        let extensionDays: number;
+        if (extensionMode === 'custom' && extensionCustomDays) {
+            extensionDays = parseInt(extensionCustomDays, 10);
+            if (isNaN(extensionDays) || extensionDays < 1) {
+                toast.error('Please enter a valid number of days');
+                return;
+            }
+        } else {
+            extensionDays = extensionMonths * 30;
+        }
+
+        setCreatingExtension(true);
+
+        try {
+            const response = await authenticatedFetch(
+                `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/doctor/orders/${order.id}/prescription-extension`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ extensionDays }),
+                }
+            );
+            const data = await response.json();
+
+            if (data.success) {
+                toast.success(`Prescription extended by ${extensionDays} days`);
+                setShowExtendForm(false);
+                setExtensionMode('months');
+                setExtensionMonths(6);
+                setExtensionCustomDays('');
+                // Refresh prescription info to show the new extension
+                fetchPrescriptionInfo();
+            } else {
+                toast.error(data.message || 'Failed to extend prescription');
+            }
+        } catch (error) {
+            console.error('Failed to create prescription extension:', error);
+            toast.error('Failed to extend prescription');
+        } finally {
+            setCreatingExtension(false);
+        }
+    };
+
     if (!isOpen || !order) return null;
 
     const handleSaveNotes = async () => {
@@ -85,9 +194,22 @@ export function OrderDetailModal({ order, isOpen, onClose, onApprove, onCancel, 
     };
 
     const handleApprove = async () => {
+        // Calculate prescription length in days
+        let prescriptionDays: number;
+        if (prescriptionLengthMode === 'custom' && customDays) {
+            prescriptionDays = parseInt(customDays, 10);
+            if (isNaN(prescriptionDays) || prescriptionDays < 1) {
+                toast.error('Please enter a valid number of days');
+                return;
+            }
+        } else {
+            // Convert months to days (approximate: 30 days per month)
+            prescriptionDays = prescriptionMonths * 30;
+        }
+
         setApproving(true);
         try {
-            await apiClient.bulkApproveOrders([order.id]);
+            await apiClient.bulkApproveOrders([order.id], prescriptionDays);
             toast.success(`Order ${order.orderNumber} approved successfully`);
             onApprove?.(order.id);
             onClose();
@@ -404,45 +526,45 @@ export function OrderDetailModal({ order, isOpen, onClose, onApprove, onCancel, 
                                 )}
 
                                 {/* Non-Medical Services */}
-                                {(order.program.hasPatientPortal || order.program.hasBmiCalculator || 
-                                  order.program.hasProteinIntakeCalculator || order.program.hasCalorieDeficitCalculator || 
-                                  order.program.hasEasyShopping) && (
-                                    <div>
-                                        <h4 className="font-medium text-gray-900 mb-2">Non-Medical Services Included</h4>
-                                        <div className="space-y-1 text-sm">
-                                            {order.program.hasPatientPortal && (
-                                                <div className="flex justify-between">
-                                                    <span className="text-gray-700">✓ Patient Portal</span>
-                                                    <span className="font-medium">${Number(order.program.patientPortalPrice || 0).toFixed(2)}</span>
-                                                </div>
-                                            )}
-                                            {order.program.hasBmiCalculator && (
-                                                <div className="flex justify-between">
-                                                    <span className="text-gray-700">✓ BMI Calculator</span>
-                                                    <span className="font-medium">${Number(order.program.bmiCalculatorPrice || 0).toFixed(2)}</span>
-                                                </div>
-                                            )}
-                                            {order.program.hasProteinIntakeCalculator && (
-                                                <div className="flex justify-between">
-                                                    <span className="text-gray-700">✓ Protein Intake Calculator</span>
-                                                    <span className="font-medium">${Number(order.program.proteinIntakeCalculatorPrice || 0).toFixed(2)}</span>
-                                                </div>
-                                            )}
-                                            {order.program.hasCalorieDeficitCalculator && (
-                                                <div className="flex justify-between">
-                                                    <span className="text-gray-700">✓ Calorie Deficit Calculator</span>
-                                                    <span className="font-medium">${Number(order.program.calorieDeficitCalculatorPrice || 0).toFixed(2)}</span>
-                                                </div>
-                                            )}
-                                            {order.program.hasEasyShopping && (
-                                                <div className="flex justify-between">
-                                                    <span className="text-gray-700">✓ Easy Shopping</span>
-                                                    <span className="font-medium">${Number(order.program.easyShoppingPrice || 0).toFixed(2)}</span>
-                                                </div>
-                                            )}
+                                {(order.program.hasPatientPortal || order.program.hasBmiCalculator ||
+                                    order.program.hasProteinIntakeCalculator || order.program.hasCalorieDeficitCalculator ||
+                                    order.program.hasEasyShopping) && (
+                                        <div>
+                                            <h4 className="font-medium text-gray-900 mb-2">Non-Medical Services Included</h4>
+                                            <div className="space-y-1 text-sm">
+                                                {order.program.hasPatientPortal && (
+                                                    <div className="flex justify-between">
+                                                        <span className="text-gray-700">✓ Patient Portal</span>
+                                                        <span className="font-medium">${Number(order.program.patientPortalPrice || 0).toFixed(2)}</span>
+                                                    </div>
+                                                )}
+                                                {order.program.hasBmiCalculator && (
+                                                    <div className="flex justify-between">
+                                                        <span className="text-gray-700">✓ BMI Calculator</span>
+                                                        <span className="font-medium">${Number(order.program.bmiCalculatorPrice || 0).toFixed(2)}</span>
+                                                    </div>
+                                                )}
+                                                {order.program.hasProteinIntakeCalculator && (
+                                                    <div className="flex justify-between">
+                                                        <span className="text-gray-700">✓ Protein Intake Calculator</span>
+                                                        <span className="font-medium">${Number(order.program.proteinIntakeCalculatorPrice || 0).toFixed(2)}</span>
+                                                    </div>
+                                                )}
+                                                {order.program.hasCalorieDeficitCalculator && (
+                                                    <div className="flex justify-between">
+                                                        <span className="text-gray-700">✓ Calorie Deficit Calculator</span>
+                                                        <span className="font-medium">${Number(order.program.calorieDeficitCalculatorPrice || 0).toFixed(2)}</span>
+                                                    </div>
+                                                )}
+                                                {order.program.hasEasyShopping && (
+                                                    <div className="flex justify-between">
+                                                        <span className="text-gray-700">✓ Easy Shopping</span>
+                                                        <span className="font-medium">${Number(order.program.easyShoppingPrice || 0).toFixed(2)}</span>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
-                                    </div>
-                                )}
+                                    )}
                             </div>
                         </section>
                     )}
@@ -569,6 +691,352 @@ export function OrderDetailModal({ order, isOpen, onClose, onApprove, onCancel, 
                             </section>
                         );
                     })()}
+
+                    {/* Prescription Length */}
+                    <section>
+                        <h3 className="text-lg font-semibold mb-3">Prescription Length</h3>
+
+                        {/* Loading state */}
+                        {loadingPrescription && (
+                            <div className="bg-gray-50 border border-gray-200 p-4 rounded-lg">
+                                <p className="text-gray-600 text-sm">Loading prescription info...</p>
+                            </div>
+                        )}
+
+                        {/* Existing prescription - read-only display */}
+                        {!loadingPrescription && existingPrescription?.hasPrescription && (
+                            <div className="space-y-4">
+                                {/* Original Prescription */}
+                                <div className="bg-green-50 border border-green-200 p-4 rounded-lg space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                            <span className="text-green-800 font-semibold">Original Prescription</span>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-4 text-sm">
+                                        <div>
+                                            <span className="text-gray-600">Duration:</span>
+                                            <p className="font-bold text-green-700 text-lg">
+                                                {existingPrescription.prescriptionDays} days
+                                                <span className="text-sm font-normal text-gray-500 ml-2">
+                                                    (~{(existingPrescription.prescriptionDays! / 30).toFixed(1)} months)
+                                                </span>
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <span className="text-gray-600">Written:</span>
+                                            <p className="font-medium text-gray-900">
+                                                {existingPrescription.writtenAt
+                                                    ? new Date(existingPrescription.writtenAt).toLocaleDateString()
+                                                    : 'N/A'}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <span className="text-gray-600">Original Expires:</span>
+                                            <p className="font-medium text-gray-900">
+                                                {existingPrescription.expiresAt
+                                                    ? new Date(existingPrescription.expiresAt).toLocaleDateString()
+                                                    : 'N/A'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Extensions List - grouped by writtenAt timestamp */}
+                                {existingPrescription.extensions && existingPrescription.extensions.length > 0 && (() => {
+                                    // Group extensions by writtenAt timestamp (extensions created at same time are one "extension event")
+                                    const groupedExtensions: Array<{
+                                        writtenAt: string;
+                                        expiresAt: string;
+                                        prescriptions: string[];
+                                    }> = [];
+
+                                    existingPrescription.extensions.forEach((ext) => {
+                                        // Find existing group with same writtenAt (within 1 minute tolerance)
+                                        const extTime = new Date(ext.writtenAt).getTime();
+                                        const existingGroup = groupedExtensions.find((g) => {
+                                            const groupTime = new Date(g.writtenAt).getTime();
+                                            return Math.abs(extTime - groupTime) < 60000; // 1 minute tolerance
+                                        });
+
+                                        if (existingGroup) {
+                                            existingGroup.prescriptions.push(ext.prescriptionName);
+                                        } else {
+                                            groupedExtensions.push({
+                                                writtenAt: ext.writtenAt,
+                                                expiresAt: ext.expiresAt,
+                                                prescriptions: [ext.prescriptionName],
+                                            });
+                                        }
+                                    });
+
+                                    // Sort by writtenAt descending
+                                    groupedExtensions.sort(
+                                        (a, b) => new Date(b.writtenAt).getTime() - new Date(a.writtenAt).getTime()
+                                    );
+
+                                    return (
+                                        <div className="bg-purple-50 border border-purple-200 p-4 rounded-lg space-y-3">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                                                <span className="text-purple-800 font-semibold">
+                                                    Prescription Extensions ({groupedExtensions.length})
+                                                </span>
+                                            </div>
+                                            <div className="space-y-2">
+                                                {groupedExtensions.map((group, index) => (
+                                                    <div
+                                                        key={`${group.writtenAt}-${index}`}
+                                                        className="bg-white border border-purple-100 p-3 rounded-md text-sm"
+                                                    >
+                                                        <div className="flex justify-between items-center">
+                                                            <span className="text-purple-700 font-medium">
+                                                                Extension #{groupedExtensions.length - index}
+                                                            </span>
+                                                            <span className="text-xs text-gray-500">
+                                                                Written: {new Date(group.writtenAt).toLocaleDateString()}
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-gray-700 mt-1">
+                                                            Extended to: <span className="font-semibold">{new Date(group.expiresAt).toLocaleDateString()}</span>
+                                                        </p>
+                                                        {group.prescriptions.length > 1 && (
+                                                            <p className="text-xs text-gray-500 mt-1">
+                                                                Applied to {group.prescriptions.length} prescriptions
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
+
+                                {/* Effective Expiration */}
+                                <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <span className="text-blue-800 font-semibold">Effective Expiration Date</span>
+                                            <p className="text-2xl font-bold text-blue-700 mt-1">
+                                                {existingPrescription.effectiveExpiresAt
+                                                    ? new Date(existingPrescription.effectiveExpiresAt).toLocaleDateString()
+                                                    : new Date(existingPrescription.expiresAt!).toLocaleDateString()}
+                                            </p>
+                                        </div>
+                                        <button
+                                            onClick={() => setShowExtendForm(!showExtendForm)}
+                                            className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors"
+                                        >
+                                            {showExtendForm ? 'Cancel' : '+ Extend Prescription'}
+                                        </button>
+                                    </div>
+                                    <p className="text-xs text-blue-700 mt-2">
+                                        Refills will continue automatically until this date.
+                                    </p>
+                                </div>
+
+                                {/* Extend Form */}
+                                {showExtendForm && (
+                                    <div className="bg-purple-50 border border-purple-200 p-4 rounded-lg space-y-4">
+                                        <h4 className="font-semibold text-purple-800">Create Prescription Extension</h4>
+
+                                        {/* Mode Toggle */}
+                                        <div className="flex items-center gap-4">
+                                            <label className="flex items-center gap-2 cursor-pointer">
+                                                <input
+                                                    type="radio"
+                                                    name="extensionMode"
+                                                    checked={extensionMode === 'months'}
+                                                    onChange={() => setExtensionMode('months')}
+                                                    className="w-4 h-4 text-purple-600"
+                                                />
+                                                <span className="text-sm font-medium">Use months slider</span>
+                                            </label>
+                                            <label className="flex items-center gap-2 cursor-pointer">
+                                                <input
+                                                    type="radio"
+                                                    name="extensionMode"
+                                                    checked={extensionMode === 'custom'}
+                                                    onChange={() => setExtensionMode('custom')}
+                                                    className="w-4 h-4 text-purple-600"
+                                                />
+                                                <span className="text-sm font-medium">Custom days</span>
+                                            </label>
+                                        </div>
+
+                                        {/* Months Slider */}
+                                        {extensionMode === 'months' && (
+                                            <div className="space-y-2">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-sm text-gray-600">Extend by:</span>
+                                                    <span className="text-lg font-bold text-purple-700">
+                                                        {extensionMonths} {extensionMonths === 1 ? 'month' : 'months'}
+                                                        <span className="text-sm font-normal text-gray-500 ml-2">
+                                                            (~{extensionMonths * 30} days)
+                                                        </span>
+                                                    </span>
+                                                </div>
+                                                <input
+                                                    type="range"
+                                                    min="1"
+                                                    max="12"
+                                                    value={extensionMonths}
+                                                    onChange={(e) => setExtensionMonths(parseInt(e.target.value, 10))}
+                                                    className="w-full h-2 bg-purple-200 rounded-lg appearance-none cursor-pointer accent-purple-600"
+                                                />
+                                                <div className="flex justify-between text-xs text-gray-500">
+                                                    <span>1 month</span>
+                                                    <span>6 months</span>
+                                                    <span>12 months</span>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Custom Days Input */}
+                                        {extensionMode === 'custom' && (
+                                            <div className="space-y-2">
+                                                <label className="block text-sm text-gray-600">Extend by (days):</label>
+                                                <div className="flex items-center gap-2">
+                                                    <input
+                                                        type="number"
+                                                        min="1"
+                                                        max="365"
+                                                        value={extensionCustomDays}
+                                                        onChange={(e) => setExtensionCustomDays(e.target.value)}
+                                                        placeholder="e.g., 90"
+                                                        className="w-32 px-3 py-2 border rounded-md text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                                    />
+                                                    <span className="text-sm text-gray-600">days</span>
+                                                </div>
+                                                {extensionCustomDays && parseInt(extensionCustomDays, 10) > 0 && (
+                                                    <p className="text-sm text-purple-700">
+                                                        ≈ {(parseInt(extensionCustomDays, 10) / 30).toFixed(1)} months
+                                                    </p>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* Preview */}
+                                        <div className="bg-white border border-purple-100 p-3 rounded-md text-sm">
+                                            <span className="text-gray-600">New expiration date will be: </span>
+                                            <span className="font-semibold text-purple-700">
+                                                {(() => {
+                                                    const currentExpires = new Date(
+                                                        existingPrescription.effectiveExpiresAt || existingPrescription.expiresAt!
+                                                    );
+                                                    const daysToAdd = extensionMode === 'custom' && extensionCustomDays
+                                                        ? parseInt(extensionCustomDays, 10) || 0
+                                                        : extensionMonths * 30;
+                                                    const newDate = new Date(currentExpires);
+                                                    newDate.setDate(newDate.getDate() + daysToAdd);
+                                                    return newDate.toLocaleDateString();
+                                                })()}
+                                            </span>
+                                        </div>
+
+                                        {/* Submit Button */}
+                                        <button
+                                            onClick={handleCreateExtension}
+                                            disabled={creatingExtension || (extensionMode === 'custom' && !extensionCustomDays)}
+                                            className="w-full px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                        >
+                                            {creatingExtension ? 'Creating Extension...' : 'Create Extension'}
+                                        </button>
+
+                                        <p className="text-xs text-gray-500">
+                                            Note: Extensions cannot be modified after creation. Create a new extension if you need to extend further.
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* No prescription yet - editable form */}
+                        {!loadingPrescription && (!existingPrescription || !existingPrescription.hasPrescription) && (
+                            <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg space-y-4">
+                                {/* Mode Toggle */}
+                                <div className="flex items-center gap-4">
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                            type="radio"
+                                            name="prescriptionMode"
+                                            checked={prescriptionLengthMode === 'months'}
+                                            onChange={() => setPrescriptionLengthMode('months')}
+                                            className="w-4 h-4 text-blue-600"
+                                        />
+                                        <span className="text-sm font-medium">Use months slider</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                            type="radio"
+                                            name="prescriptionMode"
+                                            checked={prescriptionLengthMode === 'custom'}
+                                            onChange={() => setPrescriptionLengthMode('custom')}
+                                            className="w-4 h-4 text-blue-600"
+                                        />
+                                        <span className="text-sm font-medium">Custom days</span>
+                                    </label>
+                                </div>
+
+                                {/* Months Slider */}
+                                {prescriptionLengthMode === 'months' && (
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-sm text-gray-600">Duration:</span>
+                                            <span className="text-lg font-bold text-blue-700">
+                                                {prescriptionMonths} {prescriptionMonths === 1 ? 'month' : 'months'}
+                                                <span className="text-sm font-normal text-gray-500 ml-2">
+                                                    (~{prescriptionMonths * 30} days)
+                                                </span>
+                                            </span>
+                                        </div>
+                                        <input
+                                            type="range"
+                                            min="1"
+                                            max="12"
+                                            value={prescriptionMonths}
+                                            onChange={(e) => setPrescriptionMonths(parseInt(e.target.value, 10))}
+                                            className="w-full h-2 bg-blue-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                                        />
+                                        <div className="flex justify-between text-xs text-gray-500">
+                                            <span>1 month</span>
+                                            <span>6 months</span>
+                                            <span>12 months</span>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Custom Days Input */}
+                                {prescriptionLengthMode === 'custom' && (
+                                    <div className="space-y-2">
+                                        <label className="block text-sm text-gray-600">Enter number of days:</label>
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                max="365"
+                                                value={customDays}
+                                                onChange={(e) => setCustomDays(e.target.value)}
+                                                placeholder="e.g., 90"
+                                                className="w-32 px-3 py-2 border rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                            />
+                                            <span className="text-sm text-gray-600">days</span>
+                                        </div>
+                                        {customDays && parseInt(customDays, 10) > 0 && (
+                                            <p className="text-sm text-blue-700">
+                                                ≈ {(parseInt(customDays, 10) / 30).toFixed(1)} months
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
+
+                                <p className="text-xs text-gray-500 mt-2">
+                                    This determines how long the prescription is valid. Refills will be processed automatically until the prescription expires.
+                                </p>
+                            </div>
+                        )}
+                    </section>
 
                     {/* Doctor Notes */}
                     <section>

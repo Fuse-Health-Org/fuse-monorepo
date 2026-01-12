@@ -142,6 +142,18 @@ export default function CheckoutPage() {
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-8">
+            {/* Medication Reserved Timer */}
+            <div className="flex items-center gap-2 p-4 bg-success-50 rounded-lg">
+              <div className="w-5 h-5 rounded-full bg-success-500 flex items-center justify-center">
+                <Icon icon="lucide:check" className="w-3 h-3 text-white" />
+              </div>
+              <div className="flex-1">
+                <div className="text-sm font-medium text-success-800">Your medication is reserved</div>
+                <div className="text-xs text-success-600">Complete checkout to secure your prescription</div>
+              </div>
+              <div className={`text-sm font-mono ${timeRemainingSeconds <= 60 ? 'text-danger-700' : 'text-success-700'}`}>{timeRemaining}</div>
+            </div>
+
             {/* Order Header */}
             <div>
               <h1 className="text-2xl font-semibold text-gray-900 mb-2">Complete Your Order</h1>
@@ -427,18 +439,6 @@ export default function CheckoutPage() {
           <div className="lg:col-span-1">
             <Card className="sticky top-8">
               <CardBody className="p-6">
-                {/* Status */}
-                <div className="flex items-center gap-2 mb-6 p-3 bg-success-50 rounded-lg">
-                  <div className="w-5 h-5 rounded-full bg-success-500 flex items-center justify-center">
-                    <Icon icon="lucide:check" className="w-3 h-3 text-white" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="text-sm font-medium text-success-800">Your medication is reserved</div>
-                    <div className="text-xs text-success-600">Complete checkout to secure your prescription</div>
-                  </div>
-                  <div className={`text-sm font-mono ${timeRemainingSeconds <= 60 ? 'text-danger-700' : 'text-success-700'}`}>{timeRemaining}</div>
-                </div>
-
                 <h3 className="font-medium text-gray-900 mb-4">Order Summary</h3>
 
                 {/* Product */}
@@ -479,12 +479,16 @@ export default function CheckoutPage() {
                   )}
                 </div>
 
-                {/* Total Due Today */}
+                {/* Due Today */}
                 <Divider className="my-4" />
                 <div className="space-y-2 mb-4">
                   <div className="flex justify-between items-center">
-                    <span className="font-medium text-gray-900">Total Due Today</span>
+                    <span className="font-medium text-gray-900">Due Today</span>
                     <span className="text-xl font-semibold">$0.00</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Due if approved</span>
+                    <span className="text-sm font-medium text-primary">${selectedPlanData?.price.toFixed(2) || '0.00'}</span>
                   </div>
                   <p className="text-xs text-gray-500">
                     Only charged if prescribed by a licensed physician. We'll securely hold your payment method. No
@@ -498,39 +502,39 @@ export default function CheckoutPage() {
                   <h4 className="font-medium text-gray-900">What's Included</h4>
                   <div className="space-y-3">
                     <div className="flex items-start gap-3">
-                      <div className="w-5 h-5 rounded-full bg-success-100 flex items-center justify-center mt-0.5">
+                      <div className="w-5 h-5 rounded-full bg-success-100 flex items-center justify-center flex-shrink-0">
                         <div className="w-2 h-2 rounded-full bg-success-500"></div>
                       </div>
-                      <div>
+                      <div className="flex-1 space-y-0.5">
                         <div className="text-sm font-medium text-gray-900">Free medical consultation</div>
-                        <div className="text-xs text-gray-500">Board-certified physicians licensed in your state</div>
+                        <div className="text-xs text-gray-500 leading-snug">Board-certified physicians licensed in your state</div>
                       </div>
                     </div>
                     <div className="flex items-start gap-3">
-                      <div className="w-5 h-5 rounded-full bg-success-100 flex items-center justify-center mt-0.5">
+                      <div className="w-5 h-5 rounded-full bg-success-100 flex items-center justify-center flex-shrink-0">
                         <div className="w-2 h-2 rounded-full bg-success-500"></div>
                       </div>
-                      <div>
+                      <div className="flex-1 space-y-0.5">
                         <div className="text-sm font-medium text-gray-900">Free expedited shipping</div>
-                        <div className="text-xs text-gray-500">2-day delivery included with every order</div>
+                        <div className="text-xs text-gray-500 leading-snug">2-day delivery included with every order</div>
                       </div>
                     </div>
                     <div className="flex items-start gap-3">
-                      <div className="w-5 h-5 rounded-full bg-success-100 flex items-center justify-center mt-0.5">
+                      <div className="w-5 h-5 rounded-full bg-success-100 flex items-center justify-center flex-shrink-0">
                         <div className="w-2 h-2 rounded-full bg-success-500"></div>
                       </div>
-                      <div>
+                      <div className="flex-1 space-y-0.5">
                         <div className="text-sm font-medium text-gray-900">Money-back guarantee</div>
-                        <div className="text-xs text-gray-500">100% satisfaction or full refund</div>
+                        <div className="text-xs text-gray-500 leading-snug">If you don't get approved for this program, you'll be refunded automatically.</div>
                       </div>
                     </div>
                     <div className="flex items-start gap-3">
-                      <div className="w-5 h-5 rounded-full bg-success-100 flex items-center justify-center mt-0.5">
+                      <div className="w-5 h-5 rounded-full bg-success-100 flex items-center justify-center flex-shrink-0">
                         <div className="w-2 h-2 rounded-full bg-success-500"></div>
                       </div>
-                      <div>
+                      <div className="flex-1 space-y-0.5">
                         <div className="text-sm font-medium text-gray-900">Secure payment processing</div>
-                        <div className="text-xs text-gray-500">Bank-level encryption & security</div>
+                        <div className="text-xs text-gray-500 leading-snug">Bank-level encryption & security</div>
                       </div>
                     </div>
                   </div>

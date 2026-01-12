@@ -1,8 +1,19 @@
 import React from "react";
 import { useRouter } from "next/router";
-import { Card, CardBody, Button, Chip, Spinner, Divider } from "@heroui/react";
+import { Card, CardBody, Button, Chip, Spinner, Divider, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, useDisclosure } from "@heroui/react";
 import { Icon } from "@iconify/react";
-import { fetchWithAuth } from "../../lib/api";
+import { fetchWithAuth, apiCall } from "../../lib/api";
+
+interface SubscriptionInfo {
+    id: string;
+    stripeSubscriptionId: string;
+    localStatus: string;
+    stripeStatus: string;
+    currentPeriodStart: string | null;
+    currentPeriodEnd: string | null;
+    cancelAtPeriodEnd: boolean;
+    canceledAt: string | null;
+}
 
 export default function OfferingDetailsPage() {
     const router = useRouter();
@@ -10,7 +21,12 @@ export default function OfferingDetailsPage() {
     const [loading, setLoading] = React.useState(true);
     const [error, setError] = React.useState<string | null>(null);
     const [order, setOrder] = React.useState<any>(null);
+    const [subscription, setSubscription] = React.useState<SubscriptionInfo | null>(null);
+    const [subscriptionLoading, setSubscriptionLoading] = React.useState(false);
+    const [cancelLoading, setCancelLoading] = React.useState(false);
+    const { isOpen, onOpen, onClose } = useDisclosure();
 
+    // Fetch order details
     React.useEffect(() => {
         if (!orderId) return;
         (async () => {
@@ -27,6 +43,77 @@ export default function OfferingDetailsPage() {
             }
         })();
     }, [orderId]);
+
+    // Fetch subscription status from Stripe
+    React.useEffect(() => {
+        if (!orderId || !order) return;
+        (async () => {
+            try {
+                setSubscriptionLoading(true);
+                const res: any = await fetchWithAuth(`/orders/${orderId}/subscription`);
+                if (res?.data) {
+                    setSubscription(res.data);
+                }
+            } catch (e) {
+                // Silently fail - subscription info is optional
+                console.error("Failed to fetch subscription status");
+            } finally {
+                setSubscriptionLoading(false);
+            }
+        })();
+    }, [orderId, order]);
+
+    // Handle cancel subscription
+    const handleCancelSubscription = async () => {
+        if (!orderId) return;
+        try {
+            setCancelLoading(true);
+            const res = await apiCall(`/orders/${orderId}/subscription/cancel`, {
+                method: "POST",
+            });
+            if (res.success) {
+                // Refresh subscription status
+                const subRes: any = await fetchWithAuth(`/orders/${orderId}/subscription`);
+                if (subRes?.data) {
+                    setSubscription(subRes.data);
+                }
+                onClose();
+            } else {
+                alert(res.error || "Failed to cancel subscription");
+            }
+        } catch (e) {
+            alert("Failed to cancel subscription");
+        } finally {
+            setCancelLoading(false);
+        }
+    };
+
+    // Get subscription status display info
+    const getSubscriptionStatusInfo = (status: string) => {
+        switch (status) {
+            case "active":
+                return { color: "success" as const, label: "Active" };
+            case "canceled":
+            case "cancelled":
+                return { color: "danger" as const, label: "Cancelled" };
+            case "past_due":
+                return { color: "warning" as const, label: "Past Due" };
+            case "unpaid":
+                return { color: "danger" as const, label: "Unpaid" };
+            case "trialing":
+                return { color: "primary" as const, label: "Trial" };
+            case "incomplete":
+                return { color: "warning" as const, label: "Incomplete" };
+            case "incomplete_expired":
+                return { color: "danger" as const, label: "Expired" };
+            case "paused":
+                return { color: "warning" as const, label: "Paused" };
+            case "deleted":
+                return { color: "danger" as const, label: "Deleted" };
+            default:
+                return { color: "default" as const, label: status };
+        }
+    };
 
     return (
         <div className="p-4 md:p-6 space-y-5">
@@ -84,6 +171,85 @@ export default function OfferingDetailsPage() {
                             </div>
                         </CardBody>
                     </Card>
+
+                    {/* Subscription Card */}
+                    {(subscription || subscriptionLoading) && (
+                        <Card className="transition-shadow hover:shadow-md border-2 border-secondary-200">
+                            <CardBody>
+                                <div className="flex items-center gap-2 mb-3">
+                                    <Icon icon="lucide:repeat" className="text-secondary" width={20} />
+                                    <div className="font-medium text-foreground text-lg">Subscription</div>
+                                </div>
+                                <Divider className="my-3" />
+                                {subscriptionLoading ? (
+                                    <div className="flex items-center justify-center py-4">
+                                        <Spinner size="sm" label="Loading subscription info..." />
+                                    </div>
+                                ) : subscription ? (
+                                    <div className="space-y-4">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-foreground-500">Status:</span>
+                                            <Chip
+                                                size="sm"
+                                                variant="flat"
+                                                color={getSubscriptionStatusInfo(subscription.stripeStatus).color}
+                                            >
+                                                {getSubscriptionStatusInfo(subscription.stripeStatus).label}
+                                            </Chip>
+                                        </div>
+                                        
+                                        {subscription.currentPeriodEnd && subscription.stripeStatus === "active" && (
+                                            <div className="flex items-center justify-between text-sm">
+                                                <span className="text-foreground-500">Next Charge Date:</span>
+                                                <span className="text-foreground-700 font-medium">
+                                                    {new Date(subscription.currentPeriodEnd).toLocaleDateString()}
+                                                </span>
+                                            </div>
+                                        )}
+
+                                        {subscription.canceledAt && (
+                                            <div className="flex items-center justify-between text-sm">
+                                                <span className="text-foreground-500">Cancelled At:</span>
+                                                <span className="text-foreground-700">
+                                                    {new Date(subscription.canceledAt).toLocaleDateString()}
+                                                </span>
+                                            </div>
+                                        )}
+
+                                        {/* Refill note - only show if subscription is active */}
+                                        {subscription.stripeStatus === "active" && !subscription.cancelAtPeriodEnd && (
+                                            <div className="bg-secondary-50 p-3 rounded-md text-sm text-secondary-700">
+                                                <Icon icon="lucide:info" className="inline mr-1" width={14} />
+                                                Refills will be purchased automatically unless your prescription expires or your subscription is cancelled.
+                                            </div>
+                                        )}
+
+                                        {subscription.cancelAtPeriodEnd && !subscription.canceledAt && (
+                                            <div className="bg-warning-50 p-3 rounded-md text-sm text-warning-700">
+                                                <Icon icon="lucide:alert-circle" className="inline mr-1" width={14} />
+                                                Subscription will be cancelled at end of billing period
+                                            </div>
+                                        )}
+
+                                        {/* Cancel Button - only show if subscription is active */}
+                                        {subscription.stripeStatus === "active" && !subscription.cancelAtPeriodEnd && (
+                                            <div className="pt-2">
+                                                <Button
+                                                    color="danger"
+                                                    variant="flat"
+                                                    size="sm"
+                                                    startContent={<Icon icon="lucide:x-circle" width={16} />}
+                                                    onPress={onOpen}
+                                                >
+                                                    Cancel Subscription
+                                                </Button>
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : null}
+                            </CardBody>
+                        </Card>
+                    )}
 
                     {/* Questionnaire Answers Card */}
                     {order.questionnaireAnswers && (
@@ -152,59 +318,107 @@ export default function OfferingDetailsPage() {
                                 </div>
                                 <Divider className="my-3" />
                                 <div className="space-y-4">
-                                    {order.prescriptions.map((prescription: any, idx: number) => (
-                                        <div key={prescription.id} className="bg-success-50/50 p-4 rounded-md space-y-3">
-                                            <div className="flex items-start justify-between">
-                                                <div>
-                                                    <div className="font-medium text-foreground">{prescription.name}</div>
-                                                    {prescription.doctor && (
-                                                        <div className="text-xs text-foreground-500 mt-1">
-                                                            Prescribed by: Dr. {prescription.doctor.firstName} {prescription.doctor.lastName}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                <Chip size="sm" variant="flat" color="success">
-                                                    Active
-                                                </Chip>
-                                            </div>
-                                            
-                                            <div className="grid grid-cols-2 gap-3 text-sm">
-                                                <div>
-                                                    <span className="text-foreground-500">Written:</span>{' '}
-                                                    <span className="text-foreground-700">
-                                                        {new Date(prescription.writtenAt).toLocaleDateString()}
-                                                    </span>
-                                                </div>
-                                                <div>
-                                                    <span className="text-foreground-500">Expires:</span>{' '}
-                                                    <span className="text-foreground-700">
-                                                        {new Date(prescription.expiresAt).toLocaleDateString()}
-                                                    </span>
-                                                </div>
-                                            </div>
+                                    {order.prescriptions.map((prescription: any, idx: number) => {
+                                        // Calculate effective expiration date considering extensions
+                                        const extensions = prescription.extensions || [];
+                                        let effectiveExpiresAt = new Date(prescription.expiresAt);
+                                        if (extensions.length > 0) {
+                                            const latestExtension = extensions.reduce((latest: any, ext: any) =>
+                                                new Date(ext.expiresAt) > new Date(latest.expiresAt) ? ext : latest
+                                            );
+                                            effectiveExpiresAt = new Date(latestExtension.expiresAt);
+                                        }
+                                        const hasExtensions = extensions.length > 0;
 
-                                            {prescription.prescriptionProducts && prescription.prescriptionProducts.length > 0 && (
-                                                <div className="mt-3">
-                                                    <div className="text-xs font-medium text-foreground-500 mb-2">Medications:</div>
-                                                    <div className="space-y-2">
-                                                        {prescription.prescriptionProducts.map((pp: any, ppIdx: number) => (
-                                                            <div key={ppIdx} className="bg-white/60 p-3 rounded border border-success-200">
-                                                                <div className="flex items-center gap-2">
-                                                                    <Icon icon="lucide:pill" className="text-success-600" width={16} />
-                                                                    <span className="text-sm font-medium text-foreground">
-                                                                        {pp.product?.name || 'Medication'}
-                                                                    </span>
-                                                                </div>
-                                                                <div className="text-xs text-foreground-500 mt-1">
-                                                                    Quantity: {pp.quantity}
-                                                                </div>
+                                        return (
+                                            <div key={prescription.id} className="bg-success-50/50 p-4 rounded-md space-y-3">
+                                                <div className="flex items-start justify-between">
+                                                    <div>
+                                                        <div className="font-medium text-foreground">{prescription.name}</div>
+                                                        {prescription.doctor && (
+                                                            <div className="text-xs text-foreground-500 mt-1">
+                                                                Prescribed by: Dr. {prescription.doctor.firstName} {prescription.doctor.lastName}
                                                             </div>
-                                                        ))}
+                                                        )}
+                                                    </div>
+                                                    <Chip size="sm" variant="flat" color="success">
+                                                        Active
+                                                    </Chip>
+                                                </div>
+                                                
+                                                <div className="grid grid-cols-2 gap-3 text-sm">
+                                                    <div>
+                                                        <span className="text-foreground-500">Written:</span>{' '}
+                                                        <span className="text-foreground-700">
+                                                            {new Date(prescription.writtenAt).toLocaleDateString()}
+                                                        </span>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-foreground-500">
+                                                            {hasExtensions ? 'Original Expires:' : 'Expires:'}
+                                                        </span>{' '}
+                                                        <span className={hasExtensions ? "text-foreground-400 line-through" : "text-foreground-700"}>
+                                                            {new Date(prescription.expiresAt).toLocaleDateString()}
+                                                        </span>
                                                     </div>
                                                 </div>
-                                            )}
-                                        </div>
-                                    ))}
+
+                                                {/* Show effective expiration if there are extensions */}
+                                                {hasExtensions && (
+                                                    <div className="bg-secondary-100 p-3 rounded-md">
+                                                        <div className="flex items-center gap-2 mb-2">
+                                                            <Icon icon="lucide:calendar-plus" className="text-secondary" width={16} />
+                                                            <span className="text-sm font-medium text-secondary-700">
+                                                                Extended {extensions.length} time{extensions.length > 1 ? 's' : ''}
+                                                            </span>
+                                                        </div>
+                                                        <div className="text-sm">
+                                                            <span className="text-foreground-500">Effective Expires:</span>{' '}
+                                                            <span className="text-secondary-700 font-semibold">
+                                                                {effectiveExpiresAt.toLocaleDateString()}
+                                                            </span>
+                                                        </div>
+                                                        {/* Show extension history */}
+                                                        <div className="mt-2 space-y-1">
+                                                            {extensions
+                                                                .sort((a: any, b: any) => new Date(b.writtenAt).getTime() - new Date(a.writtenAt).getTime())
+                                                                .map((ext: any, extIdx: number) => (
+                                                                    <div key={ext.id} className="text-xs text-foreground-500 flex items-center gap-1">
+                                                                        <Icon icon="lucide:arrow-right" width={12} />
+                                                                        <span>
+                                                                            Extended on {new Date(ext.writtenAt).toLocaleDateString()} 
+                                                                            → {new Date(ext.expiresAt).toLocaleDateString()}
+                                                                        </span>
+                                                                    </div>
+                                                                ))
+                                                            }
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {prescription.prescriptionProducts && prescription.prescriptionProducts.length > 0 && (
+                                                    <div className="mt-3">
+                                                        <div className="text-xs font-medium text-foreground-500 mb-2">Medications:</div>
+                                                        <div className="space-y-2">
+                                                            {prescription.prescriptionProducts.map((pp: any, ppIdx: number) => (
+                                                                <div key={ppIdx} className="bg-white/60 p-3 rounded border border-success-200">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <Icon icon="lucide:pill" className="text-success-600" width={16} />
+                                                                        <span className="text-sm font-medium text-foreground">
+                                                                            {pp.product?.name || 'Medication'}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="text-xs text-foreground-500 mt-1">
+                                                                        Quantity: {pp.quantity}
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             </CardBody>
                         </Card>
@@ -212,8 +426,39 @@ export default function OfferingDetailsPage() {
 
                 </div>
             )}
+
+            {/* Cancel Subscription Confirmation Modal */}
+            <Modal isOpen={isOpen} onClose={onClose}>
+                <ModalContent>
+                    <ModalHeader className="flex flex-col gap-1">
+                        <div className="flex items-center gap-2">
+                            <Icon icon="lucide:alert-triangle" className="text-danger" width={24} />
+                            Cancel Subscription
+                        </div>
+                    </ModalHeader>
+                    <ModalBody>
+                        <p className="text-foreground-600">
+                            Are you sure you want to cancel this subscription? This action cannot be undone.
+                        </p>
+                        <p className="text-sm text-foreground-500 mt-2">
+                            Your subscription will be cancelled immediately and you will no longer be billed.
+                        </p>
+                    </ModalBody>
+                    <ModalFooter>
+                        <Button variant="light" onPress={onClose} isDisabled={cancelLoading}>
+                            Keep Subscription
+                        </Button>
+                        <Button
+                            color="danger"
+                            onPress={handleCancelSubscription}
+                            isLoading={cancelLoading}
+                            startContent={!cancelLoading && <Icon icon="lucide:x-circle" width={16} />}
+                        >
+                            Cancel Subscription
+                        </Button>
+                    </ModalFooter>
+                </ModalContent>
+            </Modal>
         </div>
     );
 }
-
-

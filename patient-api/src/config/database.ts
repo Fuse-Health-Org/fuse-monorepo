@@ -7,6 +7,7 @@ import User from '../models/User';
 import Entity from '../models/Entity';
 import Product from '../models/Product';
 import Prescription from '../models/Prescription';
+import PrescriptionExtension from '../models/PrescriptionExtension';
 import Treatment from '../models/Treatment';
 import PrescriptionProducts from '../models/PrescriptionProducts';
 import TreatmentProducts from '../models/TreatmentProducts';
@@ -134,7 +135,7 @@ if (process.env.NODE_ENV === 'production' && !rdsCaCert) {
 export const sequelize = new Sequelize(databaseUrl, {
   ...sequelizeConfig,
   models: [User, Product,
-    Prescription, Treatment, PrescriptionProducts,
+    Prescription, PrescriptionExtension, Treatment, PrescriptionProducts,
     TreatmentProducts, Clinic, Questionnaire, QuestionnaireCustomization,
     QuestionnaireStep, Question, QuestionOption,
     Order, OrderItem, Payment,

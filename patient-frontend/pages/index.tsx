@@ -6,6 +6,7 @@ import ScrollingFeaturesBar from '../components/ScrollingFeaturesBar';
 import GetStartedButton from '../components/GetStartedButton';
 import TrendingProtocols from '../components/TrendingProtocols';
 import { useBatchLikes } from '../hooks/useLikes';
+import { UniformProductCard } from '../components/UniformProductCard';
 
 interface CustomWebsite {
   portalTitle?: string;
@@ -72,6 +73,8 @@ interface Program {
     imageUrl?: string;
     slug?: string;
   };
+  // Cheapest product price from the program
+  fromPrice?: number | null;
 }
 
 // Union type for carousel items
@@ -363,16 +366,8 @@ export default function LandingPage() {
   const isAffiliate = clinicInfo?.isAffiliate;
   const logo = affiliateLogo || parentLogo; // Fallback to parent logo if affiliate has none
 
-  // Helper function to render a product card
+  // Helper function to render a product card using uniform template
   const renderProductCard = (product: Product, index: number) => {
-    const badges = getBadges(product);
-    // Calculate 30% higher price for crossed out display
-    const crossedOutPrice = (product.price * 1.3).toFixed(2);
-
-    // Alternate rectangle colors: green, green, brown, brown, repeat
-    const rectangleColors = ["#004d4d", "#004d4d", "#8b7355", "#8b7355"];
-    const rectangleColor = rectangleColors[index % 4];
-
     const cardId = `product-${product.id}-${index}`;
     const isHovered = hoveredCardIndex === cardId;
 
@@ -390,171 +385,29 @@ export default function LandingPage() {
     };
 
     return (
-      <div
+      <UniformProductCard
         key={product.id}
-        onMouseEnter={() => setHoveredCardIndex(cardId)}
-        onMouseLeave={() => setHoveredCardIndex(null)}
-        style={{
-          cursor: "pointer",
-          position: "relative",
-        }}
-      >
-        <button
-          onClick={handleLikeClick}
-          style={{
-            position: "absolute",
-            top: "0.5rem",
-            right: "0.5rem",
-            background: isLiked ? "#fee2e2" : "white",
-            border: isLiked ? "1px solid #fca5a5" : "1px solid #e2e8f0",
-            borderRadius: "50%",
-            width: "2.5rem",
-            height: "2.5rem",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            cursor: "pointer",
-            zIndex: 1,
-            transition: "all 0.2s ease",
-          }}
-          title={isLiked ? "Unlike" : "Like"}
-        >
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill={isLiked ? "#ef4444" : "none"}
-            stroke={isLiked ? "#ef4444" : "currentColor"}
-            strokeWidth="2"
-            style={{ transition: "all 0.2s ease" }}
-          >
-            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
-          </svg>
-        </button>
-        <div
-          style={{
-            backgroundColor: "#e8e6e1",
-            borderRadius: "0.5rem",
-            padding: "1rem",
-            marginBottom: "1rem",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            aspectRatio: "1/1",
-            overflow: "hidden",
-          }}
-        >
-          {product.imageUrl ? (
-            <img
-              src={product.imageUrl}
-              alt={product.name}
-              style={{
-                width: "100%",
-                height: "100%",
-                objectFit: "cover",
-                transform: isHovered ? "scale(1.1)" : "scale(1)",
-                transition: "transform 0.3s ease",
-                borderRadius: "0.5rem",
-              }}
-            />
-          ) : (
-            <div
-              style={{
-                width: "10rem",
-                height: "12rem",
-                backgroundColor: rectangleColor,
-                borderRadius: "0.5rem",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                transform: isHovered ? "scale(1.15)" : "scale(1)",
-                transition: "transform 0.3s ease",
-              }}
-            >
-              <span style={{ fontFamily: "Georgia, serif", color: "white", fontSize: "1.25rem", textAlign: "center", padding: "1rem" }}>
-                {product.name.substring(0, 30)}
-              </span>
-            </div>
-          )}
-        </div>
-        <h3 style={{
-          fontFamily: "Georgia, serif",
-          fontSize: "1.25rem",
-          marginBottom: "0.5rem",
-          fontWeight: 400,
-          color: isHovered ? "#38bdf8" : "inherit",
-          transition: "color 0.3s ease",
-        }}>
-          {product.name}
-        </h3>
-        <p style={{ fontSize: "0.875rem", color: "#525252", marginBottom: "0.75rem", minHeight: "2.5rem" }}>
-          {product.description || "Premium health product"}
-        </p>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.75rem" }}>
-          <span style={{ fontWeight: 600 }}>From ${product.price.toFixed(2)}/mo</span>
-          <span style={{ fontSize: "0.875rem", color: "#737373", textDecoration: "line-through" }}>
-            ${crossedOutPrice}*
-          </span>
-        </div>
-        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "1rem" }}>
-          {badges.map((badge, idx) => (
-            <span
-              key={idx}
-              style={{
-                backgroundColor: badge.color,
-                color: "white",
-                padding: "0.25rem 0.75rem",
-                borderRadius: "1rem",
-                fontSize: "0.75rem",
-                fontWeight: 600,
-              }}
-            >
-              {badge.label}
-            </span>
-          ))}
-        </div>
-        <GetStartedButton
-          formId={product.formId}
-          slug={product.slug}
-          primaryColor={primaryColor}
-        />
-      </div>
+        product={product}
+        index={index}
+        isHovered={isHovered}
+        isLiked={isLiked}
+        likeCount={likeCount}
+        onHover={() => setHoveredCardIndex(cardId)}
+        onLeave={() => setHoveredCardIndex(null)}
+        onLikeClick={handleLikeClick}
+        primaryColor={primaryColor}
+        renderGetStartedButton={(formId, slug, color) => (
+          <GetStartedButton
+            formId={formId}
+            slug={slug}
+            primaryColor={color}
+          />
+        )}
+      />
     );
   };
 
-  // Helper function to get badges based on product category/categories
-  const getBadges = (product: Product) => {
-    const categories = product.categories || [product.category] || [];
-    const badgeMap: { [key: string]: { label: string; color: string } } = {
-      'weightloss': { label: 'Weight Loss', color: '#ef4444' },
-      'weight-loss': { label: 'Weight Loss', color: '#ef4444' },
-      'hairgrowth': { label: 'Hair Growth', color: '#8b5cf6' },
-      'hair-growth': { label: 'Hair Growth', color: '#8b5cf6' },
-      'performance': { label: 'Muscle Growth', color: '#3b82f6' },
-      'recovery': { label: 'Recovery', color: '#10b981' },
-      'flexibility': { label: 'Flexibility', color: '#a855f7' },
-      'sexual-health': { label: 'Sexual Health', color: '#ec4899' },
-      'skincare': { label: 'Better Skin', color: '#f59e0b' },
-      'wellness': { label: 'Wellness', color: '#06b6d4' },
-      'energy': { label: 'More Energy', color: '#eab308' },
-      'sleep': { label: 'Better Sleep', color: '#6366f1' },
-    };
-
-    const badges = categories
-      .map((cat: string) => {
-        const normalized = cat.toLowerCase().replace(/\s+/g, '-');
-        return badgeMap[normalized];
-      })
-      .filter(Boolean)
-      .slice(0, 2); // Max 2 badges per product
-
-    // Default badges if none found
-    if (badges.length === 0) {
-      badges.push({ label: 'Wellness', color: '#06b6d4' });
-    }
-
-    return badges;
-  };
+  // Badge logic is now in UniformProductCard component for consistency
 
   // Helper function to render a program card (matches product card style)
   const renderProgramCard = (program: Program, index: number) => {
@@ -703,6 +556,11 @@ export default function LandingPage() {
         <p style={{ fontSize: "0.875rem", color: "#525252", marginBottom: "0.75rem", minHeight: "2.5rem" }}>
           {program.description || program.medicalTemplate?.title || "Comprehensive health program"}
         </p>
+        {program.fromPrice && program.fromPrice > 0 && (
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.75rem" }}>
+            <span style={{ fontWeight: 600 }}>From ${program.fromPrice.toFixed(2)}/mo</span>
+          </div>
+        )}
         <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "1rem" }}>
           <span
             style={{
@@ -1078,7 +936,7 @@ export default function LandingPage() {
             </button>
           ))}
         </div>
-        {/* Programs & Products Carousel */}
+        {/* Programs & Products Grid */}
         {isCarouselLoading ? (
           <div style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>
             <p>Loading...</p>
@@ -1088,80 +946,22 @@ export default function LandingPage() {
             <p>No programs or products available at the moment.</p>
           </div>
         ) : (
-          <>
-            <style jsx global>{`
-              @keyframes scrollProducts {
-                0% {
-                  transform: translateX(0);
-                }
-                100% {
-                  transform: translateX(-50%);
-                }
-              }
-              .products-carousel {
-                display: flex;
-                overflow-x: auto;
-                overflow-y: hidden;
-                scrollbar-width: none; /* Firefox */
-                -webkit-overflow-scrolling: touch;
-                cursor: grab;
-                user-select: none;
-              }
-              .products-carousel:active {
-                cursor: grabbing;
-              }
-              .products-carousel::-webkit-scrollbar {
-                display: none; /* Chrome, Safari, Edge */
-              }
-              .products-carousel-inner {
-                display: flex;
-                gap: 1.5rem;
-              }
-              .products-carousel-inner.animated {
-                animation: scrollProducts 60s linear infinite;
-              }
-              .products-carousel-inner.animated.paused {
-                animation-play-state: paused;
-              }
-            `}</style>
-            <div
-              style={{
-                marginBottom: "4rem",
-                paddingBottom: "1rem",
-                overflow: "hidden",
-              }}
-            >
-              <div
-                ref={carouselRef}
-                className="products-carousel"
-                onMouseDown={handleMouseDown}
-                onMouseLeave={handleMouseLeaveCarousel}
-                onMouseUp={handleMouseUp}
-                onMouseMove={handleMouseMove}
-                onMouseEnter={handleMouseEnterCarousel}
-                style={{ userSelect: 'none', gap: '1.5rem' }}
-              >
-                <div className={`products-carousel-inner ${shouldDuplicate ? 'animated' : ''} ${isAutoScrollPaused ? 'paused' : ''}`} style={{ gap: '1.5rem' }}>
-                  {/* Render items */}
-                  {carouselItems.map((item, index) => (
-                    <div key={`${item.type}-${item.data.id}-${index}-first`} style={{ minWidth: "280px", maxWidth: "280px", flexShrink: 0 }}>
-                      {item.type === 'program'
-                        ? renderProgramCard(item.data, index)
-                        : renderProductCard(item.data, index)}
-                    </div>
-                  ))}
-                  {/* Only duplicate items if there's overflow (for infinite scroll) */}
-                  {shouldDuplicate && carouselItems.map((item, index) => (
-                    <div key={`${item.type}-${item.data.id}-${index}-second`} style={{ minWidth: "280px", maxWidth: "280px", flexShrink: 0 }}>
-                      {item.type === 'program'
-                        ? renderProgramCard(item.data, index)
-                        : renderProductCard(item.data, index)}
-                    </div>
-                  ))}
-                </div>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+              gap: '2rem',
+              marginBottom: '3rem',
+            }}
+          >
+            {carouselItems.map((item, index) => (
+              <div key={`${item.type}-${item.data.id}-${index}`}>
+                {item.type === 'program'
+                  ? renderProgramCard(item.data, index)
+                  : renderProductCard(item.data, index)}
               </div>
-            </div>
-          </>
+            ))}
+          </div>
         )}
 
         {/* Trending Protocols Section */}

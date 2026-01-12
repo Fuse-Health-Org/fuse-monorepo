@@ -187,8 +187,9 @@ class OrderService {
     }
   }
 
-  async approveOrder(orderId: string) {
+  async approveOrder(orderId: string, prescriptionDays?: number) {
     // TODO: this method might need to be expanded to create Order items depending on the information approved in the prescription
+    // prescriptionDays: optional number of days for prescription validity (default: 30 days / 1 month)
     try {
       // Get order with all related data including shipping address
       const order = await Order.findOne({
@@ -441,7 +442,7 @@ class OrderService {
 
         // Create prescription after successful pharmacy orders
         if (successfulCoverages.length > 0) {
-          await this.createPrescriptionForOrder(order, successfulCoverages);
+          await this.createPrescriptionForOrder(order, successfulCoverages, prescriptionDays);
         }
       } else if (
         (order.status === OrderStatus.PENDING ||
@@ -577,7 +578,7 @@ class OrderService {
 
           // Create prescription after successful pharmacy orders
           if (successfulCoverages.length > 0) {
-            await this.createPrescriptionForOrder(order, successfulCoverages);
+            await this.createPrescriptionForOrder(order, successfulCoverages, prescriptionDays);
           }
         } catch (error: any) {
           // HIPAA: Do not log detailed errors in production
@@ -808,14 +809,19 @@ class OrderService {
    * Creates ONE prescription per medication/coverage
    * @param order The approved order
    * @param coverages Array of successful pharmacy coverages
+   * @param prescriptionDays Optional number of days for prescription validity (default: 30 days)
    */
   private async createPrescriptionForOrder(
     order: Order,
-    coverages: any[]
+    coverages: any[],
+    prescriptionDays?: number
   ): Promise<void> {
     try {
+      // Default to 30 days (1 month) if not specified
+      const daysValid = prescriptionDays || 30;
+
       console.log(
-        `💊 [Prescription] Creating ${coverages.length} prescription(s) for order: ${order.orderNumber}`
+        `💊 [Prescription] Creating ${coverages.length} prescription(s) for order: ${order.orderNumber} (valid for ${daysValid} days)`
       );
 
       // Get doctor ID (physician) from order
@@ -828,9 +834,9 @@ class OrderService {
         return;
       }
 
-      // Set expiration date to 1 month from now
+      // Set expiration date based on prescriptionDays
       const expiresAt = new Date();
-      expiresAt.setMonth(expiresAt.getMonth() + 1);
+      expiresAt.setDate(expiresAt.getDate() + daysValid);
 
       // Create ONE prescription for EACH coverage (medication)
       for (const coverage of coverages) {

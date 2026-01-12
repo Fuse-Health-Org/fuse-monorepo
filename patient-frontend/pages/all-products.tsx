@@ -4,6 +4,7 @@ import { extractClinicSlugFromDomain } from '../lib/clinic-utils';
 import { apiCall } from '../lib/api';
 import ScrollingFeaturesBar from '../components/ScrollingFeaturesBar';
 import GetStartedButton from '../components/GetStartedButton';
+import { UniformProductCard } from '../components/UniformProductCard';
 
 interface CustomWebsite {
     portalTitle?: string;
@@ -56,6 +57,8 @@ interface Program {
         imageUrl?: string;
         slug?: string;
     };
+    // Cheapest product price from the program
+    fromPrice?: number | null;
 }
 
 // Union type for grid items
@@ -231,165 +234,40 @@ export default function AllProducts() {
         customWebsite
     });
 
-    // Helper function to get badges for a product
-    const getBadges = (product: Product) => {
-        const badges: Array<{ label: string; color: string }> = [];
+    // Badge logic is now in UniformProductCard component for consistency
 
-        if (product.categories && Array.isArray(product.categories)) {
-            product.categories.forEach((category: string) => {
-                const lowerCategory = category.toLowerCase();
-                if (lowerCategory.includes('recovery')) {
-                    badges.push({ label: 'Recovery', color: '#10b981' });
-                } else if (lowerCategory.includes('flexibility')) {
-                    badges.push({ label: 'Flexibility', color: '#a855f7' });
-                } else if (lowerCategory.includes('muscle') || lowerCategory.includes('growth')) {
-                    badges.push({ label: 'Muscle Growth', color: '#3b82f6' });
-                } else if (lowerCategory.includes('fat') || lowerCategory.includes('loss')) {
-                    badges.push({ label: 'Fat Loss', color: '#ef4444' });
-                } else if (lowerCategory.includes('wellness')) {
-                    badges.push({ label: 'Wellness', color: '#8b5cf6' });
-                } else if (lowerCategory.includes('performance')) {
-                    badges.push({ label: 'Performance', color: '#f59e0b' });
-                } else if (lowerCategory.includes('weight')) {
-                    badges.push({ label: 'Weight Loss', color: '#ec4899' });
-                }
-            });
-        }
-
-        return badges;
-    };
-
-    // Helper function to render a product card
+    // Helper function to render a product card using uniform template
     const renderProductCard = (product: Product, index: number) => {
-        const badges = getBadges(product);
-        // Calculate 30% higher price for crossed out display
-        const crossedOutPrice = (product.price * 1.3).toFixed(2);
-
-        // Alternate rectangle colors: green, green, brown, brown, repeat
-        const rectangleColors = ["#004d4d", "#004d4d", "#8b7355", "#8b7355"];
-        const rectangleColor = rectangleColors[index % 4];
-
         const cardId = `product-${product.id}`;
         const isHovered = hoveredCardIndex === cardId;
 
+        // Note: all-products doesn't have like functionality yet
+        const handleLikeClick = (e: React.MouseEvent) => {
+            e.stopPropagation();
+            e.preventDefault();
+            // Could integrate likes functionality here in the future
+        };
+
         return (
-            <div
+            <UniformProductCard
                 key={product.id}
-                onMouseEnter={() => setHoveredCardIndex(cardId)}
-                onMouseLeave={() => setHoveredCardIndex(null)}
-                style={{
-                    cursor: "pointer",
-                    position: "relative",
-                    transform: isHovered ? "scale(1.05)" : "scale(1)",
-                    transition: "transform 0.3s ease",
-                }}
-            >
-                <button style={{
-                    position: "absolute",
-                    top: "0.5rem",
-                    right: "0.5rem",
-                    background: "white",
-                    border: "1px solid #e2e8f0",
-                    borderRadius: "50%",
-                    width: "2.5rem",
-                    height: "2.5rem",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    cursor: "pointer",
-                    zIndex: 1,
-                }}>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
-                    </svg>
-                </button>
-                <div
-                    style={{
-                        backgroundColor: "#e8e6e1",
-                        borderRadius: "0.5rem",
-                        padding: "2rem",
-                        marginBottom: "1rem",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        aspectRatio: "1/1",
-                        overflow: "hidden",
-                    }}
-                >
-                    {product.imageUrl ? (
-                        <img
-                            src={product.imageUrl}
-                            alt={product.name}
-                            style={{
-                                width: "100%",
-                                height: "100%",
-                                objectFit: "cover",
-                                transform: isHovered ? "scale(1.1)" : "scale(1)",
-                                transition: "transform 0.3s ease",
-                            }}
-                        />
-                    ) : (
-                        <div
-                            style={{
-                                width: "8rem",
-                                height: "12rem",
-                                backgroundColor: rectangleColor,
-                                borderRadius: "0.5rem",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                transform: isHovered ? "scale(1.15)" : "scale(1)",
-                                transition: "transform 0.3s ease",
-                            }}
-                        >
-                            <span style={{ fontFamily: "Georgia, serif", color: "white", fontSize: "1.25rem", textAlign: "center", padding: "1rem" }}>
-                                {product.name.substring(0, 30)}
-                            </span>
-                        </div>
-                    )}
-                </div>
-                <h3 style={{
-                    fontFamily: "Georgia, serif",
-                    fontSize: "1.25rem",
-                    marginBottom: "0.5rem",
-                    fontWeight: 400,
-                    color: isHovered ? "#38bdf8" : "inherit",
-                    transition: "color 0.3s ease",
-                }}>
-                    {product.name}
-                </h3>
-                <p style={{ fontSize: "0.875rem", color: "#525252", marginBottom: "0.75rem", minHeight: "2.5rem" }}>
-                    {product.description || "Premium health product"}
-                </p>
-                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.75rem" }}>
-                    <span style={{ fontWeight: 600 }}>From ${product.price.toFixed(2)}/mo</span>
-                    <span style={{ fontSize: "0.875rem", color: "#737373", textDecoration: "line-through" }}>
-                        ${crossedOutPrice}*
-                    </span>
-                </div>
-                <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "1rem" }}>
-                    {badges.map((badge, idx) => (
-                        <span
-                            key={idx}
-                            style={{
-                                backgroundColor: badge.color,
-                                color: "white",
-                                padding: "0.25rem 0.75rem",
-                                borderRadius: "1rem",
-                                fontSize: "0.75rem",
-                                fontWeight: 600,
-                            }}
-                        >
-                            {badge.label}
-                        </span>
-                    ))}
-                </div>
-                <GetStartedButton
-                    formId={product.formId}
-                    slug={product.slug}
-                    primaryColor={primaryColor}
-                />
-            </div>
+                product={product}
+                index={index}
+                isHovered={isHovered}
+                isLiked={false}
+                likeCount={0}
+                onHover={() => setHoveredCardIndex(cardId)}
+                onLeave={() => setHoveredCardIndex(null)}
+                onLikeClick={handleLikeClick}
+                primaryColor={primaryColor}
+                renderGetStartedButton={(formId, slug, color) => (
+                    <GetStartedButton
+                        formId={formId}
+                        slug={slug}
+                        primaryColor={color}
+                    />
+                )}
+            />
         );
     };
 
@@ -542,6 +420,11 @@ export default function AllProducts() {
                 <p style={{ fontSize: "0.875rem", color: "#525252", marginBottom: "0.75rem", minHeight: "2.5rem" }}>
                     {program.description || program.medicalTemplate?.title || "Comprehensive health program"}
                 </p>
+                {program.fromPrice && program.fromPrice > 0 && (
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.75rem" }}>
+                        <span style={{ fontWeight: 600 }}>From ${program.fromPrice.toFixed(2)}/mo</span>
+                    </div>
+                )}
                 <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "1rem" }}>
                     <span
                         style={{
@@ -920,9 +803,9 @@ export default function AllProducts() {
                         <div
                             style={{
                                 display: "grid",
-                                gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
-                                gap: "1.5rem",
-                                marginBottom: "2rem",
+                                gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+                                gap: "2rem",
+                                marginBottom: "3rem",
                             }}
                         >
                             {allGridItems.map((item, index) =>

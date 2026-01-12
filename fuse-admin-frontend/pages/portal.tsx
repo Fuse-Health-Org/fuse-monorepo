@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/router"
 import { useAuth } from "@/contexts/AuthContext"
 import Layout from "@/components/Layout"
@@ -56,8 +57,22 @@ export default function PortalPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isUploadingLogo, setIsUploadingLogo] = useState(false)
   const [isUploadingHero, setIsUploadingHero] = useState(false)
-  const [logoInputMode, setLogoInputMode] = useState<"file" | "url">("url")
+  const [logoInputMode, setLogoInputMode] = useState<"file" | "url">(() => {
+    if (typeof window !== "undefined") {
+      const saved = window.localStorage.getItem("portal-logo-input-mode")
+      if (saved === "file" || saved === "url") return saved
+    }
+    return "file"
+  })
   const [heroInputMode, setHeroInputMode] = useState<"file" | "url">("url")
+  const logoFileInputRef = useRef<HTMLInputElement | null>(null)
+  const heroFileInputRef = useRef<HTMLInputElement | null>(null)
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("portal-logo-input-mode", logoInputMode)
+    }
+  }, [logoInputMode])
   const [settings, setSettings] = useState<PortalSettings>({
     portalTitle: "Welcome to Our Portal",
     portalDescription: "Your trusted healthcare partner. Browse our products and services below.",
@@ -85,8 +100,9 @@ export default function PortalPage() {
   const logoFileInputRef = useRef<HTMLInputElement>(null)
   const heroFileInputRef = useRef<HTMLInputElement>(null)
 
-  // Check if user has access to Portal based on their subscription plan or custom feature override
+  // Check if user has access to Portal based on tier config, custom features, or plan type
   const hasPortalAccess = 
+    subscription?.tierConfig?.hasCustomPortal ||
     subscription?.customFeatures?.hasCustomPortal ||
     (subscription?.plan?.type && PORTAL_ALLOWED_PLAN_TYPES.includes(subscription.plan.type))
 
@@ -361,7 +377,7 @@ export default function PortalPage() {
             {/* Portal Title */}
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium">Portal Title</CardTitle>
+                <CardTitle className="text-base font-semibold tracking-tight">Portal Title</CardTitle>
               </CardHeader>
               <CardContent>
                 <Input
@@ -375,7 +391,7 @@ export default function PortalPage() {
             {/* Portal Description */}
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium">Portal Description</CardTitle>
+                <CardTitle className="text-base font-semibold tracking-tight">Portal Description</CardTitle>
               </CardHeader>
               <CardContent>
                 <textarea
@@ -390,7 +406,7 @@ export default function PortalPage() {
             {/* Primary Color */}
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium">Primary Color</CardTitle>
+                <CardTitle className="text-base font-semibold tracking-tight">Primary Color</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="flex items-center gap-3">
@@ -417,7 +433,7 @@ export default function PortalPage() {
             {/* Font Selection */}
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium">Choose a Font</CardTitle>
+                <CardTitle className="text-base font-semibold tracking-tight">Choose a Font</CardTitle>
                 <CardDescription>Previews update in real-time</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -459,7 +475,7 @@ export default function PortalPage() {
             {/* Logo */}
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium">Logo</CardTitle>
+                <CardTitle className="text-base font-semibold tracking-tight">Logo</CardTitle>
                 <CardDescription>Upload your brand logo (recommended: 200x60px)</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -472,6 +488,15 @@ export default function PortalPage() {
                     />
                   </div>
                 )}
+
+                <input
+                  ref={logoFileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleLogoUpload}
+                  disabled={isUploadingLogo}
+                  className="hidden"
+                />
 
                 <div className="flex gap-2 mb-3">
                   <Button
@@ -538,7 +563,7 @@ export default function PortalPage() {
             {/* Hero Image */}
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium">Hero Banner Image</CardTitle>
+                <CardTitle className="text-base font-semibold tracking-tight">Hero Banner Image</CardTitle>
                 <CardDescription>Large viewport image displayed at the top of your landing page (recommended: 1920x1080px)</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -551,6 +576,15 @@ export default function PortalPage() {
                     />
                   </div>
                 )}
+
+                <input
+                  ref={heroFileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleHeroImageUpload}
+                  disabled={isUploadingHero}
+                  className="hidden"
+                />
 
                 <div className="flex gap-2 mb-3">
                   <Button
@@ -617,7 +651,7 @@ export default function PortalPage() {
             {/* Hero Title */}
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium">Hero Title</CardTitle>
+                <CardTitle className="text-base font-semibold tracking-tight">Hero Title</CardTitle>
               </CardHeader>
               <CardContent>
                 <Input
@@ -631,7 +665,7 @@ export default function PortalPage() {
             {/* Hero Subtitle */}
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium">Hero Subtitle</CardTitle>
+                <CardTitle className="text-base font-semibold tracking-tight">Hero Subtitle</CardTitle>
               </CardHeader>
               <CardContent>
                 <Input
@@ -744,7 +778,10 @@ export default function PortalPage() {
             <Card className="sticky top-6">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-sm font-medium">Live Preview</CardTitle>
+                  <div>
+                    <CardTitle className="text-base font-semibold tracking-tight">Your Brand Portal URL</CardTitle>
+                    <CardDescription>Share this link with your patients to direct them to your portal</CardDescription>
+                  </div>
                   <div className="flex gap-1 p-1 bg-muted rounded-lg">
                     <Button
                       variant={previewMode === "desktop" ? "default" : "ghost"}
