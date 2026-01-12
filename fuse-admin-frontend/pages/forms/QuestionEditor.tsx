@@ -74,7 +74,15 @@ export function QuestionEditor({
     const [copiedVariable, setCopiedVariable] = useState<string | null>(null)
 
     // Computed values that update with state
-    const isYesNoType = question.questionSubtype === 'yesno'
+    // Detect Yes/No questions by questionSubtype OR by having exactly 2 options with "Yes" and "No" text
+    // Check both current state options and original question options
+    const hasYesNoOptionsInState = options.length === 2 && 
+        options.some(opt => opt.optionText?.toLowerCase() === 'yes') && 
+        options.some(opt => opt.optionText?.toLowerCase() === 'no')
+    const hasYesNoOptionsInQuestion = question.options && question.options.length === 2 &&
+        question.options.some((opt: any) => (opt.optionText || '').toLowerCase() === 'yes') &&
+        question.options.some((opt: any) => (opt.optionText || '').toLowerCase() === 'no')
+    const isYesNoType = question.questionSubtype === 'yesno' || hasYesNoOptionsInState || hasYesNoOptionsInQuestion
     const isBMIType = question.questionSubtype === 'bmi'
     const isTextArea = answerType === 'textarea' || question.answerType === 'textarea'
     const isNumberInput = answerType === 'number' || question.answerType === 'number'
@@ -421,7 +429,7 @@ export function QuestionEditor({
 
     // Get question type label for display
     const getQuestionTypeLabel = () => {
-        if (question.questionSubtype === 'yesno') return 'Yes/No Question'
+        if (isYesNoType) return 'Yes/No Question'
         if (question.questionSubtype === 'bmi') return 'BMI Calculator Question'
         if (answerType === 'textarea' || question.answerType === 'textarea') return 'Multi-Line Text'
         if (answerType === 'checkbox') return 'Multi-Choice Question'
@@ -630,55 +638,60 @@ export function QuestionEditor({
                                                 disabled={restrictOptionEdits}
                                             />
                                         </div>
-                                        <div className="space-y-1">
-                                            <label className="block text-[10px] font-medium text-muted-foreground">
-                                                Value <span className="opacity-70">(for logic)</span>
-                                            </label>
-                                            <Input
-                                                value={option.optionValue}
-                                                onChange={(event: ChangeEvent<HTMLInputElement>) => handleOptionValueChange(option.localKey, event.target.value)}
-                                                placeholder="e.g., yes"
-                                                className="text-xs h-8"
-                                                disabled={restrictOptionEdits}
-                                            />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="block text-[10px] font-medium text-muted-foreground">
-                                                Risk Level <span className="opacity-70">(for workflow automation)</span>
-                                            </label>
-                                            <div className="flex gap-1">
-                                                <Button
-                                                    type="button"
-                                                    size="sm"
-                                                    variant={option.riskLevel === 'safe' ? 'default' : 'outline'}
-                                                    onClick={() => handleRiskLevelChange(option.localKey, option.riskLevel === 'safe' ? null : 'safe')}
-                                                    className={`flex-1 h-7 text-[10px] ${option.riskLevel === 'safe' ? 'bg-green-500 hover:bg-green-600 text-white' : 'border-green-300 text-green-700 hover:bg-green-50'}`}
+                                        {/* Hide Value and Risk Level fields for Yes/No questions */}
+                                        {!isYesNoType && (
+                                            <div className="space-y-1">
+                                                <label className="block text-[10px] font-medium text-muted-foreground">
+                                                    Value <span className="opacity-70">(for logic)</span>
+                                                </label>
+                                                <Input
+                                                    value={option.optionValue}
+                                                    onChange={(event: ChangeEvent<HTMLInputElement>) => handleOptionValueChange(option.localKey, event.target.value)}
+                                                    placeholder="e.g., yes"
+                                                    className="text-xs h-8"
                                                     disabled={restrictOptionEdits}
-                                                >
-                                                    ✓ Safe
-                                                </Button>
-                                                <Button
-                                                    type="button"
-                                                    size="sm"
-                                                    variant={option.riskLevel === 'review' ? 'default' : 'outline'}
-                                                    onClick={() => handleRiskLevelChange(option.localKey, option.riskLevel === 'review' ? null : 'review')}
-                                                    className={`flex-1 h-7 text-[10px] ${option.riskLevel === 'review' ? 'bg-yellow-500 hover:bg-yellow-600 text-white' : 'border-yellow-300 text-yellow-700 hover:bg-yellow-50'}`}
-                                                    disabled={restrictOptionEdits}
-                                                >
-                                                    ⚠ Review
-                                                </Button>
-                                                <Button
-                                                    type="button"
-                                                    size="sm"
-                                                    variant={option.riskLevel === 'reject' ? 'default' : 'outline'}
-                                                    onClick={() => handleRiskLevelChange(option.localKey, option.riskLevel === 'reject' ? null : 'reject')}
-                                                    className={`flex-1 h-7 text-[10px] ${option.riskLevel === 'reject' ? 'bg-red-500 hover:bg-red-600 text-white' : 'border-red-300 text-red-700 hover:bg-red-50'}`}
-                                                    disabled={restrictOptionEdits}
-                                                >
-                                                    ✕ Reject
-                                                </Button>
+                                                />
                                             </div>
-                                        </div>
+                                        )}
+                                        {!isYesNoType && (
+                                            <div className="space-y-1">
+                                                <label className="block text-[10px] font-medium text-muted-foreground">
+                                                    Risk Level <span className="opacity-70">(for workflow automation)</span>
+                                                </label>
+                                                <div className="flex gap-1">
+                                                    <Button
+                                                        type="button"
+                                                        size="sm"
+                                                        variant={option.riskLevel === 'safe' ? 'default' : 'outline'}
+                                                        onClick={() => handleRiskLevelChange(option.localKey, option.riskLevel === 'safe' ? null : 'safe')}
+                                                        className={`flex-1 h-7 text-[10px] ${option.riskLevel === 'safe' ? 'bg-green-500 hover:bg-green-600 text-white' : 'border-green-300 text-green-700 hover:bg-green-50'}`}
+                                                        disabled={restrictOptionEdits}
+                                                    >
+                                                        ✓ Safe
+                                                    </Button>
+                                                    <Button
+                                                        type="button"
+                                                        size="sm"
+                                                        variant={option.riskLevel === 'review' ? 'default' : 'outline'}
+                                                        onClick={() => handleRiskLevelChange(option.localKey, option.riskLevel === 'review' ? null : 'review')}
+                                                        className={`flex-1 h-7 text-[10px] ${option.riskLevel === 'review' ? 'bg-yellow-500 hover:bg-yellow-600 text-white' : 'border-yellow-300 text-yellow-700 hover:bg-yellow-50'}`}
+                                                        disabled={restrictOptionEdits}
+                                                    >
+                                                        ⚠ Review
+                                                    </Button>
+                                                    <Button
+                                                        type="button"
+                                                        size="sm"
+                                                        variant={option.riskLevel === 'reject' ? 'default' : 'outline'}
+                                                        onClick={() => handleRiskLevelChange(option.localKey, option.riskLevel === 'reject' ? null : 'reject')}
+                                                        className={`flex-1 h-7 text-[10px] ${option.riskLevel === 'reject' ? 'bg-red-500 hover:bg-red-600 text-white' : 'border-red-300 text-red-700 hover:bg-red-50'}`}
+                                                        disabled={restrictOptionEdits}
+                                                    >
+                                                        ✕ Reject
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                                 {options.length > 1 && !restrictOptionEdits && (

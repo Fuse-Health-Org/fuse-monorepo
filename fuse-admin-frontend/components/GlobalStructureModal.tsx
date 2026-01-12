@@ -304,7 +304,7 @@ export function GlobalStructureModal({ isOpen, onClose, baseUrl, token, structur
                       onDragOver={(e) => handleDragOver(e, index)}
                       onDragEnd={handleDragEnd}
                       className={`bg-white border-2 rounded-xl p-5 transition-all cursor-move ${draggedIndex === index ? 'border-[#4FA59C] shadow-lg scale-105' : 'border-[#E5E7EB] hover:border-[#D1D5DB]'
-                        } ${!section.enabled ? 'opacity-60' : ''}`}
+                        } ${!section.enabled ? '' : ''}`}
                     >
                       <div className="flex items-start gap-4">
                         {/* Drag Handle */}

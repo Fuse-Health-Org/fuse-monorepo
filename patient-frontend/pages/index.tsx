@@ -17,6 +17,15 @@ interface CustomWebsite {
   heroTitle?: string;
   heroSubtitle?: string;
   isActive?: boolean;
+  footerColor?: string;
+  footerShowShop?: boolean;
+  footerShowDailyHealth?: boolean;
+  footerShowRestRestore?: boolean;
+  footerShowStore?: boolean;
+  footerShowLearnMore?: boolean;
+  footerShowContact?: boolean;
+  footerShowSupport?: boolean;
+  footerShowConnect?: boolean;
 }
 
 interface ClinicInfo {
@@ -86,8 +95,34 @@ export default function LandingPage() {
   const [startX, setStartX] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
   const [isAutoScrollPaused, setIsAutoScrollPaused] = useState(false);
-  const [activeFilter, setActiveFilter] = useState<'all' | 'bundles' | 'programs'>('all');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'bundles' | 'programs' | string>('all');
   const [shouldDuplicate, setShouldDuplicate] = useState(false);
+
+  // Extract unique categories from all products
+  const productCategories = useMemo(() => {
+    const categoriesSet = new Set<string>();
+    products.forEach(product => {
+      // Support both single category and categories array
+      if (product.categories && Array.isArray(product.categories)) {
+        product.categories.forEach(cat => {
+          if (cat && cat.trim()) {
+            categoriesSet.add(cat.trim());
+          }
+        });
+      } else if (product.category && product.category.trim()) {
+        categoriesSet.add(product.category.trim());
+      }
+    });
+    return Array.from(categoriesSet).sort();
+  }, [products]);
+
+  // Format category name for display (capitalize and replace underscores with spaces)
+  const formatCategoryName = (category: string): string => {
+    return category
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
+  };
 
   // Extract tenant product IDs for batch likes
   const tenantProductIds = useMemo(() =>
@@ -734,6 +769,17 @@ export default function LandingPage() {
     } else if (activeFilter === 'bundles') {
       // Filter products that are bundles (you can add bundle logic here)
       return products.map((product): CarouselItem => ({ type: 'product', data: product }));
+    } else if (activeFilter !== 'all' && productCategories.includes(activeFilter)) {
+      // Filter by category
+      const filteredProducts = products.filter(product => {
+        if (product.categories && Array.isArray(product.categories)) {
+          return product.categories.some(cat => cat?.trim() === activeFilter);
+        } else if (product.category) {
+          return product.category.trim() === activeFilter;
+        }
+        return false;
+      });
+      return filteredProducts.map((product): CarouselItem => ({ type: 'product', data: product }));
     } else {
       // Show all: programs first, then products
       return [
@@ -1013,6 +1059,24 @@ export default function LandingPage() {
           >
             Programs
           </button>
+          {/* Category Filters */}
+          {productCategories.map((category) => (
+            <button
+              key={category}
+              onClick={() => setActiveFilter(category)}
+              style={{
+                padding: "0.5rem 1rem",
+                backgroundColor: activeFilter === category ? "#8b7355" : "white",
+                color: activeFilter === category ? "white" : "inherit",
+                border: activeFilter === category ? "none" : "1px solid #d4d4d4",
+                borderRadius: "0.25rem",
+                fontSize: "0.875rem",
+                cursor: "pointer",
+              }}
+            >
+              {formatCategoryName(category)}
+            </button>
+          ))}
         </div>
         {/* Programs & Products Carousel */}
         {isCarouselLoading ? (
@@ -1105,7 +1169,7 @@ export default function LandingPage() {
 
       </main>
       {/* Footer */}
-      <footer style={{ backgroundColor: "#0d3d3d", color: "white", padding: "4rem 0 2rem" }}>
+      <footer style={{ backgroundColor: websiteData?.footerColor || "#0d3d3d", color: "white", padding: "4rem 0 2rem" }}>
         <div style={{ maxWidth: "1280px", margin: "0 auto", padding: "0 1.5rem" }}>
           <div
             style={{
@@ -1116,6 +1180,7 @@ export default function LandingPage() {
             }}
           >
             {/* SHOP Column */}
+            {(websiteData?.footerShowShop ?? true) && (
             <div>
               <h4 style={{ fontWeight: 600, marginBottom: "1.5rem", fontSize: "0.75rem", letterSpacing: "0.05em" }}>
                 SHOP
@@ -1143,7 +1208,9 @@ export default function LandingPage() {
                 </li>
               </ul>
             </div>
+            )}
             {/* DAILY HEALTH Column */}
+            {(websiteData?.footerShowDailyHealth ?? true) && (
             <div>
               <h4 style={{ fontWeight: 600, marginBottom: "1.5rem", fontSize: "0.75rem", letterSpacing: "0.05em" }}>
                 DAILY HEALTH
@@ -1181,7 +1248,9 @@ export default function LandingPage() {
                 </li>
               </ul>
             </div>
+            )}
             {/* REST & RESTORE Column */}
+            {(websiteData?.footerShowRestRestore ?? true) && (
             <div>
               <h4 style={{ fontWeight: 600, marginBottom: "1.5rem", fontSize: "0.75rem", letterSpacing: "0.05em" }}>
                 REST & RESTORE
@@ -1209,7 +1278,9 @@ export default function LandingPage() {
                 </li>
               </ul>
             </div>
+            )}
             {/* LEARN MORE Column */}
+            {(websiteData?.footerShowLearnMore ?? true) && (
             <div>
               <h4 style={{ fontWeight: 600, marginBottom: "1.5rem", fontSize: "0.75rem", letterSpacing: "0.05em" }}>
                 LEARN MORE
@@ -1262,10 +1333,14 @@ export default function LandingPage() {
                 </li>
               </ul>
             </div>
+            )}
             {/* CONTACT & SUPPORT Column */}
+            {((websiteData?.footerShowContact ?? true) || (websiteData?.footerShowSupport ?? true)) && (
             <div>
               <h4 style={{ fontWeight: 600, marginBottom: "1.5rem", fontSize: "0.75rem", letterSpacing: "0.05em" }}>
-                CONTACT & SUPPORT
+                {(websiteData?.footerShowContact ?? true) && (websiteData?.footerShowSupport ?? true) 
+                  ? "CONTACT & SUPPORT"
+                  : (websiteData?.footerShowContact ?? true) ? "CONTACT" : "SUPPORT"}
               </h4>
               <ul style={{ listStyle: "none", padding: 0, margin: 0, fontSize: "0.875rem" }}>
                 <li style={{ marginBottom: "0.75rem" }}>
@@ -1300,7 +1375,9 @@ export default function LandingPage() {
                 </li>
               </ul>
             </div>
+            )}
             {/* CONNECT Column */}
+            {(websiteData?.footerShowConnect ?? true) && (
             <div>
               <h4 style={{ fontWeight: 600, marginBottom: "1.5rem", fontSize: "0.75rem", letterSpacing: "0.05em" }}>
                 CONNECT
@@ -1347,6 +1424,7 @@ export default function LandingPage() {
                 </a>
               </div>
             </div>
+            )}
           </div>
           <div style={{ borderTop: "1px solid rgba(255,255,255,0.2)", marginBottom: "3rem" }}></div>
           <div

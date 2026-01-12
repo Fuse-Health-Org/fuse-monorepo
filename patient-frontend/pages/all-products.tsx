@@ -14,6 +14,15 @@ interface CustomWebsite {
     heroImageUrl?: string;
     heroTitle?: string;
     heroSubtitle?: string;
+    footerColor?: string;
+    footerShowShop?: boolean;
+    footerShowDailyHealth?: boolean;
+    footerShowRestRestore?: boolean;
+    footerShowStore?: boolean;
+    footerShowLearnMore?: boolean;
+    footerShowContact?: boolean;
+    footerShowSupport?: boolean;
+    footerShowConnect?: boolean;
 }
 
 interface Product {
@@ -1186,7 +1195,7 @@ export default function AllProducts() {
 
             </main>
             {/* Footer */}
-            <footer style={{ backgroundColor: "#0d3d3d", color: "white", padding: "4rem 0 2rem" }}>
+            <footer style={{ backgroundColor: websiteData?.footerColor || "#0d3d3d", color: "white", padding: "4rem 0 2rem" }}>
                 <div style={{ maxWidth: "1280px", margin: "0 auto", padding: "0 1.5rem" }}>
                     <div
                         style={{
@@ -1197,6 +1206,7 @@ export default function AllProducts() {
                         }}
                     >
                         {/* SHOP Column */}
+                        {(websiteData?.footerShowShop ?? true) && (
                         <div>
                             <h4 style={{ fontWeight: 600, marginBottom: "1.5rem", fontSize: "0.75rem", letterSpacing: "0.05em" }}>
                                 SHOP
@@ -1224,7 +1234,9 @@ export default function AllProducts() {
                                 </li>
                             </ul>
                         </div>
+                        )}
                         {/* DAILY HEALTH Column */}
+                        {(websiteData?.footerShowDailyHealth ?? true) && (
                         <div>
                             <h4 style={{ fontWeight: 600, marginBottom: "1.5rem", fontSize: "0.75rem", letterSpacing: "0.05em" }}>
                                 DAILY HEALTH
@@ -1262,7 +1274,9 @@ export default function AllProducts() {
                                 </li>
                             </ul>
                         </div>
+                        )}
                         {/* REST & RESTORE Column */}
+                        {(websiteData?.footerShowRestRestore ?? true) && (
                         <div>
                             <h4 style={{ fontWeight: 600, marginBottom: "1.5rem", fontSize: "0.75rem", letterSpacing: "0.05em" }}>
                                 REST & RESTORE
@@ -1290,7 +1304,9 @@ export default function AllProducts() {
                                 </li>
                             </ul>
                         </div>
+                        )}
                         {/* LEARN MORE Column */}
+                        {(websiteData?.footerShowLearnMore ?? true) && (
                         <div>
                             <h4 style={{ fontWeight: 600, marginBottom: "1.5rem", fontSize: "0.75rem", letterSpacing: "0.05em" }}>
                                 LEARN MORE
@@ -1343,10 +1359,14 @@ export default function AllProducts() {
                                 </li>
                             </ul>
                         </div>
+                        )}
                         {/* CONTACT & SUPPORT Column */}
+                        {((websiteData?.footerShowContact ?? true) || (websiteData?.footerShowSupport ?? true)) && (
                         <div>
                             <h4 style={{ fontWeight: 600, marginBottom: "1.5rem", fontSize: "0.75rem", letterSpacing: "0.05em" }}>
-                                CONTACT & SUPPORT
+                                {(websiteData?.footerShowContact ?? true) && (websiteData?.footerShowSupport ?? true) 
+                                  ? "CONTACT & SUPPORT"
+                                  : (websiteData?.footerShowContact ?? true) ? "CONTACT" : "SUPPORT"}
                             </h4>
                             <ul style={{ listStyle: "none", padding: 0, margin: 0, fontSize: "0.875rem" }}>
                                 <li style={{ marginBottom: "0.75rem" }}>
@@ -1381,7 +1401,9 @@ export default function AllProducts() {
                                 </li>
                             </ul>
                         </div>
+                        )}
                         {/* CONNECT Column */}
+                        {(websiteData?.footerShowConnect ?? true) && (
                         <div>
                             <h4 style={{ fontWeight: 600, marginBottom: "1.5rem", fontSize: "0.75rem", letterSpacing: "0.05em" }}>
                                 CONNECT
@@ -1428,6 +1450,7 @@ export default function AllProducts() {
                                 </a>
                             </div>
                         </div>
+                        )}
                     </div>
                     <div style={{ borderTop: "1px solid rgba(255,255,255,0.2)", marginBottom: "3rem" }}></div>
                     <div

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/router"
 import { useAuth } from "@/contexts/AuthContext"
 import Layout from "@/components/Layout"
@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Monitor, Smartphone, Upload, Link as LinkIcon, Globe, Crown, ExternalLink } from "lucide-react"
 import { Switch } from "@/components/ui/switch"
+import { ToastManager } from "@/components/ui/toast"
+import { useToast } from "@/hooks/use-toast"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
 
@@ -34,11 +36,21 @@ interface PortalSettings {
   heroTitle: string
   heroSubtitle: string
   isActive: boolean
+  footerColor?: string
+  footerShowShop?: boolean
+  footerShowDailyHealth?: boolean
+  footerShowRestRestore?: boolean
+  footerShowStore?: boolean
+  footerShowLearnMore?: boolean
+  footerShowContact?: boolean
+  footerShowSupport?: boolean
+  footerShowConnect?: boolean
 }
 
 export default function PortalPage() {
   const router = useRouter()
   const { authenticatedFetch, subscription, user } = useAuth()
+  const { toasts, dismiss, success, error } = useToast()
   const [previewMode, setPreviewMode] = useState<"desktop" | "mobile">("desktop")
   const [isSaving, setIsSaving] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
@@ -56,11 +68,22 @@ export default function PortalPage() {
     heroTitle: "Your Daily Health, Simplified",
     heroSubtitle: "All-in-one nutritional support in one simple drink",
     isActive: true,
+    footerColor: "#000000",
+    footerShowShop: true,
+    footerShowDailyHealth: true,
+    footerShowRestRestore: true,
+    footerShowStore: true,
+    footerShowLearnMore: true,
+    footerShowContact: true,
+    footerShowSupport: true,
+    footerShowConnect: true,
   })
   const [isTogglingActive, setIsTogglingActive] = useState(false)
   const [clinicSlug, setClinicSlug] = useState<string | null>(null)
   const [customDomain, setCustomDomain] = useState<string | null>(null)
   const [isCustomDomain, setIsCustomDomain] = useState(false)
+  const logoFileInputRef = useRef<HTMLInputElement>(null)
+  const heroFileInputRef = useRef<HTMLInputElement>(null)
 
   // Check if user has access to Portal based on their subscription plan or custom feature override
   const hasPortalAccess = 
@@ -119,6 +142,15 @@ export default function PortalPage() {
             heroTitle: data.data.heroTitle || settings.heroTitle,
             heroSubtitle: data.data.heroSubtitle || settings.heroSubtitle,
             isActive: data.data.isActive ?? true,
+            footerColor: data.data.footerColor || settings.footerColor || "#000000",
+            footerShowShop: data.data.footerShowShop ?? settings.footerShowShop ?? true,
+            footerShowDailyHealth: data.data.footerShowDailyHealth ?? settings.footerShowDailyHealth ?? true,
+            footerShowRestRestore: data.data.footerShowRestRestore ?? settings.footerShowRestRestore ?? true,
+            footerShowStore: data.data.footerShowStore ?? settings.footerShowStore ?? true,
+            footerShowLearnMore: data.data.footerShowLearnMore ?? settings.footerShowLearnMore ?? true,
+            footerShowContact: data.data.footerShowContact ?? settings.footerShowContact ?? true,
+            footerShowSupport: data.data.footerShowSupport ?? settings.footerShowSupport ?? true,
+            footerShowConnect: data.data.footerShowConnect ?? settings.footerShowConnect ?? true,
           })
         }
       }
@@ -139,13 +171,20 @@ export default function PortalPage() {
       })
 
       if (response.ok) {
-        alert("Portal settings saved successfully!")
+        success("Portal settings saved successfully!", "Settings Saved")
       } else {
-        alert("Failed to save settings")
+        const errorData = await response.json().catch(() => ({}))
+        error(
+          errorData.message || "Failed to save settings",
+          "Save Failed"
+        )
       }
-    } catch (error) {
-      console.error("Error saving portal settings:", error)
-      alert("Error saving settings")
+    } catch (err) {
+      console.error("Error saving portal settings:", err)
+      error(
+        err instanceof Error ? err.message : "Error saving settings",
+        "Error"
+      )
     } finally {
       setIsSaving(false)
     }
@@ -162,12 +201,23 @@ export default function PortalPage() {
 
       if (response.ok) {
         setSettings({ ...settings, isActive: checked })
+        success(
+          `Portal ${checked ? "activated" : "deactivated"} successfully!`,
+          "Status Updated"
+        )
       } else {
-        alert("Failed to toggle portal status")
+        const errorData = await response.json().catch(() => ({}))
+        error(
+          errorData.message || "Failed to toggle portal status",
+          "Update Failed"
+        )
       }
-    } catch (error) {
-      console.error("Error toggling portal status:", error)
-      alert("Error toggling portal status")
+    } catch (err) {
+      console.error("Error toggling portal status:", err)
+      error(
+        err instanceof Error ? err.message : "Error toggling portal status",
+        "Error"
+      )
     } finally {
       setIsTogglingActive(false)
     }
@@ -427,7 +477,13 @@ export default function PortalPage() {
                   <Button
                     variant={logoInputMode === "file" ? "default" : "outline"}
                     size="sm"
-                    onClick={() => setLogoInputMode("file")}
+                    onClick={() => {
+                      setLogoInputMode("file")
+                      // Open file selector immediately when clicking "Upload a file"
+                      setTimeout(() => {
+                        logoFileInputRef.current?.click()
+                      }, 0)
+                    }}
                   >
                     <Upload className="w-4 h-4 mr-2" />
                     Upload a file
@@ -442,18 +498,23 @@ export default function PortalPage() {
                   </Button>
                 </div>
 
+                {/* Hidden file input that opens when clicking "Upload a file" */}
+                <input
+                  ref={logoFileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleLogoUpload}
+                  disabled={isUploadingLogo}
+                  className="hidden"
+                />
+
                 {logoInputMode === "file" ? (
                   <div>
-                    <Input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleLogoUpload}
-                      disabled={isUploadingLogo}
-                    />
                     {isUploadingLogo && (
-                      <p className="text-xs text-blue-600 mt-2">Uploading to S3...</p>
+                      <p className="text-xs text-blue-600 mb-2">Uploading to S3...</p>
                     )}
-                    <p className="text-xs text-muted-foreground mt-2">Accepted formats: PNG, JPG, SVG. Max size: 2MB</p>
+                    <p className="text-xs text-muted-foreground">Accepted formats: PNG, JPG, SVG. Max size: 2MB</p>
+                    <p className="text-xs text-muted-foreground mt-1">Click "Upload a file" above to select an image</p>
                   </div>
                 ) : (
                   <div className="flex gap-2">
@@ -495,7 +556,13 @@ export default function PortalPage() {
                   <Button
                     variant={heroInputMode === "file" ? "default" : "outline"}
                     size="sm"
-                    onClick={() => setHeroInputMode("file")}
+                    onClick={() => {
+                      setHeroInputMode("file")
+                      // Open file selector immediately when clicking "Upload a file"
+                      setTimeout(() => {
+                        heroFileInputRef.current?.click()
+                      }, 0)
+                    }}
                   >
                     <Upload className="w-4 h-4 mr-2" />
                     Upload a file
@@ -510,18 +577,23 @@ export default function PortalPage() {
                   </Button>
                 </div>
 
+                {/* Hidden file input that opens when clicking "Upload a file" */}
+                <input
+                  ref={heroFileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleHeroImageUpload}
+                  disabled={isUploadingHero}
+                  className="hidden"
+                />
+
                 {heroInputMode === "file" ? (
                   <div>
-                    <Input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleHeroImageUpload}
-                      disabled={isUploadingHero}
-                    />
                     {isUploadingHero && (
-                      <p className="text-xs text-blue-600 mt-2">Uploading to S3...</p>
+                      <p className="text-xs text-blue-600 mb-2">Uploading to S3...</p>
                     )}
-                    <p className="text-xs text-muted-foreground mt-2">Accepted formats: PNG, JPG, WebP. Max size: 5MB. Recommended: 1920x1080px or larger</p>
+                    <p className="text-xs text-muted-foreground">Accepted formats: PNG, JPG, WebP. Max size: 5MB. Recommended: 1920x1080px or larger</p>
+                    <p className="text-xs text-muted-foreground mt-1">Click "Upload a file" above to select an image</p>
                   </div>
                 ) : (
                   <div className="flex gap-2">
@@ -567,6 +639,97 @@ export default function PortalPage() {
                   onChange={(e) => setSettings({ ...settings, heroSubtitle: e.target.value })}
                   placeholder="Enter hero subtitle"
                 />
+              </CardContent>
+            </Card>
+
+            {/* Footer Customization */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium">Footer</CardTitle>
+                <CardDescription>Customize footer colors and visibility of footer sections</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Footer Color */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Footer Background Color</label>
+                  <div className="flex gap-2 items-center">
+                    <Input
+                      type="color"
+                      value={settings.footerColor || "#000000"}
+                      onChange={(e) => setSettings({ ...settings, footerColor: e.target.value })}
+                      className="w-20 h-10 cursor-pointer"
+                    />
+                    <Input
+                      value={settings.footerColor || "#000000"}
+                      onChange={(e) => setSettings({ ...settings, footerColor: e.target.value })}
+                      placeholder="#000000"
+                      className="flex-1"
+                    />
+                  </div>
+                </div>
+
+                {/* Footer Sections Visibility */}
+                <div className="space-y-3 pt-2 border-t">
+                  <label className="text-sm font-medium">Footer Sections</label>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm">Shop</label>
+                      <Switch
+                        checked={settings.footerShowShop ?? true}
+                        onCheckedChange={(checked) => setSettings({ ...settings, footerShowShop: checked })}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm">Daily Health</label>
+                      <Switch
+                        checked={settings.footerShowDailyHealth ?? true}
+                        onCheckedChange={(checked) => setSettings({ ...settings, footerShowDailyHealth: checked })}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm">Rest & Restore</label>
+                      <Switch
+                        checked={settings.footerShowRestRestore ?? true}
+                        onCheckedChange={(checked) => setSettings({ ...settings, footerShowRestRestore: checked })}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm">Store</label>
+                      <Switch
+                        checked={settings.footerShowStore ?? true}
+                        onCheckedChange={(checked) => setSettings({ ...settings, footerShowStore: checked })}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm">Learn More</label>
+                      <Switch
+                        checked={settings.footerShowLearnMore ?? true}
+                        onCheckedChange={(checked) => setSettings({ ...settings, footerShowLearnMore: checked })}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm">Contact</label>
+                      <Switch
+                        checked={settings.footerShowContact ?? true}
+                        onCheckedChange={(checked) => setSettings({ ...settings, footerShowContact: checked })}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm">Support</label>
+                      <Switch
+                        checked={settings.footerShowSupport ?? true}
+                        onCheckedChange={(checked) => setSettings({ ...settings, footerShowSupport: checked })}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm">Connect</label>
+                      <Switch
+                        checked={settings.footerShowConnect ?? true}
+                        onCheckedChange={(checked) => setSettings({ ...settings, footerShowConnect: checked })}
+                      />
+                    </div>
+                  </div>
+                </div>
               </CardContent>
             </Card>
 
@@ -674,6 +837,55 @@ export default function PortalPage() {
                       ))}
                     </div>
                   </div>
+
+                  {/* Preview Footer */}
+                  <div
+                    className="text-white p-4 text-xs"
+                    style={{ backgroundColor: settings.footerColor || "#000000" }}
+                  >
+                    <div className="grid grid-cols-3 gap-2 mb-3">
+                      {(settings.footerShowShop ?? true) && (
+                        <div>
+                          <div className="font-semibold mb-1 opacity-90">SHOP</div>
+                        </div>
+                      )}
+                      {(settings.footerShowDailyHealth ?? true) && (
+                        <div>
+                          <div className="font-semibold mb-1 opacity-90">DAILY HEALTH</div>
+                        </div>
+                      )}
+                      {(settings.footerShowRestRestore ?? true) && (
+                        <div>
+                          <div className="font-semibold mb-1 opacity-90">REST & RESTORE</div>
+                        </div>
+                      )}
+                      {(settings.footerShowStore ?? true) && (
+                        <div>
+                          <div className="font-semibold mb-1 opacity-90">STORE</div>
+                        </div>
+                      )}
+                      {(settings.footerShowLearnMore ?? true) && (
+                        <div>
+                          <div className="font-semibold mb-1 opacity-90">LEARN MORE</div>
+                        </div>
+                      )}
+                      {(settings.footerShowContact ?? true) && (
+                        <div>
+                          <div className="font-semibold mb-1 opacity-90">CONTACT</div>
+                        </div>
+                      )}
+                      {(settings.footerShowSupport ?? true) && (
+                        <div>
+                          <div className="font-semibold mb-1 opacity-90">SUPPORT</div>
+                        </div>
+                      )}
+                      {(settings.footerShowConnect ?? true) && (
+                        <div>
+                          <div className="font-semibold mb-1 opacity-90">CONNECT</div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -749,6 +961,7 @@ export default function PortalPage() {
           </>
         )}
       </div>
+      <ToastManager toasts={toasts} onDismiss={dismiss} />
     </Layout>
   )
 }

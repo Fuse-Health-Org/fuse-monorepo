@@ -86,6 +86,12 @@ export function ProductDetailsEditor({ product, onUpdate }: ProductDetailsEditor
             return
         }
 
+        // Validate description length
+        if (formData.description.length > 255) {
+            setError("Description cannot exceed 255 characters")
+            return
+        }
+
         const activeIngredientsArray = formData.activeIngredients.split(",").map(i => i.trim()).filter(Boolean)
         if (activeIngredientsArray.length === 0) {
             setError("At least one active ingredient is required")
@@ -174,7 +180,7 @@ export function ProductDetailsEditor({ product, onUpdate }: ProductDetailsEditor
                                 </button>
                                 <button
                                     onClick={handleSave}
-                                    disabled={saving}
+                                    disabled={saving || formData.description.length > 255}
                                     className="flex items-center gap-2 px-4 py-2 rounded-full bg-[#4FA59C] hover:bg-[#478F87] text-white shadow-sm transition-all text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {saving ? (
@@ -255,12 +261,23 @@ export function ProductDetailsEditor({ product, onUpdate }: ProductDetailsEditor
 
                     {/* Description */}
                     <div className="md:col-span-2">
-                        <label className="text-sm font-medium text-[#4B5563] mb-2 block">Description *</label>
+                        <div className="flex items-center justify-between mb-2">
+                            <label className="text-sm font-medium text-[#4B5563]">Description *</label>
+                            {editing && (
+                                <span className={`text-xs font-medium ${formData.description.length >= 255 ? 'text-red-600' : 'text-[#9CA3AF]'}`}>
+                                    {formData.description.length}/255
+                                </span>
+                            )}
+                        </div>
                         {editing ? (
                             <textarea
                                 value={formData.description}
-                                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                                onChange={(e) => {
+                                    const newValue = e.target.value.slice(0, 255) // Limit to 255 characters
+                                    setFormData({ ...formData, description: newValue })
+                                }}
                                 placeholder="Detailed product description..."
+                                maxLength={255}
                                 className="w-full rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] px-4 py-2.5 text-sm text-[#1F2937] min-h-[100px] focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all resize-none"
                             />
                         ) : (

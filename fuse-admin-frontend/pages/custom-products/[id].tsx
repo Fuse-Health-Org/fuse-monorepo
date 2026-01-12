@@ -77,7 +77,7 @@ export default function CustomProductEditor() {
     const baseUrl = useMemo(() => process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001", [])
 
     // Check if user can customize form structure based on tier or custom features
-    const canCustomizeFormStructure =
+    const canCustomizeFormStructure = 
         subscription?.customFeatures?.canCustomizeFormStructure === true ||
         subscription?.tierConfig?.canCustomizeFormStructure === true
 
@@ -2842,7 +2842,7 @@ export default function CustomProductEditor() {
                                                                         'Standard Form'}
                                                             </p>
                                                         </div>
-                                                        {canCustomizeFormStructure ? (
+                                                        {true ? (
                                                             <button
                                                                 onClick={() => {
                                                                     setStructureToEdit(structure)

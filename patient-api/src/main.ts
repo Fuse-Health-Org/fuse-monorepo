@@ -2964,7 +2964,17 @@ app.post("/custom-website", authenticateJWT, async (req, res) => {
       logo,
       heroImageUrl,
       heroTitle,
-      heroSubtitle
+      heroSubtitle,
+      isActive,
+      footerColor,
+      footerShowShop,
+      footerShowDailyHealth,
+      footerShowRestRestore,
+      footerShowStore,
+      footerShowLearnMore,
+      footerShowContact,
+      footerShowSupport,
+      footerShowConnect
     } = req.body;
 
     let customWebsite = await CustomWebsite.findOne({
@@ -2981,7 +2991,17 @@ app.post("/custom-website", authenticateJWT, async (req, res) => {
         logo,
         heroImageUrl,
         heroTitle,
-        heroSubtitle
+        heroSubtitle,
+        isActive: isActive !== undefined ? isActive : customWebsite.isActive,
+        footerColor,
+        footerShowShop,
+        footerShowDailyHealth,
+        footerShowRestRestore,
+        footerShowStore,
+        footerShowLearnMore,
+        footerShowContact,
+        footerShowSupport,
+        footerShowConnect
       });
     } else {
       // Create new
@@ -2995,7 +3015,16 @@ app.post("/custom-website", authenticateJWT, async (req, res) => {
         heroImageUrl,
         heroTitle,
         heroSubtitle,
-        isActive: true
+        isActive: isActive !== undefined ? isActive : true,
+        footerColor,
+        footerShowShop,
+        footerShowDailyHealth,
+        footerShowRestRestore,
+        footerShowStore,
+        footerShowLearnMore,
+        footerShowContact,
+        footerShowSupport,
+        footerShowConnect
       });
     }
 
