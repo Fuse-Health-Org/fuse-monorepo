@@ -9531,8 +9531,24 @@ app.post("/questionnaires/templates", authenticateJWT, async (req, res) => {
         .json({ success: false, message: "Title is required" });
     }
 
+    // Check if a template with this title already exists for this user
+    // If so, make the title unique by appending a timestamp
+    let uniqueTitle = title;
+    const existingTemplate = await Questionnaire.findOne({
+      where: {
+        title: uniqueTitle,
+        userId: currentUser.id,
+      },
+    });
+
+    if (existingTemplate) {
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+      uniqueTitle = `${title} ${timestamp}`;
+      console.log(`📝 Duplicate title detected, using unique title: ${uniqueTitle}`);
+    }
+
     const template = await questionnaireService.createTemplate({
-      title,
+      title: uniqueTitle,
       description,
       treatmentId: typeof treatmentId === "string" ? treatmentId : null,
       productId,
@@ -9559,7 +9575,7 @@ app.post("/questionnaires/templates", authenticateJWT, async (req, res) => {
         resourceType: AuditResourceType.QUESTIONNAIRE_TEMPLATE,
         resourceId: template.id,
         details: {
-          templateName: title,
+          templateName: uniqueTitle,
           formTemplateType: formTemplateType || "normal",
           productId: productId || null,
           category: category || null,
