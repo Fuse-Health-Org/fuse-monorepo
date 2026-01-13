@@ -181,7 +181,7 @@ export default function ProductEditor() {
 
       try {
         // Fetch product details
-        const response = await fetch(`${baseUrl}/products/${productId}`, {
+        const response = await fetch(`${baseUrl}/products-management/${productId}`, {
           headers: { Authorization: `Bearer ${token}` },
         })
 

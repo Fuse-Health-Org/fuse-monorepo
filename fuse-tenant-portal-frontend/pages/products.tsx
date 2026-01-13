@@ -651,7 +651,7 @@ export default function Products() {
 
       const results = await Promise.all(deletePromises)
       const successCount = results.filter(r => r.ok).length
-      
+
       if (successCount === selectedProducts.size) {
         toast.success(`Successfully deleted ${successCount} product(s)`)
         setSaveMessage(`Successfully deleted ${successCount} product(s)`)
@@ -692,7 +692,7 @@ export default function Products() {
 
       const results = await Promise.all(deactivatePromises)
       const successCount = results.filter(r => r.ok).length
-      
+
       if (successCount === selectedProducts.size) {
         toast.success(`Successfully deactivated ${successCount} product(s)`)
         setSaveMessage(`Successfully deactivated ${successCount} product(s)`)
@@ -1044,7 +1044,7 @@ export default function Products() {
                       Showing {itemsPerPage === 'all' ? products.length : Math.min((currentPage - 1) * (itemsPerPage as number) + 1, products.length)} - {itemsPerPage === 'all' ? products.length : Math.min(currentPage * (itemsPerPage as number), products.length)} of {products.length}
                     </span>
                   </div>
-                  
+
                   {itemsPerPage !== 'all' && totalPages > 1 && (
                     <div className="flex items-center gap-2">
                       <button
@@ -1054,7 +1054,7 @@ export default function Products() {
                       >
                         <ChevronLeft className="h-4 w-4" />
                       </button>
-                      
+
                       <div className="flex items-center gap-1">
                         {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
                           let pageNum: number
@@ -1067,23 +1067,22 @@ export default function Products() {
                           } else {
                             pageNum = currentPage - 3 + i
                           }
-                          
+
                           return (
                             <button
                               key={pageNum}
                               onClick={() => handlePageChange(pageNum)}
-                              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                                currentPage === pageNum
+                              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${currentPage === pageNum
                                   ? 'bg-[#4FA59C] text-white'
                                   : 'text-[#6B7280] hover:bg-[#F3F4F6]'
-                              }`}
+                                }`}
                             >
                               {pageNum}
                             </button>
                           )
                         })}
                       </div>
-                      
+
                       <button
                         onClick={() => handlePageChange(currentPage + 1)}
                         disabled={currentPage === totalPages}
@@ -1115,123 +1114,122 @@ export default function Products() {
                   </thead>
                   <tbody className="divide-y divide-[#E5E7EB]">
                     {paginatedProducts().map((product) => (
-                    <tr key={product.id} className={`hover:bg-[#F9FAFB] transition-colors ${!product.isActive ? 'opacity-60' : ''}`}>
-                      <td className="px-4 py-4">
-                        <input
-                          type="checkbox"
-                          checked={selectedProducts.has(product.id)}
-                          onChange={() => toggleSelectProduct(product.id)}
-                          className="h-4 w-4 rounded border-[#D1D5DB] text-[#4FA59C] focus:ring-[#4FA59C]"
-                        />
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="flex items-center gap-3">
-                          {product.imageUrl ? (
-                            <img src={product.imageUrl} alt={product.name} className="h-10 w-10 rounded-lg object-cover" />
-                          ) : (
-                            <div className="h-10 w-10 bg-[#F3F4F6] rounded-lg flex items-center justify-center">
-                              <ImageIcon className="h-5 w-5 text-[#9CA3AF]" />
-                            </div>
-                          )}
-                          <div>
-                            <p className="text-sm font-semibold text-[#1F2937]">{product.name}</p>
-                            {product.brandId && (
-                              <span className="text-xs text-purple-600">Custom</span>
+                      <tr key={product.id} className={`hover:bg-[#F9FAFB] transition-colors ${!product.isActive ? 'opacity-60' : ''}`}>
+                        <td className="px-4 py-4">
+                          <input
+                            type="checkbox"
+                            checked={selectedProducts.has(product.id)}
+                            onChange={() => toggleSelectProduct(product.id)}
+                            className="h-4 w-4 rounded border-[#D1D5DB] text-[#4FA59C] focus:ring-[#4FA59C]"
+                          />
+                        </td>
+                        <td className="px-4 py-4">
+                          <div className="flex items-center gap-3">
+                            {product.imageUrl ? (
+                              <img src={product.imageUrl} alt={product.name} className="h-10 w-10 rounded-lg object-cover" />
+                            ) : (
+                              <div className="h-10 w-10 bg-[#F3F4F6] rounded-lg flex items-center justify-center">
+                                <ImageIcon className="h-5 w-5 text-[#9CA3AF]" />
+                              </div>
                             )}
+                            <div>
+                              <p className="text-sm font-semibold text-[#1F2937]">{product.name}</p>
+                              {product.brandId && (
+                                <span className="text-xs text-purple-600">Custom</span>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-4">
-                        <p className="text-sm text-[#6B7280] line-clamp-2 max-w-md">{product.description}</p>
-                      </td>
-                      <td className="px-4 py-4">
-                        <p className="text-sm text-[#1F2937]">{product.medicationSize || '—'}</p>
-                      </td>
-                      <td className="px-4 py-4">
-                        {product.isActive ? (
-                          <span className="inline-flex px-2.5 py-1 bg-green-50 text-green-700 text-xs font-medium rounded-full border border-green-200">
-                            Active
-                          </span>
-                        ) : (
-                          <span className="inline-flex px-2.5 py-1 bg-[#FEF3C7] text-[#92400E] text-xs font-medium rounded-full border border-[#FDE68A]">
-                            Inactive
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => router.push(`/products/editor/${product.id}`)}
-                            className="px-3 py-1.5 rounded-lg bg-[#4FA59C] text-white text-xs font-medium hover:bg-[#478F87] transition-all"
-                          >
-                            {product.isActive ? 'Manage' : 'Configure'}
-                          </button>
-                          <button
-                            onClick={() => handlePermanentDelete(product)}
-                            className="px-3 py-1.5 rounded-lg bg-[#EF4444] text-white text-xs font-medium hover:bg-[#DC2626] transition-all"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                        </td>
+                        <td className="px-4 py-4">
+                          <p className="text-sm text-[#6B7280] line-clamp-2 max-w-md">{product.description}</p>
+                        </td>
+                        <td className="px-4 py-4">
+                          <p className="text-sm text-[#1F2937]">{product.medicationSize || '—'}</p>
+                        </td>
+                        <td className="px-4 py-4">
+                          {product.isActive ? (
+                            <span className="inline-flex px-2.5 py-1 bg-green-50 text-green-700 text-xs font-medium rounded-full border border-green-200">
+                              Active
+                            </span>
+                          ) : (
+                            <span className="inline-flex px-2.5 py-1 bg-[#FEF3C7] text-[#92400E] text-xs font-medium rounded-full border border-[#FDE68A]">
+                              Inactive
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-4">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => router.push(`/products/editor/${product.id}`)}
+                              className="px-3 py-1.5 rounded-lg bg-[#4FA59C] text-white text-xs font-medium hover:bg-[#478F87] transition-all"
+                            >
+                              {product.isActive ? 'Manage' : 'Configure'}
+                            </button>
+                            <button
+                              onClick={() => handlePermanentDelete(product)}
+                              className="px-3 py-1.5 rounded-lg bg-[#EF4444] text-white text-xs font-medium hover:bg-[#DC2626] transition-all"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
 
-              {/* Pagination controls at bottom */}
-              {itemsPerPage !== 'all' && totalPages > 1 && (
-                <div className="flex items-center justify-center px-6 py-4 border-t border-[#E5E7EB] bg-[#F9FAFB]">
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handlePageChange(currentPage - 1)}
-                      disabled={currentPage === 1}
-                      className="p-2 rounded-lg border border-[#E5E7EB] text-[#6B7280] hover:bg-[#F3F4F6] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </button>
-                    
-                    <div className="flex items-center gap-1">
-                      {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
-                        let pageNum: number
-                        if (totalPages <= 7) {
-                          pageNum = i + 1
-                        } else if (currentPage <= 4) {
-                          pageNum = i + 1
-                        } else if (currentPage >= totalPages - 3) {
-                          pageNum = totalPages - 6 + i
-                        } else {
-                          pageNum = currentPage - 3 + i
-                        }
-                        
-                        return (
-                          <button
-                            key={pageNum}
-                            onClick={() => handlePageChange(pageNum)}
-                            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                              currentPage === pageNum
-                                ? 'bg-[#4FA59C] text-white'
-                                : 'text-[#6B7280] hover:bg-[#F3F4F6]'
-                            }`}
-                          >
-                            {pageNum}
-                          </button>
-                        )
-                      })}
+                {/* Pagination controls at bottom */}
+                {itemsPerPage !== 'all' && totalPages > 1 && (
+                  <div className="flex items-center justify-center px-6 py-4 border-t border-[#E5E7EB] bg-[#F9FAFB]">
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handlePageChange(currentPage - 1)}
+                        disabled={currentPage === 1}
+                        className="p-2 rounded-lg border border-[#E5E7EB] text-[#6B7280] hover:bg-[#F3F4F6] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </button>
+
+                      <div className="flex items-center gap-1">
+                        {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+                          let pageNum: number
+                          if (totalPages <= 7) {
+                            pageNum = i + 1
+                          } else if (currentPage <= 4) {
+                            pageNum = i + 1
+                          } else if (currentPage >= totalPages - 3) {
+                            pageNum = totalPages - 6 + i
+                          } else {
+                            pageNum = currentPage - 3 + i
+                          }
+
+                          return (
+                            <button
+                              key={pageNum}
+                              onClick={() => handlePageChange(pageNum)}
+                              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${currentPage === pageNum
+                                  ? 'bg-[#4FA59C] text-white'
+                                  : 'text-[#6B7280] hover:bg-[#F3F4F6]'
+                                }`}
+                            >
+                              {pageNum}
+                            </button>
+                          )
+                        })}
+                      </div>
+
+                      <button
+                        onClick={() => handlePageChange(currentPage + 1)}
+                        disabled={currentPage === totalPages}
+                        className="p-2 rounded-lg border border-[#E5E7EB] text-[#6B7280] hover:bg-[#F3F4F6] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </button>
                     </div>
-                    
-                    <button
-                      onClick={() => handlePageChange(currentPage + 1)}
-                      disabled={currentPage === totalPages}
-                      className="p-2 rounded-lg border border-[#E5E7EB] text-[#6B7280] hover:bg-[#F3F4F6] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </button>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
-          </div>
           ) : (
             <>
               {/* Bulk Selection Actions - Always visible */}
@@ -1260,182 +1258,182 @@ export default function Products() {
               </div>
 
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {products.map((product) => (
-                <div
-                  key={product.id}
-                  className={`relative bg-white rounded-2xl shadow-sm border border-[#E5E7EB] overflow-hidden transition-all hover:shadow-md hover:border-[#4FA59C] ${!product.isActive ? "opacity-60" : ""} ${selectedProducts.has(product.id) ? 'ring-2 ring-[#4FA59C]' : ''}`}
-                >
-                  {/* Checkbox overlay */}
-                  <div className="absolute top-4 left-4 z-10">
-                    <input
-                      type="checkbox"
-                      checked={selectedProducts.has(product.id)}
-                      onChange={() => toggleSelectProduct(product.id)}
-                      className="h-5 w-5 rounded border-[#D1D5DB] text-[#4FA59C] focus:ring-[#4FA59C] bg-white shadow-sm"
-                    />
-                  </div>
-                  {/* Product Image Header */}
-                  {product.imageUrl && (
-                    <div className="w-full h-48 overflow-hidden bg-[#F9FAFB] border-b border-[#E5E7EB]">
-                      <img
-                        src={product.imageUrl}
-                        alt={product.name}
-                        className="w-full h-full object-cover"
+                {products.map((product) => (
+                  <div
+                    key={product.id}
+                    className={`relative bg-white rounded-2xl shadow-sm border border-[#E5E7EB] overflow-hidden transition-all hover:shadow-md hover:border-[#4FA59C] ${!product.isActive ? "opacity-60" : ""} ${selectedProducts.has(product.id) ? 'ring-2 ring-[#4FA59C]' : ''}`}
+                  >
+                    {/* Checkbox overlay */}
+                    <div className="absolute top-4 left-4 z-10">
+                      <input
+                        type="checkbox"
+                        checked={selectedProducts.has(product.id)}
+                        onChange={() => toggleSelectProduct(product.id)}
+                        className="h-5 w-5 rounded border-[#D1D5DB] text-[#4FA59C] focus:ring-[#4FA59C] bg-white shadow-sm"
                       />
                     </div>
-                  )}
-                  {!product.imageUrl && (
-                    <div className="w-full h-48 bg-gradient-to-br from-[#F9FAFB] to-[#F3F4F6] border-b border-[#E5E7EB] flex items-center justify-center">
-                      <ImageIcon className="h-16 w-16 text-[#D1D5DB]" />
-                    </div>
-                  )}
+                    {/* Product Image Header */}
+                    {product.imageUrl && (
+                      <div className="w-full h-48 overflow-hidden bg-[#F9FAFB] border-b border-[#E5E7EB]">
+                        <img
+                          src={product.imageUrl}
+                          alt={product.name}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    )}
+                    {!product.imageUrl && (
+                      <div className="w-full h-48 bg-gradient-to-br from-[#F9FAFB] to-[#F3F4F6] border-b border-[#E5E7EB] flex items-center justify-center">
+                        <ImageIcon className="h-16 w-16 text-[#D1D5DB]" />
+                      </div>
+                    )}
 
-                  <div className="p-6 space-y-4">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-lg font-semibold text-[#1F2937] mb-1 truncate">{product.name}</h3>
-                        <p className="text-sm text-[#6B7280] line-clamp-2">{product.description}</p>
-                        {product.brandId && (
-                          <div className="mt-2">
-                            <span className="inline-flex items-center px-2.5 py-1 bg-purple-50 text-purple-700 text-xs font-medium rounded-full border border-purple-200">
-                              Custom product from {product.brandName || 'Brand'}
-                            </span>
-                          </div>
+                    <div className="p-6 space-y-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-lg font-semibold text-[#1F2937] mb-1 truncate">{product.name}</h3>
+                          <p className="text-sm text-[#6B7280] line-clamp-2">{product.description}</p>
+                          {product.brandId && (
+                            <div className="mt-2">
+                              <span className="inline-flex items-center px-2.5 py-1 bg-purple-50 text-purple-700 text-xs font-medium rounded-full border border-purple-200">
+                                Custom product from {product.brandName || 'Brand'}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        {!product.isActive && (
+                          <span className="px-3 py-1 bg-[#FEF3C7] text-[#92400E] text-xs font-medium rounded-full border border-[#FDE68A] whitespace-nowrap">
+                            Inactive
+                          </span>
                         )}
                       </div>
-                      {!product.isActive && (
-                        <span className="px-3 py-1 bg-[#FEF3C7] text-[#92400E] text-xs font-medium rounded-full border border-[#FDE68A] whitespace-nowrap">
-                          Inactive
-                        </span>
-                      )}
-                    </div>
 
-                    <div className="space-y-3">
-                      {/* Pharmacy Coverages - Show if bundle has multiple medications */}
-                      <div className="bg-[#F0F9FF] rounded-xl p-2.5 border border-[#BAE6FD]">
-                        <p className="text-[10px] font-semibold text-[#0369A1] mb-1.5 uppercase tracking-wide">
-                          {product.pharmacyCoverages && product.pharmacyCoverages.length > 1
-                            ? `Bundle (${product.pharmacyCoverages.length} medications)`
-                            : 'Single Medication'}
-                        </p>
+                      <div className="space-y-3">
+                        {/* Pharmacy Coverages - Show if bundle has multiple medications */}
+                        <div className="bg-[#F0F9FF] rounded-xl p-2.5 border border-[#BAE6FD]">
+                          <p className="text-[10px] font-semibold text-[#0369A1] mb-1.5 uppercase tracking-wide">
+                            {product.pharmacyCoverages && product.pharmacyCoverages.length > 1
+                              ? `Bundle (${product.pharmacyCoverages.length} medications)`
+                              : 'Single Medication'}
+                          </p>
 
-                        <div className="space-y-1">
-                          {product.pharmacyCoverages && product.pharmacyCoverages.length > 0 ? (
-                            product.pharmacyCoverages.map((coverage, idx) => (
-                              <div key={coverage.id} className="text-xs">
-                                <p className="font-semibold text-[#0C4A6E] leading-tight">
-                                  • {coverage.customName || coverage.pharmacyProduct?.pharmacyProductName || 'Product'}
-                                </p>
-                                {coverage.customSig && (
-                                  <p className="text-[10px] text-[#64748B] leading-tight ml-2 truncate" title={coverage.customSig}>
-                                    {coverage.customSig}
+                          <div className="space-y-1">
+                            {product.pharmacyCoverages && product.pharmacyCoverages.length > 0 ? (
+                              product.pharmacyCoverages.map((coverage, idx) => (
+                                <div key={coverage.id} className="text-xs">
+                                  <p className="font-semibold text-[#0C4A6E] leading-tight">
+                                    • {coverage.customName || coverage.pharmacyProduct?.pharmacyProductName || 'Product'}
                                   </p>
-                                )}
-                              </div>
-                            ))
-                          ) : (
-                            <>
-                              <div className="text-xs">
-                                <p className="font-semibold text-[#0C4A6E] leading-tight">
-                                  • {product.name}
-                                </p>
-                                {product.placeholderSig && (
-                                  <p className="text-[10px] text-[#64748B] leading-tight ml-2 truncate" title={product.placeholderSig}>
-                                    {product.placeholderSig}
+                                  {coverage.customSig && (
+                                    <p className="text-[10px] text-[#64748B] leading-tight ml-2 truncate" title={coverage.customSig}>
+                                      {coverage.customSig}
+                                    </p>
+                                  )}
+                                </div>
+                              ))
+                            ) : (
+                              <>
+                                <div className="text-xs">
+                                  <p className="font-semibold text-[#0C4A6E] leading-tight">
+                                    • {product.name}
                                   </p>
-                                )}
-                              </div>
-                            </>
-                          )}
+                                  {product.placeholderSig && (
+                                    <p className="text-[10px] text-[#64748B] leading-tight ml-2 truncate" title={product.placeholderSig}>
+                                      {product.placeholderSig}
+                                    </p>
+                                  )}
+                                </div>
+                              </>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                      {product.pharmacyCoverages && product.pharmacyCoverages.length <= 1 && <div className="h-[32px]"></div>}
+                        {product.pharmacyCoverages && product.pharmacyCoverages.length <= 1 && <div className="h-[32px]"></div>}
 
-                      <div className="space-y-1.5 relative z-10">
-                        <label className="text-xs font-medium text-[#9CA3AF] uppercase tracking-wide">Medical Questions</label>
-                        <select
-                          value=""
-                          onChange={(e) => handleAttachFormToProduct(product.id, e.target.value)}
-                          disabled={attachingFormToProduct === product.id}
-                          className="w-full rounded-xl border border-[#E5E7EB] bg-white px-3 py-2 text-sm text-[#1F2937] hover:border-[#4FA59C] transition-all focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                          style={{ zIndex: 1000 }}
-                        >
-                          <option value="" disabled>
-                            {attachingFormToProduct === product.id ? 'Attaching...' : 'Choose Template...'}
-                          </option>
-                          {availableForms.map((form) => (
-                            <option key={form.id} value={form.id}>
-                              {form.title}
+                        <div className="space-y-1.5 relative z-10">
+                          <label className="text-xs font-medium text-[#9CA3AF] uppercase tracking-wide">Medical Questions</label>
+                          <select
+                            value=""
+                            onChange={(e) => handleAttachFormToProduct(product.id, e.target.value)}
+                            disabled={attachingFormToProduct === product.id}
+                            className="w-full rounded-xl border border-[#E5E7EB] bg-white px-3 py-2 text-sm text-[#1F2937] hover:border-[#4FA59C] transition-all focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                            style={{ zIndex: 1000 }}
+                          >
+                            <option value="" disabled>
+                              {attachingFormToProduct === product.id ? 'Attaching...' : 'Choose Template...'}
                             </option>
-                          ))}
-                        </select>
-                      </div>
+                            {availableForms.map((form) => (
+                              <option key={form.id} value={form.id}>
+                                {form.title}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
 
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="bg-[#F9FAFB] rounded-xl p-3 border border-[#E5E7EB]">
-                          <p className="text-xs font-medium text-[#9CA3AF] mb-1">Medication Size</p>
-                          <p className="text-sm font-semibold text-[#1F2937]">{product.medicationSize || '—'}</p>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="bg-[#F9FAFB] rounded-xl p-3 border border-[#E5E7EB]">
+                            <p className="text-xs font-medium text-[#9CA3AF] mb-1">Medication Size</p>
+                            <p className="text-sm font-semibold text-[#1F2937]">{product.medicationSize || '—'}</p>
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    <div className="flex gap-2 pt-2">
-                      {product.isActive ? (
-                        <>
-                          <button
-                            onClick={() => router.push(`/products/editor/${product.id}`)}
-                            className="flex-1 rounded-full px-4 py-2.5 bg-[#4FA59C] text-white text-sm font-medium shadow-sm hover:bg-[#478F87] transition-all flex items-center justify-center gap-2"
-                          >
-                            <FileText className="h-4 w-4" />
-                            Manage
-                          </button>
-                          {activeTab === 'all' ? (
+                      <div className="flex gap-2 pt-2">
+                        {product.isActive ? (
+                          <>
                             <button
-                              onClick={() => handlePermanentDelete(product)}
-                              className="rounded-full px-4 py-2.5 bg-[#EF4444] text-white text-sm font-medium hover:bg-[#DC2626] transition-all"
+                              onClick={() => router.push(`/products/editor/${product.id}`)}
+                              className="flex-1 rounded-full px-4 py-2.5 bg-[#4FA59C] text-white text-sm font-medium shadow-sm hover:bg-[#478F87] transition-all flex items-center justify-center gap-2"
                             >
-                              Delete
+                              <FileText className="h-4 w-4" />
+                              Manage
                             </button>
-                          ) : (
-                            <button
-                              onClick={() => handleToggleActive(product)}
-                              className="rounded-full px-4 py-2.5 border border-[#E5E7EB] text-[#EF4444] text-sm font-medium hover:bg-[#FEF2F2] transition-all"
-                            >
-                              Deactivate
-                            </button>
-                          )}
-                        </>
-                      ) : (
-                        <>
-                          <button
-                            onClick={() => handleToggleActive(product)}
-                            className="flex-1 rounded-full px-4 py-2.5 bg-[#4FA59C] text-white text-sm font-medium shadow-sm hover:bg-[#478F87] transition-all"
-                          >
-                            Configure
-                          </button>
-                          {activeTab === 'all' && (
-                            <>
-                              <button
-                                onClick={() => handleQuickActivate(product)}
-                                className="rounded-full px-4 py-2.5 bg-[#10B981] text-white text-sm font-medium hover:bg-[#059669] transition-all"
-                              >
-                                Activate
-                              </button>
+                            {activeTab === 'all' ? (
                               <button
                                 onClick={() => handlePermanentDelete(product)}
                                 className="rounded-full px-4 py-2.5 bg-[#EF4444] text-white text-sm font-medium hover:bg-[#DC2626] transition-all"
                               >
                                 Delete
                               </button>
-                            </>
-                          )}
-                        </>
-                      )}
+                            ) : (
+                              <button
+                                onClick={() => handleToggleActive(product)}
+                                className="rounded-full px-4 py-2.5 border border-[#E5E7EB] text-[#EF4444] text-sm font-medium hover:bg-[#FEF2F2] transition-all"
+                              >
+                                Deactivate
+                              </button>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              onClick={() => handleToggleActive(product)}
+                              className="flex-1 rounded-full px-4 py-2.5 bg-[#4FA59C] text-white text-sm font-medium shadow-sm hover:bg-[#478F87] transition-all"
+                            >
+                              Configure
+                            </button>
+                            {activeTab === 'all' && (
+                              <>
+                                <button
+                                  onClick={() => handleQuickActivate(product)}
+                                  className="rounded-full px-4 py-2.5 bg-[#10B981] text-white text-sm font-medium hover:bg-[#059669] transition-all"
+                                >
+                                  Activate
+                                </button>
+                                <button
+                                  onClick={() => handlePermanentDelete(product)}
+                                  className="rounded-full px-4 py-2.5 bg-[#EF4444] text-white text-sm font-medium hover:bg-[#DC2626] transition-all"
+                                >
+                                  Delete
+                                </button>
+                              </>
+                            )}
+                          </>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
             </>
           )}
         </main>
