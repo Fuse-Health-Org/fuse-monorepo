@@ -1,2 +1,6 @@
-export const UNPROTECTED_PATHS = ['/', '/my-treatments/[slug]', '/treatments/[slug]', '/my-products/[slug]'] as const;
-
+export const UNPROTECTED_PATHS = [
+  "/",
+  "/my-treatments/[slug]",
+  "/treatments/[slug]",
+  "/my-products/[slug]",
+];

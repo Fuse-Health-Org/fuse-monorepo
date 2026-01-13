@@ -50,5 +50,5 @@ export const US_STATES = [
   { key: 'WI', name: 'Wisconsin' },
   { key: 'WY', name: 'Wyoming' },
   { key: 'DC', name: 'District of Columbia' },
-] as const;
+];
 

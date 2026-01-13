@@ -14,5 +14,5 @@ export const LAYOUT_OPTIONS = [
     name: "Clinical First",
     description: "Begin with doctor-required questions for higher-compliance products.",
   },
-] as const;
+];
 

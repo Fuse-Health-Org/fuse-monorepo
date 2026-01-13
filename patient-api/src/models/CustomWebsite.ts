@@ -80,6 +80,20 @@ export default class CustomWebsite extends Entity {
     declare footerColor?: string;
 
     @Column({
+        type: DataType.JSONB,
+        allowNull: true,
+        defaultValue: null,
+    })
+    declare footerCategories?: Array<{
+        name: string;
+        visible: boolean;
+        urls?: Array<{
+            label: string;
+            url: string;
+        }>;
+    }>;
+
+    @Column({
         type: DataType.BOOLEAN,
         allowNull: false,
         defaultValue: true,

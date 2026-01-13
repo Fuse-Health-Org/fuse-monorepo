@@ -7,5 +7,5 @@ export const CATEGORY_OPTIONS = [
   { value: "skincare", label: "Skincare" },
   { value: "wellness", label: "Wellness" },
   { value: "other", label: "Other" },
-] as const;
+];
 

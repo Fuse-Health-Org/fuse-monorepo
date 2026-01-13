@@ -5,7 +5,7 @@ import Layout from "@/components/Layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Monitor, Smartphone, Upload, Link as LinkIcon, Globe, Crown, ExternalLink } from "lucide-react"
+import { Monitor, Smartphone, Upload, Link as LinkIcon, Globe, Crown, ExternalLink, Trash2, Plus, ChevronDown, GripVertical } from "lucide-react"
 import { Switch } from "@/components/ui/switch"
 import { ToastManager } from "@/components/ui/toast"
 import { useToast } from "@/hooks/use-toast"
@@ -26,6 +26,28 @@ const FONT_OPTIONS = [
   { value: "Open Sans", label: "Open Sans", description: "Humanist sans-serif, excellent legibility" },
 ]
 
+interface FooterCategoryUrl {
+  label: string
+  url: string
+}
+
+interface FooterCategory {
+  name: string
+  visible: boolean
+  urls?: FooterCategoryUrl[]
+}
+
+const DEFAULT_FOOTER_CATEGORIES: FooterCategory[] = [
+  { name: "Shop", visible: true, urls: [] },
+  { name: "Daily Health", visible: true, urls: [] },
+  { name: "Rest & Restore", visible: true, urls: [] },
+  { name: "Store", visible: true, urls: [] },
+  { name: "Learn More", visible: true, urls: [] },
+  { name: "Contact", visible: true, urls: [] },
+  { name: "Support", visible: true, urls: [] },
+  { name: "Connect", visible: true, urls: [] },
+]
+
 interface PortalSettings {
   portalTitle: string
   portalDescription: string
@@ -37,14 +59,7 @@ interface PortalSettings {
   heroSubtitle: string
   isActive: boolean
   footerColor?: string
-  footerShowShop?: boolean
-  footerShowDailyHealth?: boolean
-  footerShowRestRestore?: boolean
-  footerShowStore?: boolean
-  footerShowLearnMore?: boolean
-  footerShowContact?: boolean
-  footerShowSupport?: boolean
-  footerShowConnect?: boolean
+  footerCategories?: FooterCategory[]
 }
 
 export default function PortalPage() {
@@ -83,19 +98,19 @@ export default function PortalPage() {
     heroSubtitle: "All-in-one nutritional support in one simple drink",
     isActive: true,
     footerColor: "#000000",
-    footerShowShop: true,
-    footerShowDailyHealth: true,
-    footerShowRestRestore: true,
-    footerShowStore: true,
-    footerShowLearnMore: true,
-    footerShowContact: true,
-    footerShowSupport: true,
-    footerShowConnect: true,
+    footerCategories: DEFAULT_FOOTER_CATEGORIES,
   })
   const [isTogglingActive, setIsTogglingActive] = useState(false)
   const [clinicSlug, setClinicSlug] = useState<string | null>(null)
   const [customDomain, setCustomDomain] = useState<string | null>(null)
   const [isCustomDomain, setIsCustomDomain] = useState(false)
+  const [newCategoryName, setNewCategoryName] = useState("")
+  const [isAddingCategory, setIsAddingCategory] = useState(false)
+  const [expandedCategories, setExpandedCategories] = useState<Set<number>>(new Set())
+  const [addingUrlToCategory, setAddingUrlToCategory] = useState<number | null>(null)
+  const [newUrlLabel, setNewUrlLabel] = useState("")
+  const [newUrlValue, setNewUrlValue] = useState("")
+  const [draggedCategoryIndex, setDraggedCategoryIndex] = useState<number | null>(null)
 
   // Check if user has access to Portal based on tier config, custom features, or plan type
   const hasPortalAccess =
@@ -139,12 +154,42 @@ export default function PortalPage() {
     }
   }, [hasPortalAccess, user?.clinicId])
 
+  // Helper function to convert old format (boolean fields) to new format (array)
+  const convertToFooterCategories = (data: any): FooterCategory[] => {
+    // If footerCategories exists, use it
+    if (data.footerCategories && Array.isArray(data.footerCategories)) {
+      return data.footerCategories
+    }
+    
+    // Otherwise, convert from old boolean fields
+    const categories: FooterCategory[] = []
+    const categoryMapping: { [key: string]: string } = {
+      footerShowShop: "Shop",
+      footerShowDailyHealth: "Daily Health",
+      footerShowRestRestore: "Rest & Restore",
+      footerShowStore: "Store",
+      footerShowLearnMore: "Learn More",
+      footerShowContact: "Contact",
+      footerShowSupport: "Support",
+      footerShowConnect: "Connect",
+    }
+    
+    Object.entries(categoryMapping).forEach(([key, name]) => {
+      if (data[key] !== false) { // Only add if not explicitly false
+        categories.push({ name, visible: data[key] ?? true, urls: [] })
+      }
+    })
+    
+    return categories.length > 0 ? categories : DEFAULT_FOOTER_CATEGORIES
+  }
+
   const loadSettings = async () => {
     try {
       const response = await authenticatedFetch(`${API_URL}/custom-website`)
       if (response.ok) {
         const data = await response.json()
         if (data.success && data.data) {
+          const footerCategories = convertToFooterCategories(data.data)
           setSettings({
             portalTitle: data.data.portalTitle || settings.portalTitle,
             portalDescription: data.data.portalDescription || settings.portalDescription,
@@ -156,14 +201,7 @@ export default function PortalPage() {
             heroSubtitle: data.data.heroSubtitle || settings.heroSubtitle,
             isActive: data.data.isActive ?? true,
             footerColor: data.data.footerColor || settings.footerColor || "#000000",
-            footerShowShop: data.data.footerShowShop ?? settings.footerShowShop ?? true,
-            footerShowDailyHealth: data.data.footerShowDailyHealth ?? settings.footerShowDailyHealth ?? true,
-            footerShowRestRestore: data.data.footerShowRestRestore ?? settings.footerShowRestRestore ?? true,
-            footerShowStore: data.data.footerShowStore ?? settings.footerShowStore ?? true,
-            footerShowLearnMore: data.data.footerShowLearnMore ?? settings.footerShowLearnMore ?? true,
-            footerShowContact: data.data.footerShowContact ?? settings.footerShowContact ?? true,
-            footerShowSupport: data.data.footerShowSupport ?? settings.footerShowSupport ?? true,
-            footerShowConnect: data.data.footerShowConnect ?? settings.footerShowConnect ?? true,
+            footerCategories: footerCategories,
           })
         }
       }
@@ -234,6 +272,93 @@ export default function PortalPage() {
     } finally {
       setIsTogglingActive(false)
     }
+  }
+
+  const handleDeleteFooterCategory = (index: number) => {
+    const newCategories = settings.footerCategories?.filter((_, i) => i !== index) || []
+    setSettings({ ...settings, footerCategories: newCategories })
+  }
+
+  const handleToggleFooterCategory = (index: number, checked: boolean) => {
+    const newCategories = [...(settings.footerCategories || [])]
+    newCategories[index] = { ...newCategories[index], visible: checked }
+    setSettings({ ...settings, footerCategories: newCategories })
+  }
+
+  const handleAddFooterCategory = () => {
+    if (!newCategoryName.trim()) return
+    
+    const newCategory: FooterCategory = {
+      name: newCategoryName.trim(),
+      visible: true,
+      urls: []
+    }
+    
+    const newCategories = [...(settings.footerCategories || []), newCategory]
+    setSettings({ ...settings, footerCategories: newCategories })
+    setNewCategoryName("")
+    setIsAddingCategory(false)
+  }
+
+  const toggleCategoryExpanded = (index: number) => {
+    const newExpanded = new Set(expandedCategories)
+    if (newExpanded.has(index)) {
+      newExpanded.delete(index)
+    } else {
+      newExpanded.add(index)
+    }
+    setExpandedCategories(newExpanded)
+  }
+
+  const isValidUrl = (url: string): boolean => {
+    try {
+      const urlObj = new URL(url)
+      return urlObj.protocol === 'http:' || urlObj.protocol === 'https:'
+    } catch {
+      return false
+    }
+  }
+
+  const handleAddUrlToCategory = (categoryIndex: number) => {
+    if (!newUrlLabel.trim() || !newUrlValue.trim()) return
+    
+    if (!isValidUrl(newUrlValue.trim())) {
+      error("Please enter a valid URL (must start with http:// or https://)", "Invalid URL")
+      return
+    }
+
+    const newCategories = [...(settings.footerCategories || [])]
+    if (newCategories[categoryIndex]) {
+      const newUrl: FooterCategoryUrl = {
+        label: newUrlLabel.trim(),
+        url: newUrlValue.trim()
+      }
+      newCategories[categoryIndex].urls = [...(newCategories[categoryIndex].urls || []), newUrl]
+      setSettings({ ...settings, footerCategories: newCategories })
+      setNewUrlLabel("")
+      setNewUrlValue("")
+      setAddingUrlToCategory(null)
+    }
+  }
+
+  const handleDragStart = (index: number) => {
+    setDraggedCategoryIndex(index)
+  }
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault()
+    if (draggedCategoryIndex === null || draggedCategoryIndex === index) return
+
+    const newCategories = [...(settings.footerCategories || [])]
+    const draggedCategory = newCategories[draggedCategoryIndex]
+    newCategories.splice(draggedCategoryIndex, 1)
+    newCategories.splice(index, 0, draggedCategory)
+    setSettings({ ...settings, footerCategories: newCategories })
+    setDraggedCategoryIndex(index)
+  }
+
+  const handleDragEnd = () => {
+    setDraggedCategoryIndex(null)
   }
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -701,64 +826,218 @@ export default function PortalPage() {
 
                 {/* Footer Sections Visibility */}
                 <div className="space-y-3 pt-2 border-t">
-                  <label className="text-sm font-medium">Footer Sections</label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium">Footer Sections</label>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsAddingCategory(true)}
+                      className="h-8"
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add Category
+                    </Button>
+                  </div>
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <label className="text-sm">Shop</label>
-                      <Switch
-                        checked={settings.footerShowShop ?? true}
-                        onCheckedChange={(checked) => setSettings({ ...settings, footerShowShop: checked })}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <label className="text-sm">Daily Health</label>
-                      <Switch
-                        checked={settings.footerShowDailyHealth ?? true}
-                        onCheckedChange={(checked) => setSettings({ ...settings, footerShowDailyHealth: checked })}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <label className="text-sm">Rest & Restore</label>
-                      <Switch
-                        checked={settings.footerShowRestRestore ?? true}
-                        onCheckedChange={(checked) => setSettings({ ...settings, footerShowRestRestore: checked })}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <label className="text-sm">Store</label>
-                      <Switch
-                        checked={settings.footerShowStore ?? true}
-                        onCheckedChange={(checked) => setSettings({ ...settings, footerShowStore: checked })}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <label className="text-sm">Learn More</label>
-                      <Switch
-                        checked={settings.footerShowLearnMore ?? true}
-                        onCheckedChange={(checked) => setSettings({ ...settings, footerShowLearnMore: checked })}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <label className="text-sm">Contact</label>
-                      <Switch
-                        checked={settings.footerShowContact ?? true}
-                        onCheckedChange={(checked) => setSettings({ ...settings, footerShowContact: checked })}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <label className="text-sm">Support</label>
-                      <Switch
-                        checked={settings.footerShowSupport ?? true}
-                        onCheckedChange={(checked) => setSettings({ ...settings, footerShowSupport: checked })}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <label className="text-sm">Connect</label>
-                      <Switch
-                        checked={settings.footerShowConnect ?? true}
-                        onCheckedChange={(checked) => setSettings({ ...settings, footerShowConnect: checked })}
-                      />
-                    </div>
+                    {(settings.footerCategories || []).map((category, index) => {
+                      const isExpanded = expandedCategories.has(index)
+                      return (
+                        <div 
+                          key={index} 
+                          className={`border rounded-md ${draggedCategoryIndex === index ? 'opacity-50' : ''}`}
+                          draggable
+                          onDragStart={() => handleDragStart(index)}
+                          onDragOver={(e) => handleDragOver(e, index)}
+                          onDragEnd={handleDragEnd}
+                        >
+                          <div 
+                            className="flex items-center justify-between p-3 cursor-pointer hover:bg-muted/50"
+                            onClick={() => toggleCategoryExpanded(index)}
+                          >
+                            <div className="flex items-center gap-2 flex-1">
+                              <div
+                                className="cursor-grab active:cursor-grabbing"
+                                onClick={(e) => e.stopPropagation()}
+                                onMouseDown={(e) => e.stopPropagation()}
+                              >
+                                <GripVertical className="h-4 w-4 text-muted-foreground" />
+                              </div>
+                              <ChevronDown 
+                                className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} 
+                              />
+                              <label className="text-sm font-medium">{category.name}</label>
+                            </div>
+                            <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 hover:bg-red-50 hover:text-red-600"
+                                onClick={() => handleDeleteFooterCategory(index)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                              <Switch
+                                checked={category.visible}
+                                onCheckedChange={(checked) => handleToggleFooterCategory(index, checked)}
+                              />
+                            </div>
+                          </div>
+                          {isExpanded && (
+                            <div className="px-3 pb-3 border-t bg-muted/30">
+                              <div className="space-y-2 pt-3">
+                                <div className="flex items-center justify-between mb-2">
+                                  <div className="text-xs font-medium text-muted-foreground">
+                                    URLs ({category.urls?.length || 0})
+                                  </div>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-6 text-xs"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setAddingUrlToCategory(index)
+                                    }}
+                                  >
+                                    <Plus className="h-3 w-3 mr-1" />
+                                    Add URL
+                                  </Button>
+                                </div>
+                                {addingUrlToCategory === index ? (
+                                  <div className="space-y-2 p-2 bg-background rounded border">
+                                    <Input
+                                      value={newUrlLabel}
+                                      onChange={(e) => setNewUrlLabel(e.target.value)}
+                                      placeholder="Label (e.g., All Products)"
+                                      className="text-xs"
+                                      onKeyDown={(e) => {
+                                        if (e.key === "Enter") {
+                                          e.preventDefault()
+                                          document.getElementById(`url-input-${index}`)?.focus()
+                                        } else if (e.key === "Escape") {
+                                          setAddingUrlToCategory(null)
+                                          setNewUrlLabel("")
+                                          setNewUrlValue("")
+                                        }
+                                      }}
+                                      autoFocus
+                                    />
+                                    <Input
+                                      id={`url-input-${index}`}
+                                      value={newUrlValue}
+                                      onChange={(e) => setNewUrlValue(e.target.value)}
+                                      placeholder="https://example.com"
+                                      className="text-xs"
+                                      onKeyDown={(e) => {
+                                        if (e.key === "Enter") {
+                                          e.preventDefault()
+                                          handleAddUrlToCategory(index)
+                                        } else if (e.key === "Escape") {
+                                          setAddingUrlToCategory(null)
+                                          setNewUrlLabel("")
+                                          setNewUrlValue("")
+                                        }
+                                      }}
+                                    />
+                                    <div className="flex gap-2">
+                                      <Button
+                                        variant="default"
+                                        size="sm"
+                                        className="h-7 text-xs flex-1"
+                                        onClick={() => handleAddUrlToCategory(index)}
+                                        disabled={!newUrlLabel.trim() || !newUrlValue.trim()}
+                                      >
+                                        Add
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-7 text-xs"
+                                        onClick={() => {
+                                          setAddingUrlToCategory(null)
+                                          setNewUrlLabel("")
+                                          setNewUrlValue("")
+                                        }}
+                                      >
+                                        Cancel
+                                      </Button>
+                                    </div>
+                                  </div>
+                                ) : null}
+                                {(category.urls || []).length > 0 ? (
+                                  <div className="space-y-2">
+                                    {(category.urls || []).map((urlItem, urlIndex) => (
+                                      <div key={urlIndex} className="flex items-center gap-2 p-2 bg-background rounded border">
+                                        <div className="flex-1 min-w-0">
+                                          <div className="text-xs font-medium truncate">{urlItem.label}</div>
+                                          <div className="text-xs text-muted-foreground truncate">{urlItem.url}</div>
+                                        </div>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-6 w-6 hover:bg-red-50 hover:text-red-600"
+                                          onClick={() => {
+                                            const newCategories = [...(settings.footerCategories || [])]
+                                            if (newCategories[index]) {
+                                              newCategories[index].urls = (newCategories[index].urls || []).filter((_, i) => i !== urlIndex)
+                                              setSettings({ ...settings, footerCategories: newCategories })
+                                            }
+                                          }}
+                                        >
+                                          <Trash2 className="h-3 w-3" />
+                                        </Button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  !addingUrlToCategory && (
+                                    <div className="text-xs text-muted-foreground py-2">
+                                      No URLs configured
+                                    </div>
+                                  )
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                    {isAddingCategory && (
+                      <div className="flex items-center gap-2 pt-2 border-t">
+                        <Input
+                          value={newCategoryName}
+                          onChange={(e) => setNewCategoryName(e.target.value)}
+                          placeholder="Enter category name"
+                          className="flex-1"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              handleAddFooterCategory()
+                            } else if (e.key === "Escape") {
+                              setIsAddingCategory(false)
+                              setNewCategoryName("")
+                            }
+                          }}
+                          autoFocus
+                        />
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={handleAddFooterCategory}
+                          disabled={!newCategoryName.trim()}
+                        >
+                          Add
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setIsAddingCategory(false)
+                            setNewCategoryName("")
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -878,46 +1157,13 @@ export default function PortalPage() {
                     style={{ backgroundColor: settings.footerColor || "#000000" }}
                   >
                     <div className="grid grid-cols-3 gap-2 mb-3">
-                      {(settings.footerShowShop ?? true) && (
-                        <div>
-                          <div className="font-semibold mb-1 opacity-90">SHOP</div>
-                        </div>
-                      )}
-                      {(settings.footerShowDailyHealth ?? true) && (
-                        <div>
-                          <div className="font-semibold mb-1 opacity-90">DAILY HEALTH</div>
-                        </div>
-                      )}
-                      {(settings.footerShowRestRestore ?? true) && (
-                        <div>
-                          <div className="font-semibold mb-1 opacity-90">REST & RESTORE</div>
-                        </div>
-                      )}
-                      {(settings.footerShowStore ?? true) && (
-                        <div>
-                          <div className="font-semibold mb-1 opacity-90">STORE</div>
-                        </div>
-                      )}
-                      {(settings.footerShowLearnMore ?? true) && (
-                        <div>
-                          <div className="font-semibold mb-1 opacity-90">LEARN MORE</div>
-                        </div>
-                      )}
-                      {(settings.footerShowContact ?? true) && (
-                        <div>
-                          <div className="font-semibold mb-1 opacity-90">CONTACT</div>
-                        </div>
-                      )}
-                      {(settings.footerShowSupport ?? true) && (
-                        <div>
-                          <div className="font-semibold mb-1 opacity-90">SUPPORT</div>
-                        </div>
-                      )}
-                      {(settings.footerShowConnect ?? true) && (
-                        <div>
-                          <div className="font-semibold mb-1 opacity-90">CONNECT</div>
-                        </div>
-                      )}
+                      {(settings.footerCategories || [])
+                        .filter((category) => category.visible)
+                        .map((category, index) => (
+                          <div key={index}>
+                            <div className="font-semibold mb-1 opacity-90">{category.name.toUpperCase()}</div>
+                          </div>
+                        ))}
                     </div>
                   </div>
                 </div>
