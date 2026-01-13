@@ -39,7 +39,7 @@ export function registerPharmacyEndpoints(
         if (!user) {
           return res.status(403).json({ success: false, message: "Forbidden" });
         }
-        
+
         // Check if user has admin or brand role using UserRoles table
         const hasAccess = await userHasAnyRole(user.id, ['admin', 'brand']);
         if (!hasAccess) {
@@ -104,7 +104,7 @@ export function registerPharmacyEndpoints(
         if (!user) {
           return res.status(403).json({ success: false, message: "Forbidden" });
         }
-        
+
         // Check if user has admin or brand role using UserRoles table
         const hasAccess = await userHasAnyRole(user.id, ['admin', 'brand']);
         if (!hasAccess) {
@@ -163,7 +163,7 @@ export function registerPharmacyEndpoints(
         if (!user) {
           return res.status(403).json({ success: false, message: "Forbidden" });
         }
-        
+
         // Check if user has admin or brand role using UserRoles table
         const hasAccess = await userHasAnyRole(user.id, ['admin', 'brand']);
         if (!hasAccess) {
@@ -229,7 +229,7 @@ export function registerPharmacyEndpoints(
       if (!user) {
         return res.status(403).json({ success: false, message: "Forbidden" });
       }
-      
+
       // Check if user has admin or brand role using UserRoles table
       const hasAccess = await userHasAnyRole(user.id, ['admin', 'brand']);
       if (!hasAccess) {
@@ -270,7 +270,7 @@ export function registerPharmacyEndpoints(
         if (!user) {
           return res.status(403).json({ success: false, message: "Forbidden" });
         }
-        
+
         // Check if user has admin or brand role using UserRoles table
         const hasAccess = await userHasAnyRole(user.id, ['admin', 'brand']);
         if (!hasAccess) {
@@ -332,7 +332,7 @@ export function registerPharmacyEndpoints(
         if (!user) {
           return res.status(403).json({ success: false, message: "Forbidden" });
         }
-        
+
         // Check if user has admin or brand role using UserRoles table
         const hasAccess = await userHasAnyRole(user.id, ['admin', 'brand']);
         if (!hasAccess) {
@@ -502,11 +502,11 @@ export function registerPharmacyEndpoints(
           statesCount: assignments.length,
           exampleAssignment: assignments[0]
             ? {
-                state: assignments[0].state,
-                pharmacyProductId: assignments[0].pharmacyProductId,
-                pharmacyProductName: assignments[0].pharmacyProductName,
-                wholesaleCost: assignments[0].pharmacyWholesaleCost,
-              }
+              state: assignments[0].state,
+              pharmacyProductId: assignments[0].pharmacyProductId,
+              pharmacyProductName: assignments[0].pharmacyProductName,
+              wholesaleCost: assignments[0].pharmacyWholesaleCost,
+            }
             : null,
         });
 
@@ -546,7 +546,7 @@ export function registerPharmacyEndpoints(
       if (!user) {
         return res.status(403).json({ success: false, message: "Forbidden" });
       }
-      
+
       // Check if user has admin or brand role using UserRoles table
       const hasAccess = await userHasAnyRole(user.id, ['admin', 'brand']);
       if (!hasAccess) {
@@ -600,7 +600,7 @@ export function registerPharmacyEndpoints(
       if (!user) {
         return res.status(403).json({ success: false, message: "Forbidden" });
       }
-      
+
       // Check if user has admin or brand role using UserRoles table
       const hasAccess = await userHasAnyRole(user.id, ['admin', 'brand']);
       if (!hasAccess) {
@@ -669,7 +669,7 @@ export function registerPharmacyEndpoints(
         if (!user) {
           return res.status(403).json({ success: false, message: "Forbidden" });
         }
-        
+
         // Check if user has admin or brand role using UserRoles table
         const hasAccess = await userHasAnyRole(user.id, ['admin', 'brand']);
         if (!hasAccess) {
@@ -735,7 +735,7 @@ export function registerPharmacyEndpoints(
         if (!user) {
           return res.status(403).json({ success: false, message: "Forbidden" });
         }
-        
+
         // Check if user has admin or brand role using UserRoles table
         const hasAccess = await userHasAnyRole(user.id, ['admin', 'brand']);
         if (!hasAccess) {
@@ -746,12 +746,13 @@ export function registerPharmacyEndpoints(
           "🗑️ Starting deletion of all auto-imported IronSail products..."
         );
 
-        // Find all products with [Auto-Imported] prefix
+        // Find all products with isAutoImported flag OR [Auto-Imported] name prefix (for backwards compatibility)
         const autoImportedProducts = await Product.findAll({
           where: {
-            name: {
-              [require("sequelize").Op.like]: "[Auto-Imported]%",
-            },
+            [require("sequelize").Op.or]: [
+              { isAutoImported: true },
+              { name: { [require("sequelize").Op.like]: "[Auto-Imported]%" } },
+            ],
           },
         });
 
@@ -840,7 +841,7 @@ export function registerPharmacyEndpoints(
         if (!user) {
           return res.status(403).json({ success: false, message: "Forbidden" });
         }
-        
+
         // Check if user has admin or brand role using UserRoles table
         const hasAccess = await userHasAnyRole(user.id, ['admin', 'brand']);
         if (!hasAccess) {
@@ -891,10 +892,11 @@ export function registerPharmacyEndpoints(
               continue;
             }
 
-            // Check if product already exists (by pharmacy product ID or name)
+            // Check if product already exists (by pharmacy product ID or medication name)
             const existingProduct = await Product.findOne({
               where: {
-                name: `[Auto-Imported] ${sheetProduct.medicationName}`,
+                name: sheetProduct.medicationName,
+                isAutoImported: true,
               },
             });
 
@@ -929,7 +931,7 @@ export function registerPharmacyEndpoints(
 
             // Create the product
             const product = await Product.create({
-              name: `[Auto-Imported] ${sheetProduct.medicationName}`,
+              name: sheetProduct.medicationName,
               description: `${sheetProduct.medicationName} - ${sheetProduct.form || "Injectable"}`,
               price: sheetProduct.wholesalePrice || sheetProduct.price || 0,
               activeIngredients: [
@@ -940,6 +942,8 @@ export function registerPharmacyEndpoints(
                 "Take as directed by your healthcare provider",
               pharmacyProductId: sheetProduct.rxId,
               pharmacyWholesaleCost: sheetProduct.wholesalePrice,
+              pharmacyProvider: 'ironsail',
+              isAutoImported: true,
               isActive: true,
               categories: [category],
             });

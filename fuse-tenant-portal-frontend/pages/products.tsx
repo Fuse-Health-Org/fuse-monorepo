@@ -412,7 +412,10 @@ export default function Products() {
     try {
       const response = await fetch(`${baseUrl}/products-management/${product.id}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'X-Portal-Context': 'tenant-admin',
+        },
       })
 
       if (!response.ok) throw new Error("Failed to delete product")
@@ -570,7 +573,8 @@ export default function Products() {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'X-Portal-Context': 'tenant-admin',
         }
       })
 
@@ -645,7 +649,10 @@ export default function Products() {
       const deletePromises = Array.from(selectedProducts).map(productId =>
         fetch(`${baseUrl}/products-management/${productId}`, {
           method: "DELETE",
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'X-Portal-Context': 'tenant-admin',
+          },
         })
       )
 

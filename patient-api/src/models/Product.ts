@@ -14,6 +14,7 @@ export enum PharmacyProvider {
     ABSOLUTERX = 'absoluterx',
     TRUEPILL = 'truepill',
     PILLPACK = 'pillpack',
+    IRONSAIL = 'ironsail',
 }
 
 export enum ProductCategory {
@@ -141,6 +142,13 @@ export default class Product extends Entity {
         defaultValue: true,
     })
     declare isActive: boolean;
+
+    @Column({
+        type: DataType.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+    })
+    declare isAutoImported: boolean;
 
     @Column({
         type: DataType.DECIMAL(10, 2),

@@ -318,7 +318,7 @@ app.use(
     },
     credentials: true, // Essential for cookies
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "Cookie"],
+    allowedHeaders: ["Content-Type", "Authorization", "Cookie", "X-Portal-Context"],
     exposedHeaders: ["Set-Cookie"],
   })
 );
@@ -4650,10 +4650,15 @@ app.delete("/products-management/:id", authenticateJWT, async (req, res) => {
         .json({ success: false, message: "Not authenticated" });
     }
 
+    // Check if request is from tenant-admin portal
+    const portalContext = req.headers['x-portal-context'];
+    const isTenantAdmin = portalContext === 'tenant-admin';
+
     const productService = new ProductService();
     const result = await productService.deleteProduct(
       req.params.id,
-      currentUser.id
+      currentUser.id,
+      { isTenantAdmin }
     );
 
     if (!result.success) {

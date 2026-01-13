@@ -401,7 +401,7 @@ class ProductService {
     }
   }
 
-  async deleteProduct(productId: string, userId: string) {
+  async deleteProduct(productId: string, userId: string, options: { isTenantAdmin?: boolean } = {}) {
     try {
       const product = await Product.findByPk(productId);
 
@@ -421,20 +421,31 @@ class ProductService {
         };
       }
 
-      // Only allow brand users to delete their own products, or admins to delete any
-      if (user.hasRoleSync("brand")) {
-        if (product.brandId !== userId) {
+      // If request comes from tenant-admin portal and user has admin/superAdmin role, allow full access
+      const isTenantAdminWithPrivileges = options.isTenantAdmin && user.hasAnyRoleSync(["admin", "superAdmin"]);
+      
+      if (!isTenantAdminWithPrivileges) {
+        // Apply normal brand restrictions
+        if (user.hasRoleSync("brand")) {
+          // Brand users can delete:
+          // 1. Their own custom products (product.brandId === userId)
+          // 2. Auto-imported products (product.isAutoImported === true OR name starts with [Auto-Imported])
+          const isAutoImported = product.isAutoImported || product.name?.startsWith('[Auto-Imported]');
+          const canDelete = product.brandId === userId || isAutoImported;
+          
+          if (!canDelete) {
+            return {
+              success: false,
+              message: "You can only delete products that you created or auto-imported products",
+            };
+          }
+        } else if (!user.hasAnyRoleSync(["admin", "superAdmin"])) {
           return {
             success: false,
-            message: "You can only delete products that you created",
+            message:
+              "Only brand users can delete their own products, or admins can delete any product",
           };
         }
-      } else if (!user.hasRoleSync("admin")) {
-        return {
-          success: false,
-          message:
-            "Only brand users can delete their own products, or admins can delete any product",
-        };
       }
 
       // Hard delete the product since it's a custom brand product
