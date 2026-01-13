@@ -182,11 +182,19 @@ export default function ProductEditor() {
       try {
         // Fetch product details
         const response = await fetch(`${baseUrl}/products-management/${productId}`, {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'X-Portal-Context': 'tenant-admin',
+          },
         })
 
         if (!response.ok) {
-          throw new Error("Failed to load product")
+          const errorData = await response.json().catch(() => ({}))
+          console.error('❌ Product fetch failed:', response.status, errorData)
+          if (response.status === 401) {
+            throw new Error("Session expired. Please sign in again.")
+          }
+          throw new Error(errorData.message || "Failed to load product")
         }
 
         const data = await response.json()

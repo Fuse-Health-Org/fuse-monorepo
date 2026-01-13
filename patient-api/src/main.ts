@@ -4473,6 +4473,10 @@ app.get("/products-management", authenticateJWT, async (req, res) => {
           ? undefined
           : req.query.isActive === "true",
       pharmacyProvider: req.query.pharmacyProvider,
+      isAutoImported:
+        req.query.isAutoImported === undefined
+          ? undefined
+          : req.query.isAutoImported === "true",
     });
 
     if (!validation.success) {
@@ -4483,7 +4487,7 @@ app.get("/products-management", authenticateJWT, async (req, res) => {
       });
     }
 
-    const { page, limit, category, isActive, pharmacyProvider } =
+    const { page, limit, category, isActive, pharmacyProvider, isAutoImported } =
       validation.data;
 
     const result = await productService.listProducts(currentUser.id, {
@@ -4492,6 +4496,7 @@ app.get("/products-management", authenticateJWT, async (req, res) => {
       category,
       isActive,
       pharmacyProvider,
+      isAutoImported,
     });
     res.status(200).json(result);
   } catch (error: any) {
@@ -4519,6 +4524,8 @@ app.get("/products-management/:id", authenticateJWT, async (req, res) => {
         .json({ success: false, message: "Not authenticated" });
     }
 
+    console.log(`📦 Fetching product: ${req.params.id} for user: ${currentUser.id}`);
+
     const productService = new ProductService();
     const result = await productService.getProduct(
       req.params.id,
@@ -4526,16 +4533,15 @@ app.get("/products-management/:id", authenticateJWT, async (req, res) => {
     );
 
     if (!result.success) {
+      console.log(`❌ Product not found: ${req.params.id}`);
       return res.status(404).json(result);
     }
 
+    console.log(`✅ Product fetched successfully: ${req.params.id}`);
     res.status(200).json(result);
   } catch (error: any) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("❌ Error fetching product:", error);
-    } else {
-      console.error("❌ Error fetching product");
-    }
+    console.error("❌ Error fetching product:", error?.message || error);
+    console.error("Stack:", error?.stack);
     res
       .status(500)
       .json({

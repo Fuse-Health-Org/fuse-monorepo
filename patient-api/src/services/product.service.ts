@@ -57,6 +57,7 @@ class ProductService {
       category?: string | string[];
       isActive?: boolean;
       pharmacyProvider?: string;
+      isAutoImported?: boolean;
     } = {}
   ) {
     const {
@@ -65,6 +66,7 @@ class ProductService {
       category,
       isActive,
       pharmacyProvider,
+      isAutoImported,
     } = options;
     const offset = (page - 1) * limit;
 
@@ -111,6 +113,10 @@ class ProductService {
       }
     }
 
+    if (typeof isAutoImported === "boolean") {
+      where.isAutoImported = isAutoImported;
+    }
+
     const { rows: products, count: total } = await Product.findAndCountAll({
       where,
       limit,
@@ -151,19 +157,26 @@ class ProductService {
   }
 
   async getProduct(productId: string, userId: string) {
-    const product = await getProductWithQuestionnaires(productId);
+    try {
+      const product = await getProductWithQuestionnaires(productId);
 
-    if (!product) {
+      if (!product) {
+        console.log(`📦 Product not found in database: ${productId}`);
+        return {
+          success: false,
+          message: "Product not found",
+        };
+      }
+
       return {
-        success: false,
-        message: "Product not found",
+        success: true,
+        data: serializeProduct(product),
       };
+    } catch (error: any) {
+      console.error("❌ Error in getProduct:", error?.message || error);
+      console.error("Stack:", error?.stack);
+      throw error;
     }
-
-    return {
-      success: true,
-      data: serializeProduct(product),
-    };
   }
 
   async createProduct(input: ProductCreateInput, userId: string) {

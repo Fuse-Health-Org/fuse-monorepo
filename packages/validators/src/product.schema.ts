@@ -52,6 +52,7 @@ export const listProductsSchema = paginationSchema.extend({
   categories: z.union([z.array(z.string()), z.string()]).optional(),
   isActive: z.boolean().optional(),
   pharmacyProvider: z.string().optional(),
+  isAutoImported: z.boolean().optional(),
 });
 /**
  * Type exports

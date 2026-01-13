@@ -185,6 +185,9 @@ export default function ProductEditor() {
         })
 
         if (!response.ok) {
+          if (response.status === 401) {
+            throw new Error("Session expired. Please sign in again.")
+          }
           throw new Error("Failed to load product")
         }
 

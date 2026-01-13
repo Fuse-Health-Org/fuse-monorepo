@@ -27,6 +27,7 @@ interface Product {
   pharmacyProductId?: string
   requiredDoctorQuestions?: any[]
   isActive: boolean
+  isAutoImported?: boolean
   createdAt: string
   imageUrl?: string
   brandId?: string | null
@@ -64,6 +65,7 @@ export default function Products() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [showActiveOnly, setShowActiveOnly] = useState(true)
   const [selectedPharmacies, setSelectedPharmacies] = useState<Set<string>>(new Set())
+  const [filterAutoImported, setFilterAutoImported] = useState<boolean | null>(null)
   const [activeTab, setActiveTab] = useState<'selected' | 'all'>('selected')
   const [showModal, setShowModal] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
@@ -95,7 +97,7 @@ export default function Products() {
     fetchPharmacyVendors()
     fetchCategories()
     fetchAvailableForms()
-  }, [selectedCategory, showActiveOnly, selectedPharmacies])
+  }, [selectedCategory, showActiveOnly, selectedPharmacies, filterAutoImported])
 
   useEffect(() => {
     setShowActiveOnly(activeTab === 'selected')
@@ -115,11 +117,17 @@ export default function Products() {
       if (selectedPharmacies.size > 0) {
         baseParams.append("pharmacyProvider", Array.from(selectedPharmacies).join(','))
       }
+      if (filterAutoImported !== null) {
+        baseParams.append("isAutoImported", String(filterAutoImported))
+      }
 
       const firstRes = await fetch(`${baseUrl}/products-management?${baseParams.toString()}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
-      if (!firstRes.ok) throw new Error("Failed to fetch products")
+      if (!firstRes.ok) {
+        if (firstRes.status === 401) throw new Error("Session expired. Please sign in again.")
+        throw new Error("Failed to fetch products")
+      }
       const firstJson = await firstRes.json()
       const firstPageProducts: Product[] = firstJson?.data?.products || []
       const totalPages: number = firstJson?.data?.pagination?.totalPages || 1
@@ -196,7 +204,10 @@ export default function Products() {
         headers: { Authorization: `Bearer ${token}` },
       })
 
-      if (!response.ok) throw new Error("Failed to fetch pharmacy vendors")
+      if (!response.ok) {
+        if (response.status === 401) throw new Error("Session expired. Please sign in again.")
+        throw new Error("Failed to fetch pharmacy vendors")
+      }
 
       const data = await response.json()
       setPharmacyVendors(data.data || [])
@@ -213,7 +224,10 @@ export default function Products() {
         headers: { Authorization: `Bearer ${token}` },
       })
 
-      if (!response.ok) throw new Error("Failed to fetch categories")
+      if (!response.ok) {
+        if (response.status === 401) throw new Error("Session expired. Please sign in again.")
+        throw new Error("Failed to fetch categories")
+      }
 
       const data = await response.json()
       setCategories(data.data || [])
@@ -960,7 +974,7 @@ export default function Products() {
             </div>
           </div>
 
-          <div className="flex gap-4">
+          <div className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium text-[#4B5563]">Filter by Category</label>
               <select
@@ -976,6 +990,7 @@ export default function Products() {
                 ))}
               </select>
             </div>
+
             <div className="space-y-2">
               <label className="text-sm font-medium text-[#4B5563]">Filter by Pharmacy</label>
               <div className="flex flex-wrap gap-2">
@@ -998,11 +1013,10 @@ export default function Products() {
                         }
                         setSelectedPharmacies(newSelected)
                       }}
-                      className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                        isSelected
+                      className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${isSelected
                           ? 'bg-[#4FA59C] text-white shadow-md'
                           : 'bg-white text-[#6B7280] border border-[#E5E7EB] hover:border-[#4FA59C] hover:text-[#4FA59C]'
-                      }`}
+                        }`}
                     >
                       {pharmacy.name}
                       {isSelected && <X className="inline-block ml-1.5 h-3 w-3" />}
@@ -1015,6 +1029,30 @@ export default function Products() {
                     className="px-4 py-2 rounded-full text-sm font-medium text-[#EF4444] border border-[#EF4444] hover:bg-[#FEF2F2] transition-all"
                   >
                     Clear All
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-[#4B5563]">Filter by Auto Imported</label>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => setFilterAutoImported(filterAutoImported === true ? null : true)}
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${filterAutoImported === true
+                      ? 'bg-[#4FA59C] text-white shadow-md'
+                      : 'bg-white text-[#6B7280] border border-[#E5E7EB] hover:border-[#4FA59C] hover:text-[#4FA59C]'
+                    }`}
+                >
+                  Auto Imported
+                  {filterAutoImported === true && <X className="inline-block ml-1.5 h-3 w-3" />}
+                </button>
+                {filterAutoImported !== null && (
+                  <button
+                    onClick={() => setFilterAutoImported(null)}
+                    className="px-4 py-2 rounded-full text-sm font-medium text-[#EF4444] border border-[#EF4444] hover:bg-[#FEF2F2] transition-all"
+                  >
+                    Clear
                   </button>
                 )}
               </div>
