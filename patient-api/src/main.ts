@@ -2941,7 +2941,9 @@ app.post("/custom-website", authenticateJWT, async (req, res) => {
       });
     }
 
-    const user = await User.findByPk(currentUser.id);
+    const user = await User.findByPk(currentUser.id, {
+      include: [{ model: UserRoles, as: 'userRoles', required: false }]
+    });
     if (!user || !user.clinicId) {
       return res.status(404).json({
         success: false,
@@ -2950,7 +2952,7 @@ app.post("/custom-website", authenticateJWT, async (req, res) => {
     }
 
     // Only allow brand users to modify portal settings
-    if (!user.hasAnyRoleSync(['brand', 'doctor'])) {
+    if (!user.hasAnyRoleSync(['brand', 'doctor', 'admin', 'superAdmin'])) {
       return res.status(403).json({
         success: false,
         message: "Access denied"
@@ -3056,7 +3058,9 @@ app.post("/custom-website/toggle-active", authenticateJWT, async (req, res) => {
       });
     }
 
-    const user = await User.findByPk(currentUser.id);
+    const user = await User.findByPk(currentUser.id, {
+      include: [{ model: UserRoles, as: 'userRoles', required: false }]
+    });
     if (!user || !user.clinicId) {
       return res.status(404).json({
         success: false,
@@ -3065,7 +3069,7 @@ app.post("/custom-website/toggle-active", authenticateJWT, async (req, res) => {
     }
 
     // Only allow brand users to toggle portal status
-    if (!user.hasAnyRoleSync(['brand', 'doctor'])) {
+    if (!user.hasAnyRoleSync(['brand', 'doctor', 'admin', 'superAdmin'])) {
       return res.status(403).json({
         success: false,
         message: "Access denied"
@@ -3121,7 +3125,9 @@ app.post("/custom-website/upload-logo", authenticateJWT, upload.single('logo'), 
       });
     }
 
-    const user = await User.findByPk(currentUser.id);
+    const user = await User.findByPk(currentUser.id, {
+      include: [{ model: UserRoles, as: 'userRoles', required: false }]
+    });
     if (!user || !user.clinicId) {
       return res.status(404).json({
         success: false,
@@ -3130,7 +3136,7 @@ app.post("/custom-website/upload-logo", authenticateJWT, upload.single('logo'), 
     }
 
     // Only allow brand, doctor, or affiliate users to upload portal images
-    if (!user.hasAnyRoleSync(['brand', 'doctor', 'affiliate'])) {
+    if (!user.hasAnyRoleSync(['brand', 'doctor', 'affiliate', 'admin', 'superAdmin'])) {
       return res.status(403).json({
         success: false,
         message: "Access denied"
@@ -3200,7 +3206,9 @@ app.post("/custom-website/upload-hero", authenticateJWT, upload.single('heroImag
       });
     }
 
-    const user = await User.findByPk(currentUser.id);
+    const user = await User.findByPk(currentUser.id, {
+      include: [{ model: UserRoles, as: 'userRoles', required: false }]
+    });
     if (!user || !user.clinicId) {
       return res.status(404).json({
         success: false,
@@ -3209,7 +3217,7 @@ app.post("/custom-website/upload-hero", authenticateJWT, upload.single('heroImag
     }
 
     // Only allow brand, doctor, or affiliate users to upload portal images
-    if (!user.hasAnyRoleSync(['brand', 'doctor', 'affiliate'])) {
+    if (!user.hasAnyRoleSync(['brand', 'doctor', 'affiliate', 'admin', 'superAdmin'])) {
       return res.status(403).json({
         success: false,
         message: "Access denied"
