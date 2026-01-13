@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from "react"
-import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/router"
 import { useAuth } from "@/contexts/AuthContext"
 import Layout from "@/components/Layout"
@@ -97,11 +96,9 @@ export default function PortalPage() {
   const [clinicSlug, setClinicSlug] = useState<string | null>(null)
   const [customDomain, setCustomDomain] = useState<string | null>(null)
   const [isCustomDomain, setIsCustomDomain] = useState(false)
-  const logoFileInputRef = useRef<HTMLInputElement>(null)
-  const heroFileInputRef = useRef<HTMLInputElement>(null)
 
   // Check if user has access to Portal based on tier config, custom features, or plan type
-  const hasPortalAccess = 
+  const hasPortalAccess =
     subscription?.tierConfig?.hasCustomPortal ||
     subscription?.customFeatures?.hasCustomPortal ||
     (subscription?.plan?.type && PORTAL_ALLOWED_PLAN_TYPES.includes(subscription.plan.type))
