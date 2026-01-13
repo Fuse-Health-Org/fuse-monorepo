@@ -1014,8 +1014,8 @@ export default function Products() {
                         setSelectedPharmacies(newSelected)
                       }}
                       className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${isSelected
-                          ? 'bg-[#4FA59C] text-white shadow-md'
-                          : 'bg-white text-[#6B7280] border border-[#E5E7EB] hover:border-[#4FA59C] hover:text-[#4FA59C]'
+                        ? 'bg-[#4FA59C] text-white shadow-md'
+                        : 'bg-white text-[#6B7280] border border-[#E5E7EB] hover:border-[#4FA59C] hover:text-[#4FA59C]'
                         }`}
                     >
                       {pharmacy.name}
@@ -1040,8 +1040,8 @@ export default function Products() {
                 <button
                   onClick={() => setFilterAutoImported(filterAutoImported === true ? null : true)}
                   className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${filterAutoImported === true
-                      ? 'bg-[#4FA59C] text-white shadow-md'
-                      : 'bg-white text-[#6B7280] border border-[#E5E7EB] hover:border-[#4FA59C] hover:text-[#4FA59C]'
+                    ? 'bg-[#4FA59C] text-white shadow-md'
+                    : 'bg-white text-[#6B7280] border border-[#E5E7EB] hover:border-[#4FA59C] hover:text-[#4FA59C]'
                     }`}
                 >
                   Auto Imported
@@ -1180,6 +1180,7 @@ export default function Products() {
                           className="h-4 w-4 rounded border-[#D1D5DB] text-[#4FA59C] focus:ring-[#4FA59C]"
                         />
                       </th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-[#6B7280] uppercase tracking-wide">Pharmacy</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-[#6B7280] uppercase tracking-wide">Product</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-[#6B7280] uppercase tracking-wide">Description</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-[#6B7280] uppercase tracking-wide">Size</th>
@@ -1197,6 +1198,25 @@ export default function Products() {
                             onChange={() => toggleSelectProduct(product.id)}
                             className="h-4 w-4 rounded border-[#D1D5DB] text-[#4FA59C] focus:ring-[#4FA59C]"
                           />
+                        </td>
+                        <td className="px-4 py-4">
+                          <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                            product.pharmacyProvider === 'ironsail' 
+                              ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                              : product.pharmacyProvider === 'absoluterx'
+                              ? 'bg-purple-50 text-purple-700 border border-purple-200'
+                              : product.pharmacyProvider === 'truepill'
+                              ? 'bg-green-50 text-green-700 border border-green-200'
+                              : product.pharmacyProvider === 'pillpack'
+                              ? 'bg-orange-50 text-orange-700 border border-orange-200'
+                              : 'bg-gray-50 text-gray-600 border border-gray-200'
+                          }`}>
+                            {product.pharmacyProvider === 'ironsail' ? 'IronSail'
+                              : product.pharmacyProvider === 'absoluterx' ? 'AbsoluteRx'
+                              : product.pharmacyProvider === 'truepill' ? 'Truepill'
+                              : product.pharmacyProvider === 'pillpack' ? 'PillPack'
+                              : product.pharmacyProvider || '—'}
+                          </span>
                         </td>
                         <td className="px-4 py-4">
                           <div className="flex items-center gap-3">
