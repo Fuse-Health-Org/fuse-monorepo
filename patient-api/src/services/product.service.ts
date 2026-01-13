@@ -100,7 +100,15 @@ class ProductService {
     }
 
     if (pharmacyProvider) {
-      where.pharmacyProvider = pharmacyProvider;
+      const providersFilter = String(pharmacyProvider)
+        .split(",")
+        .map((p) => p.trim())
+        .filter(Boolean);
+      if (providersFilter.length > 0) {
+        where.pharmacyProvider = {
+          [Op.in]: providersFilter,
+        };
+      }
     }
 
     const { rows: products, count: total } = await Product.findAndCountAll({

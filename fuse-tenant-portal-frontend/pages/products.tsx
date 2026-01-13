@@ -63,7 +63,7 @@ export default function Products() {
   const [categories, setCategories] = useState<string[]>([])
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [showActiveOnly, setShowActiveOnly] = useState(true)
-  const [selectedPharmacy, setSelectedPharmacy] = useState<string | null>(null)
+  const [selectedPharmacies, setSelectedPharmacies] = useState<Set<string>>(new Set())
   const [activeTab, setActiveTab] = useState<'selected' | 'all'>('selected')
   const [showModal, setShowModal] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
@@ -95,7 +95,7 @@ export default function Products() {
     fetchPharmacyVendors()
     fetchCategories()
     fetchAvailableForms()
-  }, [selectedCategory, showActiveOnly, selectedPharmacy])
+  }, [selectedCategory, showActiveOnly, selectedPharmacies])
 
   useEffect(() => {
     setShowActiveOnly(activeTab === 'selected')
@@ -112,7 +112,9 @@ export default function Products() {
       baseParams.append("limit", "100") // server max is 100
       if (selectedCategory) baseParams.append("category", selectedCategory)
       if (activeTab === 'selected') baseParams.append("isActive", "true")
-      if (selectedPharmacy) baseParams.append("pharmacyProvider", selectedPharmacy)
+      if (selectedPharmacies.size > 0) {
+        baseParams.append("pharmacyProvider", Array.from(selectedPharmacies).join(','))
+      }
 
       const firstRes = await fetch(`${baseUrl}/products-management?${baseParams.toString()}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -412,7 +414,7 @@ export default function Products() {
     try {
       const response = await fetch(`${baseUrl}/products-management/${product.id}`, {
         method: "DELETE",
-        headers: { 
+        headers: {
           Authorization: `Bearer ${token}`,
           'X-Portal-Context': 'tenant-admin',
         },
@@ -649,7 +651,7 @@ export default function Products() {
       const deletePromises = Array.from(selectedProducts).map(productId =>
         fetch(`${baseUrl}/products-management/${productId}`, {
           method: "DELETE",
-          headers: { 
+          headers: {
             Authorization: `Bearer ${token}`,
             'X-Portal-Context': 'tenant-admin',
           },
@@ -976,18 +978,46 @@ export default function Products() {
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium text-[#4B5563]">Filter by Pharmacy</label>
-              <select
-                value={selectedPharmacy || ""}
-                onChange={(e) => setSelectedPharmacy(e.target.value || null)}
-                className="rounded-xl border border-[#E5E7EB] bg-white px-4 py-2.5 text-sm text-[#1F2937] shadow-sm hover:border-[#4FA59C] transition-all focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50"
-              >
-                <option value="">All Pharmacies</option>
-                {pharmacyProviders.map((vendor) => (
-                  <option key={vendor.id} value={vendor.id}>
-                    {vendor.name}
-                  </option>
-                ))}
-              </select>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { id: 'absoluterx', name: 'AbsoluteRx' },
+                  { id: 'ironsail', name: 'IronSail' },
+                  { id: 'truepill', name: 'Truepill' },
+                  { id: 'pillpack', name: 'PillPack' },
+                ].map((pharmacy) => {
+                  const isSelected = selectedPharmacies.has(pharmacy.id)
+                  return (
+                    <button
+                      key={pharmacy.id}
+                      onClick={() => {
+                        const newSelected = new Set(selectedPharmacies)
+                        if (isSelected) {
+                          newSelected.delete(pharmacy.id)
+                        } else {
+                          newSelected.add(pharmacy.id)
+                        }
+                        setSelectedPharmacies(newSelected)
+                      }}
+                      className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                        isSelected
+                          ? 'bg-[#4FA59C] text-white shadow-md'
+                          : 'bg-white text-[#6B7280] border border-[#E5E7EB] hover:border-[#4FA59C] hover:text-[#4FA59C]'
+                      }`}
+                    >
+                      {pharmacy.name}
+                      {isSelected && <X className="inline-block ml-1.5 h-3 w-3" />}
+                    </button>
+                  )
+                })}
+                {selectedPharmacies.size > 0 && (
+                  <button
+                    onClick={() => setSelectedPharmacies(new Set())}
+                    className="px-4 py-2 rounded-full text-sm font-medium text-[#EF4444] border border-[#EF4444] hover:bg-[#FEF2F2] transition-all"
+                  >
+                    Clear All
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
@@ -1080,8 +1110,8 @@ export default function Products() {
                               key={pageNum}
                               onClick={() => handlePageChange(pageNum)}
                               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${currentPage === pageNum
-                                  ? 'bg-[#4FA59C] text-white'
-                                  : 'text-[#6B7280] hover:bg-[#F3F4F6]'
+                                ? 'bg-[#4FA59C] text-white'
+                                : 'text-[#6B7280] hover:bg-[#F3F4F6]'
                                 }`}
                             >
                               {pageNum}
@@ -1215,8 +1245,8 @@ export default function Products() {
                               key={pageNum}
                               onClick={() => handlePageChange(pageNum)}
                               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${currentPage === pageNum
-                                  ? 'bg-[#4FA59C] text-white'
-                                  : 'text-[#6B7280] hover:bg-[#F3F4F6]'
+                                ? 'bg-[#4FA59C] text-white'
+                                : 'text-[#6B7280] hover:bg-[#F3F4F6]'
                                 }`}
                             >
                               {pageNum}
