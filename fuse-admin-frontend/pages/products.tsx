@@ -506,8 +506,10 @@ export default function Products() {
             }
 
             // Show success message with summary
-            const summary = data.data.summary
-            setError(`✅ Import completed! Imported: ${summary.imported}, Skipped: ${summary.skipped}, Errors: ${summary.errors}`)
+            const imported = data.data?.imported?.length || 0
+            const skipped = data.data?.skipped?.length || 0
+            const errors = data.data?.errors?.length || 0
+            setError(`✅ Import completed! Imported: ${imported}, Skipped: ${skipped}, Errors: ${errors}`)
 
             // Refresh products list
             await fetchProducts()

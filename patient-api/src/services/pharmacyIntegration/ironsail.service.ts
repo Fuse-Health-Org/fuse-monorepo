@@ -11,6 +11,7 @@ export interface IronSailProduct {
     price?: number;
     wholesalePrice?: number;
     suppliesPrice?: number;
+    marketplacePricing?: number;
     pharmacy?: string;
     serviceProvider?: string;
     states?: string[];
@@ -84,46 +85,52 @@ export class IronSailService {
                 // Skip empty rows or rows without medication name
                 if (Object.keys(product).length === 0) continue;
 
-                // New format columns:
-                // Display Name, Medication (Pharmacy Name), Form, Pricing, Supplies, Wholesale Price, Pharmacy, Service Provider, States, SIG
+                // New format columns (as of Jan 2026):
+                // A: Name (empty), B: Medication (Pharmacy Name), C: Form, D: Pharmacy Pricing, 
+                // E: Supplies (10 syringes + wipes), F: Marketplace Pricing, G: Pharmacy, 
+                // H: Service Provider, I: States, J: SIG, K: RX_ID
 
-                // Get display name (first column)
-                const displayName = product.display_name || row[0] || 'Unknown Product';
-
-                // Get medication name (pharmacy product name)
+                // Get medication name (pharmacy product name) - Column B
                 const medicationName = product['medication_(pharmacy_name)'] || product.medication || product.medication_name;
 
                 // Skip if no medication name
                 if (!medicationName) continue;
 
-                // Get form
+                // Get display name - Column A (but it's often empty, so fallback to medication name)
+                const displayName = product.name || medicationName;
+
+                // Get form - Column C
                 const form = product.form || 'Injectable';
 
-                // Get pricing
-                const pricingValue = product.pricing ? parseFloat(String(product.pricing).replace(/[^0-9.]/g, '')) : undefined;
+                // Get pharmacy pricing - Column D (this is now the wholesale price)
+                const pharmacyPricingValue = product.pharmacy_pricing || product.pricing;
+                const pharmacyPricing = pharmacyPricingValue ? parseFloat(String(pharmacyPricingValue).replace(/[^0-9.]/g, '')) : undefined;
 
-                // Get supplies price
+                // Get supplies price - Column E
                 const suppliesValue = product['supplies_(10_syringes_+_wipes)'] || product.supplies;
                 const suppliesPrice = suppliesValue ? parseFloat(String(suppliesValue).replace(/[^0-9.]/g, '')) : undefined;
 
-                // Get wholesale price
-                const wholesalePriceValue = product.wholesale_price;
-                const wholesalePrice = wholesalePriceValue ? parseFloat(String(wholesalePriceValue).replace(/[^0-9.]/g, '')) : undefined;
+                // Get marketplace pricing - Column F (new column, may be empty)
+                const marketplacePricingValue = product.marketplace_pricing;
+                const marketplacePricing = marketplacePricingValue ? parseFloat(String(marketplacePricingValue).replace(/[^0-9.]/g, '')) : undefined;
 
-                // Get pharmacy
+                // Use pharmacy pricing as wholesale price (no separate wholesale column anymore)
+                const wholesalePrice = pharmacyPricing;
+
+                // Get pharmacy - Column G
                 const pharmacy = product.pharmacy || 'Kaduceus';
 
-                // Get service provider
+                // Get service provider - Column H
                 const serviceProvider = product.service_provider || 'Ironsail';
 
-                // Get states (comma-separated, parse into array)
+                // Get states (comma-separated, parse into array) - Column I
                 const statesValue = product.states || '';
-                const states = statesValue ? statesValue.split(',').map((s: string) => s.trim()) : [];
+                const states = statesValue ? statesValue.split(',').map((s: string) => s.trim()).filter(Boolean) : [];
 
-                // Get SIG
+                // Get SIG - Column J
                 const sig = product.sig || 'Take as directed by your healthcare provider';
 
-                // Get RX_ID
+                // Get RX_ID - Column K
                 const rxId = product.rx_id || product.rxid || undefined;
 
                 // Debug logging for first product
@@ -133,8 +140,11 @@ export class IronSailService {
                         displayName,
                         medicationName,
                         form,
-                        pricingValue,
+                        pharmacyPricing,
                         wholesalePrice,
+                        marketplacePricing,
+                        pharmacy,
+                        states: states.length,
                         sig,
                         rxId
                     });
@@ -147,14 +157,15 @@ export class IronSailService {
                     name: medicationName,
                     displayName: displayName,
                     medicationName: medicationName,
-                    strength: undefined, // Not in new format as separate field
+                    strength: undefined, // Not in format as separate field
                     nameWithStrength: medicationName,
                     dispense: form,
                     form: form,
-                    category: undefined, // Not in new format
-                    price: pricingValue,
+                    category: undefined, // Not in format
+                    price: pharmacyPricing || wholesalePrice,
                     suppliesPrice: suppliesPrice,
                     wholesalePrice: wholesalePrice,
+                    marketplacePricing: marketplacePricing,
                     pharmacy: pharmacy,
                     serviceProvider: serviceProvider,
                     states: states,
