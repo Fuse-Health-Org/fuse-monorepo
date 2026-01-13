@@ -13104,6 +13104,159 @@ app.get("/payouts/affiliate", authenticateJWT, async (req, res) => {
   }
 });
 
+// Get payouts for a specific doctor (for doctor portal)
+app.get("/payouts/doctor", authenticateJWT, async (req, res) => {
+  try {
+    const currentUser = getCurrentUser(req);
+    if (!currentUser) {
+      return res.status(401).json({
+        success: false,
+        message: "Not authenticated",
+      });
+    }
+
+    const user = await User.findByPk(currentUser.id);
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Only allow doctors to access their payouts
+    if (user.role !== "doctor") {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. Doctor role required.",
+      });
+    }
+
+    if (!user.clinicId) {
+      return res.status(403).json({
+        success: false,
+        message: "User does not have a clinic associated",
+      });
+    }
+
+    const { dateFrom, dateTo, page = "1", limit = "50" } = req.query;
+
+    const whereClause: any = {
+      clinicId: user.clinicId,
+      status: {
+        [Op.in]: ["paid", "processing", "shipped", "delivered"],
+      },
+    };
+
+    if (dateFrom) {
+      whereClause.createdAt = {
+        ...whereClause.createdAt,
+        [Op.gte]: new Date(dateFrom as string),
+      };
+    }
+
+    if (dateTo) {
+      whereClause.createdAt = {
+        ...whereClause.createdAt,
+        [Op.lte]: new Date(dateTo as string),
+      };
+    }
+
+    const pageNum = parseInt(page as string) || 1;
+    const limitNum = parseInt(limit as string) || 50;
+    const offset = (pageNum - 1) * limitNum;
+
+    const { rows: orders, count: total } = await Order.findAndCountAll({
+      where: whereClause,
+      attributes: [
+        "id",
+        "orderNumber",
+        "status",
+        "totalAmount",
+        "doctorAmount",
+        "createdAt",
+      ],
+      include: [
+        {
+          model: Payment,
+          as: "payment",
+          attributes: ["status", "paidAt"],
+        },
+        {
+          model: Clinic,
+          as: "clinic",
+          attributes: ["id", "name", "slug"],
+        },
+        {
+          model: User,
+          as: "user",
+          attributes: ["id", "firstName", "lastName", "email"],
+        },
+      ],
+      order: [["createdAt", "DESC"]],
+      limit: limitNum,
+      offset,
+      distinct: true,
+    });
+
+    const payouts = orders
+      .filter((order: any) => parseFloat(order.doctorAmount) > 0)
+      .map((order: any) => {
+        const orderData = order.toJSON();
+        return {
+          orderId: orderData.id,
+          orderNumber: orderData.orderNumber,
+          amount: parseFloat(orderData.doctorAmount) || 0,
+          totalAmount: parseFloat(orderData.totalAmount) || 0,
+          date: orderData.createdAt,
+          status: orderData.status,
+          paymentStatus: orderData.payment?.status,
+          paidAt: orderData.payment?.paidAt,
+          brand: orderData.clinic
+            ? {
+              name: orderData.clinic.name,
+              slug: orderData.clinic.slug,
+            }
+            : null,
+          customer: orderData.user
+            ? {
+              name: `${orderData.user.firstName || ""} ${orderData.user.lastName || ""}`.trim(),
+              email: orderData.user.email,
+            }
+            : null,
+        };
+      });
+
+    const totalAmount = payouts.reduce((sum, p) => sum + p.amount, 0);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        payouts,
+        summary: {
+          totalAmount,
+          totalOrders: payouts.length,
+        },
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total,
+          totalPages: Math.ceil(total / limitNum),
+        },
+      },
+    });
+  } catch (error) {
+    if (process.env.NODE_ENV === "development") {
+      console.error("❌ Error fetching doctor payouts:", error);
+    } else {
+      console.error("❌ Error fetching doctor payouts");
+    }
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+});
+
 app.post("/webhook/orders", async (req, res) => {
   try {
     // Validate webhook signature using HMAC SHA256
