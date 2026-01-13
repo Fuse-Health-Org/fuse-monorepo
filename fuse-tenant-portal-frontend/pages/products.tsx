@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { Loader2, Plus, Package, FileText, X, Image as ImageIcon } from "lucide-react"
+import { Loader2, Plus, Package, FileText, X, Image as ImageIcon, Grid, List, Trash2, ChevronLeft, ChevronRight, PowerOff } from "lucide-react"
 import { useAuth } from "@/contexts/AuthContext"
 import { CATEGORY_OPTIONS } from "@fuse/enums"
 import { toast } from "sonner"
@@ -70,6 +70,10 @@ export default function Products() {
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
   const [availableForms, setAvailableForms] = useState<Array<{ id: string; title: string; description: string }>>([])
   const [attachingFormToProduct, setAttachingFormToProduct] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<'card' | 'list'>('card')
+  const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set())
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState<number | 'all'>(300)
 
   // Form state
   const [formData, setFormData] = useState({
@@ -628,6 +632,124 @@ export default function Products() {
     }
   }
 
+  const handleBulkDelete = async () => {
+    if (!token || selectedProducts.size === 0) return
+
+    const confirmMessage = `Are you sure you want to PERMANENTLY DELETE ${selectedProducts.size} selected product(s)? This action cannot be undone.`
+    if (!confirm(confirmMessage)) return
+
+    try {
+      setLoading(true)
+      const deletePromises = Array.from(selectedProducts).map(productId =>
+        fetch(`${baseUrl}/products-management/${productId}`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` },
+        })
+      )
+
+      const results = await Promise.all(deletePromises)
+      const successCount = results.filter(r => r.ok).length
+      
+      if (successCount === selectedProducts.size) {
+        toast.success(`Successfully deleted ${successCount} product(s)`)
+        setSaveMessage(`Successfully deleted ${successCount} product(s)`)
+      } else {
+        toast.warning(`Deleted ${successCount} of ${selectedProducts.size} product(s)`)
+        setSaveMessage(`Deleted ${successCount} of ${selectedProducts.size} product(s)`)
+      }
+
+      setSelectedProducts(new Set())
+      fetchProducts()
+    } catch (error: any) {
+      console.error("❌ Error bulk deleting products:", error)
+      toast.error(error.message || 'Failed to delete products')
+      setSaveMessage(error.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleBulkDeactivate = async () => {
+    if (!token || selectedProducts.size === 0) return
+
+    const confirmMessage = `Are you sure you want to DEACTIVATE ${selectedProducts.size} selected product(s)?`
+    if (!confirm(confirmMessage)) return
+
+    try {
+      setLoading(true)
+      const deactivatePromises = Array.from(selectedProducts).map(productId =>
+        fetch(`${baseUrl}/products-management/${productId}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ isActive: false }),
+        })
+      )
+
+      const results = await Promise.all(deactivatePromises)
+      const successCount = results.filter(r => r.ok).length
+      
+      if (successCount === selectedProducts.size) {
+        toast.success(`Successfully deactivated ${successCount} product(s)`)
+        setSaveMessage(`Successfully deactivated ${successCount} product(s)`)
+      } else {
+        toast.warning(`Deactivated ${successCount} of ${selectedProducts.size} product(s)`)
+        setSaveMessage(`Deactivated ${successCount} of ${selectedProducts.size} product(s)`)
+      }
+
+      setSelectedProducts(new Set())
+      fetchProducts()
+    } catch (error: any) {
+      console.error("❌ Error bulk deactivating products:", error)
+      toast.error(error.message || 'Failed to deactivate products')
+      setSaveMessage(error.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedProducts.size === products.length) {
+      setSelectedProducts(new Set())
+    } else {
+      setSelectedProducts(new Set(products.map(p => p.id)))
+    }
+  }
+
+  const toggleSelectProduct = (productId: string) => {
+    const newSelected = new Set(selectedProducts)
+    if (newSelected.has(productId)) {
+      newSelected.delete(productId)
+    } else {
+      newSelected.add(productId)
+    }
+    setSelectedProducts(newSelected)
+  }
+
+  // Pagination logic
+  const paginatedProducts = () => {
+    if (itemsPerPage === 'all') {
+      return products
+    }
+    const startIndex = (currentPage - 1) * itemsPerPage
+    const endIndex = startIndex + itemsPerPage
+    return products.slice(startIndex, endIndex)
+  }
+
+  const totalPages = itemsPerPage === 'all' ? 1 : Math.ceil(products.length / itemsPerPage)
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const handleItemsPerPageChange = (value: number | 'all') => {
+    setItemsPerPage(value)
+    setCurrentPage(1) // Reset to first page when changing items per page
+  }
+
   const calculateProfitMargin = (wholesale: number, retail: number) => {
     if (!wholesale || !retail) return 0
     return ((retail - wholesale) / wholesale * 100).toFixed(1)
@@ -732,34 +854,43 @@ export default function Products() {
                 Manage your product catalog with our Pharmacy & State Coverage system.
               </p>
             </div>
-            <div className="flex gap-3">
-              <Button
-                variant="outline"
-                onClick={handleDeactivateAll}
-                className="rounded-full px-6 border-[#E5E7EB] text-[#4B5563] hover:bg-[#F3F4F6] transition-all"
-              >
-                Deactivate All
-              </Button>
-              <Button
-                onClick={handleImportFromIronSail}
-                disabled={loading}
-                className="rounded-full px-6 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm transition-all disabled:opacity-50"
-              >
-                <Package className="mr-2 h-5 w-5" /> Import from IronSail
-              </Button>
-              <Button
-                onClick={handleDeleteAllFromIronSail}
-                disabled={loading}
-                className="rounded-full px-6 bg-red-600 hover:bg-red-700 text-white shadow-sm transition-all disabled:opacity-50"
-              >
-                <X className="mr-2 h-5 w-5" /> Delete All from IronSail
-              </Button>
-              <Button
-                onClick={handleCreateProduct}
-                className="rounded-full px-6 bg-[#4FA59C] hover:bg-[#478F87] text-white shadow-sm transition-all"
-              >
-                <Plus className="mr-2 h-5 w-5" /> Product Builder
-              </Button>
+            <div className="flex flex-col gap-3 items-end">
+              {/* Primary Actions Row */}
+              <div className="flex gap-3">
+                <Button
+                  onClick={handleImportFromIronSail}
+                  disabled={loading}
+                  className="rounded-full px-6 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm transition-all disabled:opacity-50"
+                >
+                  <Package className="mr-2 h-5 w-5" /> Import from IronSail
+                </Button>
+                <Button
+                  onClick={handleCreateProduct}
+                  className="rounded-full px-6 bg-[#4FA59C] hover:bg-[#478F87] text-white shadow-sm transition-all"
+                >
+                  <Plus className="mr-2 h-5 w-5" /> Product Builder
+                </Button>
+              </div>
+
+              {/* Bulk Actions Row */}
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  onClick={handleDeactivateAll}
+                  size="sm"
+                  className="rounded-full px-4 border-[#E5E7EB] text-[#6B7280] hover:bg-[#F3F4F6] transition-all text-sm"
+                >
+                  Deactivate All
+                </Button>
+                <Button
+                  onClick={handleDeleteAllFromIronSail}
+                  disabled={loading}
+                  size="sm"
+                  className="rounded-full px-4 bg-red-600 hover:bg-red-700 text-white shadow-sm transition-all disabled:opacity-50 text-sm"
+                >
+                  <X className="mr-2 h-4 w-4" /> Delete All IronSail
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -772,25 +903,50 @@ export default function Products() {
             </div>
           )}
 
-          <div className="flex items-center gap-2 bg-white rounded-2xl p-1.5 w-fit shadow-sm border border-[#E5E7EB]">
-            <button
-              onClick={() => setActiveTab('selected')}
-              className={`px-6 py-2 text-sm font-medium rounded-xl transition-all ${activeTab === 'selected'
-                ? 'bg-[#4FA59C] text-white shadow-sm'
-                : 'text-[#6B7280] hover:bg-[#F3F4F6]'
-                }`}
-            >
-              Selected Products
-            </button>
-            <button
-              onClick={() => setActiveTab('all')}
-              className={`px-6 py-2 text-sm font-medium rounded-xl transition-all ${activeTab === 'all'
-                ? 'bg-[#4FA59C] text-white shadow-sm'
-                : 'text-[#6B7280] hover:bg-[#F3F4F6]'
-                }`}
-            >
-              All Products
-            </button>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 bg-white rounded-2xl p-1.5 w-fit shadow-sm border border-[#E5E7EB]">
+              <button
+                onClick={() => setActiveTab('selected')}
+                className={`px-6 py-2 text-sm font-medium rounded-xl transition-all ${activeTab === 'selected'
+                  ? 'bg-[#4FA59C] text-white shadow-sm'
+                  : 'text-[#6B7280] hover:bg-[#F3F4F6]'
+                  }`}
+              >
+                Selected Products
+              </button>
+              <button
+                onClick={() => setActiveTab('all')}
+                className={`px-6 py-2 text-sm font-medium rounded-xl transition-all ${activeTab === 'all'
+                  ? 'bg-[#4FA59C] text-white shadow-sm'
+                  : 'text-[#6B7280] hover:bg-[#F3F4F6]'
+                  }`}
+              >
+                All Products
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2 bg-white rounded-2xl p-1.5 shadow-sm border border-[#E5E7EB]">
+              <button
+                onClick={() => setViewMode('card')}
+                className={`p-2 rounded-xl transition-all ${viewMode === 'card'
+                  ? 'bg-[#4FA59C] text-white shadow-sm'
+                  : 'text-[#6B7280] hover:bg-[#F3F4F6]'
+                  }`}
+                title="Card View"
+              >
+                <Grid className="h-5 w-5" />
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                className={`p-2 rounded-xl transition-all ${viewMode === 'list'
+                  ? 'bg-[#4FA59C] text-white shadow-sm'
+                  : 'text-[#6B7280] hover:bg-[#F3F4F6]'
+                  }`}
+                title="List View"
+              >
+                <List className="h-5 w-5" />
+              </button>
+            </div>
           </div>
 
           <div className="flex gap-4">
@@ -840,13 +996,282 @@ export default function Products() {
                 <p className="text-lg text-[#4B5563]">No products found. Create your first product to get started.</p>
               </div>
             </div>
+          ) : viewMode === 'list' ? (
+            <div className="space-y-4">
+              {/* Bulk Selection Actions - Always visible */}
+              <div className="flex items-center gap-3 bg-white rounded-xl shadow-sm border border-[#E5E7EB] px-6 py-3">
+                <span className="text-sm text-[#6B7280] font-medium">
+                  {selectedProducts.size > 0 ? `${selectedProducts.size} product(s) selected` : 'No products selected'}
+                </span>
+                <div className="flex gap-2 ml-auto">
+                  <Button
+                    onClick={handleBulkDeactivate}
+                    disabled={selectedProducts.size === 0 || loading}
+                    size="sm"
+                    className="rounded-lg px-4 bg-orange-600 hover:bg-orange-700 text-white shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                  >
+                    <PowerOff className="mr-2 h-4 w-4" /> Deactivate Selected
+                  </Button>
+                  <Button
+                    onClick={handleBulkDelete}
+                    disabled={selectedProducts.size === 0 || loading}
+                    size="sm"
+                    className="rounded-lg px-4 bg-red-600 hover:bg-red-700 text-white shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" /> Delete Selected
+                  </Button>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl shadow-sm border border-[#E5E7EB] overflow-hidden">
+                {/* Pagination controls at top */}
+                <div className="flex items-center justify-between px-6 py-4 border-b border-[#E5E7EB] bg-[#F9FAFB]">
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-[#6B7280]">Show:</span>
+                    <select
+                      value={itemsPerPage}
+                      onChange={(e) => handleItemsPerPageChange(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
+                      className="rounded-lg border border-[#E5E7EB] bg-white px-3 py-1.5 text-sm text-[#1F2937] focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50"
+                    >
+                      <option value="300">300</option>
+                      <option value="600">600</option>
+                      <option value="1000">1000</option>
+                      <option value="all">All</option>
+                    </select>
+                    <span className="text-sm text-[#6B7280]">
+                      Showing {itemsPerPage === 'all' ? products.length : Math.min((currentPage - 1) * (itemsPerPage as number) + 1, products.length)} - {itemsPerPage === 'all' ? products.length : Math.min(currentPage * (itemsPerPage as number), products.length)} of {products.length}
+                    </span>
+                  </div>
+                  
+                  {itemsPerPage !== 'all' && totalPages > 1 && (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handlePageChange(currentPage - 1)}
+                        disabled={currentPage === 1}
+                        className="p-2 rounded-lg border border-[#E5E7EB] text-[#6B7280] hover:bg-[#F3F4F6] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </button>
+                      
+                      <div className="flex items-center gap-1">
+                        {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+                          let pageNum: number
+                          if (totalPages <= 7) {
+                            pageNum = i + 1
+                          } else if (currentPage <= 4) {
+                            pageNum = i + 1
+                          } else if (currentPage >= totalPages - 3) {
+                            pageNum = totalPages - 6 + i
+                          } else {
+                            pageNum = currentPage - 3 + i
+                          }
+                          
+                          return (
+                            <button
+                              key={pageNum}
+                              onClick={() => handlePageChange(pageNum)}
+                              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                                currentPage === pageNum
+                                  ? 'bg-[#4FA59C] text-white'
+                                  : 'text-[#6B7280] hover:bg-[#F3F4F6]'
+                              }`}
+                            >
+                              {pageNum}
+                            </button>
+                          )
+                        })}
+                      </div>
+                      
+                      <button
+                        onClick={() => handlePageChange(currentPage + 1)}
+                        disabled={currentPage === totalPages}
+                        className="p-2 rounded-lg border border-[#E5E7EB] text-[#6B7280] hover:bg-[#F3F4F6] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <table className="w-full">
+                  <thead className="bg-[#F9FAFB] border-b border-[#E5E7EB]">
+                    <tr>
+                      <th className="px-4 py-3 text-left">
+                        <input
+                          type="checkbox"
+                          checked={selectedProducts.size === products.length && products.length > 0}
+                          onChange={toggleSelectAll}
+                          className="h-4 w-4 rounded border-[#D1D5DB] text-[#4FA59C] focus:ring-[#4FA59C]"
+                        />
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-[#6B7280] uppercase tracking-wide">Product</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-[#6B7280] uppercase tracking-wide">Description</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-[#6B7280] uppercase tracking-wide">Size</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-[#6B7280] uppercase tracking-wide">Status</th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold text-[#6B7280] uppercase tracking-wide">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#E5E7EB]">
+                    {paginatedProducts().map((product) => (
+                    <tr key={product.id} className={`hover:bg-[#F9FAFB] transition-colors ${!product.isActive ? 'opacity-60' : ''}`}>
+                      <td className="px-4 py-4">
+                        <input
+                          type="checkbox"
+                          checked={selectedProducts.has(product.id)}
+                          onChange={() => toggleSelectProduct(product.id)}
+                          className="h-4 w-4 rounded border-[#D1D5DB] text-[#4FA59C] focus:ring-[#4FA59C]"
+                        />
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="flex items-center gap-3">
+                          {product.imageUrl ? (
+                            <img src={product.imageUrl} alt={product.name} className="h-10 w-10 rounded-lg object-cover" />
+                          ) : (
+                            <div className="h-10 w-10 bg-[#F3F4F6] rounded-lg flex items-center justify-center">
+                              <ImageIcon className="h-5 w-5 text-[#9CA3AF]" />
+                            </div>
+                          )}
+                          <div>
+                            <p className="text-sm font-semibold text-[#1F2937]">{product.name}</p>
+                            {product.brandId && (
+                              <span className="text-xs text-purple-600">Custom</span>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4">
+                        <p className="text-sm text-[#6B7280] line-clamp-2 max-w-md">{product.description}</p>
+                      </td>
+                      <td className="px-4 py-4">
+                        <p className="text-sm text-[#1F2937]">{product.medicationSize || '—'}</p>
+                      </td>
+                      <td className="px-4 py-4">
+                        {product.isActive ? (
+                          <span className="inline-flex px-2.5 py-1 bg-green-50 text-green-700 text-xs font-medium rounded-full border border-green-200">
+                            Active
+                          </span>
+                        ) : (
+                          <span className="inline-flex px-2.5 py-1 bg-[#FEF3C7] text-[#92400E] text-xs font-medium rounded-full border border-[#FDE68A]">
+                            Inactive
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => router.push(`/products/editor/${product.id}`)}
+                            className="px-3 py-1.5 rounded-lg bg-[#4FA59C] text-white text-xs font-medium hover:bg-[#478F87] transition-all"
+                          >
+                            {product.isActive ? 'Manage' : 'Configure'}
+                          </button>
+                          <button
+                            onClick={() => handlePermanentDelete(product)}
+                            className="px-3 py-1.5 rounded-lg bg-[#EF4444] text-white text-xs font-medium hover:bg-[#DC2626] transition-all"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              {/* Pagination controls at bottom */}
+              {itemsPerPage !== 'all' && totalPages > 1 && (
+                <div className="flex items-center justify-center px-6 py-4 border-t border-[#E5E7EB] bg-[#F9FAFB]">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handlePageChange(currentPage - 1)}
+                      disabled={currentPage === 1}
+                      className="p-2 rounded-lg border border-[#E5E7EB] text-[#6B7280] hover:bg-[#F3F4F6] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </button>
+                    
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+                        let pageNum: number
+                        if (totalPages <= 7) {
+                          pageNum = i + 1
+                        } else if (currentPage <= 4) {
+                          pageNum = i + 1
+                        } else if (currentPage >= totalPages - 3) {
+                          pageNum = totalPages - 6 + i
+                        } else {
+                          pageNum = currentPage - 3 + i
+                        }
+                        
+                        return (
+                          <button
+                            key={pageNum}
+                            onClick={() => handlePageChange(pageNum)}
+                            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                              currentPage === pageNum
+                                ? 'bg-[#4FA59C] text-white'
+                                : 'text-[#6B7280] hover:bg-[#F3F4F6]'
+                            }`}
+                          >
+                            {pageNum}
+                          </button>
+                        )
+                      })}
+                    </div>
+                    
+                    <button
+                      onClick={() => handlePageChange(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                      className="p-2 rounded-lg border border-[#E5E7EB] text-[#6B7280] hover:bg-[#F3F4F6] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
           ) : (
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <>
+              {/* Bulk Selection Actions - Always visible */}
+              <div className="flex items-center gap-3 bg-white rounded-xl shadow-sm border border-[#E5E7EB] px-6 py-3">
+                <span className="text-sm text-[#6B7280] font-medium">
+                  {selectedProducts.size > 0 ? `${selectedProducts.size} product(s) selected` : 'No products selected'}
+                </span>
+                <div className="flex gap-2 ml-auto">
+                  <Button
+                    onClick={handleBulkDeactivate}
+                    disabled={selectedProducts.size === 0 || loading}
+                    size="sm"
+                    className="rounded-lg px-4 bg-orange-600 hover:bg-orange-700 text-white shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                  >
+                    <PowerOff className="mr-2 h-4 w-4" /> Deactivate Selected
+                  </Button>
+                  <Button
+                    onClick={handleBulkDelete}
+                    disabled={selectedProducts.size === 0 || loading}
+                    size="sm"
+                    className="rounded-lg px-4 bg-red-600 hover:bg-red-700 text-white shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" /> Delete Selected
+                  </Button>
+                </div>
+              </div>
+
+              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {products.map((product) => (
                 <div
                   key={product.id}
-                  className={`bg-white rounded-2xl shadow-sm border border-[#E5E7EB] overflow-hidden transition-all hover:shadow-md hover:border-[#4FA59C] ${!product.isActive ? "opacity-60" : ""}`}
+                  className={`relative bg-white rounded-2xl shadow-sm border border-[#E5E7EB] overflow-hidden transition-all hover:shadow-md hover:border-[#4FA59C] ${!product.isActive ? "opacity-60" : ""} ${selectedProducts.has(product.id) ? 'ring-2 ring-[#4FA59C]' : ''}`}
                 >
+                  {/* Checkbox overlay */}
+                  <div className="absolute top-4 left-4 z-10">
+                    <input
+                      type="checkbox"
+                      checked={selectedProducts.has(product.id)}
+                      onChange={() => toggleSelectProduct(product.id)}
+                      className="h-5 w-5 rounded border-[#D1D5DB] text-[#4FA59C] focus:ring-[#4FA59C] bg-white shadow-sm"
+                    />
+                  </div>
                   {/* Product Image Header */}
                   {product.imageUrl && (
                     <div className="w-full h-48 overflow-hidden bg-[#F9FAFB] border-b border-[#E5E7EB]">
@@ -1009,6 +1434,7 @@ export default function Products() {
                 </div>
               ))}
             </div>
+            </>
           )}
         </main>
       </div>
