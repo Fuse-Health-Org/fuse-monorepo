@@ -18,8 +18,8 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 // Extend base public paths locally for patient-frontend only
 const PATIENT_PUBLIC_PATH_PATTERNS = [
   ...PUBLIC_PATH_PATTERNS,
-  '/my-products',
-  '/my-products/[...rest]',
+  '/fuse-dashboard/my-products',
+  '/fuse-dashboard/my-products/[...rest]',
   '/verify-email',
 ] as const
 
@@ -48,8 +48,8 @@ const matchesPublicPattern = (pattern: string, pathname: string, asPath: string)
 
 const isPublicRoute = (pathname: string, asPath: string) => {
   console.log('[AuthContext] isPublicRoute input', { pathname, asPath })
-  if (pathname.includes('/my-products') || asPath.includes('/my-products')) {
-    console.log('[AuthContext] public via contains /my-products')
+  if (pathname.includes('/fuse-dashboard/my-products') || asPath.includes('/fuse-dashboard/my-products')) {
+    console.log('[AuthContext] public via contains /fuse-dashboard/my-products')
     return true
   }
   const result = PATIENT_PUBLIC_PATH_PATTERNS.some((pattern) => matchesPublicPattern(pattern as string, pathname, asPath))

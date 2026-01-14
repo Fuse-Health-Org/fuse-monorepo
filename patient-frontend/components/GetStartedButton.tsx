@@ -35,7 +35,7 @@ export default function GetStartedButton({
   if (isEnabled) {
     return (
       <a
-        href={`/my-products/${formId}/${slug}`}
+        href={`/fuse-dashboard/my-products/${formId}/${slug}`}
         target="_blank"
         rel="noopener noreferrer"
         style={{

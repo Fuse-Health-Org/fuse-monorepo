@@ -1,18 +1,18 @@
 import React from "react";
 import { motion } from "framer-motion";
-import { Sidebar } from "../components/sidebar";
-import { Header } from "../components/header";
-import { Dashboard } from "../components/dashboard";
-import { OfferingsPage } from "../components/offerings-page";
-import { MessengerPage } from "../components/messenger-page";
-import { TreatmentsPage } from "../components/treatments-page";
-import { AccountPage } from "../components/account-page";
-import { BrandingPage } from "../components/branding-page";
+import { Sidebar } from "../../components/sidebar";
+import { Header } from "../../components/header";
+import { Dashboard } from "../../components/dashboard";
+import { OfferingsPage } from "../../components/offerings-page";
+import { MessengerPage } from "../../components/messenger-page";
+import { TreatmentsPage } from "../../components/treatments-page";
+import { AccountPage } from "../../components/account-page";
+import { BrandingPage } from "../../components/branding-page";
 import { Button, Avatar } from "@heroui/react";
 import { Icon } from "@iconify/react";
-import { ProtectedRoute } from "../components/ProtectedRoute";
-import { useAuth } from "../contexts/AuthContext";
-import { getAvatarEmoji } from "../lib/avatarUtils";
+import { ProtectedRoute } from "../../components/ProtectedRoute";
+import { useAuth } from "../../contexts/AuthContext";
+import { getAvatarEmoji } from "../../lib/avatarUtils";
 
 function DashboardPage() {
   const { user } = useAuth();
@@ -133,7 +133,6 @@ function DashboardPage() {
   );
 }
 
-export default function DashboardRoute() {
+export default function FuseDashboardRoute() {
   return <DashboardPage />;
 }
-

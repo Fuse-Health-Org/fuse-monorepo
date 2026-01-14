@@ -198,7 +198,7 @@ export default function LandingPage() {
         if (!websiteData || websiteData.isActive === false) {
           console.log('🔀 Custom website is not active, redirecting to dashboard...');
           setIsRedirecting(true);
-          router.replace('/dashboard');
+          router.replace('/fuse-dashboard');
           return; // Don't set isLoading to false - keep showing nothing while redirecting
         }
 
@@ -476,7 +476,7 @@ export default function LandingPage() {
         key={program.id}
         onClick={() => {
           if (hasTemplate) {
-            window.open(`/my-products/${program.id}/program`, '_blank');
+            window.open(`/fuse-dashboard/my-products/${program.id}/program`, '_blank');
           }
         }}
         onMouseEnter={() => setHoveredCardIndex(cardId)}
@@ -626,7 +626,7 @@ export default function LandingPage() {
         </div>
         {hasTemplate ? (
           <a
-            href={`/my-products/${program.id}/program`}
+            href={`/fuse-dashboard/my-products/${program.id}/program`}
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
@@ -825,7 +825,7 @@ export default function LandingPage() {
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
             <button
-              onClick={() => router.push('/dashboard')}
+              onClick={() => router.push('/fuse-dashboard')}
               style={{ padding: "0.5rem", border: "none", background: "none", cursor: "pointer" }}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

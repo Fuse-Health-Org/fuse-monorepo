@@ -289,7 +289,7 @@ export default function AllProducts() {
                 key={program.id}
                 onClick={() => {
                     if (hasTemplate) {
-                        window.open(`/my-products/${program.id}/program`, '_blank');
+                        window.open(`/fuse-dashboard/my-products/${program.id}/program`, '_blank');
                     }
                 }}
                 onMouseEnter={() => setHoveredCardIndex(cardId)}
@@ -441,7 +441,7 @@ export default function AllProducts() {
                 </div>
                 {hasTemplate ? (
                     <a
-                        href={`/my-products/${program.id}/program`}
+                        href={`/fuse-dashboard/my-products/${program.id}/program`}
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={(e) => e.stopPropagation()}
@@ -622,7 +622,7 @@ export default function AllProducts() {
                         </button>
 
                         <button
-                            onClick={() => router.push('/dashboard')}
+                            onClick={() => router.push('/fuse-dashboard')}
                             style={{ padding: "0.5rem", border: "none", background: "none", cursor: "pointer" }}
                         >
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

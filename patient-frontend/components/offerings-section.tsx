@@ -142,7 +142,7 @@ export const OfferingsSection: React.FC = () => {
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                         {approved.map((item) => (
                             item.orderId ? (
-                                <Link href={`/offerings/${item.orderId}`} key={`${item.orderId}-${item.offeringId || item.caseOfferingId || "none"}`} className="block group">
+                                <Link href={`/fuse-dashboard/offerings/${item.orderId}`} key={`${item.orderId}-${item.offeringId || item.caseOfferingId || "none"}`} className="block group">
                                     <Card className="cursor-pointer transition-all duration-300 hover:shadow-lg hover:-translate-y-1 border-l-4 border-l-success h-full">
                                         <CardBody className="p-4">
                                             <div className="flex items-start justify-between gap-2 mb-3">
@@ -261,7 +261,7 @@ export const OfferingsSection: React.FC = () => {
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                         {pending.map((item) => (
                             item.orderId ? (
-                                <Link href={`/offerings/${item.orderId}`} key={`${item.orderId}-pending-${item.orderId}`} className="block group">
+                                <Link href={`/fuse-dashboard/offerings/${item.orderId}`} key={`${item.orderId}-pending-${item.orderId}`} className="block group">
                                     <Card className="cursor-pointer transition-all duration-300 hover:shadow-lg hover:-translate-y-1 border-l-4 border-l-warning h-full">
                                         <CardBody className="p-4">
                                             <div className="flex items-start justify-between gap-2 mb-3">

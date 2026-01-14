@@ -439,7 +439,7 @@ export default function BundlesPage() {
                             Shop All
                         </button>
                         <button
-                            onClick={() => router.push('/dashboard')}
+                            onClick={() => router.push('/fuse-dashboard')}
                             style={{
                                 background: "none",
                                 border: "none",

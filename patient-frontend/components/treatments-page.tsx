@@ -558,7 +558,7 @@ export const TreatmentsPage: React.FC = () => {
 
                         {/* Action Button - Always visible when collapsed */}
                         {!isExpanded && (
-                          <Link href={`/offerings/${order.id}`} className="block">
+                          <Link href={`/fuse-dashboard/offerings/${order.id}`} className="block">
                             <Button
                               size="sm"
                               variant="flat"
