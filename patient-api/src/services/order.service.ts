@@ -187,9 +187,10 @@ class OrderService {
     }
   }
 
-  async approveOrder(orderId: string, prescriptionDays?: number) {
+  async approveOrder(orderId: string, prescriptionDays?: number, approvedByDoctorId?: string) {
     // TODO: this method might need to be expanded to create Order items depending on the information approved in the prescription
     // prescriptionDays: optional number of days for prescription validity (default: 30 days / 1 month)
+    // approvedByDoctorId: optional userId of the doctor approving the order
     try {
       // Get order with all related data including shipping address
       const order = await Order.findOne({
@@ -303,9 +304,20 @@ class OrderService {
 
       // Mark order as approved by doctor (if not already set by auto-approval)
       if (!order.approvedByDoctor) {
-        await order.update({ approvedByDoctor: true });
+        const updateData: any = { approvedByDoctor: true };
+        // Set approvedByDoctorId if provided and not already set
+        if (approvedByDoctorId && !order.approvedByDoctorId) {
+          updateData.approvedByDoctorId = approvedByDoctorId;
+        }
+        await order.update(updateData);
         console.log(
-          `✅ Order marked as approved by doctor: ${order.orderNumber}`
+          `✅ Order marked as approved by doctor: ${order.orderNumber}${approvedByDoctorId ? ` (approved by doctor: ${approvedByDoctorId})` : ''}`
+        );
+      } else if (approvedByDoctorId && !order.approvedByDoctorId) {
+        // If already approved but approvedByDoctorId is not set, update it
+        await order.update({ approvedByDoctorId });
+        console.log(
+          `✅ Order approvedByDoctorId updated: ${order.orderNumber} (approved by doctor: ${approvedByDoctorId})`
         );
       }
 

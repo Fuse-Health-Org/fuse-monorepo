@@ -12642,6 +12642,7 @@ app.get("/payouts/tenant", authenticateJWT, async (req, res) => {
         "clinicId",
         "physicianId",
         "affiliateId",
+        "approvedByDoctorId",
       ],
       include: [
         {
@@ -12659,6 +12660,12 @@ app.get("/payouts/tenant", authenticateJWT, async (req, res) => {
         {
           model: User,
           as: "affiliate",
+          attributes: ["id", "firstName", "lastName", "email"],
+          required: false,
+        },
+        {
+          model: User,
+          as: "approvedByDoctorUser",
           attributes: ["id", "firstName", "lastName", "email"],
           required: false,
         },
@@ -12718,32 +12725,41 @@ app.get("/payouts/tenant", authenticateJWT, async (req, res) => {
         payouts.totals.totalBrandAmount += parseFloat(orderData.brandAmount) || 0;
       }
 
-      // Doctor payouts
-      if (orderData.doctorAmount > 0 && orderData.physicianId) {
-        const doctorKey = orderData.physicianId;
-        if (!payouts.doctors[doctorKey]) {
-          payouts.doctors[doctorKey] = {
-            doctorId: doctorKey,
-            doctorName: orderData.physician
-              ? `${orderData.physician.firstName || ""} ${orderData.physician.lastName || ""}`.trim()
-              : "Unknown",
-            doctorEmail: orderData.physician?.email || "",
-            totalAmount: 0,
-            orderCount: 0,
-            orders: [],
-          };
+      // Doctor payouts - use approvedByDoctorId if available, otherwise fallback to physicianId
+      if (orderData.doctorAmount > 0) {
+        // Prioritize approvedByDoctorId over physicianId
+        const doctorId = orderData.approvedByDoctorId || orderData.physicianId;
+        if (doctorId) {
+          const doctorKey = doctorId;
+          if (!payouts.doctors[doctorKey]) {
+            // Use approvedByDoctorUser user data if available, otherwise use physician data
+            const doctorUser = orderData.approvedByDoctorUser;
+            const doctorPhysician = orderData.physician;
+            payouts.doctors[doctorKey] = {
+              doctorId: doctorKey,
+              doctorName: doctorUser
+                ? `${doctorUser.firstName || ""} ${doctorUser.lastName || ""}`.trim()
+                : doctorPhysician
+                ? `${doctorPhysician.firstName || ""} ${doctorPhysician.lastName || ""}`.trim()
+                : "Unknown",
+              doctorEmail: doctorUser?.email || doctorPhysician?.email || "",
+              totalAmount: 0,
+              orderCount: 0,
+              orders: [],
+            };
+          }
+          payouts.doctors[doctorKey].totalAmount += parseFloat(orderData.doctorAmount) || 0;
+          payouts.doctors[doctorKey].orderCount += 1;
+          payouts.doctors[doctorKey].orders.push({
+            orderId: orderData.id,
+            orderNumber: orderData.orderNumber,
+            amount: parseFloat(orderData.doctorAmount) || 0,
+            date: orderData.createdAt,
+            status: orderData.status,
+            paymentStatus: orderData.payment?.status,
+          });
+          payouts.totals.totalDoctorAmount += parseFloat(orderData.doctorAmount) || 0;
         }
-        payouts.doctors[doctorKey].totalAmount += parseFloat(orderData.doctorAmount) || 0;
-        payouts.doctors[doctorKey].orderCount += 1;
-        payouts.doctors[doctorKey].orders.push({
-          orderId: orderData.id,
-          orderNumber: orderData.orderNumber,
-          amount: parseFloat(orderData.doctorAmount) || 0,
-          date: orderData.createdAt,
-          status: orderData.status,
-          paymentStatus: orderData.payment?.status,
-        });
-        payouts.totals.totalDoctorAmount += parseFloat(orderData.doctorAmount) || 0;
       }
 
       // Pharmacy payouts
@@ -13131,19 +13147,29 @@ app.get("/payouts/doctor", authenticateJWT, async (req, res) => {
       });
     }
 
-    if (!user.clinicId) {
-      return res.status(403).json({
-        success: false,
-        message: "User does not have a clinic associated",
+    const { dateFrom, dateTo, page = "1", limit = "50" } = req.query;
+
+    // Debug log in development
+    if (process.env.NODE_ENV === "development") {
+      console.log(`[PAYOUTS/DOCTOR] Fetching payouts for doctor:`, {
+        doctorId: user.id,
+        doctorEmail: user.email,
+        role: user.role,
       });
     }
 
-    const { dateFrom, dateTo, page = "1", limit = "50" } = req.query;
-
     const whereClause: any = {
-      clinicId: user.clinicId,
+      approvedByDoctorId: user.id, // Filter by the doctor who approved the order
+      // Include all statuses for approved orders (not just paid ones)
       status: {
-        [Op.in]: ["paid", "processing", "shipped", "delivered"],
+        [Op.in]: [
+          "amount_capturable_updated",
+          "paid",
+          "payment_processing",
+          "processing",
+          "shipped",
+          "delivered",
+        ],
       },
     };
 
@@ -13161,6 +13187,11 @@ app.get("/payouts/doctor", authenticateJWT, async (req, res) => {
       };
     }
 
+    // Debug log the where clause
+    if (process.env.NODE_ENV === "development") {
+      console.log(`[PAYOUTS/DOCTOR] Where clause:`, JSON.stringify(whereClause, null, 2));
+    }
+
     const pageNum = parseInt(page as string) || 1;
     const limitNum = parseInt(limit as string) || 50;
     const offset = (pageNum - 1) * limitNum;
@@ -13174,17 +13205,20 @@ app.get("/payouts/doctor", authenticateJWT, async (req, res) => {
         "totalAmount",
         "doctorAmount",
         "createdAt",
+        "approvedByDoctorId",
       ],
       include: [
         {
           model: Payment,
           as: "payment",
           attributes: ["status", "paidAt"],
+          required: false,
         },
         {
           model: Clinic,
           as: "clinic",
           attributes: ["id", "name", "slug"],
+          required: false,
         },
         {
           model: User,
@@ -13198,8 +13232,18 @@ app.get("/payouts/doctor", authenticateJWT, async (req, res) => {
       distinct: true,
     });
 
+    // Debug log in development
+    if (process.env.NODE_ENV === "development") {
+      console.log(`[PAYOUTS/DOCTOR] Found ${orders.length} orders for doctor ${user.id}`, {
+        totalCount: total,
+        orderNumbers: orders.map((o: any) => o.orderNumber),
+        doctorAmounts: orders.map((o: any) => o.doctorAmount),
+        statuses: orders.map((o: any) => o.status),
+      });
+    }
+
+    // Show all orders approved by this doctor, even if doctorAmount is 0 (it might not be calculated yet)
     const payouts = orders
-      .filter((order: any) => parseFloat(order.doctorAmount) > 0)
       .map((order: any) => {
         const orderData = order.toJSON();
         return {

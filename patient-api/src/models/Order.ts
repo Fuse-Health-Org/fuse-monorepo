@@ -317,6 +317,16 @@ export default class Order extends Entity {
   })
   declare autoApprovalReason?: string;
 
+  @ForeignKey(() => User)
+  @Column({
+    type: DataType.UUID,
+    allowNull: true,
+  })
+  declare approvedByDoctorId?: string;
+
+  @BelongsTo(() => User, 'approvedByDoctorId')
+  declare approvedByDoctorUser?: User;
+
 
   // Static method to generate order number
   /**
