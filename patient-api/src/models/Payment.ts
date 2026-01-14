@@ -19,6 +19,13 @@ export enum PaymentMethod {
   DIGITAL_WALLET = 'digital_wallet'
 }
 
+export enum PaymentGoesTo {
+  FUSE = 'fuse',
+  BRAND = 'brand',
+  DOCTOR = 'doctor',
+  PHARMACY = 'pharmacy'
+}
+
 @Table({
   freezeTableName: true,
   tableName: 'Payment',
@@ -139,6 +146,13 @@ export default class Payment extends Entity {
     allowNull: true,
   })
   declare refundedAt?: Date;
+
+  @Column({
+    type: DataType.ENUM(...Object.values(PaymentGoesTo)),
+    allowNull: false,
+    defaultValue: PaymentGoesTo.FUSE,
+  })
+  declare paymentGoesTo: PaymentGoesTo;
 
   // Update payment status from Stripe webhook
   public async updateFromStripeEvent(eventData: any): Promise<void> {

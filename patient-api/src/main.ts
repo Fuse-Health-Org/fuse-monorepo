@@ -11,7 +11,7 @@ import Treatment from "./models/Treatment";
 import Product from "./models/Product";
 import Order from "./models/Order";
 import OrderItem from "./models/OrderItem";
-import Payment from "./models/Payment";
+import Payment, { PaymentGoesTo } from "./models/Payment";
 import ShippingAddress from "./models/ShippingAddress";
 import Pharmacy from "./models/Pharmacy";
 import PharmacyCoverage from "./models/PharmacyCoverage";
@@ -12882,9 +12882,9 @@ app.get("/payouts/brand", authenticateJWT, async (req, res) => {
     const { dateFrom, dateTo, page = "1", limit = "50" } = req.query;
 
     const whereClause: any = {
-      clinicId: user.clinicId,
+      paymentGoesTo: PaymentGoesTo.BRAND,
       status: {
-        [Op.in]: ["paid", "processing", "shipped", "delivered"],
+        [Op.in]: ["succeeded", "processing"],
       },
     };
 
@@ -12906,26 +12906,33 @@ app.get("/payouts/brand", authenticateJWT, async (req, res) => {
     const limitNum = parseInt(limit as string) || 50;
     const offset = (pageNum - 1) * limitNum;
 
-    const { rows: orders, count: total } = await Order.findAndCountAll({
+    // Get payments that go to this brand
+    // Filter by clinic's stripeAccountId in metadata or by order's clinicId
+    const { rows: payments, count: total } = await Payment.findAndCountAll({
       where: whereClause,
-      attributes: [
-        "id",
-        "orderNumber",
-        "status",
-        "totalAmount",
-        "brandAmount",
-        "createdAt",
-      ],
       include: [
         {
-          model: Payment,
-          as: "payment",
-          attributes: ["status", "paidAt"],
-        },
-        {
-          model: User,
-          as: "user",
-          attributes: ["id", "firstName", "lastName", "email"],
+          model: Order,
+          as: "order",
+          where: {
+            clinicId: user.clinicId,
+          },
+          required: false,
+          attributes: [
+            "id",
+            "orderNumber",
+            "status",
+            "totalAmount",
+            "brandAmount",
+            "createdAt",
+          ],
+          include: [
+            {
+              model: User,
+              as: "user",
+              attributes: ["id", "firstName", "lastName", "email"],
+            },
+          ],
         },
       ],
       order: [["createdAt", "DESC"]],
@@ -12934,23 +12941,42 @@ app.get("/payouts/brand", authenticateJWT, async (req, res) => {
       distinct: true,
     });
 
-    const payouts = orders
-      .filter((order: any) => parseFloat(order.brandAmount) > 0)
-      .map((order: any) => {
-        const orderData = order.toJSON();
+    // Filter payments that are associated with this brand's clinic
+    // Either through order.clinicId or through metadata.destination matching clinic's stripeAccountId
+    const clinic = await Clinic.findByPk(user.clinicId);
+    const payouts = payments
+      .filter((payment: any) => {
+        const paymentData = payment.toJSON();
+        // If payment has an order with matching clinicId
+        if (paymentData.order && paymentData.order.clinicId === user.clinicId) {
+          return true;
+        }
+        // If payment metadata has destination matching clinic's stripeAccountId
+        if (
+          clinic?.stripeAccountId &&
+          paymentData.stripeMetadata?.destination === clinic.stripeAccountId
+        ) {
+          return true;
+        }
+        return false;
+      })
+      .map((payment: any) => {
+        const paymentData = payment.toJSON();
+        const order = paymentData.order;
         return {
-          orderId: orderData.id,
-          orderNumber: orderData.orderNumber,
-          amount: parseFloat(orderData.brandAmount) || 0,
-          totalAmount: parseFloat(orderData.totalAmount) || 0,
-          date: orderData.createdAt,
-          status: orderData.status,
-          paymentStatus: orderData.payment?.status,
-          paidAt: orderData.payment?.paidAt,
-          customer: orderData.user
+          paymentId: paymentData.id,
+          orderId: order?.id || null,
+          orderNumber: order?.orderNumber || null,
+          amount: parseFloat(paymentData.amount) || 0,
+          totalAmount: order ? parseFloat(order.totalAmount) || 0 : parseFloat(paymentData.amount) || 0,
+          date: paymentData.createdAt,
+          status: paymentData.status,
+          paidAt: paymentData.paidAt,
+          stripePaymentIntentId: paymentData.stripePaymentIntentId,
+          customer: order?.user
             ? {
-              name: `${orderData.user.firstName || ""} ${orderData.user.lastName || ""}`.trim(),
-              email: orderData.user.email,
+              name: `${order.user.firstName || ""} ${order.user.lastName || ""}`.trim(),
+              email: order.user.email,
             }
             : null,
         };
@@ -13162,17 +13188,9 @@ app.get("/payouts/doctor", authenticateJWT, async (req, res) => {
     }
 
     const whereClause: any = {
-      approvedByDoctorId: user.id, // Filter by the doctor who approved the order
-      // Include all statuses for approved orders (not just paid ones)
+      paymentGoesTo: PaymentGoesTo.DOCTOR,
       status: {
-        [Op.in]: [
-          "amount_capturable_updated",
-          "paid",
-          "payment_processing",
-          "processing",
-          "shipped",
-          "delivered",
-        ],
+        [Op.in]: ["succeeded", "processing"],
       },
     };
 
@@ -13190,43 +13208,44 @@ app.get("/payouts/doctor", authenticateJWT, async (req, res) => {
       };
     }
 
-    // Debug log the where clause
-    if (process.env.NODE_ENV === "development") {
-      console.log(`[PAYOUTS/DOCTOR] Where clause:`, JSON.stringify(whereClause, null, 2));
-    }
-
     const pageNum = parseInt(page as string) || 1;
     const limitNum = parseInt(limit as string) || 50;
     const offset = (pageNum - 1) * limitNum;
 
-    const { rows: orders, count: total } = await Order.findAndCountAll({
+    // Get payments that go to this doctor
+    // Filter by order's approvedByDoctorId matching this doctor
+    const { rows: payments, count: total } = await Payment.findAndCountAll({
       where: whereClause,
-      attributes: [
-        "id",
-        "orderNumber",
-        "status",
-        "totalAmount",
-        "doctorAmount",
-        "createdAt",
-        "approvedByDoctorId",
-      ],
       include: [
         {
-          model: Payment,
-          as: "payment",
-          attributes: ["status", "paidAt"],
+          model: Order,
+          as: "order",
+          where: {
+            approvedByDoctorId: user.id,
+          },
           required: false,
-        },
-        {
-          model: Clinic,
-          as: "clinic",
-          attributes: ["id", "name", "slug"],
-          required: false,
-        },
-        {
-          model: User,
-          as: "user",
-          attributes: ["id", "firstName", "lastName", "email"],
+          attributes: [
+            "id",
+            "orderNumber",
+            "status",
+            "totalAmount",
+            "doctorAmount",
+            "createdAt",
+            "approvedByDoctorId",
+          ],
+          include: [
+            {
+              model: Clinic,
+              as: "clinic",
+              attributes: ["id", "name", "slug"],
+              required: false,
+            },
+            {
+              model: User,
+              as: "user",
+              attributes: ["id", "firstName", "lastName", "email"],
+            },
+          ],
         },
       ],
       order: [["createdAt", "DESC"]],
@@ -13235,39 +13254,44 @@ app.get("/payouts/doctor", authenticateJWT, async (req, res) => {
       distinct: true,
     });
 
-    // Debug log in development
-    if (process.env.NODE_ENV === "development") {
-      console.log(`[PAYOUTS/DOCTOR] Found ${orders.length} orders for doctor ${user.id}`, {
-        totalCount: total,
-        orderNumbers: orders.map((o: any) => o.orderNumber),
-        doctorAmounts: orders.map((o: any) => o.doctorAmount),
-        statuses: orders.map((o: any) => o.status),
-      });
-    }
-
-    // Show all orders approved by this doctor, even if doctorAmount is 0 (it might not be calculated yet)
-    const payouts = orders
-      .map((order: any) => {
-        const orderData = order.toJSON();
+    // Filter payments that are associated with this doctor
+    // Either through order.approvedByDoctorId or through metadata.doctorId
+    const payouts = payments
+      .filter((payment: any) => {
+        const paymentData = payment.toJSON();
+        // If payment has an order with matching approvedByDoctorId
+        if (paymentData.order && paymentData.order.approvedByDoctorId === user.id) {
+          return true;
+        }
+        // If payment metadata has doctorId matching this doctor
+        if (paymentData.stripeMetadata?.doctorId === user.id) {
+          return true;
+        }
+        return false;
+      })
+      .map((payment: any) => {
+        const paymentData = payment.toJSON();
+        const order = paymentData.order;
         return {
-          orderId: orderData.id,
-          orderNumber: orderData.orderNumber,
-          amount: parseFloat(orderData.doctorAmount) || 0,
-          totalAmount: parseFloat(orderData.totalAmount) || 0,
-          date: orderData.createdAt,
-          status: orderData.status,
-          paymentStatus: orderData.payment?.status,
-          paidAt: orderData.payment?.paidAt,
-          brand: orderData.clinic
+          paymentId: paymentData.id,
+          orderId: order?.id || null,
+          orderNumber: order?.orderNumber || null,
+          amount: parseFloat(paymentData.amount) || 0,
+          totalAmount: order ? parseFloat(order.totalAmount) || 0 : parseFloat(paymentData.amount) || 0,
+          date: paymentData.createdAt,
+          status: paymentData.status,
+          paidAt: paymentData.paidAt,
+          stripePaymentIntentId: paymentData.stripePaymentIntentId,
+          brand: order?.clinic
             ? {
-              name: orderData.clinic.name,
-              slug: orderData.clinic.slug,
+              name: order.clinic.name,
+              slug: order.clinic.slug,
             }
             : null,
-          customer: orderData.user
+          customer: order?.user
             ? {
-              name: `${orderData.user.firstName || ""} ${orderData.user.lastName || ""}`.trim(),
-              email: orderData.user.email,
+              name: `${order.user.firstName || ""} ${order.user.lastName || ""}`.trim(),
+              email: order.user.email,
             }
             : null,
         };
@@ -13296,6 +13320,140 @@ app.get("/payouts/doctor", authenticateJWT, async (req, res) => {
       console.error("❌ Error fetching doctor payouts:", error);
     } else {
       console.error("❌ Error fetching doctor payouts");
+    }
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+});
+
+// Get payouts for pharmacy
+app.get("/payouts/pharmacy", authenticateJWT, async (req, res) => {
+  try {
+    const currentUser = getCurrentUser(req);
+    if (!currentUser) {
+      return res.status(401).json({
+        success: false,
+        message: "Not authenticated",
+      });
+    }
+
+    const { dateFrom, dateTo, page = "1", limit = "50" } = req.query;
+
+    const whereClause: any = {
+      paymentGoesTo: PaymentGoesTo.PHARMACY,
+      status: {
+        [Op.in]: ["succeeded", "processing"],
+      },
+    };
+
+    if (dateFrom) {
+      whereClause.createdAt = {
+        ...whereClause.createdAt,
+        [Op.gte]: new Date(dateFrom as string),
+      };
+    }
+
+    if (dateTo) {
+      whereClause.createdAt = {
+        ...whereClause.createdAt,
+        [Op.lte]: new Date(dateTo as string),
+      };
+    }
+
+    const pageNum = parseInt(page as string) || 1;
+    const limitNum = parseInt(limit as string) || 50;
+    const offset = (pageNum - 1) * limitNum;
+
+    // Get payments that go to pharmacy
+    const { rows: payments, count: total } = await Payment.findAndCountAll({
+      where: whereClause,
+      include: [
+        {
+          model: Order,
+          as: "order",
+          required: false,
+          attributes: [
+            "id",
+            "orderNumber",
+            "status",
+            "totalAmount",
+            "pharmacyWholesaleAmount",
+            "createdAt",
+          ],
+          include: [
+            {
+              model: Clinic,
+              as: "clinic",
+              attributes: ["id", "name", "slug"],
+              required: false,
+            },
+            {
+              model: User,
+              as: "user",
+              attributes: ["id", "firstName", "lastName", "email"],
+            },
+          ],
+        },
+      ],
+      order: [["createdAt", "DESC"]],
+      limit: limitNum,
+      offset,
+      distinct: true,
+    });
+
+    const payouts = payments.map((payment: any) => {
+      const paymentData = payment.toJSON();
+      const order = paymentData.order;
+      return {
+        paymentId: paymentData.id,
+        orderId: order?.id || null,
+        orderNumber: order?.orderNumber || null,
+        amount: parseFloat(paymentData.amount) || 0,
+        totalAmount: order ? parseFloat(order.totalAmount) || 0 : parseFloat(paymentData.amount) || 0,
+        date: paymentData.createdAt,
+        status: paymentData.status,
+        paidAt: paymentData.paidAt,
+        stripePaymentIntentId: paymentData.stripePaymentIntentId,
+        brand: order?.clinic
+          ? {
+            name: order.clinic.name,
+            slug: order.clinic.slug,
+          }
+          : null,
+        customer: order?.user
+          ? {
+            name: `${order.user.firstName || ""} ${order.user.lastName || ""}`.trim(),
+            email: order.user.email,
+          }
+          : null,
+      };
+    });
+
+    const totalAmount = payouts.reduce((sum, p) => sum + p.amount, 0);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        payouts,
+        summary: {
+          totalAmount,
+          totalOrders: payouts.length,
+        },
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total,
+          totalPages: Math.ceil(total / limitNum),
+        },
+      },
+    });
+  } catch (error) {
+    if (process.env.NODE_ENV === "development") {
+      console.error("❌ Error fetching pharmacy payouts:", error);
+    } else {
+      console.error("❌ Error fetching pharmacy payouts");
     }
     res.status(500).json({
       success: false,
