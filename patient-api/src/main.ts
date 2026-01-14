@@ -15120,6 +15120,128 @@ async function startServer() {
     }
   });
 
+  // ============= QUALIPHY INTEGRATION ENDPOINTS =============
+
+  // Invite patient to Qualiphy exam
+  app.post("/qualiphy/exam-invite", authenticateJWT, async (req, res) => {
+    try {
+      const currentUser = getCurrentUser(req);
+      if (!currentUser) {
+        return res.status(401).json({ success: false, message: "Unauthorized" });
+      }
+
+      const user = await User.findByPk(currentUser.id);
+      if (!user) {
+        return res.status(404).json({ success: false, message: "User not found" });
+      }
+
+      const {
+        exams,
+        first_name,
+        last_name,
+        email,
+        dob,
+        phone_number,
+        tele_state,
+        pharmacy_id,
+        provider_pos_selection,
+        webhook_url,
+        additional_data,
+      } = req.body;
+
+      if (!exams || !Array.isArray(exams) || exams.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: "exams array is required",
+        });
+      }
+
+      if (!first_name || !last_name || !email || !dob || !phone_number || !tele_state) {
+        return res.status(400).json({
+          success: false,
+          message: "Required fields: first_name, last_name, email, dob, phone_number, tele_state",
+        });
+      }
+
+      const QualiphyExamService = (
+        await import("./services/qualiphyIntegration/QualiphyExam.service")
+      ).default;
+
+      const inviteResponse = await QualiphyExamService.invitePatientToExam({
+        exams,
+        first_name,
+        last_name,
+        email,
+        dob,
+        phone_number,
+        tele_state,
+        pharmacy_id,
+        provider_pos_selection,
+        webhook_url,
+        additional_data,
+      });
+
+      return res.json({ success: true, data: inviteResponse });
+    } catch (error) {
+      if (process.env.NODE_ENV === "development") {
+        console.error("❌ Error inviting patient to Qualiphy exam:", error);
+      } else {
+        console.error("❌ Error inviting patient to Qualiphy exam");
+      }
+      return res.status(500).json({
+        success: false,
+        message: error instanceof Error ? error.message : "Failed to invite patient to exam",
+      });
+    }
+  });
+
+  // Get exam questions and answers
+  app.post("/qualiphy/exam-questions", authenticateJWT, async (req, res) => {
+    try {
+      const currentUser = getCurrentUser(req);
+      if (!currentUser) {
+        return res.status(401).json({ success: false, message: "Unauthorized" });
+      }
+
+      const { meeting_uuid, patient_exam_id } = req.body;
+
+      if (!meeting_uuid || typeof meeting_uuid !== "string") {
+        return res.status(400).json({
+          success: false,
+          message: "meeting_uuid is required",
+        });
+      }
+
+      if (!patient_exam_id || typeof patient_exam_id !== "number") {
+        return res.status(400).json({
+          success: false,
+          message: "patient_exam_id is required and must be a number",
+        });
+      }
+
+      const QualiphyExamService = (
+        await import("./services/qualiphyIntegration/QualiphyExam.service")
+      ).default;
+
+      const questionsResponse = await QualiphyExamService.getExamQuestions(
+        meeting_uuid,
+        patient_exam_id
+      );
+
+      return res.json({ success: true, data: questionsResponse });
+    } catch (error) {
+      if (process.env.NODE_ENV === "development") {
+        console.error("❌ Error fetching Qualiphy exam questions:", error);
+      } else {
+        console.error("❌ Error fetching Qualiphy exam questions");
+      }
+      return res.status(500).json({
+        success: false,
+        message: error instanceof Error ? error.message : "Failed to fetch exam questions",
+      });
+    }
+  });
+
   // ============= PUBLIC ENDPOINTS (No Auth Required) =============
   const { registerPublicEndpoints } = await import("./endpoints/public");
   registerPublicEndpoints(app);
