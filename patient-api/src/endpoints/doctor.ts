@@ -515,10 +515,11 @@ export function registerDoctorEndpoints(
         // Approve each order
         const orderService = new OrderService();
         const results: any[] = [];
+        const doctorUserId = user.id; // The doctor approving the orders
 
         for (const order of orders) {
           try {
-            const result = await orderService.approveOrder(order.id, prescriptionDays);
+            const result = await orderService.approveOrder(order.id, prescriptionDays, doctorUserId);
             results.push({
               orderId: order.id,
               orderNumber: order.orderNumber,
