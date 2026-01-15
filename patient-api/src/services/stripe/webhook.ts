@@ -778,61 +778,109 @@ export const handlePaymentIntentAmountCapturableUpdated = async (paymentIntent: 
         console.error('❌ Error updating order status:', error);
     }
 
-    // Check if user has mdPatientId
-    if (!user.mdPatientId) {
-        console.log('⚠️ User does not have mdPatientId:', user.id);
-        return;
-    }
+    // ============================================
+    // MINIMAL MD INTEGRATIONS IMPLEMENTATION
+    // Following the same 3-API-call pattern as /md/cases endpoint
+    // ============================================
 
     // Check if order already has mdCaseId
     if (order.mdCaseId) {
-        console.log('ℹ️ Order already has mdCaseId:', order.mdCaseId);
+        console.log('[MD-WH] ℹ️ Order already has mdCaseId:', order.mdCaseId);
+        return;
+    }
+
+    // Check if clinic uses md-integrations dashboard format
+    let clinic: any = null;
+    if (user.clinicId) {
+        clinic = await Clinic.findByPk(user.clinicId);
+    }
+
+    if (!clinic || (clinic as any).patientPortalDashboardFormat !== 'md-integrations') {
+        console.log('[MD-WH] ℹ️ Skipping MD Integrations - clinic does not use md-integrations format');
         return;
     }
 
     try {
-        // Get MD Integration access token
-        const tokenResponse = await MDAuthService.generateToken();
+        // Step 2: Ensure patient is synced with MD Integrations (creates mdPatientId if doesn't exist)
+        if (!user.mdPatientId) {
+            console.log('[MD-WH] User does not have mdPatientId, syncing patient...');
+            const { default: UserServiceClass } = await import('../user.service');
+            const userService = new UserServiceClass();
+            const syncedUser = await userService.syncPatientInMD(user.id, (order as any).shippingAddressId);
+            
+            if (!syncedUser || !syncedUser.mdPatientId) {
+                console.error('[MD-WH] ❌ Failed to sync patient with MD Integrations');
+                return;
+            }
+            
+            // Reload user to get updated mdPatientId
+            await user.reload();
+            
+            if (process.env.NODE_ENV === 'development') {
+                console.log('[MD-WH] ✅ Patient synced, mdPatientId:', user.mdPatientId);
+            }
+        }
 
-        // Create case using MD Integration
+        // Step 3: Resolve pre-configured offering_id (same logic as /md/cases endpoint)
+        // Priority: Product -> Config -> Sandbox fallback
+        let offeringId: string | undefined;
+
+        // Try product-level offering first
+        if (tenantProduct && tenantProduct.product && tenantProduct.product.mdCaseId) {
+            offeringId = tenantProduct.product.mdCaseId;
+        } else if (treatment && treatment.mdCaseId) {
+            offeringId = treatment.mdCaseId;
+        }
+
+        // Fallback to config default
+        if (!offeringId) {
+            try {
+                const mdConfig = (await import('../mdIntegration/config')).mdIntegrationsConfig;
+                if (mdConfig.defaultOfferingId) {
+                    offeringId = mdConfig.defaultOfferingId;
+                }
+            } catch { }
+        }
+
+        // Development sandbox fallback
+        if (!offeringId && process.env.NODE_ENV !== 'production') {
+            offeringId = '3c3d0118-e362-4466-9c92-d852720c5a41';
+        }
+
+        if (!offeringId) {
+            console.error('[MD-WH] ❌ No offering_id configured. Cannot create MD case.');
+            return;
+        }
+
+        // Build case questions from questionnaire answers (optional)
         const { extractCaseQuestions } = await import('../../utils/questionnaireAnswers');
         const caseQuestions = order.questionnaireAnswers
             ? extractCaseQuestions(order.questionnaireAnswers)
             : [];
 
-        // Determine case offerings based on environment
-        let caseOfferings: { offering_id: string }[] = [];
+        // Step 1: Generate access token (uses cached token if available)
+        const MDAuthService = (await import('../mdIntegration/MDAuth.service')).default;
+        const MDCaseService = (await import('../mdIntegration/MDCase.service')).default;
+        const tokenResponse = await MDAuthService.generateToken();
 
-        if (process.env.NODE_ENV !== 'production') {
-            // Always use test offering in non-production environments
-            caseOfferings = [
-                {
-                    offering_id: "3c3d0118-e362-4466-9c92-d852720c5a41"
-                }
-            ];
-        } else if (treatment && treatment.mdCaseId) {
-            // Use treatment's mdCaseId for offering in production
-            caseOfferings = [
-                {
-                    offering_id: treatment.mdCaseId
-                }
-            ];
-        } else if (tenantProduct && tenantProduct.product && tenantProduct.product.mdCaseId) {
-            // Use product's mdCaseId for offering in production
-            caseOfferings = [
-                {
-                    offering_id: tenantProduct.product.mdCaseId
-                }
-            ];
+        // Ensure mdPatientId exists before creating case
+        if (!user.mdPatientId) {
+            console.error('[MD-WH] ❌ User mdPatientId is still missing after sync');
+            return;
         }
 
+        // Step 3: Create case with minimal payload
         const caseData = {
-            patient_id: user.mdPatientId,
+            patient_id: user.mdPatientId, // TypeScript now knows this is string (not undefined)
             metadata: `orderId: ${order.id}`,
             hold_status: false,
-            case_questions: caseQuestions,
-            case_offerings: caseOfferings,
+            case_offerings: [{ offering_id: offeringId }],
         };
+
+        // Add questionnaire answers if available
+        if (caseQuestions.length > 0) {
+            (caseData as any).case_questions = caseQuestions;
+        }
 
         const caseResponse = await MDCaseService.createCase(caseData, tokenResponse.access_token);
 
@@ -841,13 +889,18 @@ export const handlePaymentIntentAmountCapturableUpdated = async (paymentIntent: 
             mdCaseId: caseResponse.case_id
         });
 
-        console.log('✅ MD Integration case created and saved to order:', {
+        console.log('[MD-WH] ✅ MD Integration case created and saved to order:', {
             orderId: order.id,
-            caseId: caseResponse
+            caseId: caseResponse.case_id,
+            patientId: user.mdPatientId
         });
 
-    } catch (error) {
-        console.error('❌ Error creating MD Integration case:', error);
+    } catch (error: any) {
+        const errorMsg = error?.message || 'Unknown error';
+        console.error('[MD-WH] ❌ Error creating MD Integration case:', errorMsg);
+        if (process.env.NODE_ENV === 'development') {
+            console.error('[MD-WH] Error details:', error);
+        }
     }
 };
 
