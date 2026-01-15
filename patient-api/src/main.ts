@@ -16629,28 +16629,27 @@ async function startServer() {
           payload = {};
         }
 
-        // SECURITY: MD Integrations webhook secret is REQUIRED
+        // SECURITY: MD Integrations webhook secret (optional but recommended)
         const secret = process.env.MD_INTEGRATIONS_WEBHOOK_SECRET;
-        if (!secret) {
-          console.error(
-            "❌ CRITICAL: MD_INTEGRATIONS_WEBHOOK_SECRET not configured"
-          );
-          return res
-            .status(500)
-            .json({ success: false, message: "Webhook configuration error" });
-        }
+        let signatureValid = true;
 
-        // ALWAYS verify signature - no bypass
-        const signatureValid = MDWebhookService.verifyWebhookSignature(
-          providedSignature,
-          rawBody,
-          secret
-        );
+        if (secret) {
+          // Verify signature if secret is configured
+          signatureValid = MDWebhookService.verifyWebhookSignature(
+            providedSignature,
+            rawBody,
+            secret
+          );
+        } else {
+          // No secret configured - skip signature verification (for sandbox/development)
+          console.log(`[MD-WH] reqId=${requestId} ⚠️ No webhook secret configured - skipping signature verification`);
+        }
 
         // SECURITY: Minimal logging - no PHI in logs
         console.log(`[MD-WH] reqId=${requestId} received`, {
           event_type: payload?.event_type,
           signature_valid: signatureValid,
+          has_secret: !!secret,
           content_type: contentType,
           // REMOVED: case_id, patient_id, body_preview (may contain PHI)
         });

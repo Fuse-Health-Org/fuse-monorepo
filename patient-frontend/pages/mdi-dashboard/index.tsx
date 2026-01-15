@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Button, Avatar, Card, CardBody, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, Chip, Spinner } from "@heroui/react";
+import { Button, Avatar, Card, CardBody, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, Chip, Spinner, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Divider } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { ProtectedRoute } from "../../components/ProtectedRoute";
 import { useAuth } from "../../contexts/AuthContext";
@@ -40,7 +40,7 @@ function MDISidebar({
   setActiveTab: (tab: string) => void;
   isMobile?: boolean;
 }) {
-  const { user, logout } = useAuth();
+  const { user, signOut } = useAuth();
 
   return (
     <div className={`
@@ -110,7 +110,7 @@ function MDISidebar({
           size="sm"
           className="w-full mt-2"
           startContent={<Icon icon="lucide:log-out" />}
-          onPress={logout}
+          onPress={signOut}
         >
           Sign Out
         </Button>
@@ -356,10 +356,245 @@ function getStatusConfig(status: string, classification: string) {
   return { color: 'default' as const, label: 'Pending', icon: 'lucide:hourglass' };
 }
 
+interface CaseDetails {
+  case_id: string;
+  metadata: string;
+  patient: {
+    first_name: string;
+    last_name: string;
+    email: string;
+    date_of_birth: string;
+    gender: number;
+    phone_number: string;
+  };
+  case_assignment?: {
+    created_at: string;
+    clinician: {
+      first_name: string;
+      last_name: string;
+      full_name: string;
+      specialty: string;
+      profile_url?: string;
+    };
+  };
+}
+
+function CaseDetailModal({ 
+  isOpen, 
+  onClose, 
+  caseItem 
+}: { 
+  isOpen: boolean; 
+  onClose: () => void; 
+  caseItem: MDCase | null;
+}) {
+  const [caseDetails, setCaseDetails] = useState<CaseDetails | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (isOpen && caseItem?.caseId) {
+      const fetchCaseDetails = async () => {
+        setLoading(true);
+        try {
+          const response = await apiCall(`/md/cases/${caseItem.caseId}`);
+          if (response.success && response.data?.data) {
+            setCaseDetails(response.data.data);
+          }
+        } catch (err) {
+          console.error('Error fetching case details:', err);
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchCaseDetails();
+    }
+  }, [isOpen, caseItem?.caseId]);
+
+  if (!caseItem) return null;
+
+  const statusConfig = getStatusConfig(caseItem.status, caseItem.classification);
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} size="2xl" scrollBehavior="inside">
+      <ModalContent>
+        <ModalHeader className="flex flex-col gap-1">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-secondary/10 flex items-center justify-center">
+              <Icon icon="lucide:pill" className="text-xl text-secondary" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold">
+                {caseItem.tenantProduct?.name || caseItem.title || 'Prescription Case'}
+              </h2>
+              <p className="text-sm text-foreground-500 font-normal">
+                {caseItem.orderNumber}
+              </p>
+            </div>
+          </div>
+        </ModalHeader>
+        <ModalBody>
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <Spinner size="lg" color="secondary" />
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {/* Status Section */}
+              <div className="flex items-center justify-between p-4 bg-content2 rounded-lg">
+                <div>
+                  <p className="text-sm text-foreground-500 mb-1">Case Status</p>
+                  <Chip
+                    color={statusConfig.color}
+                    variant="flat"
+                    size="lg"
+                    startContent={<Icon icon={statusConfig.icon} />}
+                  >
+                    {statusConfig.label}
+                  </Chip>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm text-foreground-500 mb-1">Created</p>
+                  <p className="font-medium">{new Date(caseItem.createdAt).toLocaleDateString()}</p>
+                </div>
+              </div>
+
+              <Divider />
+
+              {/* Case Information */}
+              <div>
+                <h3 className="font-semibold mb-3 flex items-center gap-2">
+                  <Icon icon="lucide:file-text" className="text-secondary" />
+                  Case Information
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-3 bg-content2 rounded-lg">
+                    <p className="text-xs text-foreground-400 mb-1">Order ID</p>
+                    <p className="text-sm font-mono">{caseItem.orderId}</p>
+                  </div>
+                  <div className="p-3 bg-content2 rounded-lg">
+                    <p className="text-xs text-foreground-400 mb-1">MDI Case ID</p>
+                    <p className="text-sm font-mono">{caseItem.caseId}</p>
+                  </div>
+                  {caseItem.tenantProduct?.category && (
+                    <div className="p-3 bg-content2 rounded-lg">
+                      <p className="text-xs text-foreground-400 mb-1">Category</p>
+                      <p className="text-sm">{caseItem.tenantProduct.category}</p>
+                    </div>
+                  )}
+                  <div className="p-3 bg-content2 rounded-lg">
+                    <p className="text-xs text-foreground-400 mb-1">Last Updated</p>
+                    <p className="text-sm">{new Date(caseItem.updatedAt).toLocaleString()}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Clinician Assignment */}
+              {caseDetails?.case_assignment?.clinician && (
+                <>
+                  <Divider />
+                  <div>
+                    <h3 className="font-semibold mb-3 flex items-center gap-2">
+                      <Icon icon="lucide:stethoscope" className="text-secondary" />
+                      Assigned Clinician
+                    </h3>
+                    <div className="flex items-center gap-4 p-4 bg-content2 rounded-lg">
+                      <Avatar
+                        name={caseDetails.case_assignment.clinician.full_name}
+                        src={caseDetails.case_assignment.clinician.profile_url}
+                        size="lg"
+                      />
+                      <div>
+                        <p className="font-semibold">
+                          Dr. {caseDetails.case_assignment.clinician.full_name}
+                        </p>
+                        {caseDetails.case_assignment.clinician.specialty && (
+                          <p className="text-sm text-foreground-500">
+                            {caseDetails.case_assignment.clinician.specialty}
+                          </p>
+                        )}
+                        <p className="text-xs text-foreground-400 mt-1">
+                          Assigned {new Date(caseDetails.case_assignment.created_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Status Timeline */}
+              <Divider />
+              <div>
+                <h3 className="font-semibold mb-3 flex items-center gap-2">
+                  <Icon icon="lucide:clock" className="text-secondary" />
+                  Status Timeline
+                </h3>
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-full bg-success/20 flex items-center justify-center flex-shrink-0">
+                      <Icon icon="lucide:check" className="text-success text-sm" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-sm">Case Created</p>
+                      <p className="text-xs text-foreground-400">
+                        {new Date(caseItem.createdAt).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                  {caseDetails?.case_assignment && (
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-full bg-success/20 flex items-center justify-center flex-shrink-0">
+                        <Icon icon="lucide:check" className="text-success text-sm" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-sm">Clinician Assigned</p>
+                        <p className="text-xs text-foreground-400">
+                          {new Date(caseDetails.case_assignment.created_at).toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  {caseItem.classification === 'approved' ? (
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-full bg-success/20 flex items-center justify-center flex-shrink-0">
+                        <Icon icon="lucide:check" className="text-success text-sm" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-sm">Case Approved</p>
+                        <p className="text-xs text-foreground-400">Prescription sent to pharmacy</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-full bg-warning/20 flex items-center justify-center flex-shrink-0">
+                        <Icon icon="lucide:clock" className="text-warning text-sm" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-sm">Awaiting Review</p>
+                        <p className="text-xs text-foreground-400">Clinician will review your case</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </ModalBody>
+        <ModalFooter>
+          <Button color="primary" variant="flat" onPress={onClose}>
+            Close
+          </Button>
+        </ModalFooter>
+      </ModalContent>
+    </Modal>
+  );
+}
+
 function MDICasesContent() {
   const [cases, setCases] = useState<MDCase[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedCase, setSelectedCase] = useState<MDCase | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const fetchCases = useCallback(async () => {
     try {
@@ -384,6 +619,11 @@ function MDICasesContent() {
   useEffect(() => {
     fetchCases();
   }, [fetchCases]);
+
+  const handleCaseClick = (caseItem: MDCase) => {
+    setSelectedCase(caseItem);
+    setIsModalOpen(true);
+  };
 
   if (loading) {
     return (
@@ -445,7 +685,12 @@ function MDICasesContent() {
           {cases.map((caseItem) => {
             const statusConfig = getStatusConfig(caseItem.status, caseItem.classification);
             return (
-              <Card key={caseItem.orderId} className="bg-content1 hover:bg-content2 transition-colors">
+              <Card 
+                key={caseItem.orderId} 
+                isPressable
+                className="bg-content1 hover:bg-content2 transition-colors cursor-pointer"
+                onPress={() => handleCaseClick(caseItem)}
+              >
                 <CardBody className="p-4">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex items-start gap-4">
@@ -484,7 +729,7 @@ function MDICasesContent() {
                         )}
                       </div>
                     </div>
-                    <div className="flex flex-col items-end gap-2">
+                    <div className="flex items-center gap-2">
                       <Chip
                         color={statusConfig.color}
                         variant="flat"
@@ -493,6 +738,7 @@ function MDICasesContent() {
                       >
                         {statusConfig.label}
                       </Chip>
+                      <Icon icon="lucide:chevron-right" className="text-foreground-400" />
                     </div>
                   </div>
                 </CardBody>
@@ -501,6 +747,13 @@ function MDICasesContent() {
           })}
         </div>
       )}
+
+      {/* Case Detail Modal */}
+      <CaseDetailModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        caseItem={selectedCase}
+      />
     </div>
   );
 }
@@ -729,7 +982,7 @@ function MDIAccountContent() {
             <div className="flex items-center justify-between py-3 border-b border-content3">
               <div>
                 <div className="font-medium">Phone</div>
-                <div className="text-sm text-foreground-500">{user?.phone || 'Not set'}</div>
+                <div className="text-sm text-foreground-500">{(user as any)?.phoneNumber || 'Not set'}</div>
               </div>
             </div>
           </div>
@@ -752,7 +1005,7 @@ function FeatureCard({ icon, title, description }: { icon: string; title: string
 }
 
 function MDIDashboardPage() {
-  const { user, logout } = useAuth();
+  const { user, signOut } = useAuth();
   const [activeTab, setActiveTab] = React.useState("dashboard");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const [isMobileView, setIsMobileView] = React.useState(false);
@@ -825,11 +1078,11 @@ function MDIDashboardPage() {
                 <p className="font-semibold">{user?.firstName || 'User'}</p>
                 <p className="text-sm text-foreground-500">{user?.email}</p>
               </DropdownItem>
-              <DropdownItem 
-                key="logout" 
-                color="danger" 
+              <DropdownItem
+                key="logout"
+                color="danger"
                 startContent={<Icon icon="lucide:log-out" />}
-                onPress={logout}
+                onPress={signOut}
               >
                 Sign Out
               </DropdownItem>
@@ -888,11 +1141,11 @@ function MDIDashboardPage() {
                   >
                     Account Settings
                   </DropdownItem>
-                  <DropdownItem 
-                    key="logout" 
-                    color="danger" 
+                  <DropdownItem
+                    key="logout"
+                    color="danger"
                     startContent={<Icon icon="lucide:log-out" />}
-                    onPress={logout}
+                    onPress={signOut}
                   >
                     Sign Out
                   </DropdownItem>
