@@ -5,7 +5,7 @@ import { Icon } from "@iconify/react";
 import { ProtectedRoute } from "../../components/ProtectedRoute";
 import { useAuth } from "../../contexts/AuthContext";
 import { getAvatarEmoji } from "../../lib/avatarUtils";
-import { authApi } from "../../lib/api";
+import { apiCall } from "../../lib/api";
 
 /**
  * MDI Dashboard - MD Integrations Portal
@@ -127,9 +127,9 @@ function MDIDashboardContent({ setActiveTab }: { setActiveTab: (tab: string) => 
   useEffect(() => {
     const fetchCases = async () => {
       try {
-        const response = await authApi.get('/md/offerings');
-        if (response.data?.success && response.data?.data) {
-          const mdiCases = response.data.data.filter((c: MDCase) => c.caseId);
+        const response = await apiCall('/md/offerings');
+        if (response.success && response.data?.data) {
+          const mdiCases = (response.data.data as MDCase[]).filter((c: MDCase) => c.caseId);
           setCases(mdiCases);
         }
       } catch (err) {
@@ -365,11 +365,13 @@ function MDICasesContent() {
     try {
       setLoading(true);
       setError(null);
-      const response = await authApi.get('/md/offerings');
-      if (response.data?.success && response.data?.data) {
+      const response = await apiCall('/md/offerings');
+      if (response.success && response.data?.data) {
         // Filter to only show orders that have an mdCaseId (actual MDI cases)
-        const mdiCases = response.data.data.filter((c: MDCase) => c.caseId);
+        const mdiCases = (response.data.data as MDCase[]).filter((c: MDCase) => c.caseId);
         setCases(mdiCases);
+      } else if (response.error) {
+        setError(response.error);
       }
     } catch (err: any) {
       console.error('Error fetching cases:', err);
@@ -533,18 +535,15 @@ function MDIMessagesContent() {
     try {
       setLoading(true);
       setError(null);
-      const response = await authApi.get('/messages', {
-        params: { channel: 'support', per_page: 50 }
-      });
-      if (response.data?.success && response.data?.data) {
+      const response = await apiCall('/messages?channel=support&per_page=50');
+      if (response.success && response.data?.data) {
         setMessages(response.data.data);
+      } else if (response.error && !response.error.includes('404')) {
+        setError(response.error);
       }
     } catch (err: any) {
       console.error('Error fetching messages:', err);
-      // Don't show error if it's just empty messages
-      if (err.response?.status !== 404) {
-        setError(err.message || 'Failed to load messages');
-      }
+      setError(err.message || 'Failed to load messages');
     } finally {
       setLoading(false);
     }
@@ -559,12 +558,19 @@ function MDIMessagesContent() {
 
     try {
       setSending(true);
-      await authApi.post('/messages', {
-        channel: 'support',
-        text: newMessage.trim()
+      const response = await apiCall('/messages', {
+        method: 'POST',
+        body: JSON.stringify({
+          channel: 'support',
+          text: newMessage.trim()
+        })
       });
-      setNewMessage('');
-      await fetchMessages(); // Refresh messages
+      if (response.success) {
+        setNewMessage('');
+        await fetchMessages(); // Refresh messages
+      } else {
+        alert('Failed to send message. Please try again.');
+      }
     } catch (err: any) {
       console.error('Error sending message:', err);
       alert('Failed to send message. Please try again.');

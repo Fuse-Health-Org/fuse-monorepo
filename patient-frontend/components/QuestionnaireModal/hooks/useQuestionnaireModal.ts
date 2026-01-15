@@ -678,11 +678,13 @@ export function useQuestionnaireModal(
       console.log('🔵 [MDI] Response:', JSON.stringify(result, null, 2));
 
       if (result.success) {
-        if (result.data?.skipped) {
-          console.log('⚠️ [MDI] Backend skipped MDI case creation:', (result as any).message || 'No message');
+        // Handle nested response structure: result.data may contain another { success, data } object
+        const responseData = result.data?.data || result.data;
+        if (result.data?.skipped || responseData?.skipped) {
+          console.log('⚠️ [MDI] Backend skipped MDI case creation:', (result as any).message || result.data?.message || 'No message');
         } else {
           console.log('✅ [MDI] MD Integrations case created successfully!');
-          console.log('✅ [MDI] Case ID:', result.data?.caseId);
+          console.log('✅ [MDI] Case ID:', responseData?.caseId || result.data?.caseId);
         }
       } else {
         console.error('❌ [MDI] Failed to create MD case:', result);
