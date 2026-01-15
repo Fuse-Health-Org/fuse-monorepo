@@ -16750,16 +16750,16 @@ async function startServer() {
 
       console.log(`[MD-ADMIN] Listed ${offerings?.length || 0} offerings`);
 
-      return res.json({ 
-        success: true, 
+      return res.json({
+        success: true,
         data: offerings,
         count: offerings?.length || 0,
         hint: "Use the 'offering_id' field when creating cases with case_offerings parameter"
       });
     } catch (error: any) {
       console.error("❌ Error listing MDI offerings:", error?.response?.data || error?.message || error);
-      return res.status(500).json({ 
-        success: false, 
+      return res.status(500).json({
+        success: false,
         message: "Failed to list MDI offerings",
         error: error?.response?.data?.message || error?.message
       });
@@ -16791,20 +16791,20 @@ async function startServer() {
         search: search || undefined,
       });
 
-      console.log(`[MD-ADMIN] Listed products`, { 
-        search, 
-        count: products?.data?.length || products?.length || 0 
+      console.log(`[MD-ADMIN] Listed products`, {
+        search,
+        count: products?.data?.length || products?.length || 0
       });
 
-      return res.json({ 
-        success: true, 
+      return res.json({
+        success: true,
         data: products,
         hint: "These are medications/services available through DoseSpot. Clinicians prescribe from this catalog."
       });
     } catch (error: any) {
       console.error("❌ Error listing MDI products:", error?.response?.data || error?.message || error);
-      return res.status(500).json({ 
-        success: false, 
+      return res.status(500).json({
+        success: false,
         message: "Failed to list MDI products",
         error: error?.response?.data?.message || error?.message
       });
