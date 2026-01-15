@@ -13764,6 +13764,11 @@ app.get("/md/cases/:caseId", authenticateJWT, async (req, res) => {
       tokenResponse.access_token
     );
 
+    // Also fetch stored prescriptions/offerings from our database
+    const order = await Order.findOne({ where: { mdCaseId: caseId, userId: currentUser.id } });
+    const storedPrescriptions = (order as any)?.mdPrescriptions || [];
+    const storedOfferings = (order as any)?.mdOfferings || [];
+
     // HIPAA Audit: Log PHI access (viewing telehealth case details)
     await AuditService.logFromRequest(req, {
       action: AuditAction.VIEW,
@@ -13772,7 +13777,18 @@ app.get("/md/cases/:caseId", authenticateJWT, async (req, res) => {
       details: { mdCase: true },
     });
 
-    return res.json({ success: true, data: mdCase });
+    return res.json({ 
+      success: true, 
+      data: {
+        ...mdCase,
+        // Include stored data from our database (from webhooks)
+        storedPrescriptions,
+        storedOfferings,
+        orderNumber: (order as any)?.orderNumber,
+        orderStatus: (order as any)?.status,
+        approvedByDoctor: (order as any)?.approvedByDoctor || false,
+      }
+    });
   } catch (error) {
     if (process.env.NODE_ENV === "development") {
       console.error("❌ Error fetching MD case:", error);
@@ -15250,6 +15266,10 @@ async function startServer() {
         const hasMdOfferings =
           Array.isArray(mdOfferings) && mdOfferings.length > 0;
 
+        // Get stored prescriptions
+        const mdPrescriptions = (order as any).mdPrescriptions as any[] | null | undefined;
+        const hasPrescriptions = Array.isArray(mdPrescriptions) && mdPrescriptions.length > 0;
+
         // Create ONE entry per order (not per MD offering)
         flattened.push({
           orderId: order.id,
@@ -15270,6 +15290,10 @@ async function startServer() {
           questionnaireAnswers: questionnaireAnswersData,
           // Store MD offerings count for reference
           mdOfferingsCount: hasMdOfferings ? mdOfferings.length : 0,
+          // Include prescription data
+          mdPrescriptions: hasPrescriptions ? mdPrescriptions : [],
+          mdOfferings: hasMdOfferings ? mdOfferings : [],
+          hasPrescriptions,
         });
       }
 

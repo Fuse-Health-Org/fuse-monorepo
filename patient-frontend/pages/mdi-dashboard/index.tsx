@@ -27,6 +27,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { id: "dashboard", label: "Dashboard", icon: "lucide:layout-dashboard" },
   { id: "cases", label: "My Cases", icon: "lucide:file-text" },
+  { id: "prescriptions", label: "Prescriptions", icon: "lucide:pill" },
   { id: "messages", label: "Messages", icon: "lucide:message-circle" },
   { id: "account", label: "Account", icon: "lucide:user" },
 ];
@@ -144,6 +145,11 @@ function MDIDashboardContent({ setActiveTab }: { setActiveTab: (tab: string) => 
   const pendingCases = cases.filter(c => c.classification === 'pending');
   const approvedCases = cases.filter(c => c.classification === 'approved');
   const latestCase = cases[0];
+  
+  // Count total prescriptions across all cases
+  const totalPrescriptions = cases.reduce((count, c) => {
+    return count + (c.mdPrescriptions?.length || 0);
+  }, 0);
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -155,7 +161,7 @@ function MDIDashboardContent({ setActiveTab }: { setActiveTab: (tab: string) => 
       </p>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         <Card className="bg-content1">
           <CardBody className="p-4">
             <div className="flex items-center gap-4">
@@ -178,7 +184,7 @@ function MDIDashboardContent({ setActiveTab }: { setActiveTab: (tab: string) => 
               </div>
               <div>
                 <div className="text-2xl font-bold">{loading ? '-' : pendingCases.length}</div>
-                <div className="text-sm text-foreground-500">Pending Review</div>
+                <div className="text-sm text-foreground-500">Pending</div>
               </div>
             </div>
           </CardBody>
@@ -193,6 +199,24 @@ function MDIDashboardContent({ setActiveTab }: { setActiveTab: (tab: string) => 
               <div>
                 <div className="text-2xl font-bold">{loading ? '-' : approvedCases.length}</div>
                 <div className="text-sm text-foreground-500">Approved</div>
+              </div>
+            </div>
+          </CardBody>
+        </Card>
+
+        <Card 
+          className="bg-content1 hover:bg-content2 transition-colors cursor-pointer"
+          isPressable
+          onPress={() => setActiveTab('prescriptions')}
+        >
+          <CardBody className="p-4">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Icon icon="lucide:pill" className="text-xl text-primary" />
+              </div>
+              <div>
+                <div className="text-2xl font-bold">{loading ? '-' : totalPrescriptions}</div>
+                <div className="text-sm text-foreground-500">Prescriptions</div>
               </div>
             </div>
           </CardBody>
@@ -245,7 +269,7 @@ function MDIDashboardContent({ setActiveTab }: { setActiveTab: (tab: string) => 
       {/* Quick Actions */}
       <div>
         <h2 className="text-lg font-semibold mb-4">Quick Actions</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Card
             isPressable
             className="bg-content1 hover:bg-content2 transition-colors"
@@ -257,8 +281,26 @@ function MDIDashboardContent({ setActiveTab }: { setActiveTab: (tab: string) => 
                   <Icon icon="lucide:file-text" className="text-lg text-secondary" />
                 </div>
                 <div>
-                  <h3 className="font-medium">View Cases</h3>
-                  <p className="text-xs text-foreground-500">Track prescription status</p>
+                  <h3 className="font-medium">My Cases</h3>
+                  <p className="text-xs text-foreground-500">Track case status</p>
+                </div>
+              </div>
+            </CardBody>
+          </Card>
+
+          <Card
+            isPressable
+            className="bg-content1 hover:bg-content2 transition-colors"
+            onPress={() => setActiveTab('prescriptions')}
+          >
+            <CardBody className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-success/10 flex items-center justify-center">
+                  <Icon icon="lucide:pill" className="text-lg text-success" />
+                </div>
+                <div>
+                  <h3 className="font-medium">Prescriptions</h3>
+                  <p className="text-xs text-foreground-500">View medications</p>
                 </div>
               </div>
             </CardBody>
@@ -294,7 +336,7 @@ function MDIDashboardContent({ setActiveTab }: { setActiveTab: (tab: string) => 
                 </div>
                 <div>
                   <h3 className="font-medium">Account</h3>
-                  <p className="text-xs text-foreground-500">Manage your profile</p>
+                  <p className="text-xs text-foreground-500">Manage profile</p>
                 </div>
               </div>
             </CardBody>
@@ -321,6 +363,41 @@ function MDIDashboardContent({ setActiveTab }: { setActiveTab: (tab: string) => 
   );
 }
 
+interface MDPrescription {
+  id: string;
+  title?: string;
+  name?: string;
+  directions?: string;
+  quantity?: string;
+  refills?: number;
+  days_supply?: number;
+  pharmacy_name?: string;
+  status?: string;
+  created_at?: string;
+  product?: {
+    name?: string;
+    ndc?: string;
+  };
+}
+
+interface MDOffering {
+  id: string;
+  case_offering_id?: string;
+  title?: string;
+  name?: string;
+  directions?: string;
+  status?: string;
+  order_status?: string;
+  thank_you_note?: string;
+  clinical_note?: string;
+  product?: {
+    name?: string;
+    directions?: string;
+    quantity?: string;
+    refills?: number;
+  };
+}
+
 interface MDCase {
   orderId: string;
   orderNumber: string;
@@ -338,6 +415,9 @@ interface MDCase {
     category: string | null;
   } | null;
   mdOfferingsCount: number;
+  mdPrescriptions?: MDPrescription[];
+  mdOfferings?: MDOffering[];
+  hasPrescriptions?: boolean;
 }
 
 function getStatusConfig(status: string, classification: string) {
@@ -377,6 +457,12 @@ interface CaseDetails {
       profile_url?: string;
     };
   };
+  // Stored data from our database (via webhooks)
+  storedPrescriptions?: MDPrescription[];
+  storedOfferings?: MDOffering[];
+  orderNumber?: string;
+  orderStatus?: string;
+  approvedByDoctor?: boolean;
 }
 
 function CaseDetailModal({ 
@@ -516,6 +602,144 @@ function CaseDetailModal({
                           Assigned {new Date(caseDetails.case_assignment.created_at).toLocaleDateString()}
                         </p>
                       </div>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Prescriptions Section */}
+              {((caseItem.mdPrescriptions && caseItem.mdPrescriptions.length > 0) || 
+                (caseDetails?.storedPrescriptions && caseDetails.storedPrescriptions.length > 0)) && (
+                <>
+                  <Divider />
+                  <div>
+                    <h3 className="font-semibold mb-3 flex items-center gap-2">
+                      <Icon icon="lucide:pill" className="text-secondary" />
+                      Prescriptions
+                    </h3>
+                    <div className="space-y-3">
+                      {(caseItem.mdPrescriptions || caseDetails?.storedPrescriptions || []).map((rx, idx) => (
+                        <Card key={rx.id || idx} className="bg-content2">
+                          <CardBody className="p-4">
+                            <div className="flex items-start justify-between">
+                              <div className="flex items-start gap-3">
+                                <div className="w-10 h-10 rounded-lg bg-success/10 flex items-center justify-center flex-shrink-0">
+                                  <Icon icon="lucide:pill" className="text-lg text-success" />
+                                </div>
+                                <div>
+                                  <h4 className="font-medium">
+                                    {rx.title || rx.name || rx.product?.name || 'Prescription'}
+                                  </h4>
+                                  {rx.directions && (
+                                    <p className="text-sm text-foreground-500 mt-1">
+                                      {rx.directions}
+                                    </p>
+                                  )}
+                                  <div className="flex flex-wrap gap-3 mt-2 text-xs text-foreground-400">
+                                    {rx.quantity && (
+                                      <span className="flex items-center gap-1">
+                                        <Icon icon="lucide:package" className="text-xs" />
+                                        Qty: {rx.quantity}
+                                      </span>
+                                    )}
+                                    {rx.refills !== undefined && (
+                                      <span className="flex items-center gap-1">
+                                        <Icon icon="lucide:refresh-cw" className="text-xs" />
+                                        Refills: {rx.refills}
+                                      </span>
+                                    )}
+                                    {rx.days_supply && (
+                                      <span className="flex items-center gap-1">
+                                        <Icon icon="lucide:calendar" className="text-xs" />
+                                        {rx.days_supply} day supply
+                                      </span>
+                                    )}
+                                    {rx.pharmacy_name && (
+                                      <span className="flex items-center gap-1">
+                                        <Icon icon="lucide:building" className="text-xs" />
+                                        {rx.pharmacy_name}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                              {rx.status && (
+                                <Chip
+                                  size="sm"
+                                  variant="flat"
+                                  color={rx.status === 'completed' ? 'success' : 'warning'}
+                                >
+                                  {rx.status}
+                                </Chip>
+                              )}
+                            </div>
+                          </CardBody>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Offerings Section */}
+              {((caseItem.mdOfferings && caseItem.mdOfferings.length > 0) || 
+                (caseDetails?.storedOfferings && caseDetails.storedOfferings.length > 0)) && (
+                <>
+                  <Divider />
+                  <div>
+                    <h3 className="font-semibold mb-3 flex items-center gap-2">
+                      <Icon icon="lucide:clipboard-list" className="text-secondary" />
+                      Offerings
+                    </h3>
+                    <div className="space-y-3">
+                      {(caseItem.mdOfferings || caseDetails?.storedOfferings || []).map((offering, idx) => (
+                        <Card key={offering.id || idx} className="bg-content2">
+                          <CardBody className="p-4">
+                            <div className="flex items-start justify-between">
+                              <div className="flex items-start gap-3">
+                                <div className="w-10 h-10 rounded-lg bg-secondary/10 flex items-center justify-center flex-shrink-0">
+                                  <Icon icon="lucide:package" className="text-lg text-secondary" />
+                                </div>
+                                <div>
+                                  <h4 className="font-medium">
+                                    {offering.title || offering.name || offering.product?.name || 'Treatment'}
+                                  </h4>
+                                  {offering.directions && (
+                                    <p className="text-sm text-foreground-500 mt-1">
+                                      {offering.directions}
+                                    </p>
+                                  )}
+                                  {offering.thank_you_note && (
+                                    <div className="mt-2 p-2 bg-success/10 rounded text-sm text-foreground-600">
+                                      <span className="font-medium">Clinician note: </span>
+                                      {offering.thank_you_note}
+                                    </div>
+                                  )}
+                                  {offering.product && (
+                                    <div className="flex flex-wrap gap-3 mt-2 text-xs text-foreground-400">
+                                      {offering.product.quantity && (
+                                        <span>Qty: {offering.product.quantity}</span>
+                                      )}
+                                      {offering.product.refills !== undefined && (
+                                        <span>Refills: {offering.product.refills}</span>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                              {offering.status && (
+                                <Chip
+                                  size="sm"
+                                  variant="flat"
+                                  color={offering.status === 'approved' || offering.status === 'completed' ? 'success' : 'warning'}
+                                >
+                                  {offering.status}
+                                </Chip>
+                              )}
+                            </div>
+                          </CardBody>
+                        </Card>
+                      ))}
                     </div>
                   </div>
                 </>
@@ -754,6 +978,216 @@ function MDICasesContent() {
         onClose={() => setIsModalOpen(false)}
         caseItem={selectedCase}
       />
+    </div>
+  );
+}
+
+// Aggregated prescription from a case
+interface AggregatedPrescription {
+  id: string;
+  prescription: MDPrescription;
+  caseId: string;
+  orderNumber: string;
+  orderId: string;
+  productName: string;
+  createdAt: string;
+  classification: 'approved' | 'pending';
+}
+
+function MDIPrescriptionsContent() {
+  const [prescriptions, setPrescriptions] = useState<AggregatedPrescription[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchPrescriptions = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await apiCall('/md/offerings');
+      if (response.success && response.data?.data) {
+        // Aggregate all prescriptions from all cases
+        const allPrescriptions: AggregatedPrescription[] = [];
+        
+        (response.data.data as MDCase[]).forEach((caseItem: MDCase) => {
+          if (caseItem.caseId && caseItem.mdPrescriptions && caseItem.mdPrescriptions.length > 0) {
+            caseItem.mdPrescriptions.forEach((rx) => {
+              allPrescriptions.push({
+                id: rx.id || `${caseItem.caseId}-${rx.name || rx.title}`,
+                prescription: rx,
+                caseId: caseItem.caseId!,
+                orderNumber: caseItem.orderNumber,
+                orderId: caseItem.orderId,
+                productName: caseItem.tenantProduct?.name || caseItem.title || 'Prescription',
+                createdAt: rx.created_at || caseItem.createdAt,
+                classification: caseItem.classification,
+              });
+            });
+          }
+        });
+        
+        // Sort by date, newest first
+        allPrescriptions.sort((a, b) => 
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+        
+        setPrescriptions(allPrescriptions);
+      } else if (response.error) {
+        setError(response.error);
+      }
+    } catch (err: any) {
+      console.error('Error fetching prescriptions:', err);
+      setError(err.message || 'Failed to load prescriptions');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchPrescriptions();
+  }, [fetchPrescriptions]);
+
+  if (loading) {
+    return (
+      <div className="max-w-4xl mx-auto flex items-center justify-center py-20">
+        <Spinner size="lg" color="secondary" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-4xl mx-auto">
+        <Card className="bg-danger-50 border border-danger-200">
+          <CardBody className="p-6 text-center">
+            <Icon icon="lucide:alert-circle" className="text-3xl text-danger mx-auto mb-2" />
+            <p className="text-danger">{error}</p>
+            <Button color="danger" variant="flat" size="sm" className="mt-4" onPress={fetchPrescriptions}>
+              Try Again
+            </Button>
+          </CardBody>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-4xl mx-auto">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold mb-1">My Prescriptions</h1>
+          <p className="text-foreground-500">
+            View all your approved prescriptions across cases
+          </p>
+        </div>
+        <Button
+          variant="flat"
+          size="sm"
+          startContent={<Icon icon="lucide:refresh-cw" />}
+          onPress={fetchPrescriptions}
+        >
+          Refresh
+        </Button>
+      </div>
+
+      {prescriptions.length === 0 ? (
+        <Card className="bg-content2">
+          <CardBody className="p-8 text-center">
+            <div className="w-16 h-16 rounded-full bg-secondary/20 flex items-center justify-center mx-auto mb-4">
+              <Icon icon="lucide:pill" className="text-3xl text-secondary" />
+            </div>
+            <h2 className="text-xl font-semibold mb-2">No Prescriptions Yet</h2>
+            <p className="text-foreground-500 max-w-md mx-auto">
+              Your prescriptions will appear here once your cases have been reviewed and approved by a clinician.
+            </p>
+          </CardBody>
+        </Card>
+      ) : (
+        <div className="space-y-4">
+          {prescriptions.map((item) => {
+            const rx = item.prescription;
+            return (
+              <Card key={item.id} className="bg-content1">
+                <CardBody className="p-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-4">
+                      <div className="w-12 h-12 rounded-lg bg-success/10 flex items-center justify-center flex-shrink-0">
+                        <Icon icon="lucide:pill" className="text-xl text-success" />
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="font-semibold text-foreground mb-1">
+                          {rx.title || rx.name || rx.product?.name || 'Prescription'}
+                        </h3>
+                        {rx.directions && (
+                          <p className="text-sm text-foreground-600 mb-2">
+                            {rx.directions}
+                          </p>
+                        )}
+                        <div className="flex flex-wrap items-center gap-3 text-sm text-foreground-500">
+                          {rx.quantity && (
+                            <span className="flex items-center gap-1">
+                              <Icon icon="lucide:package" className="text-xs" />
+                              Qty: {rx.quantity}
+                            </span>
+                          )}
+                          {rx.refills !== undefined && (
+                            <span className="flex items-center gap-1">
+                              <Icon icon="lucide:refresh-cw" className="text-xs" />
+                              Refills: {rx.refills}
+                            </span>
+                          )}
+                          {rx.days_supply && (
+                            <span className="flex items-center gap-1">
+                              <Icon icon="lucide:calendar" className="text-xs" />
+                              {rx.days_supply} day supply
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 mt-2 text-xs text-foreground-400">
+                          <span className="flex items-center gap-1">
+                            <Icon icon="lucide:file-text" className="text-xs" />
+                            {item.productName}
+                          </span>
+                          <span className="text-foreground-300">•</span>
+                          <span className="flex items-center gap-1">
+                            <Icon icon="lucide:hash" className="text-xs" />
+                            {item.orderNumber}
+                          </span>
+                          <span className="text-foreground-300">•</span>
+                          <span>
+                            {new Date(item.createdAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                        {rx.pharmacy_name && (
+                          <div className="mt-2">
+                            <Chip size="sm" variant="flat" startContent={<Icon icon="lucide:building" className="text-xs" />}>
+                              {rx.pharmacy_name}
+                            </Chip>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-2">
+                      <Chip
+                        color={item.classification === 'approved' ? 'success' : 'warning'}
+                        variant="flat"
+                        size="sm"
+                        startContent={<Icon icon={item.classification === 'approved' ? 'lucide:check-circle' : 'lucide:clock'} className="text-sm" />}
+                      >
+                        {item.classification === 'approved' ? 'Approved' : 'Pending'}
+                      </Chip>
+                      {rx.status && (
+                        <span className="text-xs text-foreground-400">
+                          {rx.status}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </CardBody>
+              </Card>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -1035,6 +1469,8 @@ function MDIDashboardPage() {
         return <MDIDashboardContent setActiveTab={setActiveTab} />;
       case "cases":
         return <MDICasesContent />;
+      case "prescriptions":
+        return <MDIPrescriptionsContent />;
       case "messages":
         return <MDIMessagesContent />;
       case "account":
