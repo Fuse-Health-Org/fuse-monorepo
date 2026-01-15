@@ -603,6 +603,75 @@ class MDWebhookService {
         break;
       }
 
+      case 'patient_modified': {
+        console.log('[MD-WH] 👤 patient_modified', { patient_id: eventData.patient_id });
+        try {
+          // Find user by mdPatientId
+          const user = await User.findOne({
+            where: { mdPatientId: eventData.patient_id }
+          });
+
+          if (!user) {
+            console.log('[MD-WH] ⚠️ no user for patient_modified', { patient_id: eventData.patient_id });
+            break;
+          }
+
+          // Fetch updated patient data from MD to check what was uploaded
+          const MDPatientService = (await import('./MDPatient.service')).default;
+          const tokenResponse = await MDAuthService.generateToken();
+          const patientData = await MDPatientService.getPatient(eventData.patient_id, tokenResponse.access_token);
+
+          console.log('[MD-WH] 👤 patient data after modification', {
+            patient_id: eventData.patient_id,
+            has_driver_license: !!patientData?.driver_license,
+            has_intro_video: !!patientData?.intro_video,
+          });
+
+          // Find recent orders with pending actions and clear them if requirements are now met
+          const orders = await Order.findAll({
+            where: { userId: user.id },
+            order: [['createdAt', 'DESC']],
+            limit: 5, // Check last 5 orders
+          } as any);
+
+          for (const order of orders) {
+            const pendingActions = (order as any).mdPendingActions;
+            if (!pendingActions) continue;
+
+            const updates: any = {};
+            let shouldUpdate = false;
+
+            // Clear driver's license pending action if now uploaded
+            if (pendingActions.driversLicense && patientData?.driver_license) {
+              updates.mdPendingActions = {
+                ...pendingActions,
+                driversLicense: null, // Clear since it's now uploaded
+              };
+              shouldUpdate = true;
+              console.log('[MD-WH] ✅ clearing driversLicense pending action', { orderNumber: (order as any).orderNumber });
+            }
+
+            // Clear intro video pending action if now uploaded
+            if (pendingActions.introVideo && patientData?.intro_video) {
+              updates.mdPendingActions = {
+                ...(updates.mdPendingActions || pendingActions),
+                introVideo: null, // Clear since it's now uploaded
+              };
+              shouldUpdate = true;
+              console.log('[MD-WH] ✅ clearing introVideo pending action', { orderNumber: (order as any).orderNumber });
+            }
+
+            if (shouldUpdate) {
+              await order.update(updates);
+              console.log('[MD-WH] ✅ updated order pending actions', { orderNumber: (order as any).orderNumber });
+            }
+          }
+        } catch (e) {
+          console.error('[MD-WH] ❌ error handling patient_modified', e);
+        }
+        break;
+      }
+
       default:
         console.log(`[MD-WH] 🔍 unhandled event type: ${eventData.event_type}`);
     }

@@ -13782,7 +13782,7 @@ app.get("/md/cases/:caseId", authenticateJWT, async (req, res) => {
     const MDPatientService = (
       await import("./services/mdIntegration/MDPatient.service")
     ).default;
-    
+
     let patientData: any = null;
     const patientId = mdCase?.patient?.patient_id || mdCase?.patient_id;
     if (patientId) {
@@ -13810,7 +13810,7 @@ app.get("/md/cases/:caseId", authenticateJWT, async (req, res) => {
     // Extract pending requirements from MD API response
     // MD may include status or requirements info in the case response
     const mdPendingRequirements: any = {};
-    
+
     // Check various possible fields where MD might indicate pending requirements
     if (mdCase?.status === 'waiting' || mdCase?.case_status === 'waiting' || mdCase?.is_waiting) {
       // Case is waiting for something
