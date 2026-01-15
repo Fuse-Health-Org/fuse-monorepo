@@ -13768,6 +13768,7 @@ app.get("/md/cases/:caseId", authenticateJWT, async (req, res) => {
     const order = await Order.findOne({ where: { mdCaseId: caseId, userId: currentUser.id } });
     const storedPrescriptions = (order as any)?.mdPrescriptions || [];
     const storedOfferings = (order as any)?.mdOfferings || [];
+    const pendingActions = (order as any)?.mdPendingActions || null;
 
     // HIPAA Audit: Log PHI access (viewing telehealth case details)
     await AuditService.logFromRequest(req, {
@@ -13777,8 +13778,8 @@ app.get("/md/cases/:caseId", authenticateJWT, async (req, res) => {
       details: { mdCase: true },
     });
 
-    return res.json({ 
-      success: true, 
+    return res.json({
+      success: true,
       data: {
         ...mdCase,
         // Include stored data from our database (from webhooks)
@@ -13787,6 +13788,7 @@ app.get("/md/cases/:caseId", authenticateJWT, async (req, res) => {
         orderNumber: (order as any)?.orderNumber,
         orderStatus: (order as any)?.status,
         approvedByDoctor: (order as any)?.approvedByDoctor || false,
+        pendingActions,
       }
     });
   } catch (error) {
@@ -15269,6 +15271,9 @@ async function startServer() {
         // Get stored prescriptions
         const mdPrescriptions = (order as any).mdPrescriptions as any[] | null | undefined;
         const hasPrescriptions = Array.isArray(mdPrescriptions) && mdPrescriptions.length > 0;
+        
+        // Get pending actions
+        const mdPendingActions = (order as any).mdPendingActions || null;
 
         // Create ONE entry per order (not per MD offering)
         flattened.push({
@@ -15294,6 +15299,8 @@ async function startServer() {
           mdPrescriptions: hasPrescriptions ? mdPrescriptions : [],
           mdOfferings: hasMdOfferings ? mdOfferings : [],
           hasPrescriptions,
+          // Include pending actions (driver's license, intro video, etc.)
+          mdPendingActions,
         });
       }
 

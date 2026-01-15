@@ -398,6 +398,16 @@ interface MDOffering {
   };
 }
 
+interface MDPendingAction {
+  accessLink: string;
+  requestedAt: string;
+}
+
+interface MDPendingActions {
+  driversLicense?: MDPendingAction;
+  introVideo?: MDPendingAction;
+}
+
 interface MDCase {
   orderId: string;
   orderNumber: string;
@@ -418,6 +428,7 @@ interface MDCase {
   mdPrescriptions?: MDPrescription[];
   mdOfferings?: MDOffering[];
   hasPrescriptions?: boolean;
+  mdPendingActions?: MDPendingActions;
 }
 
 function getStatusConfig(status: string, classification: string) {
@@ -463,6 +474,7 @@ interface CaseDetails {
   orderNumber?: string;
   orderStatus?: string;
   approvedByDoctor?: boolean;
+  pendingActions?: MDPendingActions;
 }
 
 function CaseDetailModal({ 
@@ -543,6 +555,74 @@ function CaseDetailModal({
                   <p className="font-medium">{new Date(caseItem.createdAt).toLocaleDateString()}</p>
                 </div>
               </div>
+
+              {/* Required Actions - Show prominently if there are pending actions */}
+              {(caseItem.mdPendingActions?.driversLicense || caseItem.mdPendingActions?.introVideo || 
+                caseDetails?.pendingActions?.driversLicense || caseDetails?.pendingActions?.introVideo) && (
+                <>
+                  <Card className="bg-warning-50 border border-warning-200">
+                    <CardBody className="p-4">
+                      <h3 className="font-semibold mb-3 flex items-center gap-2 text-warning-700">
+                        <Icon icon="lucide:alert-triangle" className="text-warning" />
+                        Action Required
+                      </h3>
+                      <p className="text-sm text-warning-600 mb-4">
+                        Please complete the following to continue with your consultation:
+                      </p>
+                      <div className="space-y-3">
+                        {(caseItem.mdPendingActions?.driversLicense || caseDetails?.pendingActions?.driversLicense) && (
+                          <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-warning-200">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-full bg-warning/20 flex items-center justify-center">
+                                <Icon icon="lucide:id-card" className="text-lg text-warning" />
+                              </div>
+                              <div>
+                                <p className="font-medium text-foreground">Upload Driver's License</p>
+                                <p className="text-xs text-foreground-500">Required for patient verification</p>
+                              </div>
+                            </div>
+                            <Button
+                              color="warning"
+                              size="sm"
+                              as="a"
+                              href={(caseItem.mdPendingActions?.driversLicense || caseDetails?.pendingActions?.driversLicense)?.accessLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              endContent={<Icon icon="lucide:external-link" />}
+                            >
+                              Upload Now
+                            </Button>
+                          </div>
+                        )}
+                        {(caseItem.mdPendingActions?.introVideo || caseDetails?.pendingActions?.introVideo) && (
+                          <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-warning-200">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-full bg-warning/20 flex items-center justify-center">
+                                <Icon icon="lucide:video" className="text-lg text-warning" />
+                              </div>
+                              <div>
+                                <p className="font-medium text-foreground">Record Intro Video</p>
+                                <p className="text-xs text-foreground-500">Required for your consultation</p>
+                              </div>
+                            </div>
+                            <Button
+                              color="warning"
+                              size="sm"
+                              as="a"
+                              href={(caseItem.mdPendingActions?.introVideo || caseDetails?.pendingActions?.introVideo)?.accessLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              endContent={<Icon icon="lucide:external-link" />}
+                            >
+                              Record Now
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    </CardBody>
+                  </Card>
+                </>
+              )}
 
               <Divider />
 
@@ -908,14 +988,28 @@ function MDICasesContent() {
         <div className="space-y-4">
           {cases.map((caseItem) => {
             const statusConfig = getStatusConfig(caseItem.status, caseItem.classification);
+            const hasPendingActions = caseItem.mdPendingActions?.driversLicense || caseItem.mdPendingActions?.introVideo;
             return (
               <Card 
                 key={caseItem.orderId} 
                 isPressable
-                className="bg-content1 hover:bg-content2 transition-colors cursor-pointer"
+                className={`bg-content1 hover:bg-content2 transition-colors cursor-pointer ${hasPendingActions ? 'border-2 border-warning' : ''}`}
                 onPress={() => handleCaseClick(caseItem)}
               >
                 <CardBody className="p-4">
+                  {/* Action Required Banner */}
+                  {hasPendingActions && (
+                    <div className="flex items-center gap-2 mb-3 p-2 bg-warning-50 rounded-lg text-warning-700 text-sm">
+                      <Icon icon="lucide:alert-triangle" className="text-warning" />
+                      <span className="font-medium">Action required</span>
+                      <span className="text-warning-600">—</span>
+                      <span className="text-warning-600">
+                        {caseItem.mdPendingActions?.driversLicense && 'Upload driver\'s license'}
+                        {caseItem.mdPendingActions?.driversLicense && caseItem.mdPendingActions?.introVideo && ' & '}
+                        {caseItem.mdPendingActions?.introVideo && 'Record intro video'}
+                      </span>
+                    </div>
+                  )}
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex items-start gap-4">
                       <div className="w-12 h-12 rounded-lg bg-secondary/10 flex items-center justify-center flex-shrink-0">
@@ -954,6 +1048,16 @@ function MDICasesContent() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
+                      {hasPendingActions && (
+                        <Chip
+                          color="warning"
+                          variant="flat"
+                          size="sm"
+                          startContent={<Icon icon="lucide:alert-triangle" className="text-sm" />}
+                        >
+                          Action Needed
+                        </Chip>
+                      )}
                       <Chip
                         color={statusConfig.color}
                         variant="flat"

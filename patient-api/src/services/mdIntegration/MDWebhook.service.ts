@@ -295,8 +295,6 @@ class MDWebhookService {
 
       console.log('[MD-WH] processing intro video', { userId: user.id });
 
-
-
       console.log('[MD-WH] intro video details', {
         userId: user.id,
         patientId: eventData.patient_id,
@@ -304,8 +302,47 @@ class MDWebhookService {
         metadata: eventData.metadata
       });
 
-      // TODO: Send notification to user about intro video request
-      // TODO: Store access link for future reference if needed
+      // Try to find the order from metadata or get the most recent order with mdCaseId
+      let order: Order | null = null;
+      
+      // Try to extract orderId from metadata
+      const meta = eventData?.metadata as string | undefined;
+      if (meta) {
+        const match = meta.match(/orderId:\s*([0-9a-fA-F-]{36})/);
+        if (match && match[1]) {
+          order = await Order.findByPk(match[1]);
+        }
+      }
+      
+      // Fallback: find most recent order with mdCaseId for this user
+      if (!order) {
+        order = await Order.findOne({
+          where: { 
+            userId: user.id,
+          },
+          order: [['createdAt', 'DESC']]
+        } as any);
+      }
+
+      if (order) {
+        // Update the order with the pending action
+        const currentPendingActions = (order as any).mdPendingActions || {};
+        await order.update({
+          mdPendingActions: {
+            ...currentPendingActions,
+            introVideo: {
+              accessLink: eventData.access_link,
+              requestedAt: new Date().toISOString(),
+            }
+          }
+        });
+        console.log('[MD-WH] ✅ saved intro video pending action', { 
+          orderNumber: (order as any).orderNumber,
+          accessLink: eventData.access_link 
+        });
+      } else {
+        console.log('[MD-WH] ⚠️ no order found for intro video request', { userId: user.id });
+      }
 
     } catch (error) {
       console.error('[MD-WH] ❌ intro_video_requested error', error);
@@ -337,7 +374,47 @@ class MDWebhookService {
         metadata: eventData.metadata
       });
 
-      // TODO: Send notification to user about drivers license request
+      // Try to find the order from metadata or get the most recent order with mdCaseId
+      let order: Order | null = null;
+      
+      // Try to extract orderId from metadata
+      const meta = eventData?.metadata as string | undefined;
+      if (meta) {
+        const match = meta.match(/orderId:\s*([0-9a-fA-F-]{36})/);
+        if (match && match[1]) {
+          order = await Order.findByPk(match[1]);
+        }
+      }
+      
+      // Fallback: find most recent order with mdCaseId for this user
+      if (!order) {
+        order = await Order.findOne({
+          where: { 
+            userId: user.id,
+          },
+          order: [['createdAt', 'DESC']]
+        } as any);
+      }
+
+      if (order) {
+        // Update the order with the pending action
+        const currentPendingActions = (order as any).mdPendingActions || {};
+        await order.update({
+          mdPendingActions: {
+            ...currentPendingActions,
+            driversLicense: {
+              accessLink: eventData.access_link,
+              requestedAt: new Date().toISOString(),
+            }
+          }
+        });
+        console.log('[MD-WH] ✅ saved drivers license pending action', { 
+          orderNumber: (order as any).orderNumber,
+          accessLink: eventData.access_link 
+        });
+      } else {
+        console.log('[MD-WH] ⚠️ no order found for drivers license request', { userId: user.id });
+      }
 
     } catch (error) {
       console.error('[MD-WH] ❌ drivers_license_requested error', error);
