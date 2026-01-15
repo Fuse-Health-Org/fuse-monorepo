@@ -2549,7 +2549,7 @@ app.get("/clinic/by-slug/:slug", async (req, res) => {
 
     const clinic = await Clinic.findOne({
       where: { slug },
-      attributes: ["id", "name", "slug", "logo", "defaultFormColor"], // Only return public fields
+      attributes: ["id", "name", "slug", "logo", "defaultFormColor", "patientPortalDashboardFormat"], // Only return public fields
     });
 
     if (!clinic) {
@@ -3377,6 +3377,7 @@ app.get("/custom-website/by-slug/:slug", async (req, res) => {
         parentClinicLogo,
         parentClinicName,
         parentClinicHeroImageUrl,
+        patientPortalDashboardFormat: clinic.patientPortalDashboardFormat,
       }
     });
   } catch (error) {

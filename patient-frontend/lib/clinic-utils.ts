@@ -1,6 +1,42 @@
 // Utility functions for clinic subdomain handling
 import { apiCall } from './api';
 
+export type PatientPortalDashboardFormat = 'fuse' | 'md-integrations';
+
+export interface Clinic {
+  id: string;
+  slug: string;
+  name: string;
+  logo?: string;
+  patientPortalDashboardFormat?: PatientPortalDashboardFormat;
+  // ... other fields
+}
+
+/**
+ * Returns the dashboard route prefix based on clinic's patientPortalDashboardFormat setting.
+ * 
+ * @param clinic - The clinic object (or null for default)
+ * @returns '/fuse-dashboard' or '/mdi-dashboard'
+ */
+export function getDashboardPrefix(clinic?: Clinic | null): string {
+  if (clinic?.patientPortalDashboardFormat === 'md-integrations') {
+    return '/mdi-dashboard';
+  }
+  return '/fuse-dashboard';
+}
+
+/**
+ * Builds a dashboard route path based on clinic's dashboard format.
+ * 
+ * @param clinic - The clinic object (or null for default)
+ * @param path - The path after the dashboard prefix (e.g., '/offerings/123')
+ * @returns Full path like '/fuse-dashboard/offerings/123' or '/mdi-dashboard/offerings/123'
+ */
+export function buildDashboardRoute(clinic?: Clinic | null, path: string = ''): string {
+  const prefix = getDashboardPrefix(clinic);
+  return path ? `${prefix}${path.startsWith('/') ? path : '/' + path}` : prefix;
+}
+
 export interface ClinicDomainInfo {
   hasClinicSubdomain: boolean;
   clinicSlug: string | null;

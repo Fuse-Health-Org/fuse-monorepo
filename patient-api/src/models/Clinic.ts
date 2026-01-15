@@ -19,6 +19,11 @@ export enum MerchantOfRecord {
     MYSELF = 'myself',
 }
 
+export enum PatientPortalDashboardFormat {
+    FUSE = 'fuse',
+    MD_INTEGRATIONS = 'md-integrations',
+}
+
 @Table({
     freezeTableName: true,
 })
@@ -135,6 +140,13 @@ export default class Clinic extends Entity {
         allowNull: true,
     })
     declare defaultFormColor?: string;
+
+    @Column({
+        type: DataType.ENUM(...Object.values(PatientPortalDashboardFormat)),
+        allowNull: false,
+        defaultValue: PatientPortalDashboardFormat.FUSE,
+    })
+    declare patientPortalDashboardFormat: PatientPortalDashboardFormat;
 
     // Affiliate relationship - if this clinic belongs to an affiliate of another clinic
     @ForeignKey(() => Clinic)

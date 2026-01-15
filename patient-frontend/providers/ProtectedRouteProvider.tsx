@@ -24,10 +24,13 @@ export function ProtectedRouteProvider({ children }: ProviderProps) {
             ...UNPROTECTED_PATHS,
             '/fuse-dashboard/my-products',
             '/fuse-dashboard/my-products/[...rest]',
+            '/mdi-dashboard/my-products',
+            '/mdi-dashboard/my-products/[...rest]',
         ] as const
 
         console.log('[ProtectedRouteProvider] inputs', { pathname, asPath })
-        const isUnprotected = (pathname.includes('/fuse-dashboard/my-products') || asPath.includes('/fuse-dashboard/my-products')) || LOCAL_UNPROTECTED.some((pattern) => {
+        const isUnprotected = (pathname.includes('/fuse-dashboard/my-products') || asPath.includes('/fuse-dashboard/my-products') ||
+            pathname.includes('/mdi-dashboard/my-products') || asPath.includes('/mdi-dashboard/my-products')) || LOCAL_UNPROTECTED.some((pattern) => {
             const cleanPattern = (pattern as string).trim()
             console.log('[ProtectedRouteProvider] Checking pattern:', cleanPattern, {
                 pathname,

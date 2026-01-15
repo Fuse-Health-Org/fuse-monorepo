@@ -21,7 +21,7 @@ import {
 import { Icon } from "@iconify/react";
 import { apiCall, ApiResponse } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
-import { getClinicSlugFromDomain } from "../hooks/useClinicFromDomain";
+import { getClinicSlugFromDomain, useDashboardPrefix } from "../hooks/useClinicFromDomain";
 import { QuestionnaireModal } from "./QuestionnaireModal";
 import { OrderTrackingCard } from "./OrderTrackingCard";
 
@@ -45,6 +45,7 @@ interface Treatment {
 }
 
 export const TreatmentsPage: React.FC = () => {
+  const { buildRoute } = useDashboardPrefix();
   const [treatments, setTreatments] = React.useState<Treatment[]>([]);
   const [orders, setOrders] = React.useState<any[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -558,7 +559,7 @@ export const TreatmentsPage: React.FC = () => {
 
                         {/* Action Button - Always visible when collapsed */}
                         {!isExpanded && (
-                          <Link href={`/fuse-dashboard/offerings/${order.id}`} className="block">
+                          <Link href={buildRoute(`/offerings/${order.id}`)} className="block">
                             <Button
                               size="sm"
                               variant="flat"

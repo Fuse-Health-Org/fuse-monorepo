@@ -20,6 +20,8 @@ const PATIENT_PUBLIC_PATH_PATTERNS = [
   ...PUBLIC_PATH_PATTERNS,
   '/fuse-dashboard/my-products',
   '/fuse-dashboard/my-products/[...rest]',
+  '/mdi-dashboard/my-products',
+  '/mdi-dashboard/my-products/[...rest]',
   '/verify-email',
 ] as const
 
@@ -48,8 +50,9 @@ const matchesPublicPattern = (pattern: string, pathname: string, asPath: string)
 
 const isPublicRoute = (pathname: string, asPath: string) => {
   console.log('[AuthContext] isPublicRoute input', { pathname, asPath })
-  if (pathname.includes('/fuse-dashboard/my-products') || asPath.includes('/fuse-dashboard/my-products')) {
-    console.log('[AuthContext] public via contains /fuse-dashboard/my-products')
+  if (pathname.includes('/fuse-dashboard/my-products') || asPath.includes('/fuse-dashboard/my-products') ||
+      pathname.includes('/mdi-dashboard/my-products') || asPath.includes('/mdi-dashboard/my-products')) {
+    console.log('[AuthContext] public via contains dashboard/my-products')
     return true
   }
   const result = PATIENT_PUBLIC_PATH_PATTERNS.some((pattern) => matchesPublicPattern(pattern as string, pathname, asPath))

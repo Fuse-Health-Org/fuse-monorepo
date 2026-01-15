@@ -1,6 +1,6 @@
 import React from 'react';
 import { apiCall } from '../lib/api';
-import { extractClinicSlugFromDomain } from '../lib/clinic-utils';
+import { extractClinicSlugFromDomain, getDashboardPrefix, buildDashboardRoute, PatientPortalDashboardFormat } from '../lib/clinic-utils';
 
 export interface Clinic {
   id: string;
@@ -8,6 +8,7 @@ export interface Clinic {
   slug: string;
   logo: string;
   defaultFormColor?: string;
+  patientPortalDashboardFormat?: PatientPortalDashboardFormat;
 }
 
 export interface UseClinicFromDomainResult {
@@ -105,4 +106,28 @@ export function useClinicFromDomain(): UseClinicFromDomainResult {
 export async function getClinicSlugFromDomain(): Promise<string | null> {
   const domainInfo = await extractClinicSlugFromDomain();
   return domainInfo.clinicSlug;
+}
+
+/**
+ * Hook to get the dashboard prefix based on the current clinic's patientPortalDashboardFormat
+ * 
+ * @returns Object with dashboardPrefix ('/fuse-dashboard' or '/mdi-dashboard') and helper function
+ */
+export function useDashboardPrefix() {
+  const { clinic, isLoading } = useClinicFromDomain();
+  
+  const dashboardPrefix = React.useMemo(() => {
+    return getDashboardPrefix(clinic);
+  }, [clinic]);
+  
+  const buildRoute = React.useCallback((path: string = '') => {
+    return buildDashboardRoute(clinic, path);
+  }, [clinic]);
+  
+  return {
+    dashboardPrefix,
+    buildRoute,
+    isLoading,
+    clinic
+  };
 }

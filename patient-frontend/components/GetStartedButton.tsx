@@ -1,4 +1,5 @@
 import React from "react";
+import { useDashboardPrefix } from "../hooks/useClinicFromDomain";
 
 interface GetStartedButtonProps {
   formId?: string | null;
@@ -17,6 +18,7 @@ export default function GetStartedButton({
   style = {},
   variant = "default",
 }: GetStartedButtonProps) {
+  const { buildRoute } = useDashboardPrefix();
   const isEnabled = formId && slug && !disabled;
 
   const baseStyles: React.CSSProperties = {
@@ -35,7 +37,7 @@ export default function GetStartedButton({
   if (isEnabled) {
     return (
       <a
-        href={`/fuse-dashboard/my-products/${formId}/${slug}`}
+        href={buildRoute(`/my-products/${formId}/${slug}`)}
         target="_blank"
         rel="noopener noreferrer"
         style={{
