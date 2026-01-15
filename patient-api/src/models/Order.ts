@@ -291,6 +291,22 @@ export default class Order extends Entity {
   })
   declare mdOfferings?: any;
 
+  // Pending actions required from MDI (e.g., driver's license upload, intro video)
+  @Column({
+    type: DataType.JSONB,
+    allowNull: true,
+  })
+  declare mdPendingActions?: {
+    driversLicense?: {
+      accessLink: string;
+      requestedAt: string;
+    };
+    introVideo?: {
+      accessLink: string;
+      requestedAt: string;
+    };
+  };
+
   @Column({
     type: DataType.TEXT,
     allowNull: true,

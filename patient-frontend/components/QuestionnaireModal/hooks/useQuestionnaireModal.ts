@@ -58,16 +58,16 @@ export function useQuestionnaireModal(
 
   // Affiliate tracking: Derive affiliate slug from URL using extractClinicSlugFromDomain
   const [affiliateSlug, setAffiliateSlug] = useState<string | null>(null);
-  
+
   useEffect(() => {
     const detectAffiliateSlug = async () => {
       if (typeof window === 'undefined') return;
-      
+
       try {
         // Import dynamically to avoid circular dependency
         const { extractClinicSlugFromDomain } = await import('../../../lib/clinic-utils');
         const domainInfo = await extractClinicSlugFromDomain();
-        
+
         // Use affiliateSlug from domain detection (works for subdomains AND custom domains)
         if (domainInfo.affiliateSlug) {
           setAffiliateSlug(domainInfo.affiliateSlug);
@@ -77,7 +77,7 @@ export function useQuestionnaireModal(
         console.error('❌ Error detecting affiliate slug:', error);
       }
     };
-    
+
     detectAffiliateSlug();
   }, []);
 
@@ -205,7 +205,7 @@ export function useQuestionnaireModal(
   const getCurrentStage = useCallback((): 'product' | 'payment' | 'account' => {
     if (isCheckoutStep()) return 'payment';
     const currentStep = getCurrentQuestionnaireStep();
-    
+
     console.log('📊 [getCurrentStage] Current step analysis:', {
       currentStepIndex,
       currentStep: currentStep ? {
@@ -216,7 +216,7 @@ export function useQuestionnaireModal(
       isCheckoutStep: isCheckoutStep(),
       isSignedIn: accountCreated || userId,
     });
-    
+
     // Only consider "account" stage if the step title indicates account creation
     // (e.g., "Create Your Account", not "Location Verification")
     const isSignedIn = accountCreated || userId;
@@ -227,7 +227,7 @@ export function useQuestionnaireModal(
         return 'account';
       }
     }
-    
+
     return 'product';
   }, [isCheckoutStep, getCurrentQuestionnaireStep, currentStepIndex, accountCreated, userId]);
 
@@ -621,17 +621,122 @@ export function useQuestionnaireModal(
     }
   }, [domainClinic, paymentIntentId, orderId, selectedPlan, answers, shippingInfo, selectedProducts]);
 
+  // Create MD Integrations case after payment (only for md-integrations clinics)
+  const createMDCase = useCallback(async (orderIdForCase: string) => {
+    console.log('🔵 [MDI] ========== MD INTEGRATIONS CASE CREATION ==========');
+    console.log('🔵 [MDI] Order ID:', orderIdForCase);
+    console.log('🔵 [MDI] Domain Clinic:', domainClinic ? {
+      id: domainClinic.id,
+      name: domainClinic.name,
+      slug: domainClinic.slug,
+      patientPortalDashboardFormat: (domainClinic as any).patientPortalDashboardFormat
+    } : 'null');
+
+    // Only proceed if clinic uses md-integrations dashboard format
+    if (!domainClinic) {
+      console.log('⚠️ [MDI] No domain clinic found - skipping MDI case creation');
+      return;
+    }
+
+    const dashboardFormat = (domainClinic as any).patientPortalDashboardFormat;
+    console.log('🔵 [MDI] Dashboard format:', dashboardFormat);
+
+    if (dashboardFormat !== 'md-integrations') {
+      console.log('ℹ️ [MDI] Clinic uses "' + dashboardFormat + '" format - skipping MDI case creation');
+      console.log('🔵 [MDI] ========== END (SKIPPED) ==========');
+      return;
+    }
+
+    console.log('✅ [MDI] Clinic uses md-integrations format - proceeding with case creation');
+
+    const patientOverrides = {
+      firstName: answers['firstName'],
+      lastName: answers['lastName'],
+      email: answers['email'],
+      phoneNumber: answers['mobile'],
+      dob: answers['dob'] || answers['dateOfBirth'],
+      gender: answers['gender'],
+    };
+
+    console.log('🔵 [MDI] Patient overrides:', patientOverrides);
+
+    const requestPayload = {
+      orderId: orderIdForCase,
+      clinicId: domainClinic.id,
+      patientOverrides
+    };
+
+    console.log('🔵 [MDI] Request payload:', JSON.stringify(requestPayload, null, 2));
+
+    try {
+      console.log('🔵 [MDI] Calling POST /md/cases...');
+      const result = await apiCall('/md/cases', {
+        method: 'POST',
+        body: JSON.stringify(requestPayload)
+      });
+
+      console.log('🔵 [MDI] Response:', JSON.stringify(result, null, 2));
+
+      if (result.success) {
+        // Handle nested response structure: result.data may contain another { success, data } object
+        const responseData = result.data?.data || result.data;
+        if (result.data?.skipped || responseData?.skipped) {
+          console.log('⚠️ [MDI] Backend skipped MDI case creation:', (result as any).message || result.data?.message || 'No message');
+        } else {
+          console.log('✅ [MDI] MD Integrations case created successfully!');
+          console.log('✅ [MDI] Case ID:', responseData?.caseId || result.data?.caseId);
+        }
+      } else {
+        console.error('❌ [MDI] Failed to create MD case:', result);
+      }
+    } catch (error: any) {
+      console.error('❌ [MDI] Error creating MD case:', error);
+      console.error('❌ [MDI] Error details:', {
+        message: error?.message,
+        response: error?.response?.data,
+        status: error?.response?.status
+      });
+      // Don't fail the checkout flow, just log the error
+    }
+
+    console.log('🔵 [MDI] ========== END ==========');
+  }, [domainClinic, answers]);
+
   const handlePaymentSuccess = useCallback(async () => {
+    console.log('🎉 [CHECKOUT] ========== PAYMENT SUCCESS ==========');
+    console.log('🎉 [CHECKOUT] Payment Intent ID:', paymentIntentId);
+    console.log('🎉 [CHECKOUT] Order ID:', orderId);
+    console.log('🎉 [CHECKOUT] User ID:', userId);
+    console.log('🎉 [CHECKOUT] Account Created:', accountCreated);
+
     try {
       if (!paymentIntentId) throw new Error('No payment intent ID');
       setPaymentStatus('succeeded');
+      console.log('🎉 [CHECKOUT] Payment status set to succeeded');
+
+      console.log('🎉 [CHECKOUT] Triggering checkout sequence...');
       await triggerCheckoutSequenceRun();
+      console.log('🎉 [CHECKOUT] Checkout sequence triggered');
+
+      console.log('🎉 [CHECKOUT] Tracking conversion...');
       await trackConversion(paymentIntentId, orderId || undefined);
+      console.log('🎉 [CHECKOUT] Conversion tracked');
+
+      // Create MD Integrations case if clinic uses md-integrations format
+      if (orderId) {
+        console.log('🎉 [CHECKOUT] Order ID exists, attempting MDI case creation...');
+        await createMDCase(orderId);
+      } else {
+        console.log('⚠️ [CHECKOUT] No order ID available for MDI case creation');
+      }
+
+      console.log('🎉 [CHECKOUT] ========== CHECKOUT COMPLETE ==========');
     } catch (error) {
+      console.error('❌ [CHECKOUT] Payment success handler error:', error);
       setPaymentStatus('failed');
       alert('Payment authorization failed. Please contact support.');
     }
-  }, [paymentIntentId, orderId, triggerCheckoutSequenceRun, trackConversion]);
+  }, [paymentIntentId, orderId, userId, accountCreated, triggerCheckoutSequenceRun, trackConversion, createMDCase]);
 
   const handlePaymentError = useCallback((error: string) => {
     setPaymentStatus('failed');
@@ -732,7 +837,7 @@ export function useQuestionnaireModal(
   // Program product toggle - handles both single_choice and multiple_choice modes
   const handleProgramProductToggle = useCallback((productId: string) => {
     const offerType = programData?.productOfferType || programData?.medicalTemplate?.productOfferType || 'multiple_choice';
-    
+
     if (offerType === 'single_choice') {
       // In single_choice mode, selecting a product deselects all others
       setSelectedProgramProducts(prev => {
@@ -758,15 +863,15 @@ export function useQuestionnaireModal(
   // Create program subscription with dynamic pricing
   const createProgramSubscription = useCallback(async () => {
     if (!programData) return null;
-    
+
     try {
       setPaymentStatus('processing');
-      
+
       // Calculate total from selected products + non-medical services fee
       const selectedProductsList = programData.products.filter(p => selectedProgramProducts[p.id]);
       const productsTotal = selectedProductsList.reduce((sum, p) => sum + p.displayPrice, 0);
       const totalAmount = productsTotal + programData.nonMedicalServicesFee;
-      
+
       const userDetails = {
         firstName: answers['firstName'],
         lastName: answers['lastName'],
@@ -774,7 +879,7 @@ export function useQuestionnaireModal(
         phoneNumber: answers['mobile']
       };
       const questionnaireAnswersData = buildQuestionnaireAnswers(answers);
-      
+
       const requestBody = {
         programId: programData.id,
         selectedProductIds: selectedProductsList.map(p => p.id),
@@ -788,14 +893,14 @@ export function useQuestionnaireModal(
         clinicName: domainClinic?.name,
         isProgramSubscription: true,
       };
-      
+
       console.log('🚀 Creating program subscription:', requestBody);
-      
-      const result = await apiCall('/payments/program/sub', { 
-        method: 'POST', 
-        body: JSON.stringify(requestBody) 
+
+      const result = await apiCall('/payments/program/sub', {
+        method: 'POST',
+        body: JSON.stringify(requestBody)
       });
-      
+
       if (result.success && result.data) {
         const subscriptionData = result.data.data || result.data;
         if (subscriptionData.clientSecret) {

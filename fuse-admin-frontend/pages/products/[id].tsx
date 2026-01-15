@@ -78,6 +78,7 @@ export default function ProductDetail() {
     const [clinicSlug, setClinicSlug] = useState<string | null>(null)
     const [clinicCustomDomain, setClinicCustomDomain] = useState<string | null>(null)
     const [clinicIsCustomDomain, setClinicIsCustomDomain] = useState<boolean>(false)
+    const [dashboardPrefix, setDashboardPrefix] = useState<string>('/fuse-dashboard')
     const [customizations, setCustomizations] = useState<Record<string, { customColor?: string | null; isActive: boolean }>>({})
     const [colorPickerOpen, setColorPickerOpen] = useState<string | null>(null)
     const [fees, setFees] = useState<{ platformFeePercent: number; stripeFeePercent: number; doctorFlatFeeUsd: number }>({
@@ -207,6 +208,9 @@ export default function ProductDetail() {
                         setClinicSlug(data.data.slug)
                         setClinicCustomDomain(data.data.customDomain || null)
                         setClinicIsCustomDomain(data.data.isCustomDomain || false)
+                        // Set dashboard prefix based on clinic's patientPortalDashboardFormat
+                        const format = data.data.patientPortalDashboardFormat || 'fuse'
+                        setDashboardPrefix(format === 'md-integrations' ? '/mdi-dashboard' : '/fuse-dashboard')
                     }
                 }
             } catch (err) {
@@ -725,7 +729,7 @@ export default function ProductDetail() {
         // Priority 1: Use custom domain if configured
         if (clinicCustomDomain) {
             // customDomain already includes the full domain (e.g., app.limitless2.health)
-            return `${protocol}://${clinicCustomDomain}/my-products/${formId}/${product.slug}`
+            return `${protocol}://${clinicCustomDomain}${dashboardPrefix}/my-products/${formId}/${product.slug}`
         }
 
         // Priority 2: Use subdomain URL
@@ -738,7 +742,7 @@ export default function ProductDetail() {
             : `https://${clinicSlug}.${baseDomain}`
 
         // Same format for both local and prod: /my-products/<form-id>/<product-slug>
-        return `${baseUrl}/my-products/${formId}/${product.slug}`
+        return `${baseUrl}${dashboardPrefix}/my-products/${formId}/${product.slug}`
     }
 
     // Build BOTH URLs for forms with custom domains
@@ -757,12 +761,12 @@ export default function ProductDetail() {
         const subdomainBase = isLocalhost
             ? `http://${clinicSlug}.localhost:3000`
             : `https://${clinicSlug}.${baseDomain}`
-        const subdomainUrl = `${subdomainBase}/my-products/${formId}/${product.slug}`
+        const subdomainUrl = `${subdomainBase}${dashboardPrefix}/my-products/${formId}/${product.slug}`
 
         // Custom domain URL (if configured)
         let customDomainUrl = null
         if (clinicCustomDomain) {
-            customDomainUrl = `${protocol}://${clinicCustomDomain}/my-products/${formId}/${product.slug}`
+            customDomainUrl = `${protocol}://${clinicCustomDomain}${dashboardPrefix}/my-products/${formId}/${product.slug}`
         }
 
         return {

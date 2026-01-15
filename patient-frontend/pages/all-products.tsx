@@ -5,6 +5,7 @@ import { apiCall } from '../lib/api';
 import ScrollingFeaturesBar from '../components/ScrollingFeaturesBar';
 import GetStartedButton from '../components/GetStartedButton';
 import { UniformProductCard } from '../components/UniformProductCard';
+import { useDashboardPrefix } from '../hooks/useClinicFromDomain';
 
 interface CustomWebsite {
     portalTitle?: string;
@@ -68,6 +69,7 @@ type GridItem =
 
 export default function AllProducts() {
     const router = useRouter();
+    const { dashboardPrefix } = useDashboardPrefix();
     const [customWebsite, setCustomWebsite] = useState<CustomWebsite | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [products, setProducts] = useState<Product[]>([]);
@@ -289,7 +291,7 @@ export default function AllProducts() {
                 key={program.id}
                 onClick={() => {
                     if (hasTemplate) {
-                        window.open(`/my-products/${program.id}/program`, '_blank');
+                        window.open(`${dashboardPrefix}/my-products/${program.id}/program`, '_blank');
                     }
                 }}
                 onMouseEnter={() => setHoveredCardIndex(cardId)}
@@ -441,7 +443,7 @@ export default function AllProducts() {
                 </div>
                 {hasTemplate ? (
                     <a
-                        href={`/my-products/${program.id}/program`}
+                        href={`${dashboardPrefix}/my-products/${program.id}/program`}
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={(e) => e.stopPropagation()}
@@ -622,7 +624,7 @@ export default function AllProducts() {
                         </button>
 
                         <button
-                            onClick={() => router.push('/dashboard')}
+                            onClick={() => router.push(dashboardPrefix)}
                             style={{ padding: "0.5rem", border: "none", background: "none", cursor: "pointer" }}
                         >
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

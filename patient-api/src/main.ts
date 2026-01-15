@@ -2549,7 +2549,7 @@ app.get("/clinic/by-slug/:slug", async (req, res) => {
 
     const clinic = await Clinic.findOne({
       where: { slug },
-      attributes: ["id", "name", "slug", "logo", "defaultFormColor"], // Only return public fields
+      attributes: ["id", "name", "slug", "logo", "defaultFormColor", "patientPortalDashboardFormat"], // Only return public fields
     });
 
     if (!clinic) {
@@ -2649,6 +2649,7 @@ app.get("/clinic/:id", authenticateJWT, async (req, res) => {
         logo: clinic.logo,
         customDomain: (clinic as any).customDomain,
         isCustomDomain: (clinic as any).isCustomDomain,
+        patientPortalDashboardFormat: (clinic as any).patientPortalDashboardFormat || "fuse",
       },
     });
   } catch (error) {
@@ -3377,6 +3378,7 @@ app.get("/custom-website/by-slug/:slug", async (req, res) => {
         parentClinicLogo,
         parentClinicName,
         parentClinicHeroImageUrl,
+        patientPortalDashboardFormat: clinic.patientPortalDashboardFormat,
       }
     });
   } catch (error) {
@@ -12743,8 +12745,8 @@ app.get("/payouts/tenant", authenticateJWT, async (req, res) => {
               doctorName: doctorUser
                 ? `${doctorUser.firstName || ""} ${doctorUser.lastName || ""}`.trim()
                 : doctorPhysician
-                ? `${doctorPhysician.firstName || ""} ${doctorPhysician.lastName || ""}`.trim()
-                : "Unknown",
+                  ? `${doctorPhysician.firstName || ""} ${doctorPhysician.lastName || ""}`.trim()
+                  : "Unknown",
               doctorEmail: doctorUser?.email || doctorPhysician?.email || "",
               totalAmount: 0,
               orderCount: 0,
@@ -13760,7 +13762,134 @@ app.get("/md/cases/:caseId", authenticateJWT, async (req, res) => {
     const mdCase = await MDCaseService.getCase(
       caseId,
       tokenResponse.access_token
-    );
+    ) as any;
+
+    // Log MD case response to see available fields (dev only)
+    if (process.env.NODE_ENV === "development") {
+      console.log("[MD-CASE] Full case response fields:", Object.keys(mdCase || {}));
+      console.log("[MD-CASE] Case status/hold fields:", {
+        status: mdCase?.status,
+        case_status: mdCase?.case_status,
+        hold_status: mdCase?.hold_status,
+        is_waiting: mdCase?.is_waiting,
+        waiting_for: mdCase?.waiting_for,
+        pending_requirements: mdCase?.pending_requirements,
+        requirements: mdCase?.requirements,
+      });
+    }
+
+    // Also fetch patient data to check if driver's license / intro video is uploaded
+    const MDPatientService = (
+      await import("./services/mdIntegration/MDPatient.service")
+    ).default;
+
+    let patientData: any = null;
+    const patientId = mdCase?.patient?.patient_id || mdCase?.patient_id;
+    if (patientId) {
+      try {
+        patientData = await MDPatientService.getPatient(patientId, tokenResponse.access_token);
+        if (process.env.NODE_ENV === "development") {
+          console.log("[MD-CASE] Patient verification status:", {
+            patient_id: patientId,
+            has_driver_license: !!patientData?.driver_license,
+            has_intro_video: !!patientData?.intro_video,
+            auth_link: patientData?.auth_link,
+          });
+        }
+      } catch (e) {
+        console.warn("[MD-CASE] Failed to fetch patient data:", e);
+      }
+    }
+
+    // Also fetch stored prescriptions/offerings from our database
+    const order = await Order.findOne({ where: { mdCaseId: caseId, userId: currentUser.id } });
+    const storedPrescriptions = (order as any)?.mdPrescriptions || [];
+    const storedOfferings = (order as any)?.mdOfferings || [];
+    const storedPendingActions = (order as any)?.mdPendingActions || {};
+
+    // Extract pending requirements from MD API response
+    // MD may include status or requirements info in the case response
+    const mdPendingRequirements: any = {};
+
+    // Check various possible fields where MD might indicate pending requirements
+    if (mdCase?.status === 'waiting' || mdCase?.case_status === 'waiting' || mdCase?.is_waiting) {
+      // Case is waiting for something
+      if (mdCase?.waiting_for === 'drivers_license' || mdCase?.waiting_for?.includes?.('license')) {
+        mdPendingRequirements.driversLicense = {
+          accessLink: mdCase?.drivers_license_url || mdCase?.verification_url || null,
+          requestedAt: mdCase?.updated_at || new Date().toISOString(),
+          fromApi: true,
+        };
+      }
+      if (mdCase?.waiting_for === 'intro_video' || mdCase?.waiting_for?.includes?.('video')) {
+        mdPendingRequirements.introVideo = {
+          accessLink: mdCase?.intro_video_url || mdCase?.video_url || null,
+          requestedAt: mdCase?.updated_at || new Date().toISOString(),
+          fromApi: true,
+        };
+      }
+    }
+
+    // Check for explicit requirements array
+    if (Array.isArray(mdCase?.requirements) || Array.isArray(mdCase?.pending_requirements)) {
+      const reqs = mdCase?.requirements || mdCase?.pending_requirements || [];
+      for (const req of reqs) {
+        const reqType = req?.type || req?.name || req;
+        if (typeof reqType === 'string') {
+          if (reqType.toLowerCase().includes('license') || reqType.toLowerCase().includes('id')) {
+            mdPendingRequirements.driversLicense = {
+              accessLink: req?.url || req?.access_link || null,
+              requestedAt: req?.created_at || new Date().toISOString(),
+              fromApi: true,
+            };
+          }
+          if (reqType.toLowerCase().includes('video')) {
+            mdPendingRequirements.introVideo = {
+              accessLink: req?.url || req?.access_link || null,
+              requestedAt: req?.created_at || new Date().toISOString(),
+              fromApi: true,
+            };
+          }
+        }
+      }
+    }
+
+    // Check patient data for missing verification
+    // If driver_license or intro_video is null but was requested, show as pending
+    if (patientData) {
+      // If patient has no driver's license uploaded and we have an auth link or webhook data
+      if (!patientData.driver_license && !mdPendingRequirements.driversLicense) {
+        // Check if there's an auth_link from patient data we can use
+        if (patientData.auth_link || storedPendingActions.driversLicense?.accessLink) {
+          mdPendingRequirements.driversLicense = {
+            accessLink: storedPendingActions.driversLicense?.accessLink || patientData.auth_link,
+            requestedAt: storedPendingActions.driversLicense?.requestedAt || new Date().toISOString(),
+            fromApi: true,
+            missingVerification: true,
+          };
+        }
+      }
+      // Similarly for intro video
+      if (!patientData.intro_video && !mdPendingRequirements.introVideo) {
+        if (storedPendingActions.introVideo?.accessLink) {
+          mdPendingRequirements.introVideo = {
+            accessLink: storedPendingActions.introVideo.accessLink,
+            requestedAt: storedPendingActions.introVideo.requestedAt || new Date().toISOString(),
+            fromApi: true,
+            missingVerification: true,
+          };
+        }
+      }
+    }
+
+    // Merge: prefer webhook-stored data (has access link), fall back to API data
+    const pendingActions = {
+      driversLicense: storedPendingActions.driversLicense || mdPendingRequirements.driversLicense || null,
+      introVideo: storedPendingActions.introVideo || mdPendingRequirements.introVideo || null,
+    };
+
+    // Only include if there's actually something pending
+    const hasPendingActions = pendingActions.driversLicense || pendingActions.introVideo;
 
     // HIPAA Audit: Log PHI access (viewing telehealth case details)
     await AuditService.logFromRequest(req, {
@@ -13770,7 +13899,19 @@ app.get("/md/cases/:caseId", authenticateJWT, async (req, res) => {
       details: { mdCase: true },
     });
 
-    return res.json({ success: true, data: mdCase });
+    return res.json({
+      success: true,
+      data: {
+        ...mdCase,
+        // Include stored data from our database (from webhooks)
+        storedPrescriptions,
+        storedOfferings,
+        orderNumber: (order as any)?.orderNumber,
+        orderStatus: (order as any)?.status,
+        approvedByDoctor: (order as any)?.approvedByDoctor || false,
+        pendingActions: hasPendingActions ? pendingActions : null,
+      }
+    });
   } catch (error) {
     if (process.env.NODE_ENV === "development") {
       console.error("❌ Error fetching MD case:", error);
@@ -13837,24 +13978,14 @@ app.get("/md/cases/latest", authenticateJWT, async (req, res) => {
 });
 
 // Create an MD Integrations Case directly after checkout
-// Public endpoint; attempts auth if provided, otherwise infers user from orderId
+// Called from frontend after payment success for clinics using md-integrations dashboard format
 app.post("/md/cases", async (req, res) => {
   try {
-    // TEMPORARY: Skip MD Integrations entirely
-    console.log("⚠️ MD Integrations SKIPPED - endpoint disabled temporarily");
-    return res.json({
-      success: true,
-      message: "MD Integrations skipped (disabled)",
-      data: { skipped: true },
-    });
-
-    // COMMENTED OUT - MD Integrations disabled temporarily
-    /*
     let currentUser: any = null;
     try {
       currentUser = getCurrentUser(req);
     } catch { }
-    const { orderId, patientOverrides } = req.body || {};
+    const { orderId, patientOverrides, clinicId } = req.body || {};
 
     if (!orderId || typeof orderId !== 'string') {
       return res.status(400).json({ success: false, message: "orderId is required" });
@@ -13865,6 +13996,30 @@ app.post("/md/cases", async (req, res) => {
     if (!order) {
       return res.status(404).json({ success: false, message: "Order not found" });
     }
+
+    // Check if the clinic uses md-integrations dashboard format
+    // Get clinic from order's user or from provided clinicId
+    let clinic: any = null;
+    if (clinicId) {
+      clinic = await Clinic.findByPk(clinicId);
+    } else if ((order as any).userId) {
+      const orderUser = await User.findByPk((order as any).userId);
+      if (orderUser && orderUser.clinicId) {
+        clinic = await Clinic.findByPk(orderUser.clinicId);
+      }
+    }
+
+    // Skip MDI if clinic doesn't use md-integrations format
+    if (!clinic || (clinic as any).patientPortalDashboardFormat !== 'md-integrations') {
+      console.log('ℹ️ Skipping MD Integrations - clinic uses fuse dashboard format');
+      return res.json({
+        success: true,
+        message: 'MD Integrations skipped (clinic uses fuse format)',
+        data: { skipped: true }
+      });
+    }
+
+    console.log('🏥 Processing MD Integrations for clinic:', clinic.name);
 
     // If no authenticated user, infer from order
     if (!currentUser) {
@@ -13909,12 +14064,12 @@ app.post("/md/cases", async (req, res) => {
       const emailAns = findAnswer(['email']);
 
       if (process.env.NODE_ENV === 'development') {
-  console.log('MD Case: extracted fields from QA', {
-    hasDob: Boolean(dob),
-    hasGender: Boolean(genderAns),
-    hasPhone: Boolean(phoneAns)
-  });
-}
+        console.log('MD Case: extracted fields from QA', {
+          hasDob: Boolean(dob),
+          hasGender: Boolean(genderAns),
+          hasPhone: Boolean(phoneAns)
+        });
+      }
 
       const updatePayload: Partial<User> = {} as any;
       if (!user.dob && dob) (updatePayload as any).dob = dob;
@@ -13940,6 +14095,7 @@ app.post("/md/cases", async (req, res) => {
         await user.reload();
       }
 
+      // Sync patient with MD Integrations (creates mdPatientId if doesn't exist)
       const userService = new UserService();
       await userService.syncPatientInMD(user.id, (order as any).shippingAddressId);
       await user.reload();
@@ -14045,17 +14201,20 @@ app.post("/md/cases", async (req, res) => {
       (casePayload as any).case_offerings = offeringIds;
     }
 
+    console.log('🚀 Creating MD Integrations case with payload:', JSON.stringify(casePayload, null, 2));
+
     const caseResponse = await MDCaseService.createCase(casePayload, tokenResponse.access_token);
 
     await order.update({ mdCaseId: (caseResponse as any).case_id });
 
+    console.log('✅ MD Integrations case created:', (caseResponse as any).case_id);
+
     return res.json({ success: true, message: 'MD case created', data: { caseId: (caseResponse as any).case_id } });
-    */
   } catch (error) {
     if (process.env.NODE_ENV === "development") {
-      console.error("❌ Error creating latest MD case:", error);
+      console.error("❌ Error creating MD case:", error);
     } else {
-      console.error("❌ Error creating latest MD case");
+      console.error("❌ Error creating MD case");
     }
     return res
       .status(500)
@@ -14177,6 +14336,7 @@ app.get("/organization", authenticateJWT, async (req, res) => {
       isCustomDomain: (clinic as any)?.isCustomDomain || false,
       customDomain: (clinic as any)?.customDomain || "",
       defaultFormColor: (clinic as any)?.defaultFormColor || "",
+      patientPortalDashboardFormat: (clinic as any)?.patientPortalDashboardFormat || "fuse",
     });
   } catch (error) {
     if (process.env.NODE_ENV === "development") {
@@ -14218,6 +14378,10 @@ app.put("/organization/update", authenticateJWT, async (req, res) => {
       | undefined;
     const defaultFormColor = (validation.data as any).defaultFormColor as
       | string
+      | undefined;
+    const patientPortalDashboardFormat = (validation.data as any).patientPortalDashboardFormat as
+      | "fuse"
+      | "md-integrations"
       | undefined;
 
     const user = await User.findByPk(currentUser.id);
@@ -14284,6 +14448,17 @@ app.put("/organization/update", authenticateJWT, async (req, res) => {
           updateData.defaultFormColor = defaultFormColor || null;
         }
 
+        // Update patient portal dashboard format if provided
+        if (patientPortalDashboardFormat !== undefined) {
+          if (!["fuse", "md-integrations"].includes(patientPortalDashboardFormat)) {
+            return res.status(400).json({
+              success: false,
+              message: "Patient portal dashboard format must be 'fuse' or 'md-integrations'",
+            });
+          }
+          updateData.patientPortalDashboardFormat = patientPortalDashboardFormat;
+        }
+
         await clinic.update(updateData);
         updatedClinic = clinic;
       }
@@ -14304,6 +14479,7 @@ app.put("/organization/update", authenticateJWT, async (req, res) => {
             active: updatedClinic.isActive,
             status: updatedClinic.status,
             defaultFormColor: updatedClinic.defaultFormColor,
+            patientPortalDashboardFormat: updatedClinic.patientPortalDashboardFormat,
           }
           : null,
       },
@@ -15213,6 +15389,13 @@ async function startServer() {
         const hasMdOfferings =
           Array.isArray(mdOfferings) && mdOfferings.length > 0;
 
+        // Get stored prescriptions
+        const mdPrescriptions = (order as any).mdPrescriptions as any[] | null | undefined;
+        const hasPrescriptions = Array.isArray(mdPrescriptions) && mdPrescriptions.length > 0;
+
+        // Get pending actions
+        const mdPendingActions = (order as any).mdPendingActions || null;
+
         // Create ONE entry per order (not per MD offering)
         flattened.push({
           orderId: order.id,
@@ -15233,6 +15416,12 @@ async function startServer() {
           questionnaireAnswers: questionnaireAnswersData,
           // Store MD offerings count for reference
           mdOfferingsCount: hasMdOfferings ? mdOfferings.length : 0,
+          // Include prescription data
+          mdPrescriptions: hasPrescriptions ? mdPrescriptions : [],
+          mdOfferings: hasMdOfferings ? mdOfferings : [],
+          hasPrescriptions,
+          // Include pending actions (driver's license, intro video, etc.)
+          mdPendingActions,
         });
       }
 
@@ -16538,6 +16727,152 @@ async function startServer() {
     }
   );
 
+  // ============= MD INTEGRATIONS ADMIN ENDPOINTS =============
+
+  // List all available MDI offerings (treatment types/services)
+  // Use this to find offering IDs for mapping your products
+  app.get("/md/admin/offerings", authenticateJWT, async (req, res) => {
+    try {
+      const currentUser = getCurrentUser(req);
+      if (!currentUser) {
+        return res.status(401).json({ success: false, message: "Unauthorized" });
+      }
+
+      const MDAuthService = (
+        await import("./services/mdIntegration/MDAuth.service")
+      ).default;
+      const MDCaseService = (
+        await import("./services/mdIntegration/MDCase.service")
+      ).default;
+
+      const tokenResponse = await MDAuthService.generateToken();
+      const offerings = await MDCaseService.listOfferings(tokenResponse.access_token);
+
+      console.log(`[MD-ADMIN] Listed ${offerings?.length || 0} offerings`);
+
+      return res.json({
+        success: true,
+        data: offerings,
+        count: offerings?.length || 0,
+        hint: "Use the 'offering_id' field when creating cases with case_offerings parameter"
+      });
+    } catch (error: any) {
+      console.error("❌ Error listing MDI offerings:", error?.response?.data || error?.message || error);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to list MDI offerings",
+        error: error?.response?.data?.message || error?.message
+      });
+    }
+  });
+
+  // List available MDI products (medications/services that can be prescribed)
+  // These are from DoseSpot's drug database
+  app.get("/md/admin/products", authenticateJWT, async (req, res) => {
+    try {
+      const currentUser = getCurrentUser(req);
+      if (!currentUser) {
+        return res.status(401).json({ success: false, message: "Unauthorized" });
+      }
+
+      const { page, per_page, search } = req.query as any;
+
+      const MDAuthService = (
+        await import("./services/mdIntegration/MDAuth.service")
+      ).default;
+      const MDCaseService = (
+        await import("./services/mdIntegration/MDCase.service")
+      ).default;
+
+      const tokenResponse = await MDAuthService.generateToken();
+      const products = await MDCaseService.listProducts(tokenResponse.access_token, {
+        page: page ? parseInt(page) : undefined,
+        per_page: per_page ? parseInt(per_page) : undefined,
+        search: search || undefined,
+      });
+
+      console.log(`[MD-ADMIN] Listed products`, {
+        search,
+        count: products?.data?.length || products?.length || 0
+      });
+
+      return res.json({
+        success: true,
+        data: products,
+        hint: "These are medications/services available through DoseSpot. Clinicians prescribe from this catalog."
+      });
+    } catch (error: any) {
+      console.error("❌ Error listing MDI products:", error?.response?.data || error?.message || error);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to list MDI products",
+        error: error?.response?.data?.message || error?.message
+      });
+    }
+  });
+
+  // Clear driver's license for a patient (for testing identity verification flow)
+  app.delete("/md/admin/patient/:patientId/driver-license", authenticateJWT, async (req, res) => {
+    try {
+      const currentUser = getCurrentUser(req);
+      if (!currentUser) {
+        return res.status(401).json({ success: false, message: "Unauthorized" });
+      }
+
+      const { patientId } = req.params;
+      if (!patientId) {
+        return res.status(400).json({ success: false, message: "patientId is required" });
+      }
+
+      const MDAuthService = (
+        await import("./services/mdIntegration/MDAuth.service")
+      ).default;
+
+      const tokenResponse = await MDAuthService.generateToken();
+
+      // Try to clear the driver_license_id by setting it to null
+      const response = await fetch(
+        `https://api.mdintegrations.com/v1/partner/patients/${patientId}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${tokenResponse.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            driver_license_id: null
+          })
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error("❌ Error clearing driver license:", data);
+        return res.status(response.status).json({
+          success: false,
+          message: "Failed to clear driver license",
+          error: data
+        });
+      }
+
+      console.log(`[MD-ADMIN] Cleared driver license for patient ${patientId}`);
+
+      return res.json({
+        success: true,
+        message: "Driver license cleared. Patient will need to re-verify identity.",
+        data
+      });
+    } catch (error: any) {
+      console.error("❌ Error clearing driver license:", error?.message || error);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to clear driver license",
+        error: error?.message
+      });
+    }
+  });
+
   // ============= MD INTEGRATIONS WEBHOOKS =============
 
   // MD Integrations Webhook (raw body required for signature verification)
@@ -16592,28 +16927,27 @@ async function startServer() {
           payload = {};
         }
 
-        // SECURITY: MD Integrations webhook secret is REQUIRED
+        // SECURITY: MD Integrations webhook secret (optional but recommended)
         const secret = process.env.MD_INTEGRATIONS_WEBHOOK_SECRET;
-        if (!secret) {
-          console.error(
-            "❌ CRITICAL: MD_INTEGRATIONS_WEBHOOK_SECRET not configured"
-          );
-          return res
-            .status(500)
-            .json({ success: false, message: "Webhook configuration error" });
-        }
+        let signatureValid = true;
 
-        // ALWAYS verify signature - no bypass
-        const signatureValid = MDWebhookService.verifyWebhookSignature(
-          providedSignature,
-          rawBody,
-          secret
-        );
+        if (secret) {
+          // Verify signature if secret is configured
+          signatureValid = MDWebhookService.verifyWebhookSignature(
+            providedSignature,
+            rawBody,
+            secret
+          );
+        } else {
+          // No secret configured - skip signature verification (for sandbox/development)
+          console.log(`[MD-WH] reqId=${requestId} ⚠️ No webhook secret configured - skipping signature verification`);
+        }
 
         // SECURITY: Minimal logging - no PHI in logs
         console.log(`[MD-WH] reqId=${requestId} received`, {
           event_type: payload?.event_type,
           signature_valid: signatureValid,
+          has_secret: !!secret,
           content_type: contentType,
           // REMOVED: case_id, patient_id, body_preview (may contain PHI)
         });

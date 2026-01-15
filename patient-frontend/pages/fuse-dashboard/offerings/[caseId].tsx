@@ -2,7 +2,7 @@ import React from "react";
 import { useRouter } from "next/router";
 import { Card, CardBody, Button, Chip, Spinner, Divider, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, useDisclosure } from "@heroui/react";
 import { Icon } from "@iconify/react";
-import { fetchWithAuth, apiCall } from "../../lib/api";
+import { fetchWithAuth, apiCall } from "../../../lib/api";
 
 interface SubscriptionInfo {
     id: string;

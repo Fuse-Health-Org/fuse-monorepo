@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { extractClinicSlugFromDomain } from '../lib/clinic-utils';
 import { apiCall } from '../lib/api';
 import GetStartedButton from '../components/GetStartedButton';
+import { useDashboardPrefix } from '../hooks/useClinicFromDomain';
 
 interface CustomWebsite {
     portalTitle?: string;
@@ -37,6 +38,7 @@ interface Bundle {
 
 export default function BundlesPage() {
     const router = useRouter();
+    const { dashboardPrefix } = useDashboardPrefix();
     const [customWebsite, setCustomWebsite] = useState<CustomWebsite | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [logoLoaded, setLogoLoaded] = useState(false);
@@ -439,7 +441,7 @@ export default function BundlesPage() {
                             Shop All
                         </button>
                         <button
-                            onClick={() => router.push('/dashboard')}
+                            onClick={() => router.push(dashboardPrefix)}
                             style={{
                                 background: "none",
                                 border: "none",

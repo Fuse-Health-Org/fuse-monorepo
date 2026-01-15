@@ -295,8 +295,6 @@ class MDWebhookService {
 
       console.log('[MD-WH] processing intro video', { userId: user.id });
 
-
-
       console.log('[MD-WH] intro video details', {
         userId: user.id,
         patientId: eventData.patient_id,
@@ -304,8 +302,47 @@ class MDWebhookService {
         metadata: eventData.metadata
       });
 
-      // TODO: Send notification to user about intro video request
-      // TODO: Store access link for future reference if needed
+      // Try to find the order from metadata or get the most recent order with mdCaseId
+      let order: Order | null = null;
+      
+      // Try to extract orderId from metadata
+      const meta = eventData?.metadata as string | undefined;
+      if (meta) {
+        const match = meta.match(/orderId:\s*([0-9a-fA-F-]{36})/);
+        if (match && match[1]) {
+          order = await Order.findByPk(match[1]);
+        }
+      }
+      
+      // Fallback: find most recent order with mdCaseId for this user
+      if (!order) {
+        order = await Order.findOne({
+          where: { 
+            userId: user.id,
+          },
+          order: [['createdAt', 'DESC']]
+        } as any);
+      }
+
+      if (order) {
+        // Update the order with the pending action
+        const currentPendingActions = (order as any).mdPendingActions || {};
+        await order.update({
+          mdPendingActions: {
+            ...currentPendingActions,
+            introVideo: {
+              accessLink: eventData.access_link,
+              requestedAt: new Date().toISOString(),
+            }
+          }
+        });
+        console.log('[MD-WH] ✅ saved intro video pending action', { 
+          orderNumber: (order as any).orderNumber,
+          accessLink: eventData.access_link 
+        });
+      } else {
+        console.log('[MD-WH] ⚠️ no order found for intro video request', { userId: user.id });
+      }
 
     } catch (error) {
       console.error('[MD-WH] ❌ intro_video_requested error', error);
@@ -337,7 +374,47 @@ class MDWebhookService {
         metadata: eventData.metadata
       });
 
-      // TODO: Send notification to user about drivers license request
+      // Try to find the order from metadata or get the most recent order with mdCaseId
+      let order: Order | null = null;
+      
+      // Try to extract orderId from metadata
+      const meta = eventData?.metadata as string | undefined;
+      if (meta) {
+        const match = meta.match(/orderId:\s*([0-9a-fA-F-]{36})/);
+        if (match && match[1]) {
+          order = await Order.findByPk(match[1]);
+        }
+      }
+      
+      // Fallback: find most recent order with mdCaseId for this user
+      if (!order) {
+        order = await Order.findOne({
+          where: { 
+            userId: user.id,
+          },
+          order: [['createdAt', 'DESC']]
+        } as any);
+      }
+
+      if (order) {
+        // Update the order with the pending action
+        const currentPendingActions = (order as any).mdPendingActions || {};
+        await order.update({
+          mdPendingActions: {
+            ...currentPendingActions,
+            driversLicense: {
+              accessLink: eventData.access_link,
+              requestedAt: new Date().toISOString(),
+            }
+          }
+        });
+        console.log('[MD-WH] ✅ saved drivers license pending action', { 
+          orderNumber: (order as any).orderNumber,
+          accessLink: eventData.access_link 
+        });
+      } else {
+        console.log('[MD-WH] ⚠️ no order found for drivers license request', { userId: user.id });
+      }
 
     } catch (error) {
       console.error('[MD-WH] ❌ drivers_license_requested error', error);
@@ -523,6 +600,75 @@ class MDWebhookService {
         if (!order) break;
         await order.updateStatus(OrderStatus.PENDING);
         console.log('[MD-WH] order marked pending (waiting)', { orderNumber: order.orderNumber });
+        break;
+      }
+
+      case 'patient_modified': {
+        console.log('[MD-WH] 👤 patient_modified', { patient_id: eventData.patient_id });
+        try {
+          // Find user by mdPatientId
+          const user = await User.findOne({
+            where: { mdPatientId: eventData.patient_id }
+          });
+
+          if (!user) {
+            console.log('[MD-WH] ⚠️ no user for patient_modified', { patient_id: eventData.patient_id });
+            break;
+          }
+
+          // Fetch updated patient data from MD to check what was uploaded
+          const MDPatientService = (await import('./MDPatient.service')).default;
+          const tokenResponse = await MDAuthService.generateToken();
+          const patientData = await MDPatientService.getPatient(eventData.patient_id, tokenResponse.access_token);
+
+          console.log('[MD-WH] 👤 patient data after modification', {
+            patient_id: eventData.patient_id,
+            has_driver_license: !!patientData?.driver_license,
+            has_intro_video: !!patientData?.intro_video,
+          });
+
+          // Find recent orders with pending actions and clear them if requirements are now met
+          const orders = await Order.findAll({
+            where: { userId: user.id },
+            order: [['createdAt', 'DESC']],
+            limit: 5, // Check last 5 orders
+          } as any);
+
+          for (const order of orders) {
+            const pendingActions = (order as any).mdPendingActions;
+            if (!pendingActions) continue;
+
+            const updates: any = {};
+            let shouldUpdate = false;
+
+            // Clear driver's license pending action if now uploaded
+            if (pendingActions.driversLicense && patientData?.driver_license) {
+              updates.mdPendingActions = {
+                ...pendingActions,
+                driversLicense: null, // Clear since it's now uploaded
+              };
+              shouldUpdate = true;
+              console.log('[MD-WH] ✅ clearing driversLicense pending action', { orderNumber: (order as any).orderNumber });
+            }
+
+            // Clear intro video pending action if now uploaded
+            if (pendingActions.introVideo && patientData?.intro_video) {
+              updates.mdPendingActions = {
+                ...(updates.mdPendingActions || pendingActions),
+                introVideo: null, // Clear since it's now uploaded
+              };
+              shouldUpdate = true;
+              console.log('[MD-WH] ✅ clearing introVideo pending action', { orderNumber: (order as any).orderNumber });
+            }
+
+            if (shouldUpdate) {
+              await order.update(updates);
+              console.log('[MD-WH] ✅ updated order pending actions', { orderNumber: (order as any).orderNumber });
+            }
+          }
+        } catch (e) {
+          console.error('[MD-WH] ❌ error handling patient_modified', e);
+        }
         break;
       }
 

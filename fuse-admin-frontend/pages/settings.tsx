@@ -147,6 +147,7 @@ export default function Settings({
     isCustomDomain: false,
     customDomain: "",
     defaultFormColor: "",
+    patientPortalDashboardFormat: "fuse" as "fuse" | "md-integrations",
   });
   const [organizationErrors, setOrganizationErrors] = useState<Record<string, string>>({});
   const [logoFile, setLogoFile] = useState<File | null>(null);
@@ -307,6 +308,7 @@ export default function Settings({
           isCustomDomain: data.isCustomDomain || false,
           customDomain: data.customDomain || "",
           defaultFormColor: data.defaultFormColor || "",
+          patientPortalDashboardFormat: data.patientPortalDashboardFormat || "fuse",
         });
         if (data.logo) {
           setLogoPreview(data.logo);
@@ -1464,6 +1466,109 @@ export default function Settings({
                           </div>
                         </div>
                       )}
+
+                      {/* Patient Portal Dashboard Format Section */}
+                      <div className="pt-8 border-t">
+                        <div className="mb-6 p-4 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-950/30 dark:to-blue-950/30 rounded-xl border border-purple-200 dark:border-purple-800">
+                          <div className="flex items-start gap-4">
+                            <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center flex-shrink-0">
+                              <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+                              </svg>
+                            </div>
+                            <div className="flex-1">
+                              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1">
+                                Patient Portal Dashboard
+                              </h3>
+                              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                                The dashboard experience your patients see when they sign in. This affects the entire patient portal navigation and features.
+                              </p>
+                              
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {/* Fuse Dashboard Option */}
+                                <div
+                                  className={`relative p-4 rounded-xl border-2 text-left transition-all ${
+                                    organizationData.patientPortalDashboardFormat === "fuse"
+                                      ? "border-purple-500 bg-white dark:bg-gray-900 shadow-lg ring-2 ring-purple-500/20"
+                                      : "border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 opacity-60"
+                                  }`}
+                                >
+                                  {organizationData.patientPortalDashboardFormat === "fuse" && (
+                                    <div className="absolute top-3 right-3">
+                                      <div className="w-6 h-6 rounded-full bg-purple-500 flex items-center justify-center">
+                                        <Check className="w-4 h-4 text-white" />
+                                      </div>
+                                    </div>
+                                  )}
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <div className="w-8 h-8 rounded-lg bg-blue-500 flex items-center justify-center">
+                                      <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                      </svg>
+                                    </div>
+                                    <span className="font-semibold text-gray-900 dark:text-gray-100">Fuse Dashboard</span>
+                                    {organizationData.patientPortalDashboardFormat === "fuse" && (
+                                      <Badge className="ml-auto bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300">Active</Badge>
+                                    )}
+                                  </div>
+                                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                                    Internal messaging, treatments, and subscription management. Best for clinics managing their own patient communications.
+                                  </p>
+                                  <div className="mt-3 flex flex-wrap gap-1.5">
+                                    <span className="text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded-full">Messenger</span>
+                                    <span className="text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded-full">Treatments</span>
+                                    <span className="text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded-full">Subscriptions</span>
+                                  </div>
+                                </div>
+
+                                {/* MD Integrations Dashboard Option */}
+                                <div
+                                  className={`relative p-4 rounded-xl border-2 text-left transition-all ${
+                                    organizationData.patientPortalDashboardFormat === "md-integrations"
+                                      ? "border-purple-500 bg-white dark:bg-gray-900 shadow-lg ring-2 ring-purple-500/20"
+                                      : "border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 opacity-60"
+                                  }`}
+                                >
+                                  {organizationData.patientPortalDashboardFormat === "md-integrations" && (
+                                    <div className="absolute top-3 right-3">
+                                      <div className="w-6 h-6 rounded-full bg-purple-500 flex items-center justify-center">
+                                        <Check className="w-4 h-4 text-white" />
+                                      </div>
+                                    </div>
+                                  )}
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <div className="w-8 h-8 rounded-lg bg-purple-500 flex items-center justify-center">
+                                      <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                      </svg>
+                                    </div>
+                                    <span className="font-semibold text-gray-900 dark:text-gray-100">MD Integrations</span>
+                                    {organizationData.patientPortalDashboardFormat === "md-integrations" && (
+                                      <Badge className="ml-auto bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300">Active</Badge>
+                                    )}
+                                  </div>
+                                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                                    Telehealth prescriptions via MD Integrations API. Includes clinician messaging and prescription tracking.
+                                  </p>
+                                  <div className="mt-3 flex flex-wrap gap-1.5">
+                                    <span className="text-xs px-2 py-0.5 bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 rounded-full">E-Prescribe</span>
+                                    <span className="text-xs px-2 py-0.5 bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 rounded-full">Telehealth</span>
+                                    <span className="text-xs px-2 py-0.5 bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 rounded-full">DoseSpot</span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Contact info message */}
+                              <div className="mt-4 flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg">
+                                <Shield className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+                                <p className="text-sm text-amber-800 dark:text-amber-200">
+                                  To change your patient portal dashboard type, please contact the Fuse Health team at <a href="mailto:support@fuse.health" className="font-medium underline hover:no-underline">support@fuse.health</a>
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
 
                       {/* Form Color Section */}
                       <div className="pt-8 border-t">

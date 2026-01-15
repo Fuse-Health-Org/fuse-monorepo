@@ -1,6 +1,6 @@
 import { useRouter } from 'next/router';
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { extractClinicSlugFromDomain } from '../lib/clinic-utils';
+import { extractClinicSlugFromDomain, getDashboardPrefix, PatientPortalDashboardFormat } from '../lib/clinic-utils';
 import { apiCall } from '../lib/api';
 import ScrollingFeaturesBar from '../components/ScrollingFeaturesBar';
 import GetStartedButton from '../components/GetStartedButton';
@@ -50,6 +50,7 @@ interface ClinicInfo {
   parentClinicLogo?: string;
   parentClinicName?: string;
   parentClinicHeroImageUrl?: string;
+  patientPortalDashboardFormat?: PatientPortalDashboardFormat;
 }
 
 interface Product {
@@ -177,6 +178,14 @@ export default function LandingPage() {
           } else if (result.success && result.data) {
             websiteData = result.data;
           }
+          
+          // Check if custom website is active - if not, redirect to dashboard
+          if (!websiteData || websiteData.isActive === false) {
+            console.log('🔀 Custom website is not active, redirecting to dashboard...');
+            setIsRedirecting(true);
+            router.replace(getDashboardPrefix(clinicData));
+            return; // Don't set isLoading to false - keep showing nothing while redirecting
+          }
         } else {
           // For localhost testing: fetch the default/first available custom website
           console.log('🏠 No clinic subdomain detected, loading default custom website for testing...');
@@ -192,14 +201,14 @@ export default function LandingPage() {
           } catch (error) {
             console.log('ℹ️ No custom website found');
           }
-        }
-
-        // Check if custom website is active - if not, redirect to dashboard
-        if (!websiteData || websiteData.isActive === false) {
-          console.log('🔀 Custom website is not active, redirecting to dashboard...');
-          setIsRedirecting(true);
-          router.replace('/dashboard');
-          return; // Don't set isLoading to false - keep showing nothing while redirecting
+          
+          // Check if custom website is active - if not, redirect to dashboard (default)
+          if (!websiteData || websiteData.isActive === false) {
+            console.log('🔀 Custom website is not active, redirecting to dashboard...');
+            setIsRedirecting(true);
+            router.replace('/fuse-dashboard');
+            return; // Don't set isLoading to false - keep showing nothing while redirecting
+          }
         }
 
         setCustomWebsite(websiteData);
@@ -476,7 +485,7 @@ export default function LandingPage() {
         key={program.id}
         onClick={() => {
           if (hasTemplate) {
-            window.open(`/my-products/${program.id}/program`, '_blank');
+            window.open(`${getDashboardPrefix(clinicInfo)}/my-products/${program.id}/program`, '_blank');
           }
         }}
         onMouseEnter={() => setHoveredCardIndex(cardId)}
@@ -626,7 +635,7 @@ export default function LandingPage() {
         </div>
         {hasTemplate ? (
           <a
-            href={`/my-products/${program.id}/program`}
+            href={`${getDashboardPrefix(clinicInfo)}/my-products/${program.id}/program`}
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
@@ -825,7 +834,7 @@ export default function LandingPage() {
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
             <button
-              onClick={() => router.push('/dashboard')}
+              onClick={() => router.push(getDashboardPrefix(clinicInfo))}
               style={{ padding: "0.5rem", border: "none", background: "none", cursor: "pointer" }}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

@@ -6,13 +6,14 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { authApi, apiCall } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
-import { extractClinicSlugFromDomain } from "../lib/clinic-utils";
+import { extractClinicSlugFromDomain, getDashboardPrefix, PatientPortalDashboardFormat } from "../lib/clinic-utils";
 
 interface Clinic {
   id: string;
   name: string;
   slug: string;
   logo: string;
+  patientPortalDashboardFormat?: PatientPortalDashboardFormat;
 }
 
 interface MfaState {
@@ -155,7 +156,7 @@ export default function SignIn() {
 
       // Refresh user state and redirect to dashboard
       await refreshUser();
-      router.push('/dashboard');
+      router.push(getDashboardPrefix(clinic));
 
     } catch (err) {
       // HIPAA Compliance: Don't log the actual error which might contain PHI
@@ -228,7 +229,7 @@ export default function SignIn() {
 
       // Refresh user state and redirect
       await refreshUser();
-      router.push('/dashboard');
+      router.push(getDashboardPrefix(clinic));
 
     } catch (err) {
       console.error('MFA verification error occurred');
