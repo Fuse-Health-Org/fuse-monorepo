@@ -55,7 +55,6 @@ function MDISidebar({
           <div className="font-semibold text-foreground">
             <span className="text-secondary">MDI</span> Portal
           </div>
-          <span className="text-xs text-warning">Beta</span>
         </div>
       </div>
 
@@ -325,9 +324,6 @@ function MDIDashboardPage() {
             <div className="font-semibold text-lg text-foreground">
               <span className="text-secondary">MDI</span> Portal
             </div>
-            <span className="text-xs bg-warning/20 text-warning px-2 py-0.5 rounded-full">
-              Beta
-            </span>
           </div>
           <Dropdown>
             <DropdownTrigger>

@@ -14178,6 +14178,7 @@ app.get("/organization", authenticateJWT, async (req, res) => {
       isCustomDomain: (clinic as any)?.isCustomDomain || false,
       customDomain: (clinic as any)?.customDomain || "",
       defaultFormColor: (clinic as any)?.defaultFormColor || "",
+      patientPortalDashboardFormat: (clinic as any)?.patientPortalDashboardFormat || "fuse",
     });
   } catch (error) {
     if (process.env.NODE_ENV === "development") {
@@ -14219,6 +14220,10 @@ app.put("/organization/update", authenticateJWT, async (req, res) => {
       | undefined;
     const defaultFormColor = (validation.data as any).defaultFormColor as
       | string
+      | undefined;
+    const patientPortalDashboardFormat = (validation.data as any).patientPortalDashboardFormat as
+      | "fuse"
+      | "md-integrations"
       | undefined;
 
     const user = await User.findByPk(currentUser.id);
@@ -14285,6 +14290,17 @@ app.put("/organization/update", authenticateJWT, async (req, res) => {
           updateData.defaultFormColor = defaultFormColor || null;
         }
 
+        // Update patient portal dashboard format if provided
+        if (patientPortalDashboardFormat !== undefined) {
+          if (!["fuse", "md-integrations"].includes(patientPortalDashboardFormat)) {
+            return res.status(400).json({
+              success: false,
+              message: "Patient portal dashboard format must be 'fuse' or 'md-integrations'",
+            });
+          }
+          updateData.patientPortalDashboardFormat = patientPortalDashboardFormat;
+        }
+
         await clinic.update(updateData);
         updatedClinic = clinic;
       }
@@ -14305,6 +14321,7 @@ app.put("/organization/update", authenticateJWT, async (req, res) => {
             active: updatedClinic.isActive,
             status: updatedClinic.status,
             defaultFormColor: updatedClinic.defaultFormColor,
+            patientPortalDashboardFormat: updatedClinic.patientPortalDashboardFormat,
           }
           : null,
       },
