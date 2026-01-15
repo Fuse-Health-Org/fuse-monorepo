@@ -21,6 +21,7 @@ interface FormData {
   city: string
   state: string
   zipCode: string
+  patientPortalDashboardFormat: string
 }
 
 export default function SignUp() {
@@ -37,7 +38,8 @@ export default function SignUp() {
     address: '',
     city: '',
     state: '',
-    zipCode: ''
+    zipCode: '',
+    patientPortalDashboardFormat: 'fuse'
   })
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
@@ -139,7 +141,8 @@ export default function SignUp() {
           phoneNumber: formData.phoneNumber,
           clinicName: formData.companyName,
           businessType: formData.businessType,
-          website: formData.website
+          website: formData.website,
+          patientPortalDashboardFormat: formData.patientPortalDashboardFormat
         }),
       })
 
@@ -326,6 +329,27 @@ export default function SignUp() {
                         placeholder="company.com"
                       />
                     </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label htmlFor="patientPortalDashboardFormat" className="text-sm font-medium text-foreground">
+                      Patient Portal Dashboard Format *
+                    </label>
+                    <div className="relative">
+                      <Building2 className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <select
+                        id="patientPortalDashboardFormat"
+                        value={formData.patientPortalDashboardFormat}
+                        onChange={(e) => handleInputChange('patientPortalDashboardFormat', e.target.value)}
+                        className="w-full pl-10 pr-3 py-2 border border-input rounded-md bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                        required
+                      >
+                        <option value="fuse">Fuse Dashboard</option>
+                        <option value="md-integrations">MD Integrations</option>
+                      </select>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Choose the dashboard format for your patient portal. Fuse Dashboard includes internal messaging, treatments, and subscription management. MD Integrations connects with external medical systems.
+                    </p>
                   </div>
                 </div>
 

@@ -1530,7 +1530,7 @@ export default function Settings({
                                   }`}
                                 >
                                   {organizationData.patientPortalDashboardFormat === "md-integrations" && (
-                                    <div className="absolute top-3 right-3">
+                                    <div className="absolute bottom-3 right-3">
                                       <div className="w-6 h-6 rounded-full bg-purple-500 flex items-center justify-center">
                                         <Check className="w-4 h-4 text-white" />
                                       </div>

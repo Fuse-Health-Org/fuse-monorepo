@@ -60,7 +60,7 @@ import formTemplateService from "./services/formTemplate.service";
 import User from "./models/User";
 import UserRoles from "./models/UserRoles";
 import MfaToken from "./models/MfaToken";
-import Clinic from "./models/Clinic";
+import Clinic, { PatientPortalDashboardFormat } from "./models/Clinic";
 import Physician from "./models/Physician";
 import { Op } from "sequelize";
 import QuestionnaireStepService from "./services/questionnaireStep.service";
@@ -766,6 +766,7 @@ app.post("/auth/signup", async (req, res) => {
       website,
       businessType,
       npiNumber,
+      patientPortalDashboardFormat,
     } = validation.data;
 
     // Validate clinic name for providers/brands (both require clinics)
@@ -806,11 +807,18 @@ app.post("/auth/signup", async (req, res) => {
       // Generate unique slug
       const slug = await generateUniqueSlug(clinicName.trim());
 
+      // Map patientPortalDashboardFormat string to enum value
+      let dashboardFormat: PatientPortalDashboardFormat = PatientPortalDashboardFormat.FUSE;
+      if (patientPortalDashboardFormat === 'md-integrations') {
+        dashboardFormat = PatientPortalDashboardFormat.MD_INTEGRATIONS;
+      }
+
       clinic = await Clinic.create({
         name: clinicName.trim(),
         slug: slug,
         logo: "", // Default empty logo, can be updated later
         businessType: businessType || null,
+        patientPortalDashboardFormat: dashboardFormat,
       });
 
       // Note: Global form structures are created at database initialization (ensureDefaultFormStructures)

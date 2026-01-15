@@ -5,7 +5,10 @@ import BrandSubscription from "../models/BrandSubscription";
 import BrandSubscriptionPlans from "../models/BrandSubscriptionPlans";
 import TenantCustomFeatures from "../models/TenantCustomFeatures";
 import UserRoles from "../models/UserRoles";
-import Clinic from "../models/Clinic";
+import Clinic, { PatientPortalDashboardFormat } from "../models/Clinic";
+import Order from "../models/Order";
+import Payment from "../models/Payment";
+import Prescription from "../models/Prescription";
 import { createJWTToken } from "../config/jwt";
 
 export function registerClientManagementEndpoints(
@@ -908,6 +911,278 @@ export function registerClientManagementEndpoints(
         res.status(500).json({
           success: false,
           message: "Failed to update affiliate parent clinic",
+        });
+      }
+    }
+  );
+
+  // Get clinic with patientPortalDashboardFormat for a user
+  app.get(
+    "/admin/users/:userId/clinic",
+    authenticateJWT,
+    async (req, res) => {
+      try {
+        const currentUser = getCurrentUser(req);
+        if (!currentUser) {
+          return res
+            .status(401)
+            .json({ success: false, message: "Not authenticated" });
+        }
+
+        const user = await User.findByPk(currentUser.id, {
+          include: [{ model: UserRoles, as: "userRoles", required: false }],
+        });
+        if (!user || !user.hasRoleSync("admin")) {
+          return res.status(403).json({ success: false, message: "Forbidden" });
+        }
+
+        const { userId } = req.params;
+        const targetUser = await User.findByPk(userId);
+
+        if (!targetUser || !targetUser.clinicId) {
+          return res.status(404).json({
+            success: false,
+            message: "User not found or does not have a clinic",
+          });
+        }
+
+        const clinic = await Clinic.findByPk(targetUser.clinicId, {
+          attributes: ["id", "name", "slug", "patientPortalDashboardFormat"],
+        });
+
+        if (!clinic) {
+          return res.status(404).json({
+            success: false,
+            message: "Clinic not found",
+          });
+        }
+
+        res.status(200).json({
+          success: true,
+          data: clinic.toJSON(),
+        });
+      } catch (error) {
+        console.error("❌ Error fetching clinic:", error);
+        res.status(500).json({
+          success: false,
+          message: "Failed to fetch clinic",
+        });
+      }
+    }
+  );
+
+  // Check if clinic has existing Orders, Payments, or Prescriptions
+  app.get(
+    "/admin/users/:userId/clinic/data-check",
+    authenticateJWT,
+    async (req, res) => {
+      try {
+        const currentUser = getCurrentUser(req);
+        if (!currentUser) {
+          return res
+            .status(401)
+            .json({ success: false, message: "Not authenticated" });
+        }
+
+        const user = await User.findByPk(currentUser.id, {
+          include: [{ model: UserRoles, as: "userRoles", required: false }],
+        });
+        if (!user || !user.hasRoleSync("admin")) {
+          return res.status(403).json({ success: false, message: "Forbidden" });
+        }
+
+        const { userId } = req.params;
+        const targetUser = await User.findByPk(userId);
+
+        if (!targetUser || !targetUser.clinicId) {
+          return res.status(404).json({
+            success: false,
+            message: "User not found or does not have a clinic",
+          });
+        }
+
+        const clinicId = targetUser.clinicId;
+
+        // Count orders for this clinic (Order has clinicId directly)
+        const ordersCount = await Order.count({
+          where: { clinicId },
+        });
+
+        // Count payments - Payment has orderId, get orderIds from clinic and count payments
+        const clinicOrders = await Order.findAll({
+          where: { clinicId },
+          attributes: ['id'],
+        });
+        const clinicOrderIds = clinicOrders.map(o => o.id);
+        
+        const paymentsCount = clinicOrderIds.length > 0
+          ? await Payment.count({
+              where: { orderId: { [Op.in]: clinicOrderIds } },
+            })
+          : 0;
+
+        // Count prescriptions - Prescription has patientId, count through Users
+        const clinicUsers = await User.findAll({
+          where: { clinicId },
+          attributes: ['id'],
+        });
+        const clinicUserIds = clinicUsers.map(u => u.id);
+        
+        const prescriptionsCount = clinicUserIds.length > 0
+          ? await Prescription.count({
+              where: { patientId: { [Op.in]: clinicUserIds } },
+            })
+          : 0;
+
+        const hasData = ordersCount > 0 || paymentsCount > 0 || prescriptionsCount > 0;
+
+        res.status(200).json({
+          success: true,
+          data: {
+            hasData,
+            ordersCount,
+            paymentsCount,
+            prescriptionsCount,
+          },
+        });
+      } catch (error) {
+        console.error("❌ Error checking clinic data:", error);
+        res.status(500).json({
+          success: false,
+          message: "Failed to check clinic data",
+        });
+      }
+    }
+  );
+
+  // Update patientPortalDashboardFormat for a clinic
+  app.patch(
+    "/admin/users/:userId/clinic/patient-portal-dashboard-format",
+    authenticateJWT,
+    async (req, res) => {
+      try {
+        const currentUser = getCurrentUser(req);
+        if (!currentUser) {
+          return res
+            .status(401)
+            .json({ success: false, message: "Not authenticated" });
+        }
+
+        const user = await User.findByPk(currentUser.id, {
+          include: [{ model: UserRoles, as: "userRoles", required: false }],
+        });
+        if (!user || !user.hasRoleSync("admin")) {
+          return res.status(403).json({ success: false, message: "Forbidden" });
+        }
+
+        const { userId } = req.params;
+        const { patientPortalDashboardFormat, forceUpdate } = req.body;
+
+        // Validate patientPortalDashboardFormat
+        if (!patientPortalDashboardFormat || !['fuse', 'md-integrations'].includes(patientPortalDashboardFormat)) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid patientPortalDashboardFormat. Must be 'fuse' or 'md-integrations'",
+          });
+        }
+
+        const targetUser = await User.findByPk(userId);
+
+        if (!targetUser || !targetUser.clinicId) {
+          return res.status(404).json({
+            success: false,
+            message: "User not found or does not have a clinic",
+          });
+        }
+
+        const clinic = await Clinic.findByPk(targetUser.clinicId);
+
+        if (!clinic) {
+          return res.status(404).json({
+            success: false,
+            message: "Clinic not found",
+          });
+        }
+
+        // Check if format is changing
+        const currentFormat = clinic.patientPortalDashboardFormat;
+        const newFormat = patientPortalDashboardFormat === 'md-integrations' 
+          ? PatientPortalDashboardFormat.MD_INTEGRATIONS 
+          : PatientPortalDashboardFormat.FUSE;
+
+        if (currentFormat === newFormat) {
+          return res.status(200).json({
+            success: true,
+            message: "Format is already set to the requested value",
+            data: clinic.toJSON(),
+          });
+        }
+
+        // If forceUpdate is not true, check for existing data
+        if (!forceUpdate) {
+          // Count orders for this clinic (Order has clinicId directly)
+          const ordersCount = await Order.count({
+            where: { clinicId: clinic.id },
+          });
+
+          // Count payments - Payment has orderId, get orderIds from clinic and count payments
+          const clinicOrders = await Order.findAll({
+            where: { clinicId: clinic.id },
+            attributes: ['id'],
+          });
+          const clinicOrderIds = clinicOrders.map(o => o.id);
+          
+          const paymentsCount = clinicOrderIds.length > 0
+            ? await Payment.count({
+                where: { orderId: { [Op.in]: clinicOrderIds } },
+              })
+            : 0;
+
+          // Count prescriptions - Prescription has patientId, count through Users
+          const clinicUsers = await User.findAll({
+            where: { clinicId: clinic.id },
+            attributes: ['id'],
+          });
+          const clinicUserIds = clinicUsers.map(u => u.id);
+          
+          const prescriptionsCount = clinicUserIds.length > 0
+            ? await Prescription.count({
+                where: { patientId: { [Op.in]: clinicUserIds } },
+              })
+            : 0;
+
+          if (ordersCount > 0 || paymentsCount > 0 || prescriptionsCount > 0) {
+            return res.status(400).json({
+              success: false,
+              message: "Cannot change patientPortalDashboardFormat when there are existing Orders, Payments, or Prescriptions",
+              data: {
+                ordersCount,
+                paymentsCount,
+                prescriptionsCount,
+              },
+            });
+          }
+        }
+
+        // Update the clinic
+        await clinic.update({
+          patientPortalDashboardFormat: newFormat,
+        });
+
+        console.log(
+          `✅ [Client Mgmt] Updated patientPortalDashboardFormat for clinic ${clinic.id} from ${currentFormat} to ${newFormat}`
+        );
+
+        res.status(200).json({
+          success: true,
+          message: "patientPortalDashboardFormat updated successfully",
+          data: clinic.toJSON(),
+        });
+      } catch (error) {
+        console.error("❌ Error updating patientPortalDashboardFormat:", error);
+        res.status(500).json({
+          success: false,
+          message: "Failed to update patientPortalDashboardFormat",
         });
       }
     }
