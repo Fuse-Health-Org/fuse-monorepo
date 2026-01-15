@@ -26,6 +26,7 @@ import {
 import { RegularQuestionsView } from "./components/RegularQuestionsView";
 import { InformationalStepView } from "./components/InformationalStepView";
 import { StepNavigationButtons } from "./components/StepNavigationButtons";
+import { OrderSuccessModal } from "./components/OrderSuccessModal";
 
 export const QuestionnaireModal: React.FC<QuestionnaireModalProps> = (props) => {
   const { isOpen, onClose } = props;
@@ -298,6 +299,7 @@ export const QuestionnaireModal: React.FC<QuestionnaireModalProps> = (props) => 
                         onCreateSubscription={modal.createSubscriptionForPlan}
                         onPaymentSuccess={modal.handlePaymentSuccess}
                         onPaymentError={modal.handlePaymentError}
+                        onPaymentConfirm={modal.handlePaymentConfirm}
                         stripePromise={stripePromise}
                         questionnaireProducts={modal.questionnaire.treatment?.products}
                         selectedProducts={modal.selectedProducts}
@@ -345,7 +347,7 @@ export const QuestionnaireModal: React.FC<QuestionnaireModalProps> = (props) => 
                         {renderStepContent()}
 
                         {/* Navigation buttons - only show when not in special modes */}
-                        {!(modal.isCheckoutStep() && modal.paymentStatus !== 'succeeded') &&
+                        {!modal.isCheckoutStep() &&
                           !modal.isSignInOptionsMode &&
                           !modal.isGoogleMfaMode && (
                             <>
@@ -383,11 +385,6 @@ export const QuestionnaireModal: React.FC<QuestionnaireModalProps> = (props) => 
                       </>
                     )}
 
-                    {modal.isCheckoutStep() && modal.paymentStatus !== 'succeeded' && (
-                      <div className="text-center text-sm text-gray-600 mt-4">
-                        Complete payment above to continue
-                      </div>
-                    )}
                   </motion.div>
                 </AnimatePresence>
               </div>
@@ -408,6 +405,12 @@ export const QuestionnaireModal: React.FC<QuestionnaireModalProps> = (props) => 
         }}
         isLoading={modal.emailModalLoading}
         error={modal.emailModalError}
+      />
+
+      <OrderSuccessModal
+        isOpen={modal.showSuccessModal}
+        isProcessing={modal.paymentStatus === 'processing'}
+        onContinue={modal.handleSuccessModalContinue}
       />
     </>
   );

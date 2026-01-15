@@ -144,8 +144,9 @@ class UserService {
   }
 
   async syncPatientInMD(userId: string, addressId?: string) {
+    let user: any = null;
     try {
-      const user = await getUser(userId);
+      user = await getUser(userId);
 
       if (!user) {
         throw Error("User not found");
@@ -180,9 +181,30 @@ class UserService {
       await user.reload();
       return user;
     } catch (error) {
-      if (process.env.NODE_ENV === "development") {
-        console.error("Error syncing with MD Integration");
+      // Try to get user info for logging if available
+      if (!user) {
+        try {
+          user = await getUser(userId);
+        } catch {
+          // Ignore if we can't get user
+        }
       }
+
+      if (process.env.NODE_ENV === "development") {
+        console.error("❌ Error syncing with MD Integration:", {
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+          userId,
+          hasDob: Boolean(user?.dob),
+          hasGender: Boolean(user?.gender),
+          hasPhone: Boolean(user?.phoneNumber),
+          hasFirstName: Boolean(user?.firstName),
+          hasLastName: Boolean(user?.lastName),
+          hasEmail: Boolean(user?.email),
+        });
+      }
+      // Log the actual error so we can debug
+      console.error("❌ [MD-SYNC] Failed to sync patient:", error instanceof Error ? error.message : String(error));
       return null;
     }
   }

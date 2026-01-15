@@ -10,6 +10,7 @@ import { Icon } from '@iconify/react';
 interface StripePaymentFormProps {
   onSuccess: () => void;
   onError: (error: string) => void;
+  onConfirm?: () => void; // Called when payment is submitted but before confirmation
   amount: number;
   loading?: boolean;
 }
@@ -17,6 +18,7 @@ interface StripePaymentFormProps {
 export const StripePaymentForm: React.FC<StripePaymentFormProps> = ({
   onSuccess,
   onError,
+  onConfirm,
   amount,
   loading = false
 }) => {
@@ -31,24 +33,51 @@ export const StripePaymentForm: React.FC<StripePaymentFormProps> = ({
       return;
     }
 
+    // Verify that Payment Element is mounted before proceeding
+    const paymentElement = elements.getElement('payment');
+    if (!paymentElement) {
+      onError('Payment form is not ready. Please wait a moment and try again.');
+      return;
+    }
+
     setIsProcessing(true);
 
-    const { error } = await stripe.confirmPayment({
-      elements,
-      confirmParams: {
-        // Return URL is required but won't be used since we handle success in the callback
-        return_url: window.location.origin,
-      },
-      redirect: 'if_required',
-    });
+    try {
+      // Start the payment confirmation FIRST, then open modal after a brief delay
+      // This ensures the Payment Element is fully accessible during confirmation
+      const confirmPromise = stripe.confirmPayment({
+        elements,
+        confirmParams: {
+          // Return URL is required but won't be used since we handle success in the callback
+          return_url: window.location.origin,
+        },
+        redirect: 'if_required',
+      });
 
-    if (error) {
-      onError(error.message || 'An error occurred during payment');
+      // Open modal with processing state after a small delay
+      // This gives Stripe time to access the Payment Element before the modal potentially interferes
+      if (onConfirm) {
+        // Use requestAnimationFrame to ensure DOM is stable, then setTimeout for modal
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            onConfirm();
+          }, 200);
+        });
+      }
+
+      const { error } = await confirmPromise;
+
+      if (error) {
+        setIsProcessing(false);
+        onError(error.message || 'An error occurred during payment');
+      } else {
+        // Payment succeeded
+        onSuccess();
+        setIsProcessing(false);
+      }
+    } catch (err) {
       setIsProcessing(false);
-    } else {
-      // Payment succeeded
-      onSuccess();
-      setIsProcessing(false);
+      onError('An unexpected error occurred during payment');
     }
   };
 

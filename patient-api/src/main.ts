@@ -807,11 +807,12 @@ app.post("/auth/signup", async (req, res) => {
       // Generate unique slug
       const slug = await generateUniqueSlug(clinicName.trim());
 
-      // Map patientPortalDashboardFormat string to enum value
-      let dashboardFormat: PatientPortalDashboardFormat = PatientPortalDashboardFormat.FUSE;
-      if (patientPortalDashboardFormat === 'md-integrations') {
-        dashboardFormat = PatientPortalDashboardFormat.MD_INTEGRATIONS;
-      }
+      // For brand signup, default to MD_INTEGRATIONS format
+      // (can be changed later in Tenant Management portal if needed)
+      const dashboardFormat: PatientPortalDashboardFormat = 
+        patientPortalDashboardFormat === 'fuse' 
+          ? PatientPortalDashboardFormat.FUSE 
+          : PatientPortalDashboardFormat.MD_INTEGRATIONS;
 
       clinic = await Clinic.create({
         name: clinicName.trim(),
@@ -14124,9 +14125,21 @@ app.post("/md/cases", async (req, res) => {
       }
     } catch (e) {
       const errorMsg = e instanceof Error ? e.message : 'Unknown error';
-      console.error('[MD-CASE] ⚠️ Could not enrich/sync patient before creating case:', errorMsg);
+      const errorStack = e instanceof Error ? e.stack : undefined;
+      console.error('[MD-CASE] ⚠️ Could not enrich/sync patient before creating case:', {
+        error: errorMsg,
+        stack: errorStack,
+        userId: user.id,
+        hasDob: Boolean(user.dob),
+        hasGender: Boolean(user.gender),
+        hasPhone: Boolean(user.phoneNumber),
+        hasAddress: Boolean((order as any).shippingAddressId)
+      });
       // Continue to validation - will fail with clear error message if mdPatientId missing
     }
+
+    // Reload user one more time to ensure we have latest state
+    await user.reload();
 
     if (!user.mdPatientId) {
       // Validate required fields and provide actionable details

@@ -30,6 +30,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
     onCreateSubscription,
     onPaymentSuccess,
     onPaymentError,
+    onPaymentConfirm,
     stripePromise,
     theme,
     questionnaireProducts,
@@ -629,6 +630,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                                         amount={isProgramCheckout ? programTotal : (selectedPlanData?.price || 0)}
                                         onSuccess={onPaymentSuccess}
                                         onError={onPaymentError}
+                                        onConfirm={onPaymentConfirm}
                                         loading={false}
                                     />
                                 </Elements>
