@@ -16811,6 +16811,68 @@ async function startServer() {
     }
   });
 
+  // Clear driver's license for a patient (for testing identity verification flow)
+  app.delete("/md/admin/patient/:patientId/driver-license", authenticateJWT, async (req, res) => {
+    try {
+      const currentUser = getCurrentUser(req);
+      if (!currentUser) {
+        return res.status(401).json({ success: false, message: "Unauthorized" });
+      }
+
+      const { patientId } = req.params;
+      if (!patientId) {
+        return res.status(400).json({ success: false, message: "patientId is required" });
+      }
+
+      const MDAuthService = (
+        await import("./services/mdIntegration/MDAuth.service")
+      ).default;
+
+      const tokenResponse = await MDAuthService.generateToken();
+
+      // Try to clear the driver_license_id by setting it to null
+      const response = await fetch(
+        `https://api.mdintegrations.com/v1/partner/patients/${patientId}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${tokenResponse.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            driver_license_id: null
+          })
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error("❌ Error clearing driver license:", data);
+        return res.status(response.status).json({
+          success: false,
+          message: "Failed to clear driver license",
+          error: data
+        });
+      }
+
+      console.log(`[MD-ADMIN] Cleared driver license for patient ${patientId}`);
+
+      return res.json({
+        success: true,
+        message: "Driver license cleared. Patient will need to re-verify identity.",
+        data
+      });
+    } catch (error: any) {
+      console.error("❌ Error clearing driver license:", error?.message || error);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to clear driver license",
+        error: error?.message
+      });
+    }
+  });
+
   // ============= MD INTEGRATIONS WEBHOOKS =============
 
   // MD Integrations Webhook (raw body required for signature verification)
