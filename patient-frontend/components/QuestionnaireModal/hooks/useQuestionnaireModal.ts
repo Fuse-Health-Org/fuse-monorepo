@@ -623,58 +623,118 @@ export function useQuestionnaireModal(
 
   // Create MD Integrations case after payment (only for md-integrations clinics)
   const createMDCase = useCallback(async (orderIdForCase: string) => {
+    console.log('🔵 [MDI] ========== MD INTEGRATIONS CASE CREATION ==========');
+    console.log('🔵 [MDI] Order ID:', orderIdForCase);
+    console.log('🔵 [MDI] Domain Clinic:', domainClinic ? {
+      id: domainClinic.id,
+      name: domainClinic.name,
+      slug: domainClinic.slug,
+      patientPortalDashboardFormat: (domainClinic as any).patientPortalDashboardFormat
+    } : 'null');
+
     // Only proceed if clinic uses md-integrations dashboard format
-    if (!domainClinic || (domainClinic as any).patientPortalDashboardFormat !== 'md-integrations') {
-      console.log('ℹ️ Skipping MD case creation - clinic uses fuse format');
+    if (!domainClinic) {
+      console.log('⚠️ [MDI] No domain clinic found - skipping MDI case creation');
       return;
     }
 
-    console.log('🏥 Creating MD Integrations case for order:', orderIdForCase);
+    const dashboardFormat = (domainClinic as any).patientPortalDashboardFormat;
+    console.log('🔵 [MDI] Dashboard format:', dashboardFormat);
+
+    if (dashboardFormat !== 'md-integrations') {
+      console.log('ℹ️ [MDI] Clinic uses "' + dashboardFormat + '" format - skipping MDI case creation');
+      console.log('🔵 [MDI] ========== END (SKIPPED) ==========');
+      return;
+    }
+
+    console.log('✅ [MDI] Clinic uses md-integrations format - proceeding with case creation');
+
+    const patientOverrides = {
+      firstName: answers['firstName'],
+      lastName: answers['lastName'],
+      email: answers['email'],
+      phoneNumber: answers['mobile'],
+      dob: answers['dob'] || answers['dateOfBirth'],
+      gender: answers['gender'],
+    };
+
+    console.log('🔵 [MDI] Patient overrides:', patientOverrides);
+
+    const requestPayload = {
+      orderId: orderIdForCase,
+      clinicId: domainClinic.id,
+      patientOverrides
+    };
+
+    console.log('🔵 [MDI] Request payload:', JSON.stringify(requestPayload, null, 2));
 
     try {
+      console.log('🔵 [MDI] Calling POST /md/cases...');
       const result = await apiCall('/md/cases', {
         method: 'POST',
-        body: JSON.stringify({
-          orderId: orderIdForCase,
-          clinicId: domainClinic.id,
-          patientOverrides: {
-            firstName: answers['firstName'],
-            lastName: answers['lastName'],
-            email: answers['email'],
-            phoneNumber: answers['mobile'],
-            dob: answers['dob'] || answers['dateOfBirth'],
-            gender: answers['gender'],
-          }
-        })
+        body: JSON.stringify(requestPayload)
       });
 
+      console.log('🔵 [MDI] Response:', JSON.stringify(result, null, 2));
+
       if (result.success) {
-        console.log('✅ MD Integrations case created:', result.data);
+        if (result.data?.skipped) {
+          console.log('⚠️ [MDI] Backend skipped MDI case creation:', (result as any).message || 'No message');
+        } else {
+          console.log('✅ [MDI] MD Integrations case created successfully!');
+          console.log('✅ [MDI] Case ID:', result.data?.caseId);
+        }
       } else {
-        console.error('❌ Failed to create MD case:', result);
+        console.error('❌ [MDI] Failed to create MD case:', result);
       }
-    } catch (error) {
-      console.error('❌ Error creating MD case:', error);
+    } catch (error: any) {
+      console.error('❌ [MDI] Error creating MD case:', error);
+      console.error('❌ [MDI] Error details:', {
+        message: error?.message,
+        response: error?.response?.data,
+        status: error?.response?.status
+      });
       // Don't fail the checkout flow, just log the error
     }
+
+    console.log('🔵 [MDI] ========== END ==========');
   }, [domainClinic, answers]);
 
   const handlePaymentSuccess = useCallback(async () => {
+    console.log('🎉 [CHECKOUT] ========== PAYMENT SUCCESS ==========');
+    console.log('🎉 [CHECKOUT] Payment Intent ID:', paymentIntentId);
+    console.log('🎉 [CHECKOUT] Order ID:', orderId);
+    console.log('🎉 [CHECKOUT] User ID:', userId);
+    console.log('🎉 [CHECKOUT] Account Created:', accountCreated);
+
     try {
       if (!paymentIntentId) throw new Error('No payment intent ID');
       setPaymentStatus('succeeded');
+      console.log('🎉 [CHECKOUT] Payment status set to succeeded');
+
+      console.log('🎉 [CHECKOUT] Triggering checkout sequence...');
       await triggerCheckoutSequenceRun();
+      console.log('🎉 [CHECKOUT] Checkout sequence triggered');
+
+      console.log('🎉 [CHECKOUT] Tracking conversion...');
       await trackConversion(paymentIntentId, orderId || undefined);
+      console.log('🎉 [CHECKOUT] Conversion tracked');
 
       // Create MD Integrations case if clinic uses md-integrations format
       if (orderId) {
+        console.log('🎉 [CHECKOUT] Order ID exists, attempting MDI case creation...');
         await createMDCase(orderId);
+      } else {
+        console.log('⚠️ [CHECKOUT] No order ID available for MDI case creation');
       }
+
+      console.log('🎉 [CHECKOUT] ========== CHECKOUT COMPLETE ==========');
     } catch (error) {
+      console.error('❌ [CHECKOUT] Payment success handler error:', error);
       setPaymentStatus('failed');
       alert('Payment authorization failed. Please contact support.');
     }
-  }, [paymentIntentId, orderId, triggerCheckoutSequenceRun, trackConversion, createMDCase]);
+  }, [paymentIntentId, orderId, userId, accountCreated, triggerCheckoutSequenceRun, trackConversion, createMDCase]);
 
   const handlePaymentError = useCallback((error: string) => {
     setPaymentStatus('failed');
