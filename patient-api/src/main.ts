@@ -16727,6 +16727,90 @@ async function startServer() {
     }
   );
 
+  // ============= MD INTEGRATIONS ADMIN ENDPOINTS =============
+
+  // List all available MDI offerings (treatment types/services)
+  // Use this to find offering IDs for mapping your products
+  app.get("/md/admin/offerings", authenticateJWT, async (req, res) => {
+    try {
+      const currentUser = getCurrentUser(req);
+      if (!currentUser) {
+        return res.status(401).json({ success: false, message: "Unauthorized" });
+      }
+
+      const MDAuthService = (
+        await import("./services/mdIntegration/MDAuth.service")
+      ).default;
+      const MDCaseService = (
+        await import("./services/mdIntegration/MDCase.service")
+      ).default;
+
+      const tokenResponse = await MDAuthService.generateToken();
+      const offerings = await MDCaseService.listOfferings(tokenResponse.access_token);
+
+      console.log(`[MD-ADMIN] Listed ${offerings?.length || 0} offerings`);
+
+      return res.json({ 
+        success: true, 
+        data: offerings,
+        count: offerings?.length || 0,
+        hint: "Use the 'offering_id' field when creating cases with case_offerings parameter"
+      });
+    } catch (error: any) {
+      console.error("❌ Error listing MDI offerings:", error?.response?.data || error?.message || error);
+      return res.status(500).json({ 
+        success: false, 
+        message: "Failed to list MDI offerings",
+        error: error?.response?.data?.message || error?.message
+      });
+    }
+  });
+
+  // List available MDI products (medications/services that can be prescribed)
+  // These are from DoseSpot's drug database
+  app.get("/md/admin/products", authenticateJWT, async (req, res) => {
+    try {
+      const currentUser = getCurrentUser(req);
+      if (!currentUser) {
+        return res.status(401).json({ success: false, message: "Unauthorized" });
+      }
+
+      const { page, per_page, search } = req.query as any;
+
+      const MDAuthService = (
+        await import("./services/mdIntegration/MDAuth.service")
+      ).default;
+      const MDCaseService = (
+        await import("./services/mdIntegration/MDCase.service")
+      ).default;
+
+      const tokenResponse = await MDAuthService.generateToken();
+      const products = await MDCaseService.listProducts(tokenResponse.access_token, {
+        page: page ? parseInt(page) : undefined,
+        per_page: per_page ? parseInt(per_page) : undefined,
+        search: search || undefined,
+      });
+
+      console.log(`[MD-ADMIN] Listed products`, { 
+        search, 
+        count: products?.data?.length || products?.length || 0 
+      });
+
+      return res.json({ 
+        success: true, 
+        data: products,
+        hint: "These are medications/services available through DoseSpot. Clinicians prescribe from this catalog."
+      });
+    } catch (error: any) {
+      console.error("❌ Error listing MDI products:", error?.response?.data || error?.message || error);
+      return res.status(500).json({ 
+        success: false, 
+        message: "Failed to list MDI products",
+        error: error?.response?.data?.message || error?.message
+      });
+    }
+  });
+
   // ============= MD INTEGRATIONS WEBHOOKS =============
 
   // MD Integrations Webhook (raw body required for signature verification)

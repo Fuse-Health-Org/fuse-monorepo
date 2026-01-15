@@ -124,6 +124,48 @@ class MDCaseService {
 
     return response.data;
   }
+
+  /**
+   * List all available offerings for the partner
+   * These are the treatment types/services you can use when creating cases
+   */
+  async listOfferings(accessToken: string): Promise<any[]> {
+    const response = await axios.get<any>(
+      resolveMdIntegrationsBaseUrl('/partner/offerings'),
+      {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    // API might return { data: [...] } or just [...]
+    return response.data?.data || response.data || [];
+  }
+
+  /**
+   * List all available products/services that can be prescribed
+   * These are the actual medications/services available through DoseSpot
+   */
+  async listProducts(accessToken: string, params?: { page?: number; per_page?: number; search?: string }): Promise<any> {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append('page', String(params.page));
+    if (params?.per_page) queryParams.append('per_page', String(params.per_page));
+    if (params?.search) queryParams.append('search', params.search);
+
+    const url = resolveMdIntegrationsBaseUrl('/partner/products') + 
+      (queryParams.toString() ? `?${queryParams.toString()}` : '');
+
+    const response = await axios.get<any>(url, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    return response.data;
+  }
 }
 
 export default new MDCaseService();
