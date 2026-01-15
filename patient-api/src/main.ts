@@ -13873,10 +13873,10 @@ app.post("/md/cases", async (req, res) => {
     // Skip MDI if clinic doesn't use md-integrations format
     if (!clinic || (clinic as any).patientPortalDashboardFormat !== 'md-integrations') {
       console.log('ℹ️ Skipping MD Integrations - clinic uses fuse dashboard format');
-      return res.json({ 
-        success: true, 
-        message: 'MD Integrations skipped (clinic uses fuse format)', 
-        data: { skipped: true } 
+      return res.json({
+        success: true,
+        message: 'MD Integrations skipped (clinic uses fuse format)',
+        data: { skipped: true }
       });
     }
 

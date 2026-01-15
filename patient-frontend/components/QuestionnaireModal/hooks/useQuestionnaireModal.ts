@@ -58,16 +58,16 @@ export function useQuestionnaireModal(
 
   // Affiliate tracking: Derive affiliate slug from URL using extractClinicSlugFromDomain
   const [affiliateSlug, setAffiliateSlug] = useState<string | null>(null);
-  
+
   useEffect(() => {
     const detectAffiliateSlug = async () => {
       if (typeof window === 'undefined') return;
-      
+
       try {
         // Import dynamically to avoid circular dependency
         const { extractClinicSlugFromDomain } = await import('../../../lib/clinic-utils');
         const domainInfo = await extractClinicSlugFromDomain();
-        
+
         // Use affiliateSlug from domain detection (works for subdomains AND custom domains)
         if (domainInfo.affiliateSlug) {
           setAffiliateSlug(domainInfo.affiliateSlug);
@@ -77,7 +77,7 @@ export function useQuestionnaireModal(
         console.error('❌ Error detecting affiliate slug:', error);
       }
     };
-    
+
     detectAffiliateSlug();
   }, []);
 
@@ -205,7 +205,7 @@ export function useQuestionnaireModal(
   const getCurrentStage = useCallback((): 'product' | 'payment' | 'account' => {
     if (isCheckoutStep()) return 'payment';
     const currentStep = getCurrentQuestionnaireStep();
-    
+
     console.log('📊 [getCurrentStage] Current step analysis:', {
       currentStepIndex,
       currentStep: currentStep ? {
@@ -216,7 +216,7 @@ export function useQuestionnaireModal(
       isCheckoutStep: isCheckoutStep(),
       isSignedIn: accountCreated || userId,
     });
-    
+
     // Only consider "account" stage if the step title indicates account creation
     // (e.g., "Create Your Account", not "Location Verification")
     const isSignedIn = accountCreated || userId;
@@ -227,7 +227,7 @@ export function useQuestionnaireModal(
         return 'account';
       }
     }
-    
+
     return 'product';
   }, [isCheckoutStep, getCurrentQuestionnaireStep, currentStepIndex, accountCreated, userId]);
 
@@ -665,7 +665,7 @@ export function useQuestionnaireModal(
       setPaymentStatus('succeeded');
       await triggerCheckoutSequenceRun();
       await trackConversion(paymentIntentId, orderId || undefined);
-      
+
       // Create MD Integrations case if clinic uses md-integrations format
       if (orderId) {
         await createMDCase(orderId);
@@ -775,7 +775,7 @@ export function useQuestionnaireModal(
   // Program product toggle - handles both single_choice and multiple_choice modes
   const handleProgramProductToggle = useCallback((productId: string) => {
     const offerType = programData?.productOfferType || programData?.medicalTemplate?.productOfferType || 'multiple_choice';
-    
+
     if (offerType === 'single_choice') {
       // In single_choice mode, selecting a product deselects all others
       setSelectedProgramProducts(prev => {
@@ -801,15 +801,15 @@ export function useQuestionnaireModal(
   // Create program subscription with dynamic pricing
   const createProgramSubscription = useCallback(async () => {
     if (!programData) return null;
-    
+
     try {
       setPaymentStatus('processing');
-      
+
       // Calculate total from selected products + non-medical services fee
       const selectedProductsList = programData.products.filter(p => selectedProgramProducts[p.id]);
       const productsTotal = selectedProductsList.reduce((sum, p) => sum + p.displayPrice, 0);
       const totalAmount = productsTotal + programData.nonMedicalServicesFee;
-      
+
       const userDetails = {
         firstName: answers['firstName'],
         lastName: answers['lastName'],
@@ -817,7 +817,7 @@ export function useQuestionnaireModal(
         phoneNumber: answers['mobile']
       };
       const questionnaireAnswersData = buildQuestionnaireAnswers(answers);
-      
+
       const requestBody = {
         programId: programData.id,
         selectedProductIds: selectedProductsList.map(p => p.id),
@@ -831,14 +831,14 @@ export function useQuestionnaireModal(
         clinicName: domainClinic?.name,
         isProgramSubscription: true,
       };
-      
+
       console.log('🚀 Creating program subscription:', requestBody);
-      
-      const result = await apiCall('/payments/program/sub', { 
-        method: 'POST', 
-        body: JSON.stringify(requestBody) 
+
+      const result = await apiCall('/payments/program/sub', {
+        method: 'POST',
+        body: JSON.stringify(requestBody)
       });
-      
+
       if (result.success && result.data) {
         const subscriptionData = result.data.data || result.data;
         if (subscriptionData.clientSecret) {

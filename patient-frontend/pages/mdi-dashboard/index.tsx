@@ -1,10 +1,11 @@
-import React from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Button, Avatar, Card, CardBody, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from "@heroui/react";
+import { Button, Avatar, Card, CardBody, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, Chip, Spinner } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { ProtectedRoute } from "../../components/ProtectedRoute";
 import { useAuth } from "../../contexts/AuthContext";
 import { getAvatarEmoji } from "../../lib/avatarUtils";
+import { authApi } from "../../lib/api";
 
 /**
  * MDI Dashboard - MD Integrations Portal
@@ -118,90 +119,567 @@ function MDISidebar({
   );
 }
 
-function MDIDashboardContent() {
+function MDIDashboardContent({ setActiveTab }: { setActiveTab: (tab: string) => void }) {
+  const { user } = useAuth();
+  const [cases, setCases] = useState<MDCase[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchCases = async () => {
+      try {
+        const response = await authApi.get('/md/offerings');
+        if (response.data?.success && response.data?.data) {
+          const mdiCases = response.data.data.filter((c: MDCase) => c.caseId);
+          setCases(mdiCases);
+        }
+      } catch (err) {
+        console.error('Error fetching cases:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchCases();
+  }, []);
+
+  const pendingCases = cases.filter(c => c.classification === 'pending');
+  const approvedCases = cases.filter(c => c.classification === 'approved');
+  const latestCase = cases[0];
+
   return (
     <div className="max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold mb-2">MD Integrations Dashboard</h1>
+      <h1 className="text-2xl font-bold mb-2">
+        Welcome back, {user?.firstName || 'there'}!
+      </h1>
       <p className="text-foreground-500 mb-8">
-        Telehealth prescriptions powered by MD Integrations
+        Here's an overview of your prescription cases
       </p>
 
-      {/* Coming Soon Card */}
-      <Card className="bg-content2">
-        <CardBody className="p-8 text-center">
-          <div className="w-16 h-16 rounded-full bg-secondary/20 flex items-center justify-center mx-auto mb-4">
-            <Icon icon="lucide:stethoscope" className="text-3xl text-secondary" />
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <Card className="bg-content1">
+          <CardBody className="p-4">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-lg bg-secondary/10 flex items-center justify-center">
+                <Icon icon="lucide:file-text" className="text-xl text-secondary" />
+              </div>
+              <div>
+                <div className="text-2xl font-bold">{loading ? '-' : cases.length}</div>
+                <div className="text-sm text-foreground-500">Total Cases</div>
+              </div>
+            </div>
+          </CardBody>
+        </Card>
+
+        <Card className="bg-content1">
+          <CardBody className="p-4">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-lg bg-warning/10 flex items-center justify-center">
+                <Icon icon="lucide:clock" className="text-xl text-warning" />
+              </div>
+              <div>
+                <div className="text-2xl font-bold">{loading ? '-' : pendingCases.length}</div>
+                <div className="text-sm text-foreground-500">Pending Review</div>
+              </div>
+            </div>
+          </CardBody>
+        </Card>
+
+        <Card className="bg-content1">
+          <CardBody className="p-4">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-lg bg-success/10 flex items-center justify-center">
+                <Icon icon="lucide:check-circle" className="text-xl text-success" />
+              </div>
+              <div>
+                <div className="text-2xl font-bold">{loading ? '-' : approvedCases.length}</div>
+                <div className="text-sm text-foreground-500">Approved</div>
+              </div>
+            </div>
+          </CardBody>
+        </Card>
+      </div>
+
+      {/* Latest Case */}
+      {latestCase && (
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold">Latest Case</h2>
+            <Button
+              variant="light"
+              size="sm"
+              endContent={<Icon icon="lucide:arrow-right" />}
+              onPress={() => setActiveTab('cases')}
+            >
+              View All
+            </Button>
           </div>
-          <h2 className="text-xl font-semibold mb-2">Coming Soon</h2>
-          <p className="text-foreground-500 max-w-md mx-auto mb-6">
-            This dashboard will integrate with MD Integrations to provide telehealth 
-            prescription services with licensed clinicians.
-          </p>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
-            <FeatureCard
-              icon="lucide:user-check"
-              title="Patient Registration"
-              description="Sync patient data with MD Integrations"
-            />
-            <FeatureCard
-              icon="lucide:file-text"
-              title="Case Management"
-              description="Create and track prescription cases"
-            />
-            <FeatureCard
-              icon="lucide:message-circle"
-              title="Clinician Chat"
-              description="Message with assigned clinicians"
-            />
-          </div>
-        </CardBody>
-      </Card>
+          <Card className="bg-content1">
+            <CardBody className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-lg bg-secondary/10 flex items-center justify-center">
+                    <Icon icon="lucide:pill" className="text-xl text-secondary" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold">
+                      {latestCase.tenantProduct?.name || latestCase.title || 'Prescription Case'}
+                    </h3>
+                    <p className="text-sm text-foreground-500">
+                      Created {new Date(latestCase.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+                <Chip
+                  color={getStatusConfig(latestCase.status, latestCase.classification).color}
+                  variant="flat"
+                  size="sm"
+                >
+                  {getStatusConfig(latestCase.status, latestCase.classification).label}
+                </Chip>
+              </div>
+            </CardBody>
+          </Card>
+        </div>
+      )}
+
+      {/* Quick Actions */}
+      <div>
+        <h2 className="text-lg font-semibold mb-4">Quick Actions</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card
+            isPressable
+            className="bg-content1 hover:bg-content2 transition-colors"
+            onPress={() => setActiveTab('cases')}
+          >
+            <CardBody className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-secondary/10 flex items-center justify-center">
+                  <Icon icon="lucide:file-text" className="text-lg text-secondary" />
+                </div>
+                <div>
+                  <h3 className="font-medium">View Cases</h3>
+                  <p className="text-xs text-foreground-500">Track prescription status</p>
+                </div>
+              </div>
+            </CardBody>
+          </Card>
+
+          <Card
+            isPressable
+            className="bg-content1 hover:bg-content2 transition-colors"
+            onPress={() => setActiveTab('messages')}
+          >
+            <CardBody className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-secondary/10 flex items-center justify-center">
+                  <Icon icon="lucide:message-circle" className="text-lg text-secondary" />
+                </div>
+                <div>
+                  <h3 className="font-medium">Messages</h3>
+                  <p className="text-xs text-foreground-500">Chat with clinicians</p>
+                </div>
+              </div>
+            </CardBody>
+          </Card>
+
+          <Card
+            isPressable
+            className="bg-content1 hover:bg-content2 transition-colors"
+            onPress={() => setActiveTab('account')}
+          >
+            <CardBody className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-secondary/10 flex items-center justify-center">
+                  <Icon icon="lucide:user" className="text-lg text-secondary" />
+                </div>
+                <div>
+                  <h3 className="font-medium">Account</h3>
+                  <p className="text-xs text-foreground-500">Manage your profile</p>
+                </div>
+              </div>
+            </CardBody>
+          </Card>
+        </div>
+      </div>
+
+      {/* Empty State for new users */}
+      {!loading && cases.length === 0 && (
+        <Card className="bg-content2 mt-8">
+          <CardBody className="p-8 text-center">
+            <div className="w-16 h-16 rounded-full bg-secondary/20 flex items-center justify-center mx-auto mb-4">
+              <Icon icon="lucide:stethoscope" className="text-3xl text-secondary" />
+            </div>
+            <h2 className="text-xl font-semibold mb-2">Get Started</h2>
+            <p className="text-foreground-500 max-w-md mx-auto mb-6">
+              Complete a product checkout to create your first prescription case.
+              Our clinicians will review and approve your prescriptions.
+            </p>
+          </CardBody>
+        </Card>
+      )}
     </div>
   );
+}
+
+interface MDCase {
+  orderId: string;
+  orderNumber: string;
+  caseId: string | null;
+  title: string;
+  status: string;
+  orderStatus: string;
+  classification: 'approved' | 'pending';
+  createdAt: string;
+  updatedAt: string;
+  tenantProduct: {
+    id: string;
+    name: string;
+    description: string | null;
+    category: string | null;
+  } | null;
+  mdOfferingsCount: number;
+}
+
+function getStatusConfig(status: string, classification: string) {
+  const statusLower = status?.toLowerCase() || '';
+  const classLower = classification?.toLowerCase() || '';
+
+  if (classLower === 'approved' || statusLower === 'completed' || statusLower === 'shipped') {
+    return { color: 'success' as const, label: 'Approved', icon: 'lucide:check-circle' };
+  }
+  if (statusLower === 'cancelled' || statusLower === 'rejected') {
+    return { color: 'danger' as const, label: 'Cancelled', icon: 'lucide:x-circle' };
+  }
+  if (statusLower === 'processing' || statusLower === 'in_review') {
+    return { color: 'warning' as const, label: 'In Review', icon: 'lucide:clock' };
+  }
+  return { color: 'default' as const, label: 'Pending', icon: 'lucide:hourglass' };
 }
 
 function MDICasesContent() {
+  const [cases, setCases] = useState<MDCase[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchCases = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await authApi.get('/md/offerings');
+      if (response.data?.success && response.data?.data) {
+        // Filter to only show orders that have an mdCaseId (actual MDI cases)
+        const mdiCases = response.data.data.filter((c: MDCase) => c.caseId);
+        setCases(mdiCases);
+      }
+    } catch (err: any) {
+      console.error('Error fetching cases:', err);
+      setError(err.message || 'Failed to load cases');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchCases();
+  }, [fetchCases]);
+
+  if (loading) {
+    return (
+      <div className="max-w-4xl mx-auto flex items-center justify-center py-20">
+        <Spinner size="lg" color="secondary" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-4xl mx-auto">
+        <Card className="bg-danger-50 border border-danger-200">
+          <CardBody className="p-6 text-center">
+            <Icon icon="lucide:alert-circle" className="text-3xl text-danger mx-auto mb-2" />
+            <p className="text-danger">{error}</p>
+            <Button color="danger" variant="flat" size="sm" className="mt-4" onPress={fetchCases}>
+              Try Again
+            </Button>
+          </CardBody>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold mb-2">My Cases</h1>
-      <p className="text-foreground-500 mb-8">
-        Track your prescription cases and their status
-      </p>
-
-      <Card className="bg-content2">
-        <CardBody className="p-8 text-center">
-          <div className="w-16 h-16 rounded-full bg-secondary/20 flex items-center justify-center mx-auto mb-4">
-            <Icon icon="lucide:file-text" className="text-3xl text-secondary" />
-          </div>
-          <h2 className="text-xl font-semibold mb-2">No Cases Yet</h2>
-          <p className="text-foreground-500 max-w-md mx-auto">
-            Your prescription cases will appear here once you start using MD Integrations.
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold mb-1">My Cases</h1>
+          <p className="text-foreground-500">
+            Track your prescription cases and their status
           </p>
-        </CardBody>
-      </Card>
+        </div>
+        <Button
+          variant="flat"
+          size="sm"
+          startContent={<Icon icon="lucide:refresh-cw" />}
+          onPress={fetchCases}
+        >
+          Refresh
+        </Button>
+      </div>
+
+      {cases.length === 0 ? (
+        <Card className="bg-content2">
+          <CardBody className="p-8 text-center">
+            <div className="w-16 h-16 rounded-full bg-secondary/20 flex items-center justify-center mx-auto mb-4">
+              <Icon icon="lucide:file-text" className="text-3xl text-secondary" />
+            </div>
+            <h2 className="text-xl font-semibold mb-2">No Cases Yet</h2>
+            <p className="text-foreground-500 max-w-md mx-auto">
+              Your prescription cases will appear here after you complete a checkout.
+            </p>
+          </CardBody>
+        </Card>
+      ) : (
+        <div className="space-y-4">
+          {cases.map((caseItem) => {
+            const statusConfig = getStatusConfig(caseItem.status, caseItem.classification);
+            return (
+              <Card key={caseItem.orderId} className="bg-content1 hover:bg-content2 transition-colors">
+                <CardBody className="p-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-4">
+                      <div className="w-12 h-12 rounded-lg bg-secondary/10 flex items-center justify-center flex-shrink-0">
+                        <Icon icon="lucide:pill" className="text-xl text-secondary" />
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="font-semibold text-foreground mb-1">
+                          {caseItem.tenantProduct?.name || caseItem.title || 'Prescription Case'}
+                        </h3>
+                        <div className="flex flex-wrap items-center gap-2 text-sm text-foreground-500">
+                          <span className="flex items-center gap-1">
+                            <Icon icon="lucide:hash" className="text-xs" />
+                            {caseItem.orderNumber || caseItem.orderId.slice(0, 8)}
+                          </span>
+                          <span className="text-foreground-300">•</span>
+                          <span className="flex items-center gap-1">
+                            <Icon icon="lucide:calendar" className="text-xs" />
+                            {new Date(caseItem.createdAt).toLocaleDateString()}
+                          </span>
+                          {caseItem.caseId && (
+                            <>
+                              <span className="text-foreground-300">•</span>
+                              <span className="flex items-center gap-1 text-xs font-mono bg-content2 px-2 py-0.5 rounded">
+                                Case: {caseItem.caseId.slice(0, 8)}...
+                              </span>
+                            </>
+                          )}
+                        </div>
+                        {caseItem.tenantProduct?.category && (
+                          <div className="mt-2">
+                            <Chip size="sm" variant="flat" className="text-xs">
+                              {caseItem.tenantProduct.category}
+                            </Chip>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-2">
+                      <Chip
+                        color={statusConfig.color}
+                        variant="flat"
+                        size="sm"
+                        startContent={<Icon icon={statusConfig.icon} className="text-sm" />}
+                      >
+                        {statusConfig.label}
+                      </Chip>
+                    </div>
+                  </div>
+                </CardBody>
+              </Card>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
 
-function MDIMessagesContent() {
-  return (
-    <div className="max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold mb-2">Messages</h1>
-      <p className="text-foreground-500 mb-8">
-        Communicate with your assigned clinicians
-      </p>
+interface Message {
+  id: string;
+  patient_id: string;
+  channel: string;
+  text: string;
+  user_type: string;
+  user_id: string;
+  created_at: string;
+  user: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    specialty?: string;
+    profile_url?: string;
+  };
+}
 
-      <Card className="bg-content2">
-        <CardBody className="p-8 text-center">
-          <div className="w-16 h-16 rounded-full bg-secondary/20 flex items-center justify-center mx-auto mb-4">
-            <Icon icon="lucide:message-circle" className="text-3xl text-secondary" />
-          </div>
-          <h2 className="text-xl font-semibold mb-2">No Messages</h2>
-          <p className="text-foreground-500 max-w-md mx-auto">
-            Messages from clinicians will appear here.
-          </p>
+function MDIMessagesContent() {
+  const { user } = useAuth();
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [newMessage, setNewMessage] = useState('');
+  const [sending, setSending] = useState(false);
+
+  const fetchMessages = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await authApi.get('/messages', {
+        params: { channel: 'support', per_page: 50 }
+      });
+      if (response.data?.success && response.data?.data) {
+        setMessages(response.data.data);
+      }
+    } catch (err: any) {
+      console.error('Error fetching messages:', err);
+      // Don't show error if it's just empty messages
+      if (err.response?.status !== 404) {
+        setError(err.message || 'Failed to load messages');
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchMessages();
+  }, [fetchMessages]);
+
+  const handleSendMessage = async () => {
+    if (!newMessage.trim() || sending) return;
+
+    try {
+      setSending(true);
+      await authApi.post('/messages', {
+        channel: 'support',
+        text: newMessage.trim()
+      });
+      setNewMessage('');
+      await fetchMessages(); // Refresh messages
+    } catch (err: any) {
+      console.error('Error sending message:', err);
+      alert('Failed to send message. Please try again.');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="max-w-4xl mx-auto flex items-center justify-center py-20">
+        <Spinner size="lg" color="secondary" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-4xl mx-auto flex flex-col h-[calc(100vh-200px)]">
+      <div className="mb-4">
+        <h1 className="text-2xl font-bold mb-1">Messages</h1>
+        <p className="text-foreground-500">
+          Communicate with your assigned clinicians
+        </p>
+      </div>
+
+      <Card className="flex-1 flex flex-col overflow-hidden">
+        <CardBody className="flex-1 overflow-y-auto p-4">
+          {error ? (
+            <div className="text-center py-8">
+              <Icon icon="lucide:alert-circle" className="text-3xl text-danger mx-auto mb-2" />
+              <p className="text-danger">{error}</p>
+              <Button color="danger" variant="flat" size="sm" className="mt-4" onPress={fetchMessages}>
+                Try Again
+              </Button>
+            </div>
+          ) : messages.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="w-16 h-16 rounded-full bg-secondary/20 flex items-center justify-center mx-auto mb-4">
+                <Icon icon="lucide:message-circle" className="text-3xl text-secondary" />
+              </div>
+              <h2 className="text-lg font-semibold mb-2">No Messages Yet</h2>
+              <p className="text-foreground-500 max-w-sm mx-auto">
+                Start a conversation with your clinician. They'll respond to any questions about your prescriptions.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {messages.map((msg) => {
+                const isFromUser = msg.user_type === 'patient' || msg.user_id === user?.id;
+                return (
+                  <div
+                    key={msg.id}
+                    className={`flex ${isFromUser ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div className={`max-w-[80%] ${isFromUser ? 'order-2' : 'order-1'}`}>
+                      {!isFromUser && (
+                        <div className="flex items-center gap-2 mb-1">
+                          <Avatar
+                            size="sm"
+                            name={`${msg.user.first_name} ${msg.user.last_name}`}
+                            src={msg.user.profile_url}
+                          />
+                          <span className="text-sm font-medium">
+                            Dr. {msg.user.first_name} {msg.user.last_name}
+                          </span>
+                          {msg.user.specialty && (
+                            <span className="text-xs text-foreground-400">
+                              {msg.user.specialty}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      <div
+                        className={`rounded-2xl px-4 py-2 ${
+                          isFromUser
+                            ? 'bg-secondary text-white rounded-br-md'
+                            : 'bg-content2 text-foreground rounded-bl-md'
+                        }`}
+                      >
+                        <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
+                      </div>
+                      <p className={`text-xs text-foreground-400 mt-1 ${isFromUser ? 'text-right' : ''}`}>
+                        {new Date(msg.created_at).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </CardBody>
+
+        {/* Message Input */}
+        <div className="border-t border-content3 p-4">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
+              placeholder="Type a message..."
+              className="flex-1 bg-content2 border border-content3 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-secondary"
+              disabled={sending}
+            />
+            <Button
+              color="secondary"
+              isIconOnly
+              onPress={handleSendMessage}
+              isLoading={sending}
+              isDisabled={!newMessage.trim()}
+            >
+              <Icon icon="lucide:send" />
+            </Button>
+          </div>
+        </div>
       </Card>
     </div>
   );
@@ -295,7 +773,7 @@ function MDIDashboardPage() {
   const renderContent = () => {
     switch (activeTab) {
       case "dashboard":
-        return <MDIDashboardContent />;
+        return <MDIDashboardContent setActiveTab={setActiveTab} />;
       case "cases":
         return <MDICasesContent />;
       case "messages":
@@ -303,7 +781,7 @@ function MDIDashboardPage() {
       case "account":
         return <MDIAccountContent />;
       default:
-        return <MDIDashboardContent />;
+        return <MDIDashboardContent setActiveTab={setActiveTab} />;
     }
   };
 
