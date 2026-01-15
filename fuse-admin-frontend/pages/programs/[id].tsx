@@ -121,6 +121,7 @@ export default function ProgramEditor() {
     // Clinic info for building form URLs
     const [clinicSlug, setClinicSlug] = useState<string | null>(null)
     const [clinicCustomDomain, setClinicCustomDomain] = useState<string | null>(null)
+    const [dashboardPrefix, setDashboardPrefix] = useState<string>('/fuse-dashboard')
     
     // Enabled forms for each product
     const [enabledForms, setEnabledForms] = useState<EnabledForm[]>([])
@@ -167,6 +168,9 @@ export default function ProgramEditor() {
                     if (data.success && data.data) {
                         setClinicSlug(data.data.slug)
                         setClinicCustomDomain(data.data.customDomain || null)
+                        // Set dashboard prefix based on clinic's patientPortalDashboardFormat
+                        const format = data.data.patientPortalDashboardFormat || 'fuse'
+                        setDashboardPrefix(format === 'md-integrations' ? '/mdi-dashboard' : '/fuse-dashboard')
                     }
                 }
             } catch (err) {
@@ -473,7 +477,7 @@ export default function ProgramEditor() {
     const buildFormUrls = (formId: string, productSlug: string | undefined | null) => {
         if (!formId || !productSlug || !clinicSlug) return null
 
-        const isLocalhost = process.env.NODE_ENV !== 'production'
+        const isLocalhost = typeof window !== 'undefined' && window.location.hostname === 'localhost'
         const protocol = isLocalhost ? 'http' : 'https'
 
         // Standard subdomain URL (always available)
@@ -482,12 +486,12 @@ export default function ProgramEditor() {
         const subdomainBase = isLocalhost
             ? `http://${clinicSlug}.localhost:3000`
             : `https://${clinicSlug}.${baseDomain}`
-        const subdomainUrl = `${subdomainBase}/my-products/${formId}/${productSlug}`
+        const subdomainUrl = `${subdomainBase}${dashboardPrefix}/my-products/${formId}/${productSlug}`
 
         // Custom domain URL (if configured)
         let customDomainUrl = null
         if (clinicCustomDomain) {
-            customDomainUrl = `${protocol}://${clinicCustomDomain}/my-products/${formId}/${productSlug}`
+            customDomainUrl = `${protocol}://${clinicCustomDomain}${dashboardPrefix}/my-products/${formId}/${productSlug}`
         }
 
         return {
@@ -1341,10 +1345,10 @@ export default function ProgramEditor() {
                                     ? `http://${clinicSlug}.localhost:3000`
                                     : `https://${clinicSlug}.${baseDomain}`
                                 
-                                // Use program ID in the URL
-                                const programUrl = `${subdomainBase}/my-products/${id}/program`
+                                // Use program ID in the URL with dashboard prefix
+                                const programUrl = `${subdomainBase}${dashboardPrefix}/my-products/${id}/program`
                                 const customProgramUrl = clinicCustomDomain 
-                                    ? `${protocol}://${clinicCustomDomain}/my-products/${id}/program`
+                                    ? `${protocol}://${clinicCustomDomain}${dashboardPrefix}/my-products/${id}/program`
                                     : null
 
                                 return (

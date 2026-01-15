@@ -2649,6 +2649,7 @@ app.get("/clinic/:id", authenticateJWT, async (req, res) => {
         logo: clinic.logo,
         customDomain: (clinic as any).customDomain,
         isCustomDomain: (clinic as any).isCustomDomain,
+        patientPortalDashboardFormat: (clinic as any).patientPortalDashboardFormat || "fuse",
       },
     });
   } catch (error) {

@@ -121,6 +121,7 @@ export default function CustomProductEditor() {
     })
     const [clinicSlug, setClinicSlug] = useState<string | null>(null)
     const [clinicCustomDomain, setClinicCustomDomain] = useState<string | null>(null)
+    const [dashboardPrefix, setDashboardPrefix] = useState<string>('/fuse-dashboard')
     const [customizations, setCustomizations] = useState<Record<string, { customColor?: string | null; isActive: boolean }>>({})
     const [colorPickerOpen, setColorPickerOpen] = useState<string | null>(null)
 
@@ -390,6 +391,9 @@ export default function CustomProductEditor() {
                     if (data.success && data.data) {
                         setClinicSlug(data.data.slug)
                         setClinicCustomDomain(data.data.customDomain || null)
+                        // Set dashboard prefix based on clinic's patientPortalDashboardFormat
+                        const format = data.data.patientPortalDashboardFormat || 'fuse'
+                        setDashboardPrefix(format === 'md-integrations' ? '/mdi-dashboard' : '/fuse-dashboard')
                     }
                 }
             } catch (err) {
@@ -2398,11 +2402,11 @@ export default function CustomProductEditor() {
         const subdomainBase = isLocalhost
             ? `http://${clinicSlug}.localhost:3000`
             : `https://${clinicSlug}.${baseDomain}`
-        const subdomainUrl = `${subdomainBase}/my-products/${formId}/${product.slug}`
+        const subdomainUrl = `${subdomainBase}${dashboardPrefix}/my-products/${formId}/${product.slug}`
 
         let customDomainUrl = null
         if (clinicCustomDomain) {
-            customDomainUrl = `${protocol}://${clinicCustomDomain}/my-products/${formId}/${product.slug}`
+            customDomainUrl = `${protocol}://${clinicCustomDomain}${dashboardPrefix}/my-products/${formId}/${product.slug}`
         }
 
         return {
