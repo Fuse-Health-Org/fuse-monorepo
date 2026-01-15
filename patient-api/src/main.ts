@@ -13839,24 +13839,14 @@ app.get("/md/cases/latest", authenticateJWT, async (req, res) => {
 });
 
 // Create an MD Integrations Case directly after checkout
-// Public endpoint; attempts auth if provided, otherwise infers user from orderId
+// Called from frontend after payment success for clinics using md-integrations dashboard format
 app.post("/md/cases", async (req, res) => {
   try {
-    // TEMPORARY: Skip MD Integrations entirely
-    console.log("⚠️ MD Integrations SKIPPED - endpoint disabled temporarily");
-    return res.json({
-      success: true,
-      message: "MD Integrations skipped (disabled)",
-      data: { skipped: true },
-    });
-
-    // COMMENTED OUT - MD Integrations disabled temporarily
-    /*
     let currentUser: any = null;
     try {
       currentUser = getCurrentUser(req);
     } catch { }
-    const { orderId, patientOverrides } = req.body || {};
+    const { orderId, patientOverrides, clinicId } = req.body || {};
 
     if (!orderId || typeof orderId !== 'string') {
       return res.status(400).json({ success: false, message: "orderId is required" });
@@ -13867,6 +13857,30 @@ app.post("/md/cases", async (req, res) => {
     if (!order) {
       return res.status(404).json({ success: false, message: "Order not found" });
     }
+
+    // Check if the clinic uses md-integrations dashboard format
+    // Get clinic from order's user or from provided clinicId
+    let clinic: any = null;
+    if (clinicId) {
+      clinic = await Clinic.findByPk(clinicId);
+    } else if ((order as any).userId) {
+      const orderUser = await User.findByPk((order as any).userId);
+      if (orderUser && orderUser.clinicId) {
+        clinic = await Clinic.findByPk(orderUser.clinicId);
+      }
+    }
+
+    // Skip MDI if clinic doesn't use md-integrations format
+    if (!clinic || (clinic as any).patientPortalDashboardFormat !== 'md-integrations') {
+      console.log('ℹ️ Skipping MD Integrations - clinic uses fuse dashboard format');
+      return res.json({ 
+        success: true, 
+        message: 'MD Integrations skipped (clinic uses fuse format)', 
+        data: { skipped: true } 
+      });
+    }
+
+    console.log('🏥 Processing MD Integrations for clinic:', clinic.name);
 
     // If no authenticated user, infer from order
     if (!currentUser) {
@@ -13911,12 +13925,12 @@ app.post("/md/cases", async (req, res) => {
       const emailAns = findAnswer(['email']);
 
       if (process.env.NODE_ENV === 'development') {
-  console.log('MD Case: extracted fields from QA', {
-    hasDob: Boolean(dob),
-    hasGender: Boolean(genderAns),
-    hasPhone: Boolean(phoneAns)
-  });
-}
+        console.log('MD Case: extracted fields from QA', {
+          hasDob: Boolean(dob),
+          hasGender: Boolean(genderAns),
+          hasPhone: Boolean(phoneAns)
+        });
+      }
 
       const updatePayload: Partial<User> = {} as any;
       if (!user.dob && dob) (updatePayload as any).dob = dob;
@@ -13942,6 +13956,7 @@ app.post("/md/cases", async (req, res) => {
         await user.reload();
       }
 
+      // Sync patient with MD Integrations (creates mdPatientId if doesn't exist)
       const userService = new UserService();
       await userService.syncPatientInMD(user.id, (order as any).shippingAddressId);
       await user.reload();
@@ -14047,17 +14062,20 @@ app.post("/md/cases", async (req, res) => {
       (casePayload as any).case_offerings = offeringIds;
     }
 
+    console.log('🚀 Creating MD Integrations case with payload:', JSON.stringify(casePayload, null, 2));
+
     const caseResponse = await MDCaseService.createCase(casePayload, tokenResponse.access_token);
 
     await order.update({ mdCaseId: (caseResponse as any).case_id });
 
+    console.log('✅ MD Integrations case created:', (caseResponse as any).case_id);
+
     return res.json({ success: true, message: 'MD case created', data: { caseId: (caseResponse as any).case_id } });
-    */
   } catch (error) {
     if (process.env.NODE_ENV === "development") {
-      console.error("❌ Error creating latest MD case:", error);
+      console.error("❌ Error creating MD case:", error);
     } else {
-      console.error("❌ Error creating latest MD case");
+      console.error("❌ Error creating MD case");
     }
     return res
       .status(500)

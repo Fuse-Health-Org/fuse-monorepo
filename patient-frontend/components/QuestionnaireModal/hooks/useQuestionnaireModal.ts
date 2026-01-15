@@ -621,17 +621,60 @@ export function useQuestionnaireModal(
     }
   }, [domainClinic, paymentIntentId, orderId, selectedPlan, answers, shippingInfo, selectedProducts]);
 
+  // Create MD Integrations case after payment (only for md-integrations clinics)
+  const createMDCase = useCallback(async (orderIdForCase: string) => {
+    // Only proceed if clinic uses md-integrations dashboard format
+    if (!domainClinic || (domainClinic as any).patientPortalDashboardFormat !== 'md-integrations') {
+      console.log('ℹ️ Skipping MD case creation - clinic uses fuse format');
+      return;
+    }
+
+    console.log('🏥 Creating MD Integrations case for order:', orderIdForCase);
+
+    try {
+      const result = await apiCall('/md/cases', {
+        method: 'POST',
+        body: JSON.stringify({
+          orderId: orderIdForCase,
+          clinicId: domainClinic.id,
+          patientOverrides: {
+            firstName: answers['firstName'],
+            lastName: answers['lastName'],
+            email: answers['email'],
+            phoneNumber: answers['mobile'],
+            dob: answers['dob'] || answers['dateOfBirth'],
+            gender: answers['gender'],
+          }
+        })
+      });
+
+      if (result.success) {
+        console.log('✅ MD Integrations case created:', result.data);
+      } else {
+        console.error('❌ Failed to create MD case:', result);
+      }
+    } catch (error) {
+      console.error('❌ Error creating MD case:', error);
+      // Don't fail the checkout flow, just log the error
+    }
+  }, [domainClinic, answers]);
+
   const handlePaymentSuccess = useCallback(async () => {
     try {
       if (!paymentIntentId) throw new Error('No payment intent ID');
       setPaymentStatus('succeeded');
       await triggerCheckoutSequenceRun();
       await trackConversion(paymentIntentId, orderId || undefined);
+      
+      // Create MD Integrations case if clinic uses md-integrations format
+      if (orderId) {
+        await createMDCase(orderId);
+      }
     } catch (error) {
       setPaymentStatus('failed');
       alert('Payment authorization failed. Please contact support.');
     }
-  }, [paymentIntentId, orderId, triggerCheckoutSequenceRun, trackConversion]);
+  }, [paymentIntentId, orderId, triggerCheckoutSequenceRun, trackConversion, createMDCase]);
 
   const handlePaymentError = useCallback((error: string) => {
     setPaymentStatus('failed');
