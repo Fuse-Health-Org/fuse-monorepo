@@ -12744,8 +12744,8 @@ app.get("/payouts/tenant", authenticateJWT, async (req, res) => {
               doctorName: doctorUser
                 ? `${doctorUser.firstName || ""} ${doctorUser.lastName || ""}`.trim()
                 : doctorPhysician
-                ? `${doctorPhysician.firstName || ""} ${doctorPhysician.lastName || ""}`.trim()
-                : "Unknown",
+                  ? `${doctorPhysician.firstName || ""} ${doctorPhysician.lastName || ""}`.trim()
+                  : "Unknown",
               doctorEmail: doctorUser?.email || doctorPhysician?.email || "",
               totalAmount: 0,
               orderCount: 0,
