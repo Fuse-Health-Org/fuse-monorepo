@@ -13762,13 +13762,134 @@ app.get("/md/cases/:caseId", authenticateJWT, async (req, res) => {
     const mdCase = await MDCaseService.getCase(
       caseId,
       tokenResponse.access_token
-    );
+    ) as any;
+
+    // Log MD case response to see available fields (dev only)
+    if (process.env.NODE_ENV === "development") {
+      console.log("[MD-CASE] Full case response fields:", Object.keys(mdCase || {}));
+      console.log("[MD-CASE] Case status/hold fields:", {
+        status: mdCase?.status,
+        case_status: mdCase?.case_status,
+        hold_status: mdCase?.hold_status,
+        is_waiting: mdCase?.is_waiting,
+        waiting_for: mdCase?.waiting_for,
+        pending_requirements: mdCase?.pending_requirements,
+        requirements: mdCase?.requirements,
+      });
+    }
+
+    // Also fetch patient data to check if driver's license / intro video is uploaded
+    const MDPatientService = (
+      await import("./services/mdIntegration/MDPatient.service")
+    ).default;
+    
+    let patientData: any = null;
+    const patientId = mdCase?.patient?.patient_id || mdCase?.patient_id;
+    if (patientId) {
+      try {
+        patientData = await MDPatientService.getPatient(patientId, tokenResponse.access_token);
+        if (process.env.NODE_ENV === "development") {
+          console.log("[MD-CASE] Patient verification status:", {
+            patient_id: patientId,
+            has_driver_license: !!patientData?.driver_license,
+            has_intro_video: !!patientData?.intro_video,
+            auth_link: patientData?.auth_link,
+          });
+        }
+      } catch (e) {
+        console.warn("[MD-CASE] Failed to fetch patient data:", e);
+      }
+    }
 
     // Also fetch stored prescriptions/offerings from our database
     const order = await Order.findOne({ where: { mdCaseId: caseId, userId: currentUser.id } });
     const storedPrescriptions = (order as any)?.mdPrescriptions || [];
     const storedOfferings = (order as any)?.mdOfferings || [];
-    const pendingActions = (order as any)?.mdPendingActions || null;
+    const storedPendingActions = (order as any)?.mdPendingActions || {};
+
+    // Extract pending requirements from MD API response
+    // MD may include status or requirements info in the case response
+    const mdPendingRequirements: any = {};
+    
+    // Check various possible fields where MD might indicate pending requirements
+    if (mdCase?.status === 'waiting' || mdCase?.case_status === 'waiting' || mdCase?.is_waiting) {
+      // Case is waiting for something
+      if (mdCase?.waiting_for === 'drivers_license' || mdCase?.waiting_for?.includes?.('license')) {
+        mdPendingRequirements.driversLicense = {
+          accessLink: mdCase?.drivers_license_url || mdCase?.verification_url || null,
+          requestedAt: mdCase?.updated_at || new Date().toISOString(),
+          fromApi: true,
+        };
+      }
+      if (mdCase?.waiting_for === 'intro_video' || mdCase?.waiting_for?.includes?.('video')) {
+        mdPendingRequirements.introVideo = {
+          accessLink: mdCase?.intro_video_url || mdCase?.video_url || null,
+          requestedAt: mdCase?.updated_at || new Date().toISOString(),
+          fromApi: true,
+        };
+      }
+    }
+
+    // Check for explicit requirements array
+    if (Array.isArray(mdCase?.requirements) || Array.isArray(mdCase?.pending_requirements)) {
+      const reqs = mdCase?.requirements || mdCase?.pending_requirements || [];
+      for (const req of reqs) {
+        const reqType = req?.type || req?.name || req;
+        if (typeof reqType === 'string') {
+          if (reqType.toLowerCase().includes('license') || reqType.toLowerCase().includes('id')) {
+            mdPendingRequirements.driversLicense = {
+              accessLink: req?.url || req?.access_link || null,
+              requestedAt: req?.created_at || new Date().toISOString(),
+              fromApi: true,
+            };
+          }
+          if (reqType.toLowerCase().includes('video')) {
+            mdPendingRequirements.introVideo = {
+              accessLink: req?.url || req?.access_link || null,
+              requestedAt: req?.created_at || new Date().toISOString(),
+              fromApi: true,
+            };
+          }
+        }
+      }
+    }
+
+    // Check patient data for missing verification
+    // If driver_license or intro_video is null but was requested, show as pending
+    if (patientData) {
+      // If patient has no driver's license uploaded and we have an auth link or webhook data
+      if (!patientData.driver_license && !mdPendingRequirements.driversLicense) {
+        // Check if there's an auth_link from patient data we can use
+        if (patientData.auth_link || storedPendingActions.driversLicense?.accessLink) {
+          mdPendingRequirements.driversLicense = {
+            accessLink: storedPendingActions.driversLicense?.accessLink || patientData.auth_link,
+            requestedAt: storedPendingActions.driversLicense?.requestedAt || new Date().toISOString(),
+            fromApi: true,
+            missingVerification: true,
+          };
+        }
+      }
+      // Similarly for intro video
+      if (!patientData.intro_video && !mdPendingRequirements.introVideo) {
+        if (storedPendingActions.introVideo?.accessLink) {
+          mdPendingRequirements.introVideo = {
+            accessLink: storedPendingActions.introVideo.accessLink,
+            requestedAt: storedPendingActions.introVideo.requestedAt || new Date().toISOString(),
+            fromApi: true,
+            missingVerification: true,
+          };
+        }
+      }
+    }
+
+    // Merge: prefer webhook-stored data (has access link), fall back to API data
+    const pendingActions = {
+      driversLicense: storedPendingActions.driversLicense || mdPendingRequirements.driversLicense || null,
+      introVideo: storedPendingActions.introVideo || mdPendingRequirements.introVideo || null,
+    };
+
+    // Only include if there's actually something pending
+    const hasPendingActions = pendingActions.driversLicense || pendingActions.introVideo;
 
     // HIPAA Audit: Log PHI access (viewing telehealth case details)
     await AuditService.logFromRequest(req, {
@@ -13788,7 +13909,7 @@ app.get("/md/cases/:caseId", authenticateJWT, async (req, res) => {
         orderNumber: (order as any)?.orderNumber,
         orderStatus: (order as any)?.status,
         approvedByDoctor: (order as any)?.approvedByDoctor || false,
-        pendingActions,
+        pendingActions: hasPendingActions ? pendingActions : null,
       }
     });
   } catch (error) {
@@ -15271,7 +15392,7 @@ async function startServer() {
         // Get stored prescriptions
         const mdPrescriptions = (order as any).mdPrescriptions as any[] | null | undefined;
         const hasPrescriptions = Array.isArray(mdPrescriptions) && mdPrescriptions.length > 0;
-        
+
         // Get pending actions
         const mdPendingActions = (order as any).mdPendingActions || null;
 
