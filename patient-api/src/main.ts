@@ -14145,39 +14145,54 @@ app.post("/md/cases", async (req, res) => {
       });
     }
 
-    // Resolve offering to use
+    // Resolve offering to use - priority: product.mdOfferingId > product.mdCaseId > config > sandbox default
     let offeringIds: { offering_id: string }[] = [];
-    try {
-      const mdConfig = (await import('./services/mdIntegration/config')).mdIntegrationsConfig;
-      if (mdConfig.defaultOfferingId) {
-        offeringIds = [{ offering_id: mdConfig.defaultOfferingId }];
-      }
-    } catch { }
+    let offeringSource = 'none';
 
-    if (offeringIds.length === 0) {
-      // Try to infer from environment or product metadata
-      if (process.env.NODE_ENV !== 'production') {
-        // Known sandbox offering for development
-        offeringIds = [{ offering_id: '3c3d0118-e362-4466-9c92-d852720c5a41' }];
-      } else {
-        // Try from related product (via tenantProduct)
-        let inferredOfferingId: string | undefined;
-        try {
-          if ((order as any).tenantProductId) {
-            const tenantProduct = await TenantProduct.findByPk((order as any).tenantProductId, {
-              include: [{ model: Product, as: 'product', required: false }] as any
-            } as any);
-            const product = tenantProduct && (tenantProduct as any).product;
-            if (product && product.mdCaseId) {
-              inferredOfferingId = product.mdCaseId;
-            }
-          }
-        } catch { }
-        if (inferredOfferingId) {
-          offeringIds = [{ offering_id: inferredOfferingId }];
+    // First, try to get offering from the product linked to this order
+    try {
+      if ((order as any).tenantProductId) {
+        const tenantProduct = await TenantProduct.findByPk((order as any).tenantProductId, {
+          include: [{ model: Product, as: 'product', required: false }] as any
+        } as any);
+        const product = tenantProduct && (tenantProduct as any).product;
+        
+        // Check for new mdOfferingId field first
+        if (product && product.mdOfferingId) {
+          offeringIds = [{ offering_id: product.mdOfferingId }];
+          offeringSource = `product.mdOfferingId (${product.mdOfferingName || product.name})`;
+        }
+        // Fall back to legacy mdCaseId field
+        else if (product && product.mdCaseId) {
+          offeringIds = [{ offering_id: product.mdCaseId }];
+          offeringSource = `product.mdCaseId (legacy)`;
         }
       }
+    } catch (e) {
+      console.warn('[MD-CASE] Error getting product offering:', e);
     }
+
+    // Fall back to config default
+    if (offeringIds.length === 0) {
+      try {
+        const mdConfig = (await import('./services/mdIntegration/config')).mdIntegrationsConfig;
+        if (mdConfig.defaultOfferingId) {
+          offeringIds = [{ offering_id: mdConfig.defaultOfferingId }];
+          offeringSource = 'config.defaultOfferingId';
+        }
+      } catch { }
+    }
+
+    // Fall back to sandbox default for development
+    if (offeringIds.length === 0 && process.env.NODE_ENV !== 'production') {
+      offeringIds = [{ offering_id: '3c3d0118-e362-4466-9c92-d852720c5a41' }];
+      offeringSource = 'sandbox default';
+    }
+
+    console.log('[MD-CASE] Resolved offering:', { 
+      offeringId: offeringIds[0]?.offering_id || 'none',
+      source: offeringSource 
+    });
 
     // Build case questions from stored questionnaire answers
     const { extractCaseQuestions } = await import('./utils/questionnaireAnswers');
@@ -16868,6 +16883,265 @@ async function startServer() {
       return res.status(500).json({
         success: false,
         message: "Failed to clear driver license",
+        error: error?.message
+      });
+    }
+  });
+
+  // Get MDI offering linked to a product
+  app.get("/md/admin/products/:productId/offering", authenticateJWT, async (req, res) => {
+    try {
+      const currentUser = getCurrentUser(req);
+      if (!currentUser) {
+        return res.status(401).json({ success: false, message: "Unauthorized" });
+      }
+
+      const { productId } = req.params;
+      const product = await Product.findByPk(productId);
+
+      if (!product) {
+        return res.status(404).json({ success: false, message: "Product not found" });
+      }
+
+      if (!product.mdOfferingId) {
+        return res.json({
+          success: true,
+          data: {
+            hasOffering: false,
+            product: {
+              id: product.id,
+              name: product.name,
+              description: product.description,
+              categories: product.categories,
+            }
+          }
+        });
+      }
+
+      // Fetch the offering details from MDI
+      const MDAuthService = (await import("./services/mdIntegration/MDAuth.service")).default;
+      const MDCaseService = (await import("./services/mdIntegration/MDCase.service")).default;
+
+      const tokenResponse = await MDAuthService.generateToken();
+      const offerings = await MDCaseService.listOfferings(tokenResponse.access_token);
+
+      const linkedOffering = offerings.find((o: any) => 
+        o.offering_id === product.mdOfferingId || o.id === product.mdOfferingId
+      );
+
+      return res.json({
+        success: true,
+        data: {
+          hasOffering: true,
+          offeringId: product.mdOfferingId,
+          offeringName: product.mdOfferingName || linkedOffering?.name || linkedOffering?.title,
+          offering: linkedOffering || null,
+          product: {
+            id: product.id,
+            name: product.name,
+            description: product.description,
+            categories: product.categories,
+          }
+        }
+      });
+    } catch (error: any) {
+      console.error("❌ Error getting product MDI offering:", error?.message || error);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to get product MDI offering",
+        error: error?.message
+      });
+    }
+  });
+
+  // Link an existing MDI offering to a product
+  app.post("/md/admin/products/:productId/offering/link", authenticateJWT, async (req, res) => {
+    try {
+      const currentUser = getCurrentUser(req);
+      if (!currentUser) {
+        return res.status(401).json({ success: false, message: "Unauthorized" });
+      }
+
+      const { productId } = req.params;
+      const { offeringId } = req.body;
+
+      if (!offeringId) {
+        return res.status(400).json({ success: false, message: "offeringId is required" });
+      }
+
+      const product = await Product.findByPk(productId);
+      if (!product) {
+        return res.status(404).json({ success: false, message: "Product not found" });
+      }
+
+      // Verify the offering exists in MDI
+      const MDAuthService = (await import("./services/mdIntegration/MDAuth.service")).default;
+      const MDCaseService = (await import("./services/mdIntegration/MDCase.service")).default;
+
+      const tokenResponse = await MDAuthService.generateToken();
+      const offerings = await MDCaseService.listOfferings(tokenResponse.access_token);
+
+      const offering = offerings.find((o: any) => 
+        o.offering_id === offeringId || o.id === offeringId
+      );
+
+      if (!offering) {
+        return res.status(404).json({ success: false, message: "MDI offering not found" });
+      }
+
+      // Update the product
+      await product.update({
+        mdOfferingId: offering.offering_id || offering.id,
+        mdOfferingName: offering.name || offering.title,
+      });
+
+      console.log(`[MD-ADMIN] Linked product ${product.name} to MDI offering ${offering.name || offering.title}`);
+
+      return res.json({
+        success: true,
+        message: "Product linked to MDI offering",
+        data: {
+          productId: product.id,
+          productName: product.name,
+          offeringId: product.mdOfferingId,
+          offeringName: product.mdOfferingName,
+        }
+      });
+    } catch (error: any) {
+      console.error("❌ Error linking product to MDI offering:", error?.message || error);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to link product to MDI offering",
+        error: error?.message
+      });
+    }
+  });
+
+  // Unlink MDI offering from a product
+  app.delete("/md/admin/products/:productId/offering", authenticateJWT, async (req, res) => {
+    try {
+      const currentUser = getCurrentUser(req);
+      if (!currentUser) {
+        return res.status(401).json({ success: false, message: "Unauthorized" });
+      }
+
+      const { productId } = req.params;
+      const product = await Product.findByPk(productId);
+
+      if (!product) {
+        return res.status(404).json({ success: false, message: "Product not found" });
+      }
+
+      await product.update({
+        mdOfferingId: null,
+        mdOfferingName: null,
+      });
+
+      console.log(`[MD-ADMIN] Unlinked product ${product.name} from MDI offering`);
+
+      return res.json({
+        success: true,
+        message: "Product unlinked from MDI offering",
+      });
+    } catch (error: any) {
+      console.error("❌ Error unlinking product from MDI offering:", error?.message || error);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to unlink product from MDI offering",
+        error: error?.message
+      });
+    }
+  });
+
+  // Create a new MDI offering from product data
+  app.post("/md/admin/products/:productId/offering/create", authenticateJWT, async (req, res) => {
+    try {
+      const currentUser = getCurrentUser(req);
+      if (!currentUser) {
+        return res.status(401).json({ success: false, message: "Unauthorized" });
+      }
+
+      const { productId } = req.params;
+      const product = await Product.findByPk(productId);
+
+      if (!product) {
+        return res.status(404).json({ success: false, message: "Product not found" });
+      }
+
+      if (product.mdOfferingId) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Product already has an MDI offering linked",
+          existingOfferingId: product.mdOfferingId,
+          existingOfferingName: product.mdOfferingName,
+        });
+      }
+
+      const MDAuthService = (await import("./services/mdIntegration/MDAuth.service")).default;
+      const { resolveMdIntegrationsBaseUrl } = await import("./services/mdIntegration/config");
+
+      const tokenResponse = await MDAuthService.generateToken();
+
+      // Create the offering in MDI
+      const offeringData = {
+        name: product.name,
+        title: product.name,
+        description: product.description || `Treatment for ${product.name}`,
+        // Add any other required fields based on MDI API requirements
+      };
+
+      console.log(`[MD-ADMIN] Creating MDI offering for product ${product.name}:`, offeringData);
+
+      const response = await fetch(
+        resolveMdIntegrationsBaseUrl('/partner/offerings'),
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${tokenResponse.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(offeringData)
+        }
+      );
+
+      const data: any = await response.json();
+
+      if (!response.ok) {
+        console.error("❌ Error creating MDI offering:", data);
+        return res.status(response.status).json({
+          success: false,
+          message: "Failed to create MDI offering",
+          error: data?.message || data?.error || data
+        });
+      }
+
+      const newOfferingId = data.offering_id || data.id;
+      const newOfferingName = data.name || data.title || product.name;
+
+      // Update the product with the new offering ID
+      await product.update({
+        mdOfferingId: newOfferingId,
+        mdOfferingName: newOfferingName,
+      });
+
+      console.log(`[MD-ADMIN] Created MDI offering ${newOfferingName} (${newOfferingId}) for product ${product.name}`);
+
+      return res.json({
+        success: true,
+        message: "MDI offering created and linked to product",
+        data: {
+          productId: product.id,
+          productName: product.name,
+          offeringId: newOfferingId,
+          offeringName: newOfferingName,
+          offering: data,
+        }
+      });
+    } catch (error: any) {
+      console.error("❌ Error creating MDI offering:", error?.message || error);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to create MDI offering",
         error: error?.message
       });
     }

@@ -14,6 +14,7 @@ import { CATEGORY_OPTIONS } from "@fuse/enums"
 import { ProductDetailsEditor } from "@/components/products/ProductDetailsEditor"
 import { NoFormAttached } from "@/components/products/NoFormAttached"
 import { PharmacyStateManager } from "@/components/products/PharmacyStateManager"
+import { MDIOfferingManager } from "@/components/products/MDIOfferingManager"
 
 interface Step {
   id: string
@@ -2154,6 +2155,14 @@ export default function ProductEditor() {
             product={product}
             onUpdate={handleUpdateProduct}
           />
+
+          {/* MD Integrations Offering */}
+          {product && (
+            <MDIOfferingManager 
+              productId={product.id} 
+              productName={product.name}
+            />
+          )}
 
           {/* Pharmacy & State Coverage */}
           {product && (
