@@ -244,6 +244,7 @@ class MDWebhookService {
   }
 
   // This event will be dispatched when a treatment is approved and ready to be ordered, depending on the offering type:
+  // NOTE: We save offerings here but do NOT trigger pharmacy orders yet - we wait for prescription_submitted
   async handleOfferingSubmitted(eventData: OfferingSubmittedEvent): Promise<void> {
     console.log('[MD-WH] 🩺 offering_submitted start', { case_id: eventData.case_id, offerings_count: eventData.offerings?.length });
 
@@ -268,10 +269,12 @@ class MDWebhookService {
         console.warn('[MD-WH] ⚠️ failed to save offerings from payload', e);
       }
 
-      // Approve the order with the assigned physician
-      const orderService = new OrderService();
-      await orderService.approveOrder(order.id);
-      console.log('[MD-WH] ✅ order approved', { orderNumber: order.orderNumber });
+      // Mark order as processing (clinician has approved, waiting for prescription to be finalized)
+      await order.updateStatus(OrderStatus.PROCESSING);
+      console.log('[MD-WH] 🔄 order marked processing (waiting for prescription_submitted)', { orderNumber: order.orderNumber });
+
+      // NOTE: We do NOT call approveOrder() here anymore.
+      // Pharmacy orders are triggered by prescription_submitted webhook when the Rx is finalized.
 
     } catch (error) {
       console.error('[MD-WH] ❌ offering_submitted error', error);
@@ -527,24 +530,26 @@ class MDWebhookService {
         console.log('[MD-WH] ✅ case_approved', { case_id: eventData.case_id });
         const order = await findOrderForEvent(eventData as GenericCaseEvent);
         if (!order) break;
-        try {
-          const orderService = new OrderService();
-          await orderService.approveOrder(order.id);
-          console.log('[MD-WH] order approval attempted after case_approved', { orderNumber: order.orderNumber });
-        } catch (e) {
-          console.error('[MD-WH] ❌ approve after case_approved failed', e);
-        }
+        // Mark as processing - pharmacy order will be triggered by prescription_submitted
+        await order.updateStatus(OrderStatus.PROCESSING);
+        console.log('[MD-WH] 🔄 order marked processing after case_approved (waiting for prescription_submitted)', { orderNumber: order.orderNumber });
+        
+        // NOTE: We do NOT call approveOrder() here anymore.
+        // Pharmacy orders are triggered by prescription_submitted webhook when the Rx is finalized.
         break;
       }
 
       case 'prescription_submitted': {
-        console.log('[MD-WH] 💊 prescription_submitted', { case_id: eventData.case_id });
+        console.log('[MD-WH] 💊 prescription_submitted - PRESCRIPTION APPROVED!', { case_id: eventData.case_id });
         const order = await findOrderForEvent(eventData as GenericCaseEvent);
-        if (!order) break;
-        await order.updateStatus(OrderStatus.PROCESSING);
-        console.log('[MD-WH] order marked processing after prescription submission', { orderNumber: order.orderNumber });
+        if (!order) {
+          console.log('[MD-WH] ⚠️ no order for prescription_submitted', { case_id: eventData.case_id });
+          break;
+        }
+        
+        console.log('[MD-WH] 💊 processing prescription for order', { orderNumber: order.orderNumber });
 
-        // Persist prescriptions/offerings from payload if present
+        // Persist prescriptions/offerings from payload - THIS IS THE ACTUAL Rx DATA
         try {
           const payloadPrescriptions = (eventData as any)?.prescriptions;
           const payloadOfferings = (eventData as any)?.offerings ?? (eventData as any)?.services;
@@ -561,14 +566,16 @@ class MDWebhookService {
 
             if (Array.isArray(payloadPrescriptions)) {
               payloadPrescriptions.forEach((p: any, idx: number) => {
-                console.log('[MD-WH] 💊 prescription(payload)', {
+                console.log('[MD-WH] 💊 prescription details', {
                   idx,
                   id: p?.id,
                   title: p?.title ?? p?.name,
                   directions: p?.directions,
                   quantity: p?.quantity,
                   refills: p?.refills,
-                  product_id: p?.product_id
+                  days_supply: p?.days_supply,
+                  pharmacy_notes: p?.pharmacy_notes,
+                  dosespot_prescription_id: p?.dosespot_prescription_id
                 });
               });
             }
@@ -584,6 +591,17 @@ class MDWebhookService {
           } catch (e) {
             console.warn('[MD-WH] ⚠️ fetch after prescription_submitted failed', e);
           }
+        }
+
+        // NOW approve the order and send to pharmacy (IronSail)
+        // This is the correct trigger - prescription is finalized and ready
+        try {
+          const orderService = new OrderService();
+          await orderService.approveOrder(order.id);
+          console.log('[MD-WH] ✅ order approved and sent to pharmacy after prescription_submitted', { orderNumber: order.orderNumber });
+        } catch (approveError) {
+          console.error('[MD-WH] ❌ failed to approve order after prescription_submitted', approveError);
+          // Don't throw - the prescription is saved, we can retry pharmacy order later
         }
         break;
       }

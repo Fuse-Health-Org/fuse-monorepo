@@ -138,7 +138,7 @@ export class StripeConnectService {
       try {
         const account = await stripe.accounts.retrieve(accountId);
         console.log(`✅ Account ${accountId} verified, type: ${account.type}`);
-        
+
         // Update existing account to ensure it has the right capabilities
         await this.updateAccountCapabilities(accountId, merchantModel);
       } catch (error: any) {
@@ -155,7 +155,12 @@ export class StripeConnectService {
       const accountSession = await stripe.accountSessions.create({
         account: accountId,
         components: {
-          account_onboarding: { enabled: true },
+          account_onboarding: {
+            enabled: true,
+            features: {
+              external_account_collection: true,
+            },
+          },
           payments: {
             enabled: true,
             features: {
@@ -352,6 +357,10 @@ export class StripeConnectService {
       refresh_url: refreshUrl,
       return_url: returnUrl,
       type: 'account_onboarding',
+      collection_options: {
+        fields: 'eventually_due',
+        future_requirements: 'include',
+      },
     });
 
     return accountLink.url;

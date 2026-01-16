@@ -18212,7 +18212,7 @@ app.get("/public/brand-products/:clinicSlug/:slug", async (req, res) => {
     // Determine questionnaire
     let questionnaireId =
       selectedForm?.questionnaireId || tenantProduct?.questionnaireId || null;
-    
+
     console.log('[brand-products] Questionnaire sources:', {
       productId: product.id,
       productSlug: product.slug,
@@ -18221,7 +18221,7 @@ app.get("/public/brand-products/:clinicSlug/:slug", async (req, res) => {
       tenantProductQuestionnaireId: tenantProduct?.questionnaireId,
       initialQuestionnaireId: questionnaireId,
     });
-    
+
     try {
       const productQuestionnaire = await Questionnaire.findOne({
         where: {
@@ -18246,7 +18246,7 @@ app.get("/public/brand-products/:clinicSlug/:slug", async (req, res) => {
         console.error("Error finding product questionnaire");
       }
     }
-    
+
     console.log('[brand-products] Final questionnaireId:', questionnaireId);
 
     const categories = Array.isArray((product as any).categories)

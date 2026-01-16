@@ -29,6 +29,38 @@ interface IronSailOrderData {
     shippingInfo: string;
     memo: string;
     orderDate: string;
+    // MDI Prescription fields
+    ndc?: string;
+    pharmacyNotes?: string;
+    mdiClinicianName?: string;
+    isMdiPrescription: boolean;
+}
+
+// MDI Offering/Product structure from webhook
+interface MDIOfferingProduct {
+    ndc?: string | null;
+    name?: string;
+    title?: string;
+    quantity?: string;
+    directions?: string;
+    days_supply?: number | null;
+    refills?: number;
+    dispense_unit?: string;
+    pharmacy_notes?: string;
+    pharmacy_id?: string | null;
+    pharmacy_name?: string | null;
+    force_pharmacy?: boolean;
+}
+
+interface MDIOffering {
+    id?: string;
+    case_offering_id?: string;
+    title?: string;
+    name?: string;
+    directions?: string;
+    status?: string;
+    product?: MDIOfferingProduct;
+    product_id?: string;
 }
 
 class IronSailOrderService {
@@ -172,6 +204,53 @@ class IronSailOrderService {
             dob: patient?.dob
         });
 
+        // Check for MDI prescription data
+        const mdOfferings = (order as any).mdOfferings as MDIOffering[] | undefined;
+        const mdPrescriptions = (order as any).mdPrescriptions as any[] | undefined;
+        const hasMdiData = Boolean((mdOfferings && mdOfferings.length > 0) || (mdPrescriptions && mdPrescriptions.length > 0));
+
+        // Get the first MDI offering/prescription (or match by product name if multiple)
+        let mdiOffering: MDIOffering | undefined;
+        let mdiProduct: MDIOfferingProduct | undefined;
+
+        if (mdOfferings && mdOfferings.length > 0) {
+            // Try to match by product name if coverage has a custom name
+            const coverageName = coverage?.pharmacyCoverage?.customName?.toLowerCase();
+            if (coverageName) {
+                mdiOffering = mdOfferings.find(o => 
+                    o.title?.toLowerCase().includes(coverageName) ||
+                    o.name?.toLowerCase().includes(coverageName) ||
+                    o.product?.name?.toLowerCase().includes(coverageName) ||
+                    o.product?.title?.toLowerCase().includes(coverageName)
+                );
+            }
+            // Fallback to first offering
+            if (!mdiOffering) {
+                mdiOffering = mdOfferings[0];
+            }
+            mdiProduct = mdiOffering?.product;
+        }
+
+        // Log MDI prescription data for debugging
+        if (hasMdiData) {
+            console.log('💊 [IronSail] MDI Prescription data found:', {
+                orderNumber: order.orderNumber,
+                offeringsCount: mdOfferings?.length || 0,
+                prescriptionsCount: mdPrescriptions?.length || 0,
+                selectedOffering: mdiOffering ? {
+                    title: mdiOffering.title || mdiOffering.name,
+                    directions: mdiOffering.directions || mdiProduct?.directions,
+                    quantity: mdiProduct?.quantity,
+                    daysSupply: mdiProduct?.days_supply,
+                    refills: mdiProduct?.refills,
+                    ndc: mdiProduct?.ndc,
+                    pharmacyNotes: mdiProduct?.pharmacy_notes,
+                } : 'none'
+            });
+        } else {
+            console.log('📋 [IronSail] No MDI prescription data, using coverage/product defaults');
+        }
+
         // Format gender
         const gender = patient?.gender ?
             patient.gender.charAt(0).toUpperCase() + patient.gender.slice(1) : '';
@@ -179,16 +258,28 @@ class IronSailOrderService {
         // Format DOB
         const dob = patient?.dob ? new Date(patient.dob).toISOString().split('T')[0] : '';
 
-        // Use SIG from product placeholder first, then pharmacy coverage, then fallback to order notes or default
-        const sig = product?.placeholderSig ||
+        // Priority for SIG: MDI directions > product placeholder > pharmacy coverage > order notes > default
+        const sig = mdiOffering?.directions ||
+            mdiProduct?.directions ||
+            product?.placeholderSig ||
             coverage?.pharmacyCoverage?.customSig ||
             coverage?.sig ||
             order.doctorNotes ||
             order.notes ||
             `Take as directed by your healthcare provider`;
 
-        // Dispense format
-        const dispense = `${quantity} ${product?.medicationSize || 'Unit'}`;
+        // Priority for quantity/dispense: MDI quantity > order quantity
+        const mdiQuantity = mdiProduct?.quantity;
+        const dispenseUnit = mdiProduct?.dispense_unit || product?.medicationSize || 'Unit';
+        const dispense = mdiQuantity 
+            ? `${mdiQuantity} ${dispenseUnit}`
+            : `${quantity} ${dispenseUnit}`;
+
+        // Priority for days supply: MDI days_supply > default 30
+        const daysSupply = mdiProduct?.days_supply?.toString() || '30';
+
+        // Priority for refills: MDI refills > default 2
+        const refills = mdiProduct?.refills?.toString() || '2';
 
         // Use patient address if available, otherwise fall back to shipping address
         const address = patient?.address || shippingAddr?.address || '';
@@ -206,6 +297,11 @@ class IronSailOrderService {
             source: patient?.address ? 'patient' : 'shipping'
         });
 
+        // Build memo with MDI info if available
+        const memo = hasMdiData 
+            ? `MDI Prescription - ${mdiOffering?.status || 'Approved'}`
+            : 'Order approved';
+
         return {
             orderNumber: order.orderNumber,
             patientFirstName: patient?.firstName || '',
@@ -219,17 +315,22 @@ class IronSailOrderService {
             patientState: state,
             patientZipCode: zipCode,
             patientCountry: 'USA',
-            productName: coverage?.pharmacyCoverage?.customName || coverage?.pharmacyProductName || product?.name || 'Unknown Product',
+            productName: mdiOffering?.title || mdiOffering?.name || mdiProduct?.name || coverage?.pharmacyCoverage?.customName || coverage?.pharmacyProductName || product?.name || 'Unknown Product',
             productSKU: coverage?.pharmacyProductId || product?.pharmacyProductId || '',
             rxId: coverage?.rxId || '',
             medicationForm: coverage?.form || '',
             sig: sig,
             dispense: dispense,
-            daysSupply: '30',
-            refills: '2',
+            daysSupply: daysSupply,
+            refills: refills,
             shippingInfo: 'fedex_priority_overnight',
-            memo: 'Order approved',
-            orderDate: new Date(order.createdAt).toLocaleDateString('en-US')
+            memo: memo,
+            orderDate: new Date(order.createdAt).toLocaleDateString('en-US'),
+            // MDI specific fields
+            ndc: mdiProduct?.ndc || undefined,
+            pharmacyNotes: mdiProduct?.pharmacy_notes || undefined,
+            mdiClinicianName: undefined, // Could be populated from case assignment if needed
+            isMdiPrescription: hasMdiData
         };
     }
 
@@ -258,15 +359,19 @@ class IronSailOrderService {
             doc.text('+19095321861', { align: 'center' });
             doc.moveDown(1.5);
 
-            // Title
-            doc.fontSize(16).text('Electronic Prescription Order', { align: 'center', underline: true });
+            // Title - indicate if MDI prescription
+            const titleText = data.isMdiPrescription 
+                ? 'Electronic Prescription Order (MDI)'
+                : 'Electronic Prescription Order';
+            doc.fontSize(16).text(titleText, { align: 'center', underline: true });
             doc.moveDown(1.5);
 
             // === FIRST 3-COLUMN GRID ===
             let startY = doc.y;
 
-            // Left column
-            doc.fontSize(10).text('Prescriber: SHUBH DHRUV', col1, startY);
+            // Left column - show MDI clinician if available, otherwise default prescriber
+            const prescriberName = data.mdiClinicianName || 'SHUBH DHRUV';
+            doc.fontSize(10).text(`Prescriber: ${prescriberName}`, col1, startY);
             doc.text('Order', col1, doc.y);
             doc.text('Number: ' + data.orderNumber, col1, doc.y);
             doc.text('Memo: ' + data.memo, col1, doc.y);
@@ -278,6 +383,11 @@ class IronSailOrderService {
 
             // Right column
             doc.text('Date: ' + data.orderDate, col3, startY);
+            if (data.isMdiPrescription) {
+                doc.moveDown(0.5);
+                doc.fillColor('blue').text('MDI Prescription', col3, doc.y);
+                doc.fillColor('black');
+            }
 
             doc.moveDown(3);
 
@@ -327,9 +437,13 @@ class IronSailOrderService {
 
             // === THIRD GRID (Labels left, values span middle + right) ===
             startY = doc.y;
-            const labelWidth = 80;
+            const labelWidth = 100; // Slightly wider for NDC label
 
             doc.fontSize(10).text('Name:', col1, startY, { width: labelWidth });
+            // Include NDC if available
+            if (data.ndc) {
+                doc.text('NDC:', col1, doc.y, { width: labelWidth });
+            }
             doc.text('RX ID:', col1, doc.y, { width: labelWidth });
             doc.text('Medication Form:', col1, doc.y, { width: labelWidth });
             doc.text('Sig:', col1, doc.y, { width: labelWidth });
@@ -339,13 +453,24 @@ class IronSailOrderService {
 
             // Values (spanning middle + right columns) - wider for 30% increase
             const valueCol = col1 + labelWidth + 10;
-            doc.text(data.productName + ' (' + data.productSKU + ')', valueCol, startY, { width: 500 });
-            doc.text(data.rxId, valueCol, doc.y, { width: 500 });
-            doc.text(data.medicationForm, valueCol, doc.y, { width: 500 });
+            doc.text(data.productName + (data.productSKU ? ' (' + data.productSKU + ')' : ''), valueCol, startY, { width: 500 });
+            if (data.ndc) {
+                doc.text(data.ndc, valueCol, doc.y, { width: 500 });
+            }
+            doc.text(data.rxId || 'N/A', valueCol, doc.y, { width: 500 });
+            doc.text(data.medicationForm || 'N/A', valueCol, doc.y, { width: 500 });
             doc.text(data.sig, valueCol, doc.y, { width: 500 });
             doc.text(data.dispense, valueCol, doc.y, { width: 500 });
             doc.text(data.daysSupply, valueCol, doc.y, { width: 500 });
             doc.text(data.refills, valueCol, doc.y, { width: 500 });
+
+            // Add pharmacy notes section if available (from MDI)
+            if (data.pharmacyNotes) {
+                doc.moveDown(2);
+                doc.fontSize(14).text('Pharmacy Notes', 0, doc.y, { align: 'center', underline: true });
+                doc.moveDown(1);
+                doc.fontSize(10).text(data.pharmacyNotes, col1, doc.y, { width: 695 });
+            }
 
             doc.end();
         });
@@ -362,19 +487,41 @@ class IronSailOrderService {
 
         // Add coverage identifier to subject if provided (for multi-coverage products)
         const subjectSuffix = coverageIdentifier ? ` - ${coverageIdentifier}` : '';
+        
+        // Add MDI indicator to subject if this is an MDI prescription
+        const mdiIndicator = data.isMdiPrescription ? ' [MDI]' : '';
+
+        // Build pharmacy notes section if available
+        const pharmacyNotesHtml = data.pharmacyNotes 
+            ? `<p><strong>Pharmacy Notes:</strong> ${data.pharmacyNotes}</p>` 
+            : '';
+
+        // Build NDC section if available
+        const ndcHtml = data.ndc 
+            ? `<p><strong>NDC:</strong> ${data.ndc}</p>` 
+            : '';
 
         const msg: any = {
             to: recipientEmail,
             from: 'noreply@fusehealth.com',
             ...(bccEmails.length > 0 && { bcc: bccEmails }), // Only add BCC if there are emails
-            subject: `New Prescription Order ${data.orderNumber}${subjectSuffix} - ${patientFullName}`,
+            subject: `New Prescription Order ${data.orderNumber}${subjectSuffix}${mdiIndicator} - ${patientFullName}`,
             html: `
         <h2>New Electronic Prescription Order from FUSE HEALTH INC</h2>
+        ${data.isMdiPrescription ? '<p style="color: #2563eb; font-weight: bold;">📋 MDI Prescription</p>' : ''}
         <p><strong>Order Number:</strong> ${data.orderNumber}</p>
         <p><strong>Date:</strong> ${data.orderDate}</p>
         <p><strong>Patient:</strong> ${patientFullName}</p>
+        <hr style="margin: 15px 0;">
+        <h3>Prescription Details</h3>
         <p><strong>Medication:</strong> ${data.productName}</p>
+        ${ndcHtml}
+        <p><strong>SIG:</strong> ${data.sig}</p>
         <p><strong>Dispense:</strong> ${data.dispense}</p>
+        <p><strong>Days Supply:</strong> ${data.daysSupply}</p>
+        <p><strong>Refills:</strong> ${data.refills}</p>
+        ${pharmacyNotesHtml}
+        <hr style="margin: 15px 0;">
         <p><strong>Shipping:</strong> ${data.shippingInfo}</p>
         <br>
         <p>Please see the attached PDF for complete prescription details.</p>
@@ -419,7 +566,7 @@ class IronSailOrderService {
             try {
                 const headerResponse = await sheets.spreadsheets.values.get({
                     spreadsheetId: this.spreadsheetId,
-                    range: `${sheetName}!A1:Z1`,
+                    range: `${sheetName}!A1:AD1`, // Extended for MDI fields
                 });
 
                 const existingHeaders = headerResponse.data.values?.[0];
@@ -447,18 +594,21 @@ class IronSailOrderService {
                         'Patient Country',
                         'Medication Name',
                         'Product SKU',
+                        'NDC',
                         'Sig',
                         'Dispense',
                         'Days Supply',
                         'Refills',
                         'Shipping Information',
                         'Memo',
+                        'Pharmacy Notes',
+                        'MDI Prescription',
                         'Status'
                     ];
 
                     await sheets.spreadsheets.values.update({
                         spreadsheetId: this.spreadsheetId,
-                        range: `${sheetName}!A1:Z1`,
+                        range: `${sheetName}!A1:AD1`, // Extended for MDI fields
                         valueInputOption: 'USER_ENTERED',
                         requestBody: {
                             values: [headers],
@@ -472,10 +622,11 @@ class IronSailOrderService {
             }
 
             // Prepare row data
+            const prescriberName = data.mdiClinicianName || 'SHUBH DHRUV';
             const row = [
                 data.orderDate,
                 data.orderNumber,
-                'SHUBH DHRUV', // Prescriber
+                prescriberName, // Prescriber - use MDI clinician if available
                 'PA63768 (California)', // License
                 '1477329381', // NPI
                 data.patientFirstName,
@@ -492,16 +643,19 @@ class IronSailOrderService {
                 data.patientCountry,
                 data.productName,
                 data.productSKU,
+                data.ndc || '', // NDC from MDI
                 data.sig,
                 data.dispense,
                 data.daysSupply,
                 data.refills,
                 data.shippingInfo,
                 data.memo,
+                data.pharmacyNotes || '', // Pharmacy notes from MDI
+                data.isMdiPrescription ? 'Yes' : 'No', // MDI Prescription flag
                 'Pending' // Status
             ];
 
-            const appendRange = `${sheetName}!A:Z`;
+            const appendRange = `${sheetName}!A:AD`; // Extended for MDI fields
             console.log(`📝 [IronSail] Appending order data to ${appendRange}`);
 
             // Append to spreadsheet
