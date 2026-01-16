@@ -183,11 +183,13 @@ export interface PharmacyCoverage {
     };
 }
 
+export type PaymentStatus = "idle" | "processing" | "succeeded" | "creatingMDCase" | "ready" | "failed";
+
 export interface CheckoutViewProps {
     plans: PlanOption[];
     selectedPlan: string;
     onPlanChange: (planId: string) => void;
-    paymentStatus: "idle" | "processing" | "succeeded" | "failed";
+    paymentStatus: PaymentStatus;
     clientSecret: string | null;
     shippingInfo: Record<string, string>;
     onShippingInfoChange: ShippingInfoUpdater;

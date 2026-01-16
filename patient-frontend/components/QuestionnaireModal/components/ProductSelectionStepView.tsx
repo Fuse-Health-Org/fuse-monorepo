@@ -2,6 +2,7 @@ import React from "react";
 import { Icon } from "@iconify/react";
 import { ProgressBar } from "./ProgressBar";
 import { ProductSelection } from "./ProductSelection";
+import { PaymentStatus } from "../types";
 
 interface ProductSelectionStepViewProps {
   progressPercent: number;
@@ -11,7 +12,7 @@ interface ProductSelectionStepViewProps {
   onProductQuantityChange: (productId: string, quantity: number) => void;
   onNext: () => void;
   isCheckoutStep: () => boolean;
-  paymentStatus: 'idle' | 'processing' | 'succeeded' | 'failed';
+  paymentStatus: PaymentStatus;
   isLastStep: boolean;
   isProductSelectionStep: () => boolean;
 }

@@ -185,18 +185,33 @@ interface DriversLicenseResponse {
 
 class MDPatientService {
   async createPatient(patientData: CreatePatientRequest, accessToken: string): Promise<PatientResponse> {
-    const response = await axios.post<PatientResponse>(
-      resolveMdIntegrationsBaseUrl('/partner/patients'),
-      patientData,
-      {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
+    try {
+      const response = await axios.post<PatientResponse>(
+        resolveMdIntegrationsBaseUrl('/partner/patients'),
+        patientData,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          }
         }
-      }
-    );
+      );
 
-    return response.data;
+      return response.data;
+    } catch (error: any) {
+      // Log the full error details for debugging
+      if (axios.isAxiosError(error) && error.response) {
+        const errorDetails = {
+          status: error.response.status,
+          statusText: error.response.statusText,
+          data: error.response.data,
+          requestData: patientData,
+        };
+        console.error('[MD-PATIENT] ❌ Error creating patient in MD Integrations:', JSON.stringify(errorDetails, null, 2));
+        throw new Error(`MD Integrations API error (${error.response.status}): ${JSON.stringify(error.response.data)}`);
+      }
+      throw error;
+    }
   }
 
   async updatePatient(patientId: string, patientData: UpdatePatientRequest, accessToken: string): Promise<PatientResponse> {

@@ -1,10 +1,10 @@
 import React from "react";
 import { Icon } from "@iconify/react";
-import { QuestionnaireStep } from "../types";
+import { QuestionnaireStep, PaymentStatus } from "../types";
 
 interface StepNavigationButtonsProps {
   isCheckoutStep: () => boolean;
-  paymentStatus: 'idle' | 'processing' | 'succeeded' | 'failed';
+  paymentStatus: PaymentStatus;
   currentStep: QuestionnaireStep | null;
   isSignInMode: boolean;
   isEmailVerificationMode: boolean;

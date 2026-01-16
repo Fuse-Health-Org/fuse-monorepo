@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/router";
 import { motion } from "framer-motion";
 import { Button, Avatar, Card, CardBody, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, Chip, Spinner, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Divider } from "@heroui/react";
 import { Icon } from "@iconify/react";
@@ -1327,14 +1328,33 @@ function MDIMessagesContent() {
       setLoading(true);
       setError(null);
       const response = await apiCall('/messages?channel=support&per_page=50');
-      if (response.success && response.data?.data) {
-        setMessages(response.data.data);
+      
+      if (response.success && response.data) {
+        // Handle different response structures
+        // Backend returns: { success: true, data: { data: Message[] } }
+        const messagesData = response.data.data || response.data;
+        
+        // Ensure messages is always an array
+        const messagesArray = Array.isArray(messagesData) ? messagesData : [];
+        setMessages(messagesArray);
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[MDI-MESSAGES] Fetched messages:', {
+            count: messagesArray.length,
+            structure: Array.isArray(messagesData) ? 'array' : typeof messagesData,
+            rawData: messagesData,
+          });
+        }
       } else if (response.error && !response.error.includes('404')) {
         setError(response.error);
+      } else {
+        // No messages found or empty response - set empty array
+        setMessages([]);
       }
     } catch (err: any) {
       console.error('Error fetching messages:', err);
       setError(err.message || 'Failed to load messages');
+      setMessages([]); // Ensure messages is always an array even on error
     } finally {
       setLoading(false);
     }
@@ -1397,7 +1417,7 @@ function MDIMessagesContent() {
                 Try Again
               </Button>
             </div>
-          ) : messages.length === 0 ? (
+          ) : !Array.isArray(messages) || messages.length === 0 ? (
             <div className="text-center py-12">
               <div className="w-16 h-16 rounded-full bg-secondary/20 flex items-center justify-center mx-auto mb-4">
                 <Icon icon="lucide:message-circle" className="text-3xl text-secondary" />
@@ -1409,7 +1429,7 @@ function MDIMessagesContent() {
             </div>
           ) : (
             <div className="space-y-4">
-              {messages.map((msg) => {
+              {Array.isArray(messages) && messages.map((msg) => {
                 const isFromUser = msg.user_type === 'patient' || msg.user_id === user?.id;
                 return (
                   <div
@@ -1544,9 +1564,18 @@ function FeatureCard({ icon, title, description }: { icon: string; title: string
 
 function MDIDashboardPage() {
   const { user, signOut } = useAuth();
+  const router = useRouter();
   const [activeTab, setActiveTab] = React.useState("dashboard");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const [isMobileView, setIsMobileView] = React.useState(false);
+
+  // Initialize activeTab from URL query parameter
+  React.useEffect(() => {
+    const tabFromQuery = router.query.tab as string;
+    if (tabFromQuery && ['dashboard', 'cases', 'prescriptions', 'messages', 'account'].includes(tabFromQuery)) {
+      setActiveTab(tabFromQuery);
+    }
+  }, [router.query.tab]);
 
   // Detect mobile view
   React.useEffect(() => {
