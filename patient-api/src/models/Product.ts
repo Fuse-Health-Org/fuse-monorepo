@@ -162,6 +162,20 @@ export default class Product extends Entity {
     })
     declare mdCaseId?: string;
 
+    // MD Integrations Offering ID - links this product to an MDI offering
+    @Column({
+        type: DataType.UUID,
+        allowNull: true,
+    })
+    declare mdOfferingId?: string;
+
+    // MD Integrations Offering Name (cached for display)
+    @Column({
+        type: DataType.STRING,
+        allowNull: true,
+    })
+    declare mdOfferingName?: string;
+
     @ForeignKey(() => User)
     @Column({
         type: DataType.UUID,
