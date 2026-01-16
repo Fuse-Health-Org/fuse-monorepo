@@ -23,6 +23,7 @@ interface CheckoutStepViewProps {
   onCreateSubscription: (planId: string) => Promise<void>;
   onPaymentSuccess: () => Promise<void>;
   onPaymentError: (error: string) => void;
+  onPaymentConfirm?: () => void;
   stripePromise: any;
   questionnaireProducts: any;
   selectedProducts: Record<string, number>;
@@ -54,6 +55,7 @@ export const CheckoutStepView: React.FC<CheckoutStepViewProps> = ({
   onCreateSubscription,
   onPaymentSuccess,
   onPaymentError,
+  onPaymentConfirm,
   stripePromise,
   questionnaireProducts,
   selectedProducts,
@@ -92,6 +94,7 @@ export const CheckoutStepView: React.FC<CheckoutStepViewProps> = ({
           onCreateSubscription={onCreateSubscription}
           onPaymentSuccess={onPaymentSuccess}
           onPaymentError={onPaymentError}
+          onPaymentConfirm={onPaymentConfirm}
           stripePromise={stripePromise}
           theme={theme}
           questionnaireProducts={questionnaireProducts}
@@ -105,7 +108,7 @@ export const CheckoutStepView: React.FC<CheckoutStepViewProps> = ({
           onCreateProgramSubscription={onCreateProgramSubscription}
         />
 
-        {paymentStatus === 'succeeded' && (
+        {/* {paymentStatus === 'succeeded' && (
           <div className="pt-2">
             <Button
               color="primary"
@@ -115,7 +118,7 @@ export const CheckoutStepView: React.FC<CheckoutStepViewProps> = ({
               Continue
             </Button>
           </div>
-        )}
+        )} */}
       </div>
     </>
   );

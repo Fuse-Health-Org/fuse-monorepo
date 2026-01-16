@@ -35,8 +35,8 @@ export const StepNavigationButtons: React.FC<StepNavigationButtonsProps> = ({
   onClose,
   setCurrentStepIndex,
 }) => {
-  // Don't show buttons during sign-in or email verification on account creation step
-  if (isCheckoutStep() && paymentStatus !== 'succeeded') {
+  // Don't show buttons during checkout step - the success modal handles the continue action
+  if (isCheckoutStep()) {
     return null;
   }
 

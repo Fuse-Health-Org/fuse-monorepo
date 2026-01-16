@@ -195,6 +195,7 @@ export interface CheckoutViewProps {
     onCreateSubscription: (planId: string) => Promise<void>;
     onPaymentSuccess: () => Promise<void>;
     onPaymentError: (error: string) => void;
+    onPaymentConfirm?: () => void;
     stripePromise: any;
     theme: ThemePalette;
     questionnaireProducts?: Product[];

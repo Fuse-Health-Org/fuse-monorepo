@@ -85,6 +85,13 @@ export default function ClientManagement() {
   const [previewing, setPreviewing] = useState(false)
   const [availablePlans, setAvailablePlans] = useState<BrandSubscriptionPlan[]>([])
   const [updatingRole, setUpdatingRole] = useState(false)
+  const [patientPortalDashboardFormat, setPatientPortalDashboardFormat] = useState<string>('fuse')
+  const [originalPatientPortalDashboardFormat, setOriginalPatientPortalDashboardFormat] = useState<string>('fuse')
+  const [showWarningModal, setShowWarningModal] = useState(false)
+  const [pendingFormatChange, setPendingFormatChange] = useState<string | null>(null)
+  const [checkingData, setCheckingData] = useState(false)
+  const [loadingClinicData, setLoadingClinicData] = useState(false)
+  const [clinicDataCheck, setClinicDataCheck] = useState<{hasData: boolean, ordersCount: number, paymentsCount: number, prescriptionsCount: number} | null>(null)
 
   // BrandSubscription form state
   const [formData, setFormData] = useState({
@@ -163,7 +170,43 @@ export default function ClientManagement() {
     }
   }
 
-  const handleSelectUser = (user: User) => {
+  const fetchClinicData = async (userId: string) => {
+    try {
+      const response = await fetch(`${baseUrl}/admin/users/${userId}/clinic`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        const format = result.data?.patientPortalDashboardFormat || 'fuse'
+        setPatientPortalDashboardFormat(format)
+        setOriginalPatientPortalDashboardFormat(format)
+      }
+    } catch (error) {
+      console.error('Error fetching clinic data:', error)
+    }
+  }
+
+  const checkClinicData = async (userId: string) => {
+    try {
+      const response = await fetch(`${baseUrl}/admin/users/${userId}/clinic/data-check`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        setClinicDataCheck(result.data)
+      }
+    } catch (error) {
+      console.error('Error checking clinic data:', error)
+    }
+  }
+
+  const handleSelectUser = async (user: User) => {
     console.log('👤 [Client Mgmt Frontend] Selected user:', user)
     console.log('📋 [Client Mgmt Frontend] User subscription:', user.brandSubscriptions?.[0])
     console.log('📦 [Client Mgmt Frontend] Subscription plan:', user.brandSubscriptions?.[0]?.plan)
@@ -172,6 +215,16 @@ export default function ClientManagement() {
       : user.tenantCustomFeatures
     console.log('🎨 [Client Mgmt Frontend] Custom features:', customFeaturesToLog)
     setSelectedUser(user)
+    setLoadingClinicData(true)
+    setClinicDataCheck(null)
+    try {
+      await Promise.all([
+        fetchClinicData(user.id),
+        checkClinicData(user.id)
+      ])
+    } finally {
+      setLoadingClinicData(false)
+    }
     const subscription = user.brandSubscriptions?.[0]
     if (subscription) {
       setFormData({
@@ -335,11 +388,22 @@ export default function ClientManagement() {
     }
   }
 
-  const handleSave = async () => {
+  const handleSave = async (forceUpdateFormat = false) => {
     if (!selectedUser) return
 
     setSaving(true)
     try {
+      // Check if patientPortalDashboardFormat changed
+      const formatChanged = patientPortalDashboardFormat !== originalPatientPortalDashboardFormat
+      
+      // If format changed and there's existing data, show warning (unless forceUpdate is true)
+      if (formatChanged && clinicDataCheck?.hasData && !forceUpdateFormat) {
+        setPendingFormatChange(patientPortalDashboardFormat)
+        setShowWarningModal(true)
+        setSaving(false)
+        return
+      }
+
       // Update subscription settings
       const subscriptionResponse = await fetch(`${baseUrl}/admin/users/${selectedUser.id}/brand-subscription`, {
         method: 'PATCH',
@@ -374,6 +438,30 @@ export default function ClientManagement() {
       const featuresResult = await featuresResponse.json()
       console.log('✅ [Client Mgmt Frontend] Features save response:', featuresResult)
 
+      // Update patient portal dashboard format if changed
+      if (formatChanged) {
+        const formatResponse = await fetch(`${baseUrl}/admin/users/${selectedUser.id}/clinic/patient-portal-dashboard-format`, {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            patientPortalDashboardFormat: patientPortalDashboardFormat,
+            forceUpdate: forceUpdateFormat,
+          }),
+        })
+
+        if (!formatResponse.ok) {
+          const errorData = await formatResponse.json()
+          throw new Error(errorData.message || 'Failed to update patient portal dashboard format')
+        }
+
+        const formatResult = await formatResponse.json()
+        console.log('✅ [Client Mgmt Frontend] Format save response:', formatResult)
+        setOriginalPatientPortalDashboardFormat(patientPortalDashboardFormat)
+      }
+
       toast.success('Settings updated successfully')
 
       // Update the selected user with the response data
@@ -394,10 +482,23 @@ export default function ClientManagement() {
       )
     } catch (error) {
       console.error('Error updating settings:', error)
-      toast.error('Failed to update settings')
+      toast.error(error instanceof Error ? error.message : 'Failed to update settings')
     } finally {
       setSaving(false)
     }
+  }
+
+  const handleConfirmFormatChange = () => {
+    setShowWarningModal(false)
+    setPendingFormatChange(null)
+    // Save with forceUpdate = true
+    handleSave(true)
+  }
+
+  const handleCancelFormatChange = () => {
+    setShowWarningModal(false)
+    setPendingFormatChange(null)
+    setPatientPortalDashboardFormat(originalPatientPortalDashboardFormat)
   }
 
   const filteredUsers = users.filter(user => {
@@ -498,21 +599,51 @@ export default function ClientManagement() {
                   {selectedUser ? (
                     <div className="space-y-6">
                       {/* User Info */}
-                      <div className="bg-[#F9FAFB] rounded-lg p-4 border border-[#E5E7EB]">
-                        <h3 className="font-semibold text-[#1F2937] mb-2">User Information</h3>
-                        <div className="grid grid-cols-2 gap-3 text-sm">
-                          <div>
-                            <span className="text-[#6B7280]">Name:</span>
-                            <span className="ml-2 text-[#1F2937] font-medium">
-                              {selectedUser.firstName} {selectedUser.lastName}
-                            </span>
+                      {loadingClinicData ? (
+                        <div className="bg-[#F9FAFB] rounded-lg p-4 border border-[#E5E7EB] animate-pulse">
+                          <div className="h-6 bg-gray-200 rounded w-1/3 mb-4"></div>
+                          <div className="grid grid-cols-2 gap-3 text-sm">
+                            <div>
+                              <div className="h-4 bg-gray-200 rounded w-24 mb-1"></div>
+                              <div className="h-4 bg-gray-200 rounded w-32"></div>
+                            </div>
+                            <div>
+                              <div className="h-4 bg-gray-200 rounded w-20 mb-1"></div>
+                              <div className="h-4 bg-gray-200 rounded w-40"></div>
+                            </div>
+                            <div className="col-span-2 mt-2">
+                              <div className="h-4 bg-gray-200 rounded w-32 mb-3"></div>
+                              <div className="space-y-2">
+                                <div className="h-4 bg-gray-200 rounded w-20"></div>
+                                <div className="h-4 bg-gray-200 rounded w-20"></div>
+                                <div className="h-4 bg-gray-200 rounded w-20"></div>
+                                <div className="h-4 bg-gray-200 rounded w-20"></div>
+                              </div>
+                              <div className="h-8 bg-gray-200 rounded w-32 mt-4"></div>
+                            </div>
+                            <div>
+                              <div className="h-4 bg-gray-200 rounded w-28 mb-1"></div>
+                              <div className="h-4 bg-gray-200 rounded w-20"></div>
+                            </div>
                           </div>
-                          <div>
-                            <span className="text-[#6B7280]">Email:</span>
-                            <span className="ml-2 text-[#1F2937] font-medium">
-                              {selectedUser.email}
-                            </span>
-                          </div>
+                          <div className="h-10 bg-gray-200 rounded w-full mt-4"></div>
+                        </div>
+                      ) : (
+                        <div className="bg-[#F9FAFB] rounded-lg p-4 border border-[#E5E7EB]">
+                          <h3 className="font-semibold text-[#1F2937] mb-2">User Information</h3>
+                          <div className="grid grid-cols-2 gap-3 text-sm">
+                            <div>
+                              <span className="text-[#6B7280]">Name:</span>
+                              <span className="ml-2 text-[#1F2937] font-medium">
+                                {selectedUser.firstName} {selectedUser.lastName}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-[#6B7280]">Email:</span>
+                              <span className="ml-2 text-[#1F2937] font-medium">
+                                {selectedUser.email}
+                              </span>
+                            </div>
                           <div className="col-span-2">
                             <label className="block text-[#6B7280] mb-2">Roles (select all that apply):</label>
                             <div className="space-y-2">
@@ -615,9 +746,42 @@ export default function ClientManagement() {
                             Opens a new tab to view the portal as this user
                           </p>
                         </div>
-                      </div>
+                        </div>
+                      )}
 
-                      {selectedUser.brandSubscriptions && selectedUser.brandSubscriptions.length > 0 ? (
+                      {loadingClinicData ? (
+                        <div className="space-y-6 animate-pulse">
+                          {/* Skeleton for User Info */}
+                          <div className="bg-[#F9FAFB] rounded-lg p-4 border border-[#E5E7EB]">
+                            <div className="h-6 bg-gray-200 rounded w-1/3 mb-4"></div>
+                            <div className="space-y-3">
+                              <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+                              <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+                              <div className="h-4 bg-gray-200 rounded w-1/3"></div>
+                            </div>
+                          </div>
+                          {/* Skeleton for Subscription Details */}
+                          <div className="bg-[#F9FAFB] rounded-lg p-4 border border-[#E5E7EB]">
+                            <div className="h-6 bg-gray-200 rounded w-1/3 mb-4"></div>
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="h-4 bg-gray-200 rounded"></div>
+                              <div className="h-4 bg-gray-200 rounded"></div>
+                              <div className="h-4 bg-gray-200 rounded"></div>
+                              <div className="h-4 bg-gray-200 rounded"></div>
+                            </div>
+                          </div>
+                          {/* Skeleton for Settings */}
+                          <div className="space-y-4">
+                            <div className="h-6 bg-gray-200 rounded w-1/4"></div>
+                            <div className="space-y-4">
+                              <div className="h-10 bg-gray-200 rounded"></div>
+                              <div className="h-10 bg-gray-200 rounded w-3/4"></div>
+                              <div className="h-10 bg-gray-200 rounded w-2/3"></div>
+                              <div className="h-20 bg-gray-200 rounded"></div>
+                            </div>
+                          </div>
+                        </div>
+                      ) : selectedUser.brandSubscriptions && selectedUser.brandSubscriptions.length > 0 ? (
                         <>
                           {/* Subscription Info */}
                           <div className="bg-[#F9FAFB] rounded-lg p-4 border border-[#E5E7EB]">
@@ -937,10 +1101,53 @@ export default function ClientManagement() {
                               </div>
                             </div>
 
+                            {/* Patient Portal Dashboard Format */}
+                            <div className="space-y-4 pt-6 border-t border-[#E5E7EB]">
+                              <h3 className="font-semibold text-[#1F2937]">Patient Portal Dashboard Format</h3>
+                              <p className="text-sm text-[#6B7280]">
+                                Choose the dashboard format for the patient portal. Changing this setting is strongly discouraged if there are existing Orders, Payments, or Prescriptions.
+                              </p>
+                              
+                              <div>
+                                <label className="block text-sm font-medium text-[#374151] mb-2">
+                                  Dashboard Format
+                                </label>
+                                <select
+                                  value={patientPortalDashboardFormat}
+                                  onChange={(e) => setPatientPortalDashboardFormat(e.target.value)}
+                                  disabled={saving || checkingData}
+                                  className="w-full max-w-md px-3 py-2 border border-[#D1D5DB] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4FA59C] bg-white"
+                                >
+                                  <option value="fuse">Fuse Dashboard</option>
+                                  <option value="md-integrations">MD Integrations</option>
+                                </select>
+                                <p className="text-xs text-[#6B7280] mt-1">
+                                  Fuse Dashboard: Internal messaging, treatments, and subscription management.
+                                  <br />
+                                  MD Integrations: Connects with external medical systems.
+                                </p>
+                                {clinicDataCheck?.hasData && (
+                                  <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                                    <p className="text-xs text-yellow-800">
+                                      <strong>Warning:</strong> This brand has existing data:
+                                      <br />
+                                      • {clinicDataCheck.ordersCount} Orders
+                                      <br />
+                                      • {clinicDataCheck.paymentsCount} Payments
+                                      <br />
+                                      • {clinicDataCheck.prescriptionsCount} Prescriptions
+                                      <br />
+                                      Changing the dashboard format is strongly discouraged.
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
                             {/* Save Button */}
                             <div className="flex justify-end pt-4 border-t border-[#E5E7EB]">
                               <Button
-                                onClick={handleSave}
+                                onClick={() => handleSave()}
                                 disabled={saving}
                                 className="bg-[#4FA59C] hover:bg-[#3d8580] text-white"
                               >
@@ -979,6 +1186,70 @@ export default function ClientManagement() {
           </div>
         </main>
       </div>
+
+      {/* Warning Modal */}
+      {showWarningModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 p-6">
+            <div className="mb-4">
+              <h2 className="text-2xl font-bold text-red-600 mb-2">⚠️ WARNING: Critical Configuration Change</h2>
+              <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4">
+                <p className="text-lg font-semibold text-red-800 mb-2">
+                  You should NOT change the Patient Portal Dashboard Format if there are already Orders, Payments, or Prescriptions for this brand.
+                </p>
+                {clinicDataCheck && (
+                  <div className="text-sm text-red-700 space-y-1">
+                    <p><strong>Current Data:</strong></p>
+                    <ul className="list-disc list-inside ml-2">
+                      <li>{clinicDataCheck.ordersCount} Order(s)</li>
+                      <li>{clinicDataCheck.paymentsCount} Payment(s)</li>
+                      <li>{clinicDataCheck.prescriptionsCount} Prescription(s)</li>
+                    </ul>
+                  </div>
+                )}
+              </div>
+              <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4 mb-4">
+                <p className="text-sm text-yellow-800">
+                  <strong>Why this is risky:</strong> Changing the dashboard format after data has been created can cause:
+                  <br />
+                  • Data inconsistencies
+                  <br />
+                  • Integration failures with MD systems
+                  <br />
+                  • Patient portal access issues
+                  <br />
+                  • Potential data loss or corruption
+                </p>
+              </div>
+              <p className="text-sm text-gray-700 mb-4">
+                <strong>We strongly advise against this change.</strong> If you absolutely must proceed, ensure you have:
+                <br />
+                • Backed up all data
+                <br />
+                • Notified all stakeholders
+                <br />
+                • Tested the new format in a staging environment
+              </p>
+            </div>
+            <div className="flex justify-end space-x-3">
+              <Button
+                onClick={handleCancelFormatChange}
+                disabled={saving}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+              >
+                Cancel (Recommended)
+              </Button>
+              <Button
+                onClick={handleConfirmFormatChange}
+                disabled={saving}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+              >
+                {saving ? 'Updating...' : 'Yes, I Understand the Risks - Proceed Anyway'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

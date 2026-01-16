@@ -12,6 +12,7 @@ import { useQuestionnaireAnalytics } from "./useQuestionnaireAnalytics";
 import { useQuestionnairePlans } from "./useQuestionnairePlans";
 import { useQuestionnaireTheme } from "./useQuestionnaireTheme";
 import { usePharmacyCoverages } from "./usePharmacyCoverages";
+import { getDashboardPrefix } from "../../../lib/clinic-utils";
 
 export function useQuestionnaireModal(
   props: QuestionnaireModalProps,
@@ -97,6 +98,7 @@ export function useQuestionnaireModal(
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [emailModalLoading, setEmailModalLoading] = useState(false);
   const [emailModalError, setEmailModalError] = useState('');
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   // Track initialization
   const hasInitializedStepRef = useRef(false);
@@ -731,17 +733,131 @@ export function useQuestionnaireModal(
       }
 
       console.log('🎉 [CHECKOUT] ========== CHECKOUT COMPLETE ==========');
+      
+      // Modal is already open from handlePaymentConfirm, just update status to succeeded
+      // The modal will automatically show success state because paymentStatus is now 'succeeded'
+      
     } catch (error) {
       console.error('❌ [CHECKOUT] Payment success handler error:', error);
       setPaymentStatus('failed');
+      setShowSuccessModal(false); // Ensure modal is closed on error
       alert('Payment authorization failed. Please contact support.');
     }
   }, [paymentIntentId, orderId, userId, accountCreated, triggerCheckoutSequenceRun, trackConversion, createMDCase]);
 
+  const handlePaymentConfirm = useCallback(() => {
+    // Open modal with processing state when payment confirmation starts
+    setShowSuccessModal(true);
+    setPaymentStatus('processing');
+    console.log('🔄 [CHECKOUT] Payment confirmation started, showing processing modal');
+  }, []);
+
   const handlePaymentError = useCallback((error: string) => {
     setPaymentStatus('failed');
+    setShowSuccessModal(false); // Close modal on error
     alert(`Payment failed: ${error}`);
   }, []);
+
+  const handleSuccessModalContinue = useCallback(async () => {
+    try {
+      // Priority order for getting clinic:
+      // 1. Get clinic from order (most reliable)
+      // 2. Get clinic from authenticated user
+      // 3. Fallback to domainClinic
+      
+      let clinicForRedirect = domainClinic;
+      
+      console.log('🔍 [CHECKOUT] Determining redirect clinic:', {
+        hasOrderId: !!orderId,
+        hasUserId: !!userId,
+        domainClinicFormat: (domainClinic as any)?.patientPortalDashboardFormat,
+        domainClinicId: domainClinic?.id,
+      });
+      
+      // Try to get clinic from order first (if we have orderId)
+      if (orderId) {
+        try {
+          const orderResult = await apiCall(`/orders/${orderId}`);
+          if (orderResult.success && orderResult.data?.data?.clinicId) {
+            const orderClinicId = orderResult.data.data.clinicId;
+            const clinicResult = await apiCall(`/clinic/${orderClinicId}`);
+            if (clinicResult.success && clinicResult.data?.data) {
+              clinicForRedirect = clinicResult.data.data;
+              console.log('✅ [CHECKOUT] Loaded clinic from order for redirect:', {
+                id: clinicForRedirect?.id,
+                patientPortalDashboardFormat: (clinicForRedirect as any)?.patientPortalDashboardFormat,
+                source: 'order',
+              });
+            }
+          }
+        } catch (error) {
+          console.warn('⚠️ [CHECKOUT] Could not fetch clinic from order:', error);
+        }
+      }
+      
+      // If we still don't have clinic, try getting it from user
+      if (!clinicForRedirect || (clinicForRedirect === domainClinic && userId)) {
+        try {
+          const userResult = await apiCall('/auth/me');
+          if (userResult.success && userResult.data?.clinicId) {
+            const clinicResult = await apiCall(`/clinic/${userResult.data.clinicId}`);
+            if (clinicResult.success && clinicResult.data?.data) {
+              clinicForRedirect = clinicResult.data.data;
+              console.log('✅ [CHECKOUT] Loaded clinic from user for redirect:', {
+                id: clinicForRedirect?.id,
+                patientPortalDashboardFormat: (clinicForRedirect as any)?.patientPortalDashboardFormat,
+                source: 'user',
+              });
+            }
+          }
+        } catch (error) {
+          console.warn('⚠️ [CHECKOUT] Could not fetch user clinic:', error);
+        }
+      }
+      
+      // Determine the correct dashboard based on clinic's patientPortalDashboardFormat
+      const dashboardFormat = (clinicForRedirect as any)?.patientPortalDashboardFormat;
+      const dashboardPrefix = getDashboardPrefix(clinicForRedirect);
+      
+      console.log('🎉 [CHECKOUT] Final redirect decision:', {
+        dashboardPrefix,
+        patientPortalDashboardFormat: dashboardFormat,
+        clinicId: clinicForRedirect?.id,
+        clinicName: clinicForRedirect?.name,
+        usedDomainClinic: clinicForRedirect === domainClinic,
+        source: clinicForRedirect === domainClinic ? 'domainClinic' : 'order/user',
+      });
+      
+      // Close success modal and main modal
+      setShowSuccessModal(false);
+      onClose();
+      
+      // Redirect after a short delay to allow modals to close
+      setTimeout(() => {
+        if (typeof window !== 'undefined') {
+          console.log('🎉 [CHECKOUT] Executing redirect to:', dashboardPrefix);
+          window.location.href = dashboardPrefix;
+        } else {
+          console.error('❌ [CHECKOUT] window is undefined, cannot redirect');
+        }
+      }, 300);
+    } catch (error) {
+      console.error('❌ [CHECKOUT] Error in handleSuccessModalContinue:', error);
+      // Fallback to domainClinic if there's an error
+      const dashboardPrefix = getDashboardPrefix(domainClinic);
+      console.warn('⚠️ [CHECKOUT] Using fallback domainClinic for redirect:', {
+        dashboardPrefix,
+        patientPortalDashboardFormat: (domainClinic as any)?.patientPortalDashboardFormat,
+      });
+      setShowSuccessModal(false);
+      onClose();
+      setTimeout(() => {
+        if (typeof window !== 'undefined') {
+          window.location.href = dashboardPrefix;
+        }
+      }, 300);
+    }
+  }, [domainClinic, userId, orderId, onClose]);
 
   // Navigation
   const replaceCurrentVariables = useCallback((text: string): string => {
@@ -757,7 +873,8 @@ export function useQuestionnaireModal(
 
   const handleSubmit = useCallback(async () => {
     if (isCheckoutStep()) {
-      alert('Order submitted successfully!');
+      // Checkout submission is handled by handlePaymentSuccess, which shows the success modal
+      // Just close the modal here
       onClose();
     } else {
       alert('Questionnaire submitted!');
@@ -1017,6 +1134,8 @@ export function useQuestionnaireModal(
     showEmailModal, setShowEmailModal,
     emailModalLoading, setEmailModalLoading,
     emailModalError, setEmailModalError,
+    showSuccessModal, setShowSuccessModal,
+    handleSuccessModalContinue,
     // Google MFA
     ...googleMfa,
     // Plans & theme
@@ -1031,7 +1150,7 @@ export function useQuestionnaireModal(
     handleProductQuantityChange,
     validateCurrentStep,
     handleSignIn, handleGoogleSignIn, createUserAccount, emailVerificationHandlers,
-    handlePlanSelection, createSubscriptionForPlan, handlePaymentSuccess, handlePaymentError,
+    handlePlanSelection, createSubscriptionForPlan, handlePaymentSuccess, handlePaymentError, handlePaymentConfirm,
     handleNext, handlePrevious, handleSubmit,
     buildQuestionnaireAnswers,
     // Program-related
