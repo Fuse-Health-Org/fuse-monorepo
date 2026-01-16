@@ -17019,8 +17019,88 @@ async function startServer() {
     }
   });
 
+  // Search DoseSpot pharmacies
+  app.get("/md/admin/pharmacies", authenticateJWT, async (req, res) => {
+    try {
+      const currentUser = getCurrentUser(req);
+      if (!currentUser) {
+        return res.status(401).json({ success: false, message: "Unauthorized" });
+      }
+
+      const { name, city, state, zip, address, phoneOrFax, ncpdpID } = req.query as any;
+
+      // At least one parameter is required
+      if (!name && !city && !state && !zip && !address && !phoneOrFax && !ncpdpID) {
+        return res.status(400).json({
+          success: false,
+          message: "At least one search parameter is required",
+          hint: "Provide name, city, state, zip, address, phoneOrFax, or ncpdpID"
+        });
+      }
+
+      const MDAuthService = (
+        await import("./services/mdIntegration/MDAuth.service")
+      ).default;
+      const { resolveMdIntegrationsBaseUrl } = await import("./services/mdIntegration/config");
+
+      const tokenResponse = await MDAuthService.generateToken();
+
+      // Build query params
+      const params = new URLSearchParams();
+      if (name) params.append('name', name);
+      if (city) params.append('city', city);
+      if (state) params.append('state', state);
+      if (zip) params.append('zip', zip);
+      if (address) params.append('address', address);
+      if (phoneOrFax) params.append('phoneOrFax', phoneOrFax);
+      if (ncpdpID) params.append('ncpdpID', ncpdpID);
+
+      const url = resolveMdIntegrationsBaseUrl(`/partner/pharmacies?${params.toString()}`);
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${tokenResponse.access_token}`,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error("❌ Error searching pharmacies:", data);
+        return res.status(response.status).json({
+          success: false,
+          message: "Failed to search pharmacies",
+          error: data
+        });
+      }
+
+      console.log(`[MD-ADMIN] Pharmacy search:`, {
+        params: Object.fromEntries(params),
+        count: Array.isArray(data) ? data.length : 0
+      });
+
+      return res.json({
+        success: true,
+        data: Array.isArray(data) ? data : [],
+        count: Array.isArray(data) ? data.length : 0,
+        hint: "These are pharmacies from the DoseSpot network"
+      });
+    } catch (error: any) {
+      console.error("❌ Error searching pharmacies:", error?.response?.data || error?.message || error);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to search pharmacies",
+        error: error?.response?.data?.message || error?.message
+      });
+    }
+  });
+
   // List available MDI products (medications/services that can be prescribed)
   // These are from DoseSpot's drug database
+  // NOTE: This endpoint may not be available in all MD Integrations environments
   app.get("/md/admin/products", authenticateJWT, async (req, res) => {
     try {
       const currentUser = getCurrentUser(req);
@@ -17055,11 +17135,25 @@ async function startServer() {
         hint: "These are medications/services available through DoseSpot. Clinicians prescribe from this catalog."
       });
     } catch (error: any) {
-      console.error("❌ Error listing MDI products:", error?.response?.data || error?.message || error);
+      const errorData = error?.response?.data || {};
+      const isNotFound = error?.response?.status === 404 || errorData.error === 'NotFoundHttpException';
+      
+      console.error("❌ Error listing MDI products:", errorData || error?.message || error);
+      
+      // Return a more helpful error for 404s
+      if (isNotFound) {
+        return res.status(503).json({
+          success: false,
+          message: "MDI Products endpoint not available",
+          error: "The /partner/products endpoint is not available in your MD Integrations environment. This feature may not be supported by your current MDI plan or API version.",
+          hint: "This feature is optional - you can still manage offerings and create cases without it."
+        });
+      }
+      
       return res.status(500).json({
         success: false,
         message: "Failed to list MDI products",
-        error: error?.response?.data?.message || error?.message
+        error: errorData?.message || error?.message
       });
     }
   });

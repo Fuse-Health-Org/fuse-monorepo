@@ -14,6 +14,7 @@ import {
   Shield,
   UserCheck,
   CreditCard,
+  ExternalLink,
 } from "lucide-react"
 
 const navigation = [
@@ -27,6 +28,7 @@ const navigation = [
   { name: "Payouts Tracking", icon: CreditCard, href: "/payouts" },
   { name: "Audit Logs", icon: Shield, href: "/audit-logs" },
   { name: "Support", icon: MessageSquare, href: "/support" },
+  { name: "MDI Admin Area", icon: ExternalLink, href: "/mdi-admin" },
 ]
 
 export function Sidebar() {
