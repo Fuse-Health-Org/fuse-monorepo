@@ -14156,7 +14156,7 @@ app.post("/md/cases", async (req, res) => {
           include: [{ model: Product, as: 'product', required: false }] as any
         } as any);
         const product = tenantProduct && (tenantProduct as any).product;
-        
+
         // Check for new mdOfferingId field first
         if (product && product.mdOfferingId) {
           offeringIds = [{ offering_id: product.mdOfferingId }];
@@ -14189,9 +14189,9 @@ app.post("/md/cases", async (req, res) => {
       offeringSource = 'sandbox default';
     }
 
-    console.log('[MD-CASE] Resolved offering:', { 
+    console.log('[MD-CASE] Resolved offering:', {
       offeringId: offeringIds[0]?.offering_id || 'none',
-      source: offeringSource 
+      source: offeringSource
     });
 
     // Build case questions from stored questionnaire answers
@@ -16925,7 +16925,7 @@ async function startServer() {
       const tokenResponse = await MDAuthService.generateToken();
       const offerings = await MDCaseService.listOfferings(tokenResponse.access_token);
 
-      const linkedOffering = offerings.find((o: any) => 
+      const linkedOffering = offerings.find((o: any) =>
         o.offering_id === product.mdOfferingId || o.id === product.mdOfferingId
       );
 
@@ -16981,7 +16981,7 @@ async function startServer() {
       const tokenResponse = await MDAuthService.generateToken();
       const offerings = await MDCaseService.listOfferings(tokenResponse.access_token);
 
-      const offering = offerings.find((o: any) => 
+      const offering = offerings.find((o: any) =>
         o.offering_id === offeringId || o.id === offeringId
       );
 
@@ -17069,8 +17069,8 @@ async function startServer() {
       }
 
       if (product.mdOfferingId) {
-        return res.status(400).json({ 
-          success: false, 
+        return res.status(400).json({
+          success: false,
           message: "Product already has an MDI offering linked",
           existingOfferingId: product.mdOfferingId,
           existingOfferingName: product.mdOfferingName,
