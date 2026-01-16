@@ -1,5 +1,5 @@
 import Stripe from 'stripe';
-import Payment from '../../models/Payment';
+import Payment, { PaymentGoesTo } from '../../models/Payment';
 import Order, { OrderStatus } from '../../models/Order';
 import { StripeService } from '@fuse/stripe';
 import Subscription from '../../models/Subscription';
@@ -863,6 +863,151 @@ export const handleAccountUpdated = async (account: Stripe.Account): Promise<voi
     }
 };
 
+/**
+ * Handle Stripe transfer.created webhook
+ * When money is transferred to a brand/doctor/pharmacy, create a Payment record
+ */
+export const handleTransferCreated = async (transfer: Stripe.Transfer): Promise<void> => {
+    try {
+        console.log('💸 Transfer created:', transfer.id);
+
+        // Get the payment intent ID from transfer metadata or source transaction
+        // When transfer_data is used, the transfer is linked to the original payment intent's charge
+        let paymentIntentId: string | null = null;
+
+        // Try to get payment intent ID from metadata first
+        if (transfer.metadata?.paymentIntentId) {
+            paymentIntentId = transfer.metadata.paymentIntentId;
+        } else if (transfer.metadata?.orderId) {
+            // If we have orderId in metadata, find the original payment intent
+            const Order = (await import('../../models/Order')).default;
+            const order = await Order.findByPk(transfer.metadata.orderId, {
+                include: [{ model: Payment, as: 'payment' }]
+            });
+            if (order && (order as any).payment) {
+                paymentIntentId = (order as any).payment.stripePaymentIntentId;
+            }
+        } else if (transfer.source_transaction) {
+            // The source_transaction is the charge ID, we can retrieve the charge to get payment intent
+            try {
+                const stripe = new (await import('stripe')).default(process.env.STRIPE_SECRET_KEY!, {
+                    apiVersion: '2025-08-27.basil',
+                });
+                const charge = await stripe.charges.retrieve(transfer.source_transaction as string);
+                if (charge.payment_intent) {
+                    paymentIntentId = typeof charge.payment_intent === 'string' 
+                        ? charge.payment_intent 
+                        : charge.payment_intent.id;
+                }
+            } catch (error) {
+                console.error('❌ Error retrieving charge for transfer:', error);
+            }
+        }
+
+        if (!paymentIntentId) {
+            console.warn('⚠️ Could not determine payment intent ID for transfer:', transfer.id);
+            // Use transfer ID as a fallback payment intent ID for tracking
+            paymentIntentId = `transfer_${transfer.id}`;
+        }
+
+        // Determine paymentGoesTo based on transfer metadata or order information
+        let paymentGoesTo: PaymentGoesTo = PaymentGoesTo.FUSE;
+        
+        if (transfer.metadata?.paymentGoesTo) {
+            // If explicitly set in metadata
+            paymentGoesTo = transfer.metadata.paymentGoesTo as PaymentGoesTo;
+        } else if (transfer.metadata?.orderId) {
+            // Try to determine from order
+            const Order = (await import('../../models/Order')).default;
+            const order = await Order.findByPk(transfer.metadata.orderId);
+            
+            if (order) {
+                // Determine based on which amount is being transferred
+                // If brandAmount > 0 and matches transfer amount, it's for brand
+                // If doctorAmount > 0 and matches transfer amount, it's for doctor
+                // If pharmacyWholesaleAmount > 0 and matches transfer amount, it's for pharmacy
+                const transferAmountUsd = transfer.amount / 100;
+                const brandAmount = Number(order.brandAmount) || 0;
+                const doctorAmount = Number(order.doctorAmount) || 0;
+                const pharmacyAmount = Number(order.pharmacyWholesaleAmount) || 0;
+                
+                // Check which amount matches (with small tolerance for rounding)
+                if (Math.abs(brandAmount - transferAmountUsd) < 0.01 && brandAmount > 0) {
+                    paymentGoesTo = PaymentGoesTo.BRAND;
+                } else if (Math.abs(doctorAmount - transferAmountUsd) < 0.01 && doctorAmount > 0) {
+                    paymentGoesTo = PaymentGoesTo.DOCTOR;
+                } else if (Math.abs(pharmacyAmount - transferAmountUsd) < 0.01 && pharmacyAmount > 0) {
+                    paymentGoesTo = PaymentGoesTo.PHARMACY;
+                } else {
+                    // Default to brand if going to a clinic account
+                    const Clinic = (await import('../../models/Clinic')).default;
+                    const clinic = await Clinic.findOne({
+                        where: { stripeAccountId: transfer.destination }
+                    });
+                    if (clinic) {
+                        paymentGoesTo = PaymentGoesTo.BRAND;
+                    }
+                }
+            } else {
+                // If order not found, try to determine from destination account
+                const Clinic = (await import('../../models/Clinic')).default;
+                const clinic = await Clinic.findOne({
+                    where: { stripeAccountId: transfer.destination }
+                });
+                if (clinic) {
+                    paymentGoesTo = PaymentGoesTo.BRAND;
+                }
+            }
+        } else {
+            // Try to determine from destination account (Clinic)
+            const Clinic = (await import('../../models/Clinic')).default;
+            const clinic = await Clinic.findOne({
+                where: { stripeAccountId: transfer.destination }
+            });
+            
+            // For now, assume it's a brand payment if going to a clinic account
+            // This can be refined based on business logic
+            if (clinic) {
+                paymentGoesTo = PaymentGoesTo.BRAND;
+            }
+        }
+
+        // Check if payment already exists for this transfer
+        const existingPayment = await Payment.findOne({
+            where: { stripePaymentIntentId: paymentIntentId }
+        });
+
+        // Only create if it doesn't exist and it's not the original fuse payment
+        if (!existingPayment || paymentIntentId.startsWith('transfer_')) {
+            // Create payment record for the transfer
+            await Payment.create({
+                stripePaymentIntentId: paymentIntentId.startsWith('transfer_') 
+                    ? paymentIntentId 
+                    : `transfer_${transfer.id}`,
+                status: transfer.reversed ? 'failed' : 'succeeded',
+                paymentMethod: 'card',
+                amount: transfer.amount / 100, // Convert from cents
+                currency: transfer.currency.toUpperCase(),
+                paymentGoesTo: paymentGoesTo,
+                stripeMetadata: {
+                    transferId: transfer.id,
+                    destination: transfer.destination,
+                    sourceTransaction: transfer.source_transaction,
+                    originalPaymentIntentId: paymentIntentId.startsWith('transfer_') ? null : paymentIntentId,
+                    ...transfer.metadata
+                },
+            });
+
+            console.log(`✅ Created Payment record for transfer ${transfer.id} (paymentGoesTo: ${paymentGoesTo})`);
+        } else {
+            console.log(`ℹ️ Payment already exists for transfer ${transfer.id}`);
+        }
+    } catch (error) {
+        console.error('❌ Error handling transfer.created webhook:', error);
+        // Don't throw - we don't want to fail the webhook processing
+    }
+};
+
 export const processStripeWebhook = async (event: Stripe.Event): Promise<void> => {
     switch (event.type) {
         case 'payment_intent.succeeded':
@@ -918,6 +1063,10 @@ export const processStripeWebhook = async (event: Stripe.Event): Promise<void> =
 
         case 'account.application.deauthorized':
             console.log('📬 Account application deauthorized:', event.data.object);
+            break;
+
+        case 'transfer.created':
+            await handleTransferCreated(event.data.object as Stripe.Transfer);
             break;
 
         default:
