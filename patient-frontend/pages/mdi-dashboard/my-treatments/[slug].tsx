@@ -59,7 +59,7 @@ export default function PublicTreatmentPage() {
     const handleModalClose = () => {
         setIsModalOpen(false)
         // Stay on the current subdomain and go to home page
-        window.location.href = window.location.origin + '/'
+        window.location.href = window.location.origin + '/signin'
     }
 
     return (

@@ -1302,8 +1302,9 @@ interface Message {
   patient_id: string;
   channel: string;
   text: string;
-  user_type: string;
-  user_id: string;
+  user_type: string | null;
+  user_id: string | null;
+  user_name: string | null;
   created_at: string;
   user: {
     id: string;
@@ -1312,8 +1313,76 @@ interface Message {
     email: string;
     specialty?: string;
     profile_url?: string;
-  };
+  } | null;
 }
+
+// Helper function to normalize text and convert URLs to clickable links
+const renderMessageWithLinks = (text: string): (string | JSX.Element)[] => {
+  // First, normalize the text: remove excessive whitespace and normalize line breaks
+  // Replace multiple spaces with single space, normalize line breaks, and trim
+  let normalizedText = text
+    .replace(/\s+/g, ' ') // Replace multiple whitespace characters with single space
+    .replace(/\n\s+/g, '\n') // Remove spaces after newlines
+    .replace(/\s+\n/g, '\n') // Remove spaces before newlines
+    .replace(/\n{3,}/g, '\n\n') // Replace 3+ consecutive newlines with just 2
+    .trim(); // Remove leading/trailing whitespace
+
+  // URL regex pattern - matches http, https, and www URLs
+  const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/gi;
+  const parts: (string | JSX.Element)[] = [];
+  let lastIndex = 0;
+  let match;
+  let linkIndex = 0;
+  let hasUrls = false;
+
+  // Reset regex lastIndex to avoid issues with global regex
+  urlRegex.lastIndex = 0;
+
+  while ((match = urlRegex.exec(normalizedText)) !== null) {
+    hasUrls = true;
+    // Add text before the URL
+    if (match.index > lastIndex) {
+      const textBefore = normalizedText.substring(lastIndex, match.index);
+      if (textBefore) {
+        parts.push(textBefore);
+      }
+    }
+
+    // Extract the URL
+    let url = match[0];
+    // Add protocol if it starts with www
+    if (url.startsWith('www.')) {
+      url = `https://${url}`;
+    }
+
+    // Add the link component
+    parts.push(
+      <a
+        key={`link-${linkIndex++}`}
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-primary-600 hover:text-primary-700 underline font-medium"
+      >
+        this link
+      </a>
+    );
+
+    lastIndex = match.index + match[0].length;
+  }
+
+  // Add remaining text after the last URL
+  if (lastIndex < normalizedText.length) {
+    parts.push(normalizedText.substring(lastIndex));
+  }
+
+  // If no URLs were found, return array with just the normalized text
+  if (!hasUrls) {
+    return [normalizedText];
+  }
+
+  return parts;
+};
 
 function MDIMessagesContent() {
   const { user } = useAuth();
@@ -1322,6 +1391,7 @@ function MDIMessagesContent() {
   const [error, setError] = useState<string | null>(null);
   const [newMessage, setNewMessage] = useState('');
   const [sending, setSending] = useState(false);
+  const messagesEndRef = React.useRef<HTMLDivElement>(null);
 
   const fetchMessages = useCallback(async () => {
     try {
@@ -1330,19 +1400,28 @@ function MDIMessagesContent() {
       const response = await apiCall('/messages?channel=support&per_page=50');
       
       if (response.success && response.data) {
-        // Handle different response structures
-        // Backend returns: { success: true, data: { data: Message[] } }
-        const messagesData = response.data.data || response.data;
+        // Handle nested response structure: { success: true, data: { data: Message[], links: {}, meta: {} } }
+        // The actual messages array is in response.data.data
+        const messagesData = response.data.data?.data || response.data.data || response.data;
         
         // Ensure messages is always an array
         const messagesArray = Array.isArray(messagesData) ? messagesData : [];
-        setMessages(messagesArray);
+        
+        // Sort messages by created_at in ascending order (oldest first, newest last)
+        const sortedMessages = [...messagesArray].sort((a, b) => {
+          const dateA = new Date(a.created_at).getTime();
+          const dateB = new Date(b.created_at).getTime();
+          return dateA - dateB;
+        });
+        
+        setMessages(sortedMessages);
         
         if (process.env.NODE_ENV === 'development') {
           console.log('[MDI-MESSAGES] Fetched messages:', {
             count: messagesArray.length,
             structure: Array.isArray(messagesData) ? 'array' : typeof messagesData,
-            rawData: messagesData,
+            rawResponse: response,
+            messagesData: messagesData,
           });
         }
       } else if (response.error && !response.error.includes('404')) {
@@ -1364,26 +1443,98 @@ function MDIMessagesContent() {
     fetchMessages();
   }, [fetchMessages]);
 
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    if (messages.length > 0 && !loading) {
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+    }
+  }, [messages.length, loading]);
+
   const handleSendMessage = async () => {
     if (!newMessage.trim() || sending) return;
 
+    const messageText = newMessage.trim();
+    const tempId = `temp-${Date.now()}`;
+    
+    // Optimistically add the message to the UI immediately
+    const optimisticMessage: Message = {
+      id: tempId,
+      patient_id: user?.id || '',
+      channel: 'support',
+      text: messageText,
+      user_type: 'patient',
+      user_id: user?.id || '',
+      user_name: null,
+      created_at: new Date().toISOString(),
+      user: null
+    };
+
+    // Add optimistic message to the list and sort
+    setMessages(prev => {
+      const updated = [...prev, optimisticMessage];
+      // Sort by created_at to maintain order
+      return updated.sort((a, b) => {
+        const dateA = new Date(a.created_at).getTime();
+        const dateB = new Date(b.created_at).getTime();
+        return dateA - dateB;
+      });
+    });
+    setNewMessage('');
+    setSending(true);
+    
+    // Scroll to bottom after adding optimistic message
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
+
     try {
-      setSending(true);
       const response = await apiCall('/messages', {
         method: 'POST',
         body: JSON.stringify({
           channel: 'support',
-          text: newMessage.trim()
+          text: messageText
         })
       });
+      
       if (response.success) {
-        setNewMessage('');
-        await fetchMessages(); // Refresh messages
+        // If the API returns the created message, replace the optimistic one
+        if (response.data?.data) {
+          const createdMessage = response.data.data;
+          setMessages(prev => {
+            // Remove the optimistic message and add the real one, then sort
+            const filtered = prev.filter(msg => msg.id !== tempId);
+            const updated = [...filtered, createdMessage];
+            // Sort by created_at to maintain order
+            return updated.sort((a, b) => {
+              const dateA = new Date(a.created_at).getTime();
+              const dateB = new Date(b.created_at).getTime();
+              return dateA - dateB;
+            });
+          });
+          // Scroll to bottom after adding new message
+          setTimeout(() => {
+            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+          }, 100);
+        } else {
+          // If no message returned, just remove the optimistic one and fetch the latest
+          // This is a fallback - ideally the API should return the created message
+          setMessages(prev => prev.filter(msg => msg.id !== tempId));
+          // Silently fetch in the background to get the real message
+          fetchMessages();
+        }
       } else {
+        // Remove optimistic message on error
+        setMessages(prev => prev.filter(msg => msg.id !== tempId));
+        setNewMessage(messageText); // Restore the message text
         alert('Failed to send message. Please try again.');
       }
     } catch (err: any) {
       console.error('Error sending message:', err);
+      // Remove optimistic message on error
+      setMessages(prev => prev.filter(msg => msg.id !== tempId));
+      setNewMessage(messageText); // Restore the message text
       alert('Failed to send message. Please try again.');
     } finally {
       setSending(false);
@@ -1431,13 +1582,14 @@ function MDIMessagesContent() {
             <div className="space-y-4">
               {Array.isArray(messages) && messages.map((msg) => {
                 const isFromUser = msg.user_type === 'patient' || msg.user_id === user?.id;
+                const isSystemMessage = msg.user_type === 'system' || !msg.user;
                 return (
                   <div
                     key={msg.id}
                     className={`flex ${isFromUser ? 'justify-end' : 'justify-start'}`}
                   >
                     <div className={`max-w-[80%] ${isFromUser ? 'order-2' : 'order-1'}`}>
-                      {!isFromUser && (
+                      {!isFromUser && !isSystemMessage && msg.user && (
                         <div className="flex items-center gap-2 mb-1">
                           <Avatar
                             size="sm"
@@ -1454,14 +1606,30 @@ function MDIMessagesContent() {
                           )}
                         </div>
                       )}
+                      {isSystemMessage && (
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center">
+                            <Icon icon="lucide:info" className="text-xs text-blue-600" />
+                          </div>
+                          <span className="text-xs text-blue-600 font-medium">System Message</span>
+                        </div>
+                      )}
                       <div
-                        className={`rounded-2xl px-4 py-2 ${
+                        className={`rounded-2xl px-4 py-3 ${
                           isFromUser
                             ? 'bg-secondary text-white rounded-br-md'
+                            : isSystemMessage
+                            ? 'bg-blue-50 border border-blue-200 text-foreground rounded-bl-md'
                             : 'bg-content2 text-foreground rounded-bl-md'
                         }`}
                       >
-                        <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
+                        {isSystemMessage ? (
+                          <div className="text-sm whitespace-pre-wrap leading-relaxed">
+                            {renderMessageWithLinks(msg.text)}
+                          </div>
+                        ) : (
+                          <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
+                        )}
                       </div>
                       <p className={`text-xs text-foreground-400 mt-1 ${isFromUser ? 'text-right' : ''}`}>
                         {new Date(msg.created_at).toLocaleString()}
@@ -1470,6 +1638,8 @@ function MDIMessagesContent() {
                   </div>
                 );
               })}
+              {/* Scroll anchor for auto-scrolling to bottom */}
+              <div ref={messagesEndRef} />
             </div>
           )}
         </CardBody>

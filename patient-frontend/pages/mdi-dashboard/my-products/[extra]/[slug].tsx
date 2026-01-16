@@ -225,7 +225,7 @@ export default function PublicProductPage() {
     const handleModalClose = () => {
         setIsModalOpen(false)
         // Stay on the current subdomain and go to home page
-        window.location.href = window.location.origin + '/'
+        window.location.href = window.location.origin + '/signin'
     }
 
     // Determine page title
