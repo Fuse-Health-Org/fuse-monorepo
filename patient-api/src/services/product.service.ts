@@ -58,6 +58,7 @@ class ProductService {
       isActive?: boolean;
       pharmacyProvider?: string;
       isAutoImported?: boolean;
+      hasMdiOffering?: boolean;
     } = {}
   ) {
     const {
@@ -67,6 +68,7 @@ class ProductService {
       isActive,
       pharmacyProvider,
       isAutoImported,
+      hasMdiOffering,
     } = options;
     const offset = (page - 1) * limit;
 
@@ -115,6 +117,16 @@ class ProductService {
 
     if (typeof isAutoImported === "boolean") {
       where.isAutoImported = isAutoImported;
+    }
+
+    if (typeof hasMdiOffering === "boolean") {
+      if (hasMdiOffering) {
+        // Only show products with mdOfferingId set
+        where.mdOfferingId = { [Op.ne]: null };
+      } else {
+        // Only show products without mdOfferingId
+        where.mdOfferingId = null;
+      }
     }
 
     const { rows: products, count: total } = await Product.findAndCountAll({

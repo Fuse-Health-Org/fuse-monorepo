@@ -53,6 +53,7 @@ export const listProductsSchema = paginationSchema.extend({
   isActive: z.boolean().optional(),
   pharmacyProvider: z.string().optional(),
   isAutoImported: z.boolean().optional(),
+  hasMdiOffering: z.boolean().optional(),
 });
 /**
  * Type exports

@@ -809,9 +809,9 @@ app.post("/auth/signup", async (req, res) => {
 
       // For brand signup, default to MD_INTEGRATIONS format
       // (can be changed later in Tenant Management portal if needed)
-      const dashboardFormat: PatientPortalDashboardFormat = 
-        patientPortalDashboardFormat === 'fuse' 
-          ? PatientPortalDashboardFormat.FUSE 
+      const dashboardFormat: PatientPortalDashboardFormat =
+        patientPortalDashboardFormat === 'fuse'
+          ? PatientPortalDashboardFormat.FUSE
           : PatientPortalDashboardFormat.MD_INTEGRATIONS;
 
       clinic = await Clinic.create({
@@ -4491,6 +4491,10 @@ app.get("/products-management", authenticateJWT, async (req, res) => {
         req.query.isAutoImported === undefined
           ? undefined
           : req.query.isAutoImported === "true",
+      hasMdiOffering:
+        req.query.hasMdiOffering === undefined
+          ? undefined
+          : req.query.hasMdiOffering === "true",
     });
 
     if (!validation.success) {
@@ -4501,7 +4505,7 @@ app.get("/products-management", authenticateJWT, async (req, res) => {
       });
     }
 
-    const { page, limit, category, isActive, pharmacyProvider, isAutoImported } =
+    const { page, limit, category, isActive, pharmacyProvider, isAutoImported, hasMdiOffering } =
       validation.data;
 
     const result = await productService.listProducts(currentUser.id, {
@@ -4511,6 +4515,7 @@ app.get("/products-management", authenticateJWT, async (req, res) => {
       isActive,
       pharmacyProvider,
       isAutoImported,
+      hasMdiOffering,
     });
     res.status(200).json(result);
   } catch (error: any) {
@@ -14267,13 +14272,13 @@ app.post("/md/cases", async (req, res) => {
       // OR: PATCH /partner/patients/{id} if mdPatientId exists
       const userService = new UserService();
       const syncedUser = await userService.syncPatientInMD(user.id, (order as any).shippingAddressId);
-      
+
       if (!syncedUser) {
         throw new Error('Failed to sync patient with MD Integrations');
       }
-      
+
       await user.reload();
-      
+
       if (process.env.NODE_ENV === 'development') {
         const wasNewPatient = !user.mdPatientId && syncedUser.mdPatientId;
         console.log('[MD-CASE] Patient synced:', {
@@ -14416,7 +14421,7 @@ app.post("/md/cases", async (req, res) => {
       hold_status: false,
       case_offerings: [{ offering_id: offeringId }], // Pre-configured offering
     };
-    
+
     // Add questionnaire answers if available (optional enhancement)
     if (caseQuestions.length > 0) {
       casePayload.case_questions = caseQuestions;
@@ -14465,7 +14470,7 @@ app.post("/md/cases", async (req, res) => {
 
     // Return appropriate status code based on error type
     const statusCode = error?.response?.status || 500;
-    
+
     return res.status(statusCode).json({
       success: false,
       message: "Failed to create MD Integrations case",
@@ -17137,9 +17142,9 @@ async function startServer() {
     } catch (error: any) {
       const errorData = error?.response?.data || {};
       const isNotFound = error?.response?.status === 404 || errorData.error === 'NotFoundHttpException';
-      
+
       console.error("❌ Error listing MDI products:", errorData || error?.message || error);
-      
+
       // Return a more helpful error for 404s
       if (isNotFound) {
         return res.status(503).json({
@@ -17149,7 +17154,7 @@ async function startServer() {
           hint: "This feature is optional - you can still manage offerings and create cases without it."
         });
       }
-      
+
       return res.status(500).json({
         success: false,
         message: "Failed to list MDI products",
@@ -18207,6 +18212,16 @@ app.get("/public/brand-products/:clinicSlug/:slug", async (req, res) => {
     // Determine questionnaire
     let questionnaireId =
       selectedForm?.questionnaireId || tenantProduct?.questionnaireId || null;
+    
+    console.log('[brand-products] Questionnaire sources:', {
+      productId: product.id,
+      productSlug: product.slug,
+      selectedFormId: selectedForm?.id,
+      selectedFormQuestionnaireId: selectedForm?.questionnaireId,
+      tenantProductQuestionnaireId: tenantProduct?.questionnaireId,
+      initialQuestionnaireId: questionnaireId,
+    });
+    
     try {
       const productQuestionnaire = await Questionnaire.findOne({
         where: {
@@ -18221,6 +18236,8 @@ app.get("/public/brand-products/:clinicSlug/:slug", async (req, res) => {
           "✅ Using questionnaire from Questionnaire.productId:",
           questionnaireId
         );
+      } else {
+        console.log('[brand-products] ⚠️ No questionnaire found for product:', product.id);
       }
     } catch (e) {
       if (process.env.NODE_ENV === "development") {
@@ -18229,6 +18246,8 @@ app.get("/public/brand-products/:clinicSlug/:slug", async (req, res) => {
         console.error("Error finding product questionnaire");
       }
     }
+    
+    console.log('[brand-products] Final questionnaireId:', questionnaireId);
 
     const categories = Array.isArray((product as any).categories)
       ? ((product as any).categories as string[]).filter(Boolean)

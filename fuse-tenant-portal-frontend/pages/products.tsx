@@ -33,6 +33,8 @@ interface Product {
   brandId?: string | null
   brandName?: string
   pharmacyCoverages?: PharmacyCoverage[]
+  mdOfferingId?: string | null
+  mdOfferingName?: string | null
 }
 
 interface PharmacyCoverage {
@@ -66,6 +68,7 @@ export default function Products() {
   const [showActiveOnly, setShowActiveOnly] = useState(true)
   const [selectedPharmacies, setSelectedPharmacies] = useState<Set<string>>(new Set())
   const [filterAutoImported, setFilterAutoImported] = useState<boolean | null>(null)
+  const [filterHasMdiOffering, setFilterHasMdiOffering] = useState<boolean | null>(null)
   const [activeTab, setActiveTab] = useState<'selected' | 'all'>('selected')
   const [showModal, setShowModal] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
@@ -97,7 +100,7 @@ export default function Products() {
     fetchPharmacyVendors()
     fetchCategories()
     fetchAvailableForms()
-  }, [selectedCategory, showActiveOnly, selectedPharmacies, filterAutoImported])
+  }, [selectedCategory, showActiveOnly, selectedPharmacies, filterAutoImported, filterHasMdiOffering])
 
   useEffect(() => {
     setShowActiveOnly(activeTab === 'selected')
@@ -119,6 +122,9 @@ export default function Products() {
       }
       if (filterAutoImported !== null) {
         baseParams.append("isAutoImported", String(filterAutoImported))
+      }
+      if (filterHasMdiOffering !== null) {
+        baseParams.append("hasMdiOffering", String(filterHasMdiOffering))
       }
 
       const firstRes = await fetch(`${baseUrl}/products-management?${baseParams.toString()}`, {
@@ -1050,6 +1056,30 @@ export default function Products() {
                 {filterAutoImported !== null && (
                   <button
                     onClick={() => setFilterAutoImported(null)}
+                    className="px-4 py-2 rounded-full text-sm font-medium text-[#EF4444] border border-[#EF4444] hover:bg-[#FEF2F2] transition-all"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-[#4B5563]">Filter by MDI Offering</label>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => setFilterHasMdiOffering(filterHasMdiOffering === true ? null : true)}
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${filterHasMdiOffering === true
+                    ? 'bg-[#4FA59C] text-white shadow-md'
+                    : 'bg-white text-[#6B7280] border border-[#E5E7EB] hover:border-[#4FA59C] hover:text-[#4FA59C]'
+                    }`}
+                >
+                  Has MDI Offering
+                  {filterHasMdiOffering === true && <X className="inline-block ml-1.5 h-3 w-3" />}
+                </button>
+                {filterHasMdiOffering !== null && (
+                  <button
+                    onClick={() => setFilterHasMdiOffering(null)}
                     className="px-4 py-2 rounded-full text-sm font-medium text-[#EF4444] border border-[#EF4444] hover:bg-[#FEF2F2] transition-all"
                   >
                     Clear
