@@ -29,7 +29,8 @@ const navItems: NavItem[] = [
   { id: "dashboard", label: "Dashboard", icon: "lucide:layout-dashboard" },
   { id: "cases", label: "My Cases", icon: "lucide:file-text" },
   { id: "prescriptions", label: "Prescriptions", icon: "lucide:pill" },
-  { id: "messages", label: "Messages", icon: "lucide:message-circle" },
+  { id: "messages", label: "Doctor Messages", icon: "lucide:message-circle" },
+  { id: "support-messages", label: "Support Messages", icon: "lucide:headphones" },
   { id: "account", label: "Account", icon: "lucide:user" },
 ];
 
@@ -318,7 +319,7 @@ function MDIDashboardContent({ setActiveTab }: { setActiveTab: (tab: string) => 
                   <Icon icon="lucide:message-circle" className="text-lg text-secondary" />
                 </div>
                 <div>
-                  <h3 className="font-medium">Messages</h3>
+                  <h3 className="font-medium">Doctor Messages</h3>
                   <p className="text-xs text-foreground-500">Chat with clinicians</p>
                 </div>
               </div>
@@ -1397,7 +1398,7 @@ function MDIMessagesContent() {
     try {
       setLoading(true);
       setError(null);
-      const response = await apiCall('/messages?channel=support&per_page=50');
+      const response = await apiCall('/messages?per_page=50');
       
       if (response.success && response.data) {
         // Handle nested response structure: { success: true, data: { data: Message[], links: {}, meta: {} } }
@@ -1432,6 +1433,306 @@ function MDIMessagesContent() {
       }
     } catch (err: any) {
       console.error('Error fetching messages:', err);
+      setError(err.message || 'Failed to load messages');
+      setMessages([]); // Ensure messages is always an array even on error
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchMessages();
+  }, [fetchMessages]);
+
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    if (messages.length > 0 && !loading) {
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+    }
+  }, [messages.length, loading]);
+
+  const handleSendMessage = async () => {
+    if (!newMessage.trim() || sending) return;
+
+    const messageText = newMessage.trim();
+    const tempId = `temp-${Date.now()}`;
+    
+    // Optimistically add the message to the UI immediately
+    const optimisticMessage: Message = {
+      id: tempId,
+      patient_id: user?.id || '',
+      channel: 'patient',
+      text: messageText,
+      user_type: 'patient',
+      user_id: user?.id || '',
+      user_name: null,
+      created_at: new Date().toISOString(),
+      user: null
+    };
+
+    // Add optimistic message to the list and sort
+    setMessages(prev => {
+      const updated = [...prev, optimisticMessage];
+      // Sort by created_at to maintain order
+      return updated.sort((a, b) => {
+        const dateA = new Date(a.created_at).getTime();
+        const dateB = new Date(b.created_at).getTime();
+        return dateA - dateB;
+      });
+    });
+    setNewMessage('');
+    setSending(true);
+    
+    // Scroll to bottom after adding optimistic message
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
+
+    try {
+      const response = await apiCall('/messages', {
+        method: 'POST',
+        body: JSON.stringify({
+          channel: 'patient',
+          text: messageText
+        })
+      });
+      
+      if (response.success) {
+        // If the API returns the created message, replace the optimistic one
+        if (response.data?.data) {
+          const createdMessage = response.data.data;
+          setMessages(prev => {
+            // Remove the optimistic message and add the real one, then sort
+            const filtered = prev.filter(msg => msg.id !== tempId);
+            const updated = [...filtered, createdMessage];
+            // Sort by created_at to maintain order
+            return updated.sort((a, b) => {
+              const dateA = new Date(a.created_at).getTime();
+              const dateB = new Date(b.created_at).getTime();
+              return dateA - dateB;
+            });
+          });
+          // Scroll to bottom after adding new message
+          setTimeout(() => {
+            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+          }, 100);
+        } else {
+          // If no message returned, just remove the optimistic one and fetch the latest
+          // This is a fallback - ideally the API should return the created message
+          setMessages(prev => prev.filter(msg => msg.id !== tempId));
+          // Silently fetch in the background to get the real message
+          fetchMessages();
+        }
+      } else {
+        // Remove optimistic message on error
+        setMessages(prev => prev.filter(msg => msg.id !== tempId));
+        setNewMessage(messageText); // Restore the message text
+        alert('Failed to send message. Please try again.');
+      }
+    } catch (err: any) {
+      console.error('Error sending message:', err);
+      // Remove optimistic message on error
+      setMessages(prev => prev.filter(msg => msg.id !== tempId));
+      setNewMessage(messageText); // Restore the message text
+      alert('Failed to send message. Please try again.');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="max-w-4xl mx-auto flex items-center justify-center py-20">
+        <Spinner size="lg" color="secondary" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-4xl mx-auto flex flex-col h-[calc(100vh-200px)]">
+      <div className="mb-4">
+        <h1 className="text-2xl font-bold mb-1">Doctor Messages</h1>
+        <p className="text-foreground-500">
+          Communicate with your assigned clinicians
+        </p>
+      </div>
+
+      <Card className="flex-1 flex flex-col overflow-hidden">
+        <CardBody className="flex-1 overflow-y-auto p-4">
+          {error ? (
+            <div className="text-center py-8">
+              <Icon icon="lucide:alert-circle" className="text-3xl text-danger mx-auto mb-2" />
+              <p className="text-danger">{error}</p>
+              <Button color="danger" variant="flat" size="sm" className="mt-4" onPress={fetchMessages}>
+                Try Again
+              </Button>
+            </div>
+          ) : !Array.isArray(messages) || messages.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="w-16 h-16 rounded-full bg-secondary/20 flex items-center justify-center mx-auto mb-4">
+                <Icon icon="lucide:message-circle" className="text-3xl text-secondary" />
+              </div>
+              <h2 className="text-lg font-semibold mb-2">No Messages Yet</h2>
+              <p className="text-foreground-500 max-w-sm mx-auto">
+                Start a conversation with your clinician. They'll respond to any questions about your prescriptions.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {Array.isArray(messages) && messages.map((msg) => {
+                // Patient messages: user_type contains 'Patient' OR user_id matches current user
+                const isFromUser = msg.user_type?.includes('Patient') || msg.user_id === user?.id;
+                // System messages: user_type is 'system' OR no user
+                const isSystemMessage = msg.user_type === 'system' || !msg.user;
+                // Doctor/Clinician messages: user_type contains 'Clinician' AND not from patient, AND not system
+                const isDoctorMessage = !isFromUser && !isSystemMessage && msg.user_type?.includes('Clinician');
+                return (
+                  <div
+                    key={msg.id}
+                    className={`flex ${isFromUser ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div className={`max-w-[80%] ${isFromUser ? 'order-2' : 'order-1'}`}>
+                      {!isFromUser && !isSystemMessage && msg.user && (
+                        <div className="flex items-center gap-2 mb-1">
+                          <div className={isDoctorMessage ? 'ring-2 ring-green-300 rounded-full' : ''}>
+                            <Avatar
+                              size="sm"
+                              name={`${msg.user.first_name} ${msg.user.last_name}`}
+                              src={msg.user.profile_url}
+                              classNames={{
+                                base: isDoctorMessage ? 'bg-green-100' : '',
+                                name: isDoctorMessage ? 'text-green-900 font-semibold' : '',
+                              }}
+                            />
+                          </div>
+                          <span className="text-sm font-medium">
+                            Dr. {msg.user.first_name} {msg.user.last_name}
+                          </span>
+                          {msg.user.specialty && (
+                            <span className="text-xs text-foreground-400">
+                              {msg.user.specialty}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      {isSystemMessage && (
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center">
+                            <Icon icon="lucide:info" className="text-xs text-blue-600" />
+                          </div>
+                          <span className="text-xs text-blue-600 font-medium">System Message</span>
+                        </div>
+                      )}
+                      <div
+                        className={`rounded-2xl px-4 py-3 ${
+                          isFromUser
+                            ? 'bg-content2 text-foreground rounded-br-md'
+                            : isSystemMessage
+                            ? 'bg-blue-50 border border-blue-200 text-foreground rounded-bl-md'
+                            : isDoctorMessage
+                            ? 'bg-green-100 text-green-900 border border-green-200 rounded-bl-md'
+                            : 'bg-content2 text-foreground rounded-bl-md'
+                        }`}
+                      >
+                        {isSystemMessage ? (
+                          <div className="text-sm whitespace-pre-wrap leading-relaxed">
+                            {renderMessageWithLinks(msg.text)}
+                          </div>
+                        ) : (
+                          <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
+                        )}
+                      </div>
+                      <p className={`text-xs text-foreground-400 mt-1 ${isFromUser ? 'text-right' : ''}`}>
+                        {new Date(msg.created_at).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+              {/* Scroll anchor for auto-scrolling to bottom */}
+              <div ref={messagesEndRef} />
+            </div>
+          )}
+        </CardBody>
+
+        {/* Message Input */}
+        <div className="border-t border-content3 p-4">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
+              placeholder="Type a message..."
+              className="flex-1 bg-content2 border border-content3 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-secondary"
+              disabled={sending}
+            />
+            <Button
+              color="secondary"
+              isIconOnly
+              onPress={handleSendMessage}
+              isLoading={sending}
+              isDisabled={!newMessage.trim()}
+            >
+              <Icon icon="lucide:send" />
+            </Button>
+          </div>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+function MDISupportMessagesContent() {
+  const { user } = useAuth();
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [newMessage, setNewMessage] = useState('');
+  const [sending, setSending] = useState(false);
+  const messagesEndRef = React.useRef<HTMLDivElement>(null);
+
+  const fetchMessages = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await apiCall('/messages?channel=support&per_page=50');
+      
+      if (response.success && response.data) {
+        // Handle nested response structure: { success: true, data: { data: Message[], links: {}, meta: {} } }
+        // The actual messages array is in response.data.data
+        const messagesData = response.data.data?.data || response.data.data || response.data;
+        
+        // Ensure messages is always an array
+        const messagesArray = Array.isArray(messagesData) ? messagesData : [];
+        
+        // Sort messages by created_at in ascending order (oldest first, newest last)
+        const sortedMessages = [...messagesArray].sort((a, b) => {
+          const dateA = new Date(a.created_at).getTime();
+          const dateB = new Date(b.created_at).getTime();
+          return dateA - dateB;
+        });
+        
+        setMessages(sortedMessages);
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[MDI-SUPPORT-MESSAGES] Fetched messages:', {
+            count: messagesArray.length,
+            structure: Array.isArray(messagesData) ? 'array' : typeof messagesData,
+            rawResponse: response,
+            messagesData: messagesData,
+          });
+        }
+      } else if (response.error && !response.error.includes('404')) {
+        setError(response.error);
+      } else {
+        // No messages found or empty response - set empty array
+        setMessages([]);
+      }
+    } catch (err: any) {
+      console.error('Error fetching support messages:', err);
       setError(err.message || 'Failed to load messages');
       setMessages([]); // Ensure messages is always an array even on error
     } finally {
@@ -1552,9 +1853,9 @@ function MDIMessagesContent() {
   return (
     <div className="max-w-4xl mx-auto flex flex-col h-[calc(100vh-200px)]">
       <div className="mb-4">
-        <h1 className="text-2xl font-bold mb-1">Messages</h1>
+        <h1 className="text-2xl font-bold mb-1">Support Messages</h1>
         <p className="text-foreground-500">
-          Communicate with your assigned clinicians
+          Get help from our support team
         </p>
       </div>
 
@@ -1571,18 +1872,22 @@ function MDIMessagesContent() {
           ) : !Array.isArray(messages) || messages.length === 0 ? (
             <div className="text-center py-12">
               <div className="w-16 h-16 rounded-full bg-secondary/20 flex items-center justify-center mx-auto mb-4">
-                <Icon icon="lucide:message-circle" className="text-3xl text-secondary" />
+                <Icon icon="lucide:headphones" className="text-3xl text-secondary" />
               </div>
-              <h2 className="text-lg font-semibold mb-2">No Messages Yet</h2>
+              <h2 className="text-lg font-semibold mb-2">No Support Messages Yet</h2>
               <p className="text-foreground-500 max-w-sm mx-auto">
-                Start a conversation with your clinician. They'll respond to any questions about your prescriptions.
+                Reach out to our support team for help with any questions or issues.
               </p>
             </div>
           ) : (
             <div className="space-y-4">
               {Array.isArray(messages) && messages.map((msg) => {
-                const isFromUser = msg.user_type === 'patient' || msg.user_id === user?.id;
+                // System messages: user_type is 'system' OR no user
                 const isSystemMessage = msg.user_type === 'system' || !msg.user;
+                // Patient messages: user_type contains 'Patient' OR user_id matches current user OR user_id matches patient_id
+                const isFromUser = msg.user_type?.includes('Patient') || msg.user_id === user?.id || msg.user_id === msg.patient_id;
+                // Support messages: user_type contains 'SupportStaff' or 'Support' or 'Clinician', AND not from patient, AND not system
+                const isSupportMessage = !isFromUser && !isSystemMessage && (msg.user_type?.includes('SupportStaff') || msg.user_type?.includes('Support') || msg.user_type?.includes('Clinician'));
                 return (
                   <div
                     key={msg.id}
@@ -1591,13 +1896,19 @@ function MDIMessagesContent() {
                     <div className={`max-w-[80%] ${isFromUser ? 'order-2' : 'order-1'}`}>
                       {!isFromUser && !isSystemMessage && msg.user && (
                         <div className="flex items-center gap-2 mb-1">
-                          <Avatar
-                            size="sm"
-                            name={`${msg.user.first_name} ${msg.user.last_name}`}
-                            src={msg.user.profile_url}
-                          />
+                          <div className={isSupportMessage ? 'ring-2 ring-purple-300 rounded-full' : ''}>
+                            <Avatar
+                              size="sm"
+                              name={`${msg.user.first_name} ${msg.user.last_name}`}
+                              src={msg.user.profile_url}
+                              classNames={{
+                                base: isSupportMessage ? 'bg-purple-100' : '',
+                                name: isSupportMessage ? 'text-purple-900 font-semibold' : '',
+                              }}
+                            />
+                          </div>
                           <span className="text-sm font-medium">
-                            Dr. {msg.user.first_name} {msg.user.last_name}
+                            {msg.user.first_name} {msg.user.last_name}
                           </span>
                           {msg.user.specialty && (
                             <span className="text-xs text-foreground-400">
@@ -1617,9 +1928,11 @@ function MDIMessagesContent() {
                       <div
                         className={`rounded-2xl px-4 py-3 ${
                           isFromUser
-                            ? 'bg-secondary text-white rounded-br-md'
+                            ? 'bg-content2 text-foreground rounded-br-md'
                             : isSystemMessage
                             ? 'bg-blue-50 border border-blue-200 text-foreground rounded-bl-md'
+                            : isSupportMessage
+                            ? 'bg-purple-100 text-purple-900 border border-purple-200 rounded-bl-md'
                             : 'bg-content2 text-foreground rounded-bl-md'
                         }`}
                       >
@@ -1742,7 +2055,7 @@ function MDIDashboardPage() {
   // Initialize activeTab from URL query parameter
   React.useEffect(() => {
     const tabFromQuery = router.query.tab as string;
-    if (tabFromQuery && ['dashboard', 'cases', 'prescriptions', 'messages', 'account'].includes(tabFromQuery)) {
+    if (tabFromQuery && ['dashboard', 'cases', 'prescriptions', 'messages', 'support-messages', 'account'].includes(tabFromQuery)) {
       setActiveTab(tabFromQuery);
     }
   }, [router.query.tab]);
@@ -1776,6 +2089,8 @@ function MDIDashboardPage() {
         return <MDIPrescriptionsContent />;
       case "messages":
         return <MDIMessagesContent />;
+      case "support-messages":
+        return <MDISupportMessagesContent />;
       case "account":
         return <MDIAccountContent />;
       default:

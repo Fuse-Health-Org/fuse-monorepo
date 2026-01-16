@@ -163,12 +163,6 @@ export default function SignIn() {
       // If no redirect parameter, use default dashboard
       if (!redirectPath) {
         redirectPath = getDashboardPrefix(clinic);
-        
-        // If clinic uses md-integrations, default to messages tab
-        const dashboardFormat = clinic?.patientPortalDashboardFormat;
-        if (dashboardFormat === 'md-integrations' || dashboardFormat === 'MD_INTEGRATIONS') {
-          redirectPath = `${redirectPath}?tab=messages`;
-        }
       }
       
       console.log('[SIGNIN] Redirecting after login:', { 
@@ -256,12 +250,6 @@ export default function SignIn() {
       // If no redirect parameter, use default dashboard
       if (!redirectPath) {
         redirectPath = getDashboardPrefix(clinic);
-        
-        // If clinic uses md-integrations, default to messages tab
-        const dashboardFormat = clinic?.patientPortalDashboardFormat;
-        if (dashboardFormat === 'md-integrations' || dashboardFormat === 'MD_INTEGRATIONS') {
-          redirectPath = `${redirectPath}?tab=messages`;
-        }
       }
       
       console.log('[SIGNIN] Redirecting after MFA verification:', { 

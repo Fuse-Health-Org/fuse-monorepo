@@ -10,6 +10,7 @@ export const messageCreateSchema = z.object({
   files: z.array(z.object({
     id: z.string(),
   })).optional(),
+  channel: z.enum(['patient', 'support']).optional(),
 });
 
 /**

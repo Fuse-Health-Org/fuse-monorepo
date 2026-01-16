@@ -13472,7 +13472,7 @@ app.post("/webhook/pharmacy", async (req, res) => {
 app.get("/messages", authenticateJWT, async (req, res) => {
   try {
     const currentUser = getCurrentUser(req);
-    const { page = 1, per_page = 15 } = req.query;
+    const { page = 1, per_page = 15, channel } = req.query;
 
     if (!currentUser) {
       return res.status(401).json({
@@ -13481,10 +13481,15 @@ app.get("/messages", authenticateJWT, async (req, res) => {
       });
     }
 
-    const params = {
+    const params: any = {
       page: parseInt(page as string),
       per_page: parseInt(per_page as string),
     };
+
+    // Add channel if provided in query string
+    if (channel && typeof channel === 'string') {
+      params.channel = channel;
+    }
 
     const messages = await MessageService.getMessagesByUserId(
       currentUser.id,
@@ -13537,10 +13542,13 @@ app.post("/messages", authenticateJWT, async (req, res) => {
       });
     }
 
-    const { text, reference_message_id, files } = validation.data;
+    const { text, reference_message_id, files, channel } = validation.data;
+
+    // Default to "patient" channel if not specified
+    const messageChannel = channel || "patient";
 
     const payload = {
-      channel: "patient",
+      channel: messageChannel,
       text,
       reference_message_id,
       files,
