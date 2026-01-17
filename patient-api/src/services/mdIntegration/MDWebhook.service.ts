@@ -566,6 +566,12 @@ class MDWebhookService {
 
             if (Array.isArray(payloadPrescriptions)) {
               payloadPrescriptions.forEach((p: any, idx: number) => {
+                // Log ALL fields to see what MDI sends
+                console.log('[MD-WH] 💊 prescription ALL FIELDS', {
+                  idx,
+                  allKeys: Object.keys(p || {}),
+                  fullObject: JSON.stringify(p, null, 2)
+                });
                 console.log('[MD-WH] 💊 prescription details', {
                   idx,
                   id: p?.id,
@@ -575,7 +581,24 @@ class MDWebhookService {
                   refills: p?.refills,
                   days_supply: p?.days_supply,
                   pharmacy_notes: p?.pharmacy_notes,
-                  dosespot_prescription_id: p?.dosespot_prescription_id
+                  dosespot_prescription_id: p?.dosespot_prescription_id,
+                  // Additional fields that might contain SIG/notes
+                  sig: p?.sig,
+                  clinical_note: p?.clinical_note,
+                  thank_you_note: p?.thank_you_note,
+                  instructions: p?.instructions,
+                  dispense_unit: p?.dispense_unit,
+                });
+              });
+            }
+            
+            // Also log offerings if present
+            if (Array.isArray(payloadOfferings)) {
+              payloadOfferings.forEach((o: any, idx: number) => {
+                console.log('[MD-WH] 🩺 offering ALL FIELDS', {
+                  idx,
+                  allKeys: Object.keys(o || {}),
+                  fullObject: JSON.stringify(o, null, 2)
                 });
               });
             }

@@ -233,6 +233,41 @@ class IronSailOrderService {
 
         // Log MDI prescription data for debugging
         if (hasMdiData) {
+            // Log ALL fields from offerings to find where clinician note is
+            if (mdOfferings && mdOfferings.length > 0) {
+                mdOfferings.forEach((o: any, idx: number) => {
+                    console.log('💊 [IronSail] Full offering object:', {
+                        idx,
+                        allKeys: Object.keys(o || {}),
+                        // Check all possible note/directions fields
+                        directions: o?.directions,
+                        thank_you_note: o?.thank_you_note,
+                        clinical_note: o?.clinical_note,
+                        clinician_note: o?.clinician_note,
+                        notes: o?.notes,
+                        sig: o?.sig,
+                        instructions: o?.instructions,
+                        // Product fields
+                        productKeys: Object.keys(o?.product || {}),
+                        productDirections: o?.product?.directions,
+                        productPharmacyNotes: o?.product?.pharmacy_notes,
+                    });
+                });
+            }
+            
+            // Log prescriptions too
+            if (mdPrescriptions && mdPrescriptions.length > 0) {
+                mdPrescriptions.forEach((p: any, idx: number) => {
+                    console.log('💊 [IronSail] Full prescription object:', {
+                        idx,
+                        allKeys: Object.keys(p || {}),
+                        directions: p?.directions,
+                        sig: p?.sig,
+                        pharmacy_notes: p?.pharmacy_notes,
+                    });
+                });
+            }
+            
             console.log('💊 [IronSail] MDI Prescription data found:', {
                 orderNumber: order.orderNumber,
                 offeringsCount: mdOfferings?.length || 0,
@@ -258,15 +293,39 @@ class IronSailOrderService {
         // Format DOB
         const dob = patient?.dob ? new Date(patient.dob).toISOString().split('T')[0] : '';
 
-        // Priority for SIG: MDI directions > product placeholder > pharmacy coverage > order notes > default
-        const sig = mdiOffering?.directions ||
-            mdiProduct?.directions ||
-            product?.placeholderSig ||
-            coverage?.pharmacyCoverage?.customSig ||
-            coverage?.sig ||
-            order.doctorNotes ||
-            order.notes ||
-            `Take as directed by your healthcare provider`;
+        // Priority for SIG: MDI directions > MDI thank_you_note > product placeholder > pharmacy coverage > order notes > default
+        // Note: MDI clinicians often put instructions in thank_you_note instead of directions field
+        const mdiDirections = mdiOffering?.directions || mdiProduct?.directions;
+        const mdiThankYouNote = (mdiOffering as any)?.thank_you_note || (mdiProduct as any)?.thank_you_note;
+        
+        // Also check prescriptions for thank_you_note
+        const mdiPrescription = mdPrescriptions?.[0];
+        const prescriptionThankYouNote = mdiPrescription?.thank_you_note;
+        const prescriptionDirections = mdiPrescription?.directions;
+        
+        // Use directions if available, otherwise fall back to thank_you_note (which contains INSTRUCTIONS)
+        let sig: string;
+        if (mdiDirections && mdiDirections.trim()) {
+            sig = mdiDirections;
+            console.log('📋 [IronSail] Using MDI directions as SIG');
+        } else if (prescriptionDirections && prescriptionDirections.trim()) {
+            sig = prescriptionDirections;
+            console.log('📋 [IronSail] Using MDI prescription directions as SIG');
+        } else if (mdiThankYouNote && mdiThankYouNote.trim()) {
+            sig = mdiThankYouNote;
+            console.log('📋 [IronSail] Using MDI thank_you_note as SIG (fallback)');
+        } else if (prescriptionThankYouNote && prescriptionThankYouNote.trim()) {
+            sig = prescriptionThankYouNote;
+            console.log('📋 [IronSail] Using MDI prescription thank_you_note as SIG (fallback)');
+        } else {
+            sig = product?.placeholderSig ||
+                coverage?.pharmacyCoverage?.customSig ||
+                coverage?.sig ||
+                order.doctorNotes ||
+                order.notes ||
+                `Take as directed by your healthcare provider`;
+            console.log('📋 [IronSail] Using product/coverage/default SIG');
+        }
 
         // Priority for quantity/dispense: MDI quantity > order quantity
         const mdiQuantity = mdiProduct?.quantity;
@@ -435,41 +494,47 @@ class IronSailOrderService {
             doc.fontSize(14).text('Medication', 0, doc.y, { align: 'center', underline: true });
             doc.moveDown(1);
 
-            // === THIRD GRID (Labels left, values span middle + right) ===
-            startY = doc.y;
-            const labelWidth = 100; // Slightly wider for NDC label
+            // Use row-by-row layout to handle long text properly
+            const labelWidth = 110;
+            const valueWidth = 580;
+            
+            // Helper function to add a row with label and value
+            const addRow = (label: string, value: string) => {
+                const rowY = doc.y;
+                doc.font('Helvetica-Bold').text(label, col1, rowY, { width: labelWidth, continued: false });
+                doc.font('Helvetica').text(value, col1 + labelWidth, rowY, { width: valueWidth });
+                doc.moveDown(0.3);
+            };
 
-            doc.fontSize(10).text('Name:', col1, startY, { width: labelWidth });
-            // Include NDC if available
+            // Medication details - compact rows
+            addRow('Name:', data.productName + (data.productSKU ? ' (' + data.productSKU + ')' : ''));
             if (data.ndc) {
-                doc.text('NDC:', col1, doc.y, { width: labelWidth });
+                addRow('NDC:', data.ndc);
             }
-            doc.text('RX ID:', col1, doc.y, { width: labelWidth });
-            doc.text('Medication Form:', col1, doc.y, { width: labelWidth });
-            doc.text('Sig:', col1, doc.y, { width: labelWidth });
-            doc.text('Dispense:', col1, doc.y, { width: labelWidth });
-            doc.text('Days Supply:', col1, doc.y, { width: labelWidth });
-            doc.text('Refills:', col1, doc.y, { width: labelWidth });
+            addRow('RX ID:', data.rxId || 'N/A');
+            addRow('Medication Form:', data.medicationForm || 'N/A');
+            addRow('Dispense:', data.dispense);
+            addRow('Days Supply:', data.daysSupply);
+            addRow('Refills:', data.refills);
 
-            // Values (spanning middle + right columns) - wider for 30% increase
-            const valueCol = col1 + labelWidth + 10;
-            doc.text(data.productName + (data.productSKU ? ' (' + data.productSKU + ')' : ''), valueCol, startY, { width: 500 });
-            if (data.ndc) {
-                doc.text(data.ndc, valueCol, doc.y, { width: 500 });
-            }
-            doc.text(data.rxId || 'N/A', valueCol, doc.y, { width: 500 });
-            doc.text(data.medicationForm || 'N/A', valueCol, doc.y, { width: 500 });
-            doc.text(data.sig, valueCol, doc.y, { width: 500 });
-            doc.text(data.dispense, valueCol, doc.y, { width: 500 });
-            doc.text(data.daysSupply, valueCol, doc.y, { width: 500 });
-            doc.text(data.refills, valueCol, doc.y, { width: 500 });
+            // SIG gets its own section since it can be long
+            doc.moveDown(1);
+            doc.fontSize(12).font('Helvetica-Bold').text('Sig (Directions):', col1);
+            doc.moveDown(0.5);
+            doc.fontSize(10).font('Helvetica');
+            
+            // Draw a box around the SIG for better readability
+            const sigStartY = doc.y;
+            doc.rect(col1, sigStartY, 695, 80).stroke();
+            doc.text(data.sig, col1 + 10, sigStartY + 10, { width: 675, height: 70 });
+            doc.y = sigStartY + 90;
 
             // Add pharmacy notes section if available (from MDI)
             if (data.pharmacyNotes) {
-                doc.moveDown(2);
-                doc.fontSize(14).text('Pharmacy Notes', 0, doc.y, { align: 'center', underline: true });
                 doc.moveDown(1);
-                doc.fontSize(10).text(data.pharmacyNotes, col1, doc.y, { width: 695 });
+                doc.fontSize(12).font('Helvetica-Bold').text('Pharmacy Notes:', col1);
+                doc.moveDown(0.5);
+                doc.fontSize(10).font('Helvetica').text(data.pharmacyNotes, col1, doc.y, { width: 695 });
             }
 
             doc.end();
