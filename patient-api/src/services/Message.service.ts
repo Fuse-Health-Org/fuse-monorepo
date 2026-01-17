@@ -9,7 +9,7 @@ const MDI_ERROR_MESSAGE_MAP: Record<string, string> = {
     "Paciente no encontrado en MDI. Verifica el mdPatientId.",
   "provider not found":
     "Proveedor no encontrado en MDI. Revisa la configuración de credenciales.",
-  "invalid channel": 'Canal inválido en MDI. Asegúrate de usar "patient".',
+  "invalid channel": 'Canal inválido en MDI. Asegúrate de usar "patient" o "support".',
 };
 
 const normalizeMdiError = (error: unknown): string => {
@@ -45,9 +45,11 @@ class MessageService {
     });
 
     try {
+      // Use channel from params if provided, otherwise default to "patient"
+      const channel = params.channel || "patient";
       return await MDMessagesService.getMessages(user.mdPatientId, {
         ...params,
-        channel: "patient",
+        channel,
       });
     } catch (error) {
       throw new Error(normalizeMdiError(error));

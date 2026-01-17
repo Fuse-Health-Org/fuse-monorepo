@@ -102,27 +102,41 @@ export const createUserAccount = async (
   lastName: string,
   email: string,
   phoneNumber: string,
-  clinicId?: string
+  clinicId?: string,
+  dob?: string,
+  gender?: string
 ): Promise<{ success: boolean; userId?: string; error?: string }> => {
   try {
     console.log('🔐 Creating user account with data:', {
       firstName,
       lastName,
       email,
-      phoneNumber
+      phoneNumber,
+      dob,
+      gender
     });
+
+    const signupPayload: any = {
+      firstName,
+      lastName,
+      email,
+      phoneNumber,
+      password: Math.random().toString(36).slice(-12) + 'Aa1!', // Generate stronger password
+      role: 'patient', // Backend automatically creates UserRoles entry with patient: true
+      clinicId: clinicId || null
+    };
+
+    // Add dob and gender if provided
+    if (dob) {
+      signupPayload.dob = dob;
+    }
+    if (gender) {
+      signupPayload.gender = gender;
+    }
 
     const result = await apiCall('/auth/signup', {
       method: 'POST',
-      body: JSON.stringify({
-        firstName,
-        lastName,
-        email,
-        phoneNumber,
-        password: Math.random().toString(36).slice(-12) + 'Aa1!', // Generate stronger password
-        role: 'patient', // Backend automatically creates UserRoles entry with patient: true
-        clinicId: clinicId || null
-      })
+      body: JSON.stringify(signupPayload)
     });
 
     if (result.success && result.data) {

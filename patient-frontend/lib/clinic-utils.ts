@@ -19,7 +19,9 @@ export interface Clinic {
  * @returns '/fuse-dashboard' or '/mdi-dashboard'
  */
 export function getDashboardPrefix(clinic?: Clinic | null): string {
-  if (clinic?.patientPortalDashboardFormat === 'md-integrations') {
+  // Normalize the format value to handle both enum and string formats
+  const format = clinic?.patientPortalDashboardFormat;
+  if (format === 'md-integrations') {
     return '/mdi-dashboard';
   }
   return '/fuse-dashboard';

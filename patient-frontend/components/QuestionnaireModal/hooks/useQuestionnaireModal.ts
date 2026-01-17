@@ -4,7 +4,7 @@ import { replaceVariables, getVariablesFromClinic } from "../../../lib/templateV
 import { signInUser, createUserAccount as createUserAccountAPI, signInWithGoogle } from "../auth";
 import { createEmailVerificationHandlers } from "../emailVerification";
 import { trackFormConversion } from "../../../lib/analytics";
-import { QuestionnaireModalProps, QuestionnaireData, PlanOption } from "../types";
+import { QuestionnaireModalProps, QuestionnaireData, PlanOption, PaymentStatus } from "../types";
 import { useQuestionnaireData } from "./useQuestionnaireData";
 import { useGoogleOAuth } from "./useGoogleOAuth";
 import { useGoogleMfa } from "./useGoogleMfa";
@@ -45,7 +45,7 @@ export function useQuestionnaireModal(
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
-  const [paymentStatus, setPaymentStatus] = useState<'idle' | 'processing' | 'succeeded' | 'failed'>('idle');
+  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>('idle');
   const [userId, setUserId] = useState<string | null>(null);
   const [accountCreated, setAccountCreated] = useState(false);
   const [patientName, setPatientName] = useState<string>('');
@@ -534,7 +534,13 @@ export function useQuestionnaireModal(
     setPatientFirstName(firstName);
     setPatientName(`${firstName} ${lastName}`.trim());
     const result = await createUserAccountAPI(
-      answers['firstName'], answers['lastName'], answers['email'], answers['mobile'], domainClinic?.id
+      answers['firstName'], 
+      answers['lastName'], 
+      answers['email'], 
+      answers['mobile'], 
+      domainClinic?.id,
+      answers['dob'] || answers['dateOfBirth'],
+      answers['gender']
     );
     if (result.success && result.userId) {
       setUserId(result.userId);
@@ -725,17 +731,21 @@ export function useQuestionnaireModal(
       console.log('🎉 [CHECKOUT] Conversion tracked');
 
       // Create MD Integrations case if clinic uses md-integrations format
-      if (orderId) {
-        console.log('🎉 [CHECKOUT] Order ID exists, attempting MDI case creation...');
+      const dashboardFormat = (domainClinic as any)?.patientPortalDashboardFormat;
+      const needsMDCase = dashboardFormat === 'md-integrations' || dashboardFormat === 'MD_INTEGRATIONS';
+      
+      if (needsMDCase && orderId) {
+        console.log('🎉 [CHECKOUT] Clinic uses MD Integrations, creating case...');
+        setPaymentStatus('creatingMDCase'); // Update status to show MD case creation in progress
         await createMDCase(orderId);
+        console.log('✅ [CHECKOUT] MD case creation complete');
       } else {
-        console.log('⚠️ [CHECKOUT] No order ID available for MDI case creation');
+        console.log('ℹ️ [CHECKOUT] Skipping MD case creation (not md-integrations format or no orderId)');
       }
 
-      console.log('🎉 [CHECKOUT] ========== CHECKOUT COMPLETE ==========');
-      
-      // Modal is already open from handlePaymentConfirm, just update status to succeeded
-      // The modal will automatically show success state because paymentStatus is now 'succeeded'
+      // Set status to ready - all steps complete, user can now continue to dashboard
+      setPaymentStatus('ready');
+      console.log('🎉 [CHECKOUT] ========== CHECKOUT COMPLETE - READY TO REDIRECT ==========');
       
     } catch (error) {
       console.error('❌ [CHECKOUT] Payment success handler error:', error);
@@ -769,9 +779,13 @@ export function useQuestionnaireModal(
       
       console.log('🔍 [CHECKOUT] Determining redirect clinic:', {
         hasOrderId: !!orderId,
+        orderId: orderId,
         hasUserId: !!userId,
+        userId: userId,
         domainClinicFormat: (domainClinic as any)?.patientPortalDashboardFormat,
         domainClinicId: domainClinic?.id,
+        domainClinicName: domainClinic?.name,
+        domainClinicSlug: domainClinic?.slug,
       });
       
       // Try to get clinic from order first (if we have orderId)
@@ -817,7 +831,13 @@ export function useQuestionnaireModal(
       
       // Determine the correct dashboard based on clinic's patientPortalDashboardFormat
       const dashboardFormat = (clinicForRedirect as any)?.patientPortalDashboardFormat;
-      const dashboardPrefix = getDashboardPrefix(clinicForRedirect);
+      let dashboardPrefix = getDashboardPrefix(clinicForRedirect);
+      
+      // For MD Integrations, redirect to messages tab after checkout
+      // Normalize format to handle both 'md-integrations' and 'MD_INTEGRATIONS'
+      if (dashboardFormat === 'md-integrations' || dashboardFormat === 'MD_INTEGRATIONS') {
+        dashboardPrefix = `${dashboardPrefix}?tab=messages`;
+      }
       
       console.log('🎉 [CHECKOUT] Final redirect decision:', {
         dashboardPrefix,
@@ -828,32 +848,96 @@ export function useQuestionnaireModal(
         source: clinicForRedirect === domainClinic ? 'domainClinic' : 'order/user',
       });
       
+      // Build full URL to handle subdomain correctly BEFORE closing modals
+      const protocol = typeof window !== 'undefined' ? window.location.protocol : 'http:';
+      const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
+      const port = typeof window !== 'undefined' && window.location.port ? `:${window.location.port}` : '';
+      const baseUrl = `${protocol}//${hostname}${port}`;
+      const fullUrl = `${baseUrl}${dashboardPrefix}`;
+      
+      console.log('🎉 [CHECKOUT] Prepared redirect URL:', {
+        dashboardPrefix,
+        fullUrl,
+        currentUrl: typeof window !== 'undefined' ? window.location.href : 'N/A',
+        hostname,
+        willRedirectIn: '300ms',
+      });
+      
       // Close success modal and main modal
       setShowSuccessModal(false);
       onClose();
       
+      // Check if user is authenticated before redirecting
+      // If not authenticated, redirect to signin with return URL
+      const isAuthenticated = typeof window !== 'undefined' && localStorage.getItem('auth-token');
+      
+      if (!isAuthenticated) {
+        console.log('⚠️ [CHECKOUT] User not authenticated, redirecting to signin with return URL');
+        const signinUrl = `${baseUrl}/signin?redirect=${encodeURIComponent(dashboardPrefix)}`;
+        setShowSuccessModal(false);
+        onClose();
+        setTimeout(() => {
+          if (typeof window !== 'undefined') {
+            window.location.replace(signinUrl);
+          }
+        }, 500);
+        return;
+      }
+      
       // Redirect after a short delay to allow modals to close
+      // Use a longer timeout to ensure modals are fully closed
       setTimeout(() => {
         if (typeof window !== 'undefined') {
-          console.log('🎉 [CHECKOUT] Executing redirect to:', dashboardPrefix);
-          window.location.href = dashboardPrefix;
+          console.log('🎉 [CHECKOUT] Executing redirect NOW:', {
+            dashboardPrefix,
+            fullUrl,
+            currentUrl: window.location.href,
+            hostname,
+            timestamp: new Date().toISOString(),
+            isAuthenticated: true,
+          });
+          
+          // Use window.location.replace to avoid adding to history
+          // This prevents back button issues
+          window.location.replace(fullUrl);
         } else {
           console.error('❌ [CHECKOUT] window is undefined, cannot redirect');
         }
-      }, 300);
+      }, 500);
     } catch (error) {
       console.error('❌ [CHECKOUT] Error in handleSuccessModalContinue:', error);
       // Fallback to domainClinic if there's an error
-      const dashboardPrefix = getDashboardPrefix(domainClinic);
+      let dashboardPrefix = getDashboardPrefix(domainClinic);
+      const dashboardFormat = (domainClinic as any)?.patientPortalDashboardFormat;
+      
+      // For MD Integrations, redirect to messages tab after checkout
+      // Normalize format to handle both 'md-integrations' and 'MD_INTEGRATIONS'
+      if (dashboardFormat === 'md-integrations' || dashboardFormat === 'MD_INTEGRATIONS') {
+        dashboardPrefix = `${dashboardPrefix}?tab=messages`;
+      }
+      
       console.warn('⚠️ [CHECKOUT] Using fallback domainClinic for redirect:', {
         dashboardPrefix,
-        patientPortalDashboardFormat: (domainClinic as any)?.patientPortalDashboardFormat,
+        patientPortalDashboardFormat: dashboardFormat,
       });
       setShowSuccessModal(false);
       onClose();
       setTimeout(() => {
         if (typeof window !== 'undefined') {
-          window.location.href = dashboardPrefix;
+          // Build full URL to handle subdomain correctly
+          const protocol = window.location.protocol;
+          const hostname = window.location.hostname;
+          const port = window.location.port ? `:${window.location.port}` : '';
+          const baseUrl = `${protocol}//${hostname}${port}`;
+          const fullUrl = `${baseUrl}${dashboardPrefix}`;
+          
+          console.log('⚠️ [CHECKOUT] Fallback redirect:', {
+            dashboardPrefix,
+            fullUrl,
+            currentUrl: window.location.href,
+          });
+          
+          window.location.href = fullUrl;
         }
       }, 300);
     }

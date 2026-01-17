@@ -3,7 +3,7 @@ import { Button } from "@heroui/react";
 import { ProgressBar } from "./ProgressBar";
 import { StepHeader } from "./StepHeader";
 import { CheckoutView } from "./CheckoutView";
-import { PlanOption, ProgramData } from "../types";
+import { PlanOption, ProgramData, PaymentStatus } from "../types";
 
 interface CheckoutStepViewProps {
   progressPercent: number;
@@ -15,7 +15,7 @@ interface CheckoutStepViewProps {
   plans: PlanOption[];
   selectedPlan: string;
   onPlanChange: (planId: string) => void;
-  paymentStatus: 'idle' | 'processing' | 'succeeded' | 'failed';
+  paymentStatus: PaymentStatus;
   clientSecret: string | null;
   shippingInfo: any;
   onShippingInfoChange: (field: string, value: any) => void;

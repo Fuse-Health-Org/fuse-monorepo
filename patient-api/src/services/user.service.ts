@@ -98,6 +98,14 @@ class UserService {
   }
 
   async mapUserToMDPatientRequest(user: User, addressId?: string) {
+    // Validate required fields
+    if (!user.firstName) throw new Error('User firstName is required for MD Integrations');
+    if (!user.lastName) throw new Error('User lastName is required for MD Integrations');
+    if (!user.email) throw new Error('User email is required for MD Integrations');
+    if (!user.dob) throw new Error('User dob is required for MD Integrations');
+    if (!user.gender) throw new Error('User gender is required for MD Integrations');
+    if (!user.phoneNumber) throw new Error('User phoneNumber is required for MD Integrations');
+
     let address;
 
     if (addressId) {
@@ -106,6 +114,26 @@ class UserService {
       });
 
       if (shippingAddress) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[MD-SYNC] ShippingAddress details:', {
+            country: shippingAddress.country,
+            state: shippingAddress.state,
+            zipCode: shippingAddress.zipCode,
+            city: shippingAddress.city,
+            address: shippingAddress.address,
+          });
+        }
+
+        // MD Integrations requires US addresses - validate country (case-insensitive)
+        const countryUpper = shippingAddress.country?.toUpperCase();
+        if (countryUpper && countryUpper !== 'US') {
+          const errorMsg = `MD Integrations only supports US addresses. Current country: ${shippingAddress.country}. Please provide a US shipping address.`;
+          if (process.env.NODE_ENV === 'development') {
+            console.error('[MD-SYNC] ❌ Address validation failed:', errorMsg);
+          }
+          throw new Error(errorMsg);
+        }
+
         address = {
           address: shippingAddress.address,
           address2: shippingAddress.apartment || undefined,
@@ -117,21 +145,25 @@ class UserService {
     }
 
     if (!address) {
+      // Try to use user's address fields, but validate they exist
+      if (!user.address || !user.city || !user.state || !user.zipCode) {
+        throw new Error('Shipping address is required for MD Integrations - either provide addressId or user must have address, city, state, and zipCode');
+      }
       address = {
-        address: user.address!,
-        city_name: user.city!,
-        state_name: user.state!,
-        zip_code: user.zipCode!,
+        address: user.address,
+        city_name: user.city,
+        state_name: user.state,
+        zip_code: user.zipCode,
       };
     }
 
     return {
-      first_name: user.firstName!,
-      last_name: user.lastName!,
-      email: user.email!,
-      date_of_birth: user.dob!,
-      gender: this.mapGenderToMDFormat(user.gender!),
-      phone_number: this.formatPhoneNumberToUS(user.phoneNumber!),
+      first_name: user.firstName,
+      last_name: user.lastName,
+      email: user.email,
+      date_of_birth: user.dob,
+      gender: this.mapGenderToMDFormat(user.gender),
+      phone_number: this.formatPhoneNumberToUS(user.phoneNumber),
       phone_type: this.validatePhoneTypeForMD(),
       address: address,
       allergies:
@@ -159,16 +191,53 @@ class UserService {
       );
 
       if (!user.mdPatientId) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[MD-SYNC] Creating new patient in MD Integrations with data:', {
+            firstName: mdPatientRequest.first_name,
+            lastName: mdPatientRequest.last_name,
+            email: mdPatientRequest.email,
+            hasDob: Boolean(mdPatientRequest.date_of_birth),
+            dob: mdPatientRequest.date_of_birth,
+            hasGender: Boolean(mdPatientRequest.gender),
+            gender: mdPatientRequest.gender,
+            hasPhone: Boolean(mdPatientRequest.phone_number),
+            phoneNumber: mdPatientRequest.phone_number,
+            hasAddress: Boolean(mdPatientRequest.address),
+            address: mdPatientRequest.address,
+          });
+          console.log('[MD-SYNC] Full payload being sent to MD Integrations:', JSON.stringify(mdPatientRequest, null, 2));
+        }
+        
         const mdResult = await MDPatientService.createPatient(
           mdPatientRequest,
           tokenResponse.access_token
         );
 
-        if (mdResult.patient_id) {
-          await User.update(
-            { mdPatientId: mdResult.patient_id },
-            { where: { id: userId } }
-          );
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[MD-SYNC] MD createPatient response:', {
+            hasPatientId: Boolean(mdResult?.patient_id),
+            patientId: mdResult?.patient_id,
+            fullResponse: JSON.stringify(mdResult, null, 2),
+          });
+        }
+
+        if (!mdResult || !mdResult.patient_id) {
+          throw new Error(`MD Integrations createPatient did not return patient_id. Response: ${JSON.stringify(mdResult)}`);
+        }
+
+        await User.update(
+          { mdPatientId: mdResult.patient_id },
+          { where: { id: userId } }
+        );
+        
+        // Reload user to get the updated mdPatientId
+        await user.reload();
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[MD-SYNC] ✅ Patient created in MD Integrations:', {
+            mdPatientId: user.mdPatientId,
+            userId: user.id,
+          });
         }
       } else {
         await MDPatientService.updatePatient(
@@ -176,9 +245,14 @@ class UserService {
           mdPatientRequest,
           tokenResponse.access_token
         );
+        await user.reload();
       }
 
-      await user.reload();
+      // Final verification that mdPatientId is set
+      if (!user.mdPatientId) {
+        throw new Error('Failed to set mdPatientId after sync - user update may have failed');
+      }
+
       return user;
     } catch (error) {
       // Try to get user info for logging if available

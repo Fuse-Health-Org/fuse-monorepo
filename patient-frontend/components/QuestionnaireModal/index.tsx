@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Modal, ModalContent, ModalBody } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { stripePromise } from "../../lib/stripe";
-import { QuestionnaireModalProps } from "./types";
+import { QuestionnaireModalProps, PaymentStatus } from "./types";
 import { useClinicFromDomain } from "../../hooks/useClinicFromDomain";
 import { useQuestionnaireModal } from "./hooks/useQuestionnaireModal";
 import { LoadingState } from "./components/LoadingState";
@@ -289,7 +289,7 @@ export const QuestionnaireModal: React.FC<QuestionnaireModalProps> = (props) => 
                         plans={modal.plans}
                         selectedPlan={modal.selectedPlan}
                         onPlanChange={modal.handlePlanSelection}
-                        paymentStatus={modal.paymentStatus}
+                        paymentStatus={modal.paymentStatus as PaymentStatus}
                         clientSecret={modal.clientSecret}
                         shippingInfo={modal.shippingInfo}
                         onShippingInfoChange={(field, value) =>
@@ -321,7 +321,7 @@ export const QuestionnaireModal: React.FC<QuestionnaireModalProps> = (props) => 
                         onProductQuantityChange={modal.handleProductQuantityChange}
                         onNext={modal.handleNext}
                         isCheckoutStep={modal.isCheckoutStep}
-                        paymentStatus={modal.paymentStatus}
+                        paymentStatus={modal.paymentStatus as PaymentStatus}
                         isLastStep={isLastStep}
                         isProductSelectionStep={modal.isProductSelectionStep}
                       />
@@ -353,7 +353,7 @@ export const QuestionnaireModal: React.FC<QuestionnaireModalProps> = (props) => 
                             <>
                               <StepNavigationButtons
                                 isCheckoutStep={modal.isCheckoutStep}
-                                paymentStatus={modal.paymentStatus}
+                                paymentStatus={modal.paymentStatus as PaymentStatus}
                                 currentStep={currentStep}
                                 isSignInMode={modal.isSignInMode}
                                 isEmailVerificationMode={modal.isEmailVerificationMode}
@@ -409,7 +409,7 @@ export const QuestionnaireModal: React.FC<QuestionnaireModalProps> = (props) => 
 
       <OrderSuccessModal
         isOpen={modal.showSuccessModal}
-        isProcessing={modal.paymentStatus === 'processing'}
+        paymentStatus={modal.paymentStatus}
         onContinue={modal.handleSuccessModalContinue}
       />
     </>

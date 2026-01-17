@@ -156,7 +156,21 @@ export default function SignIn() {
 
       // Refresh user state and redirect to dashboard
       await refreshUser();
-      router.push(getDashboardPrefix(clinic));
+      
+      // Use redirect parameter if provided
+      let redirectPath = router.query.redirect as string;
+      
+      // If no redirect parameter, use default dashboard
+      if (!redirectPath) {
+        redirectPath = getDashboardPrefix(clinic);
+      }
+      
+      console.log('[SIGNIN] Redirecting after login:', { 
+        redirectPath, 
+        hasRedirectParam: !!router.query.redirect,
+        clinicFormat: clinic?.patientPortalDashboardFormat,
+      });
+      router.push(redirectPath);
 
     } catch (err) {
       // HIPAA Compliance: Don't log the actual error which might contain PHI
@@ -229,7 +243,21 @@ export default function SignIn() {
 
       // Refresh user state and redirect
       await refreshUser();
-      router.push(getDashboardPrefix(clinic));
+      
+      // Use redirect parameter if provided
+      let redirectPath = router.query.redirect as string;
+      
+      // If no redirect parameter, use default dashboard
+      if (!redirectPath) {
+        redirectPath = getDashboardPrefix(clinic);
+      }
+      
+      console.log('[SIGNIN] Redirecting after MFA verification:', { 
+        redirectPath, 
+        hasRedirectParam: !!router.query.redirect,
+        clinicFormat: clinic?.patientPortalDashboardFormat,
+      });
+      router.push(redirectPath);
 
     } catch (err) {
       console.error('MFA verification error occurred');

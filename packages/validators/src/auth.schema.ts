@@ -19,6 +19,8 @@ export const signUpSchema = z.object({
   password: passwordSchema,
   role: RoleEnum.optional(),
   dateOfBirth: z.string().optional(),
+  dob: z.string().optional(), // Alias for dateOfBirth
+  gender: z.string().optional(),
   phoneNumber: z.string().optional(),
   clinicName: z.string().optional(),
   clinicId: z.string().optional(),

@@ -1,18 +1,27 @@
 import React from "react";
 import { Icon } from "@iconify/react";
+import { PaymentStatus } from "../types";
 
 interface OrderSuccessModalProps {
   isOpen: boolean;
-  isProcessing: boolean;
+  paymentStatus: PaymentStatus;
   onContinue: () => void;
 }
 
 export const OrderSuccessModal: React.FC<OrderSuccessModalProps> = ({
   isOpen,
-  isProcessing,
+  paymentStatus,
   onContinue,
 }) => {
   if (!isOpen) return null;
+
+  const isProcessing = paymentStatus === 'processing';
+  const isCreatingMDCase = paymentStatus === 'creatingMDCase';
+  const isReady = paymentStatus === 'ready';
+  const isSucceeded = paymentStatus === 'succeeded';
+  const showContinueButton = isReady;
+  const showLoadingState = isProcessing || isCreatingMDCase;
+  const showSuccessState = isSucceeded || isReady;
 
   return (
     <div
@@ -30,7 +39,7 @@ export const OrderSuccessModal: React.FC<OrderSuccessModalProps> = ({
         aria-labelledby="success-modal-title"
         onClick={(e) => e.stopPropagation()}
       >
-        {isProcessing ? (
+        {showLoadingState ? (
           <>
             {/* Loading Animation */}
             <div className="flex justify-center">
@@ -48,10 +57,12 @@ export const OrderSuccessModal: React.FC<OrderSuccessModalProps> = ({
                 id="success-modal-title"
                 className="text-2xl font-semibold text-gray-900"
               >
-                Processing Your Payment
+                {isProcessing ? 'Processing Your Payment' : 'Setting Up Your Account'}
               </h3>
               <p className="text-gray-600 text-base">
-                Please wait while we process your order. This may take a few moments...
+                {isProcessing 
+                  ? 'Please wait while we process your order. This may take a few moments...'
+                  : 'Your payment was successful! We\'re now creating your account and setting everything up...'}
               </p>
             </div>
 
@@ -88,15 +99,17 @@ export const OrderSuccessModal: React.FC<OrderSuccessModalProps> = ({
               </p>
             </div>
 
-            {/* Continue Button */}
-            <button
-              type="button"
-              onClick={onContinue}
-              className="w-full px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-xl transition-colors flex items-center justify-center gap-2 shadow-lg hover:shadow-xl"
-            >
-              <span>Continue to Dashboard</span>
-              <Icon icon="mdi:arrow-right" className="text-xl" />
-            </button>
+            {/* Continue Button - Only show when ready */}
+            {showContinueButton && (
+              <button
+                type="button"
+                onClick={onContinue}
+                className="w-full px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-xl transition-colors flex items-center justify-center gap-2 shadow-lg hover:shadow-xl"
+              >
+                <span>Continue to Dashboard</span>
+                <Icon icon="mdi:arrow-right" className="text-xl" />
+              </button>
+            )}
           </>
         )}
       </div>

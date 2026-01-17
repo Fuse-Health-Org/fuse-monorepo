@@ -458,6 +458,7 @@ export default class User extends Entity {
     password: string;
     role?: 'patient' | 'doctor' | 'admin' | 'brand' | 'affiliate';
     dob?: string;
+    gender?: string;
     phoneNumber?: string;
     website?: string;
     businessType?: string;
@@ -473,6 +474,7 @@ export default class User extends Entity {
       passwordHash,
       role: finalRole, // @deprecated - kept for backwards compatibility
       dob: userData.dob,
+      gender: userData.gender,
       phoneNumber: userData.phoneNumber,
       website: userData.website,
       businessType: userData.businessType,

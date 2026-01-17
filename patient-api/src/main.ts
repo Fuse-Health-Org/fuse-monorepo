@@ -760,6 +760,8 @@ app.post("/auth/signup", async (req, res) => {
       password,
       role,
       dateOfBirth,
+      dob,
+      gender,
       phoneNumber,
       clinicName,
       clinicId,
@@ -858,7 +860,8 @@ app.post("/auth/signup", async (req, res) => {
       email,
       password,
       role: mappedRole,
-      dob: dateOfBirth,
+      dob: dob || dateOfBirth, // Support both dob and dateOfBirth
+      gender: gender ? String(gender).toLowerCase() : undefined,
       phoneNumber,
       website,
       businessType,
@@ -2578,11 +2581,29 @@ app.get("/clinic/by-slug/:slug", async (req, res) => {
     });
 
     const clinicData = clinic.toJSON();
+    
+    // Normalize patientPortalDashboardFormat to ensure it's always a string value
+    const dashboardFormat = clinicData.patientPortalDashboardFormat;
+    const normalizedFormat = dashboardFormat === 'md-integrations' || dashboardFormat === 'MD_INTEGRATIONS' 
+      ? 'md-integrations' 
+      : 'fuse';
+
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[CLINIC] GET /clinic/by-slug/:slug response:', {
+        slug: slug,
+        clinicId: clinic.id,
+        clinicName: clinic.name,
+        rawFormat: dashboardFormat,
+        normalizedFormat: normalizedFormat,
+        willRedirectTo: normalizedFormat === 'md-integrations' ? '/mdi-dashboard?tab=messages' : '/fuse-dashboard',
+      });
+    }
 
     res.json({
       success: true,
       data: {
         ...clinicData,
+        patientPortalDashboardFormat: normalizedFormat,
         userId: brandOwner?.id || null, // Add userId for analytics tracking
       },
     });
@@ -2649,6 +2670,22 @@ app.get("/clinic/:id", authenticateJWT, async (req, res) => {
       });
     }
 
+    // Normalize patientPortalDashboardFormat to ensure it's always a string value
+    const dashboardFormat = (clinic as any).patientPortalDashboardFormat;
+    const normalizedFormat = dashboardFormat === 'md-integrations' || dashboardFormat === 'MD_INTEGRATIONS' 
+      ? 'md-integrations' 
+      : 'fuse';
+
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[CLINIC] GET /clinic/:id response:', {
+        clinicId: clinic.id,
+        clinicName: clinic.name,
+        rawFormat: dashboardFormat,
+        normalizedFormat: normalizedFormat,
+        willRedirectTo: normalizedFormat === 'md-integrations' ? '/mdi-dashboard?tab=messages' : '/fuse-dashboard',
+      });
+    }
+
     res.status(200).json({
       success: true,
       data: {
@@ -2658,7 +2695,7 @@ app.get("/clinic/:id", authenticateJWT, async (req, res) => {
         logo: clinic.logo,
         customDomain: (clinic as any).customDomain,
         isCustomDomain: (clinic as any).isCustomDomain,
-        patientPortalDashboardFormat: (clinic as any).patientPortalDashboardFormat || "fuse",
+        patientPortalDashboardFormat: normalizedFormat,
       },
     });
   } catch (error) {
@@ -8349,6 +8386,17 @@ app.get("/orders/:id", authenticateJWT, async (req, res) => {
       });
     }
 
+    // Log order clinicId for redirect debugging
+    if (process.env.NODE_ENV === 'development') {
+      const orderJson = order.toJSON();
+      console.log('[ORDERS/:ID] Order retrieved for redirect:', {
+        orderId: order.id,
+        orderNumber: (order as any).orderNumber,
+        clinicId: (order as any).clinicId || orderJson.clinicId,
+        userId: order.userId,
+      });
+    }
+
     // Fetch prescriptions for this order (created around the same time)
     const prescriptions = await Prescription.findAll({
       where: {
@@ -13587,7 +13635,7 @@ app.post("/webhook/pharmacy", async (req, res) => {
 app.get("/messages", authenticateJWT, async (req, res) => {
   try {
     const currentUser = getCurrentUser(req);
-    const { page = 1, per_page = 15 } = req.query;
+    const { page = 1, per_page = 15, channel } = req.query;
 
     if (!currentUser) {
       return res.status(401).json({
@@ -13596,10 +13644,15 @@ app.get("/messages", authenticateJWT, async (req, res) => {
       });
     }
 
-    const params = {
+    const params: any = {
       page: parseInt(page as string),
       per_page: parseInt(per_page as string),
     };
+
+    // Add channel if provided in query string
+    if (channel && typeof channel === 'string') {
+      params.channel = channel;
+    }
 
     const messages = await MessageService.getMessagesByUserId(
       currentUser.id,
@@ -13652,10 +13705,13 @@ app.post("/messages", authenticateJWT, async (req, res) => {
       });
     }
 
-    const { text, reference_message_id, files } = validation.data;
+    const { text, reference_message_id, files, channel } = validation.data;
+
+    // Default to "patient" channel if not specified
+    const messageChannel = channel || "patient";
 
     const payload = {
-      channel: "patient",
+      channel: messageChannel,
       text,
       reference_message_id,
       files,
@@ -14271,19 +14327,43 @@ app.post("/md/cases", async (req, res) => {
       // This performs: POST /partner/patients if mdPatientId is missing
       // OR: PATCH /partner/patients/{id} if mdPatientId exists
       const userService = new UserService();
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[MD-CASE] Starting patient sync:', {
+          userId: user.id,
+          hasMdPatientId: Boolean(user.mdPatientId),
+          hasDob: Boolean(user.dob),
+          hasGender: Boolean(user.gender),
+          hasPhone: Boolean(user.phoneNumber),
+          hasShippingAddressId: Boolean((order as any).shippingAddressId),
+        });
+      }
+      
       const syncedUser = await userService.syncPatientInMD(user.id, (order as any).shippingAddressId);
 
       if (!syncedUser) {
-        throw new Error('Failed to sync patient with MD Integrations');
+        const errorDetails = {
+          userId: user.id,
+          hasDob: Boolean(user.dob),
+          hasGender: Boolean(user.gender),
+          hasPhone: Boolean(user.phoneNumber),
+          hasShippingAddressId: Boolean((order as any).shippingAddressId),
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+        };
+        console.error('[MD-CASE] ❌ syncPatientInMD returned null', errorDetails);
+        throw new Error(`Failed to sync patient with MD Integrations. Check server logs for details. User data: ${JSON.stringify(errorDetails)}`);
       }
 
       await user.reload();
 
       if (process.env.NODE_ENV === 'development') {
         const wasNewPatient = !user.mdPatientId && syncedUser.mdPatientId;
-        console.log('[MD-CASE] Patient synced:', {
+        console.log('[MD-CASE] ✅ Patient synced successfully:', {
           wasNewPatient,
-          mdPatientId: syncedUser.mdPatientId || user.mdPatientId
+          mdPatientId: syncedUser.mdPatientId || user.mdPatientId,
+          userId: user.id,
         });
       }
     } catch (e) {
@@ -14296,7 +14376,10 @@ app.post("/md/cases", async (req, res) => {
         hasDob: Boolean(user.dob),
         hasGender: Boolean(user.gender),
         hasPhone: Boolean(user.phoneNumber),
-        hasAddress: Boolean((order as any).shippingAddressId)
+        hasAddress: Boolean((order as any).shippingAddressId),
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
       });
       // Continue to validation - will fail with clear error message if mdPatientId missing
     }
