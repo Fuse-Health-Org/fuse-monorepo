@@ -77,6 +77,7 @@ export default class Clinic extends Entity {
     @Column({
         type: DataType.STRING,
         allowNull: true,
+        unique: true,
     })
     declare customDomain?: string;
 
