@@ -58,6 +58,10 @@ export default function MDIAdmin() {
   // Utils state
   const [patientIdForLicense, setPatientIdForLicense] = useState("")
   const [clearingLicense, setClearingLicense] = useState(false)
+  
+  // Test PDF state
+  const [testPdfEmail, setTestPdfEmail] = useState("grrbm2@gmail.com")
+  const [sendingTestPdf, setSendingTestPdf] = useState(false)
 
   useEffect(() => {
     if (activeTab === "offerings") {
@@ -154,6 +158,35 @@ export default function MDIAdmin() {
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text)
     toast.success(`${label} copied to clipboard`)
+  }
+
+  const handleSendTestPdf = async () => {
+    if (!testPdfEmail.trim()) {
+      toast.error("Please enter an email address")
+      return
+    }
+
+    setSendingTestPdf(true)
+    try {
+      const res = await fetch(`${baseUrl}/test/ironsail-pdf`, {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email: testPdfEmail })
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success(`Test PDF sent to ${testPdfEmail}`)
+      } else {
+        toast.error(data.message || "Failed to send test PDF")
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to send test PDF")
+      console.error(err)
+    } finally {
+      setSendingTestPdf(false)
+    }
   }
 
   return (
@@ -484,6 +517,48 @@ export default function MDIAdmin() {
           {/* Utilities Tab */}
           {activeTab === "utils" && (
             <div className="space-y-4">
+              {/* Test Prescription PDF */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Package className="h-5 w-5" />
+                    Test Prescription PDF
+                  </CardTitle>
+                  <CardDescription>
+                    Send a sample prescription PDF to test the pharmacy email format
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">
+                        Recipient Email
+                      </label>
+                      <Input
+                        placeholder="Enter email address"
+                        value={testPdfEmail}
+                        onChange={(e) => setTestPdfEmail(e.target.value)}
+                        type="email"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        PDF will be sent with sample prescription data to test formatting
+                      </p>
+                    </div>
+                    <Button
+                      onClick={handleSendTestPdf}
+                      disabled={sendingTestPdf || !testPdfEmail.trim()}
+                    >
+                      {sendingTestPdf ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      ) : (
+                        <CheckCircle2 className="h-4 w-4 mr-2" />
+                      )}
+                      Send Test PDF
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
               {/* Clear Driver License */}
               <Card>
                 <CardHeader>

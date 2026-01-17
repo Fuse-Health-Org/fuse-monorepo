@@ -494,28 +494,52 @@ class IronSailOrderService {
             doc.fontSize(14).text('Medication', 0, doc.y, { align: 'center', underline: true });
             doc.moveDown(1);
 
-            // Use row-by-row layout to handle long text properly
-            const labelWidth = 110;
-            const valueWidth = 580;
-            
-            // Helper function to add a row with label and value
-            const addRow = (label: string, value: string) => {
-                const rowY = doc.y;
-                doc.font('Helvetica-Bold').text(label, col1, rowY, { width: labelWidth, continued: false });
-                doc.font('Helvetica').text(value, col1 + labelWidth, rowY, { width: valueWidth });
-                doc.moveDown(0.3);
-            };
+            // Simple table layout - label on left, value on right, each row separate
+            const labelX = col1;
+            const valueX = col1 + 120;
+            const rowHeight = 18;
 
-            // Medication details - compact rows
-            addRow('Name:', data.productName + (data.productSKU ? ' (' + data.productSKU + ')' : ''));
+            let currentY = doc.y;
+            doc.fontSize(10);
+
+            // Row 1: Name
+            doc.font('Helvetica-Bold').text('Name:', labelX, currentY);
+            doc.font('Helvetica').text(data.productName + (data.productSKU ? ' (' + data.productSKU + ')' : ''), valueX, currentY);
+            currentY += rowHeight;
+
+            // Row 2: NDC (if available)
             if (data.ndc) {
-                addRow('NDC:', data.ndc);
+                doc.font('Helvetica-Bold').text('NDC:', labelX, currentY);
+                doc.font('Helvetica').text(data.ndc, valueX, currentY);
+                currentY += rowHeight;
             }
-            addRow('RX ID:', data.rxId || 'N/A');
-            addRow('Medication Form:', data.medicationForm || 'N/A');
-            addRow('Dispense:', data.dispense);
-            addRow('Days Supply:', data.daysSupply);
-            addRow('Refills:', data.refills);
+
+            // Row 3: RX ID
+            doc.font('Helvetica-Bold').text('RX ID:', labelX, currentY);
+            doc.font('Helvetica').text(data.rxId || 'N/A', valueX, currentY);
+            currentY += rowHeight;
+
+            // Row 4: Form
+            doc.font('Helvetica-Bold').text('Form:', labelX, currentY);
+            doc.font('Helvetica').text(data.medicationForm || 'N/A', valueX, currentY);
+            currentY += rowHeight;
+
+            // Row 5: Dispense
+            doc.font('Helvetica-Bold').text('Dispense:', labelX, currentY);
+            doc.font('Helvetica').text(data.dispense, valueX, currentY);
+            currentY += rowHeight;
+
+            // Row 6: Days Supply
+            doc.font('Helvetica-Bold').text('Days Supply:', labelX, currentY);
+            doc.font('Helvetica').text(data.daysSupply, valueX, currentY);
+            currentY += rowHeight;
+
+            // Row 7: Refills
+            doc.font('Helvetica-Bold').text('Refills:', labelX, currentY);
+            doc.font('Helvetica').text(data.refills, valueX, currentY);
+            currentY += rowHeight;
+
+            doc.y = currentY;
 
             // SIG gets its own section since it can be long
             doc.moveDown(1);

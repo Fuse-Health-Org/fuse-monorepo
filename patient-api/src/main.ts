@@ -2581,11 +2581,11 @@ app.get("/clinic/by-slug/:slug", async (req, res) => {
     });
 
     const clinicData = clinic.toJSON();
-    
+
     // Normalize patientPortalDashboardFormat to ensure it's always a string value
     const dashboardFormat = clinicData.patientPortalDashboardFormat;
-    const normalizedFormat = dashboardFormat === 'md-integrations' || dashboardFormat === 'MD_INTEGRATIONS' 
-      ? 'md-integrations' 
+    const normalizedFormat = dashboardFormat === 'md-integrations' || dashboardFormat === 'MD_INTEGRATIONS'
+      ? 'md-integrations'
       : 'fuse';
 
     if (process.env.NODE_ENV === 'development') {
@@ -2672,8 +2672,8 @@ app.get("/clinic/:id", authenticateJWT, async (req, res) => {
 
     // Normalize patientPortalDashboardFormat to ensure it's always a string value
     const dashboardFormat = (clinic as any).patientPortalDashboardFormat;
-    const normalizedFormat = dashboardFormat === 'md-integrations' || dashboardFormat === 'MD_INTEGRATIONS' 
-      ? 'md-integrations' 
+    const normalizedFormat = dashboardFormat === 'md-integrations' || dashboardFormat === 'MD_INTEGRATIONS'
+      ? 'md-integrations'
       : 'fuse';
 
     if (process.env.NODE_ENV === 'development') {
@@ -14327,7 +14327,7 @@ app.post("/md/cases", async (req, res) => {
       // This performs: POST /partner/patients if mdPatientId is missing
       // OR: PATCH /partner/patients/{id} if mdPatientId exists
       const userService = new UserService();
-      
+
       if (process.env.NODE_ENV === 'development') {
         console.log('[MD-CASE] Starting patient sync:', {
           userId: user.id,
@@ -14338,7 +14338,7 @@ app.post("/md/cases", async (req, res) => {
           hasShippingAddressId: Boolean((order as any).shippingAddressId),
         });
       }
-      
+
       const syncedUser = await userService.syncPatientInMD(user.id, (order as any).shippingAddressId);
 
       if (!syncedUser) {
@@ -19284,7 +19284,7 @@ app.post("/test/ironsail-pdf", async (req, res) => {
     const IronSailOrderService = (await import('./services/pharmacy/ironsail-order')).default;
     const sgMail = (await import('@sendgrid/mail')).default;
     const PDFDocument = (await import('pdfkit')).default;
-    
+
     // Sample data matching the problematic case
     const testData = {
       orderNumber: 'ORD-20260116-231232-781543',
@@ -19400,7 +19400,7 @@ Case ID: 8536c3d3-66e0-4bf2-8497-a31f359fad20`,
       const labelX = col1;
       const valueX = col1 + 120;
       const rowHeight = 18;
-      
+
       let currentY = doc.y;
       doc.fontSize(10);
 
@@ -19441,7 +19441,7 @@ Case ID: 8536c3d3-66e0-4bf2-8497-a31f359fad20`,
       doc.fontSize(12).font('Helvetica-Bold').text('Sig (Directions):', col1);
       doc.moveDown(0.5);
       doc.fontSize(10).font('Helvetica');
-      
+
       const sigStartY = doc.y;
       doc.rect(col1, sigStartY, 695, 100).stroke();
       doc.text(testData.sig, col1 + 10, sigStartY + 10, { width: 675 });
@@ -19456,9 +19456,12 @@ Case ID: 8536c3d3-66e0-4bf2-8497-a31f359fad20`,
       doc.end();
     });
 
+    // Get email from request body or default
+    const recipientEmail = req.body?.email || 'grrbm2@gmail.com';
+
     // Send email
     const msg = {
-      to: 'grrbm2@gmail.com',
+      to: recipientEmail,
       from: 'noreply@fusehealth.com',
       subject: `[TEST] IronSail PDF Preview - ${new Date().toISOString()}`,
       html: `<h2>Test PDF for IronSail Layout</h2><p>See attached PDF to review the current layout.</p>`,
@@ -19476,7 +19479,7 @@ Case ID: 8536c3d3-66e0-4bf2-8497-a31f359fad20`,
 
     res.json({
       success: true,
-      message: 'Test PDF sent to grrbm2@gmail.com',
+      message: `Test PDF sent to ${recipientEmail}`,
       pdfSize: pdfBuffer.length,
     });
   } catch (error) {
