@@ -23,7 +23,7 @@ interface ChartDataPoint {
 }
 
 export function StoreAnalytics({ startDate, endDate }: StoreAnalyticsProps) {
-  const { user, token } = useAuth();
+  const { user, authenticatedFetch } = useAuth();
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -62,7 +62,7 @@ export function StoreAnalytics({ startDate, endDate }: StoreAnalyticsProps) {
 
   useEffect(() => {
     const fetchChartData = async () => {
-      if (!user?.clinicId || !token) {
+      if (!user?.clinicId) {
         setLoading(false);
         return;
       }
@@ -74,7 +74,7 @@ export function StoreAnalytics({ startDate, endDate }: StoreAnalyticsProps) {
         // Fetch historical data (for This Month: from start to today; otherwise full range)
         const fetchEndDate = isThisMonth ? todayEnd : endDate;
         
-        const response = await fetch(
+        const response = await authenticatedFetch(
           `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/dashboard/revenue-chart?` +
           `clinicId=${user.clinicId}&` +
           `startDate=${startDate.toISOString()}&` +
@@ -82,7 +82,6 @@ export function StoreAnalytics({ startDate, endDate }: StoreAnalyticsProps) {
           `interval=${interval}`,
           {
             headers: {
-              'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json'
             }
           }
@@ -109,14 +108,13 @@ export function StoreAnalytics({ startDate, endDate }: StoreAnalyticsProps) {
 
         // Fetch projected subscription renewals for "This Month" future dates
         if (isThisMonth && daysRemainingInMonth > 0) {
-          const projectedResponse = await fetch(
+          const projectedResponse = await authenticatedFetch(
             `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/dashboard/projected-revenue?` +
             `clinicId=${user.clinicId}&` +
             `endDate=${todayEnd.toISOString()}&` +
             `daysToProject=${daysRemainingInMonth}`,
             {
               headers: {
-                'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
               }
             }
@@ -145,6 +143,10 @@ export function StoreAnalytics({ startDate, endDate }: StoreAnalyticsProps) {
           setChartData(historical);
         }
       } catch (err) {
+        // If it's an unauthorized error, the user will be redirected by authenticatedFetch
+        if ((err as Error).message === 'unauthorized') {
+          return;
+        }
         console.error('Error fetching chart data:', err);
         setError('Failed to load chart data');
       } finally {
@@ -154,7 +156,7 @@ export function StoreAnalytics({ startDate, endDate }: StoreAnalyticsProps) {
 
     fetchChartData();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.clinicId, token, startDate, endDate, interval, isThisMonth, daysRemainingInMonth]);
+  }, [user?.clinicId, authenticatedFetch, startDate, endDate, interval, isThisMonth, daysRemainingInMonth]);
 
   const formatDate = (dateStr: string) => {
     // Parse YYYY-MM-DD as local date to avoid timezone shifts

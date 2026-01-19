@@ -200,12 +200,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (storedToken && storedUser) {
         try {
-          const userData = JSON.parse(storedUser)
-          setToken(storedToken)
-          setUser(userData)
+          // Validate the stored token with the server
+          const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+          const response = await fetch(`${apiUrl}/auth/me`, {
+            headers: {
+              'Authorization': `Bearer ${storedToken}`,
+            },
+          })
+
+          if (response.ok) {
+            const data = await response.json()
+            if (data.success && data.user) {
+              // Token is valid, use the fresh user data from server
+              localStorage.setItem('admin_user', JSON.stringify(data.user))
+              setToken(storedToken)
+              setUser(data.user)
+            } else {
+              // Token validation failed, clear storage
+              console.log('🔐 [Auth] Token validation failed - clearing session')
+              localStorage.removeItem('admin_token')
+              localStorage.removeItem('admin_user')
+            }
+          } else if (response.status === 401) {
+            // Token expired or invalid
+            console.log('🔐 [Auth] Token expired (401) - clearing session')
+            localStorage.removeItem('admin_token')
+            localStorage.removeItem('admin_user')
+            
+            // Only redirect if we're not already on signin page
+            if (router.pathname !== '/signin') {
+              const message = 'Your session has expired. Please sign in again.'
+              router.push(`/signin?message=${encodeURIComponent(message)}`)
+            }
+          } else {
+            // Other error - keep the cached data but log it
+            console.error('🔐 [Auth] Token validation request failed:', response.status)
+            const userData = JSON.parse(storedUser)
+            setToken(storedToken)
+            setUser(userData)
+          }
         } catch (error) {
-          localStorage.removeItem('admin_token')
-          localStorage.removeItem('admin_user')
+          console.error('🔐 [Auth] Network error validating token:', error)
+          // On network error, use cached data (offline support)
+          try {
+            const userData = JSON.parse(storedUser)
+            setToken(storedToken)
+            setUser(userData)
+          } catch {
+            localStorage.removeItem('admin_token')
+            localStorage.removeItem('admin_user')
+          }
         }
       }
 

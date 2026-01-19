@@ -20,7 +20,7 @@ interface Order {
 }
 
 export function RecentActivity() {
-  const { user, token } = useAuth();
+  const { user, authenticatedFetch } = useAuth();
   const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -28,7 +28,7 @@ export function RecentActivity() {
 
   useEffect(() => {
     const fetchRecentActivity = async () => {
-      if (!user?.clinicId || !token) {
+      if (!user?.clinicId) {
         setLoading(false);
         return;
       }
@@ -37,13 +37,12 @@ export function RecentActivity() {
         setLoading(true);
         setError(null);
 
-        const response = await fetch(
+        const response = await authenticatedFetch(
           `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/dashboard/recent-activity?` +
           `clinicId=${user.clinicId}&` +
           `limit=5`,
           {
             headers: {
-              'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json'
             }
           }
@@ -60,6 +59,10 @@ export function RecentActivity() {
           setError('Failed to load recent activity');
         }
       } catch (err) {
+        // If it's an unauthorized error, the user will be redirected by authenticatedFetch
+        if ((err as Error).message === 'unauthorized') {
+          return;
+        }
         console.error('Error fetching recent activity:', err);
         setError('Failed to load recent activity');
       } finally {
@@ -68,7 +71,7 @@ export function RecentActivity() {
     };
 
     fetchRecentActivity();
-  }, [user?.clinicId, token]);
+  }, [user?.clinicId, authenticatedFetch]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {

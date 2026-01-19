@@ -16,6 +16,7 @@ export default function SignIn() {
   const { login, verifyMfa, resendMfaCode, cancelMfa, mfa, isLoading, error, user } = useAuth()
   const router = useRouter()
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  const [infoMessage, setInfoMessage] = useState<string | null>(null)
   const mfaInputRefs = useRef<(HTMLInputElement | null)[]>([])
 
   // Redirect if already authenticated
@@ -28,7 +29,16 @@ export default function SignIn() {
   // Check for query parameter messages
   useEffect(() => {
     if (router.query.message && typeof router.query.message === 'string') {
-      setSuccessMessage(router.query.message)
+      const message = router.query.message
+      // Session-related messages should be displayed as info/warning, not success
+      if (message.toLowerCase().includes('expired') || message.toLowerCase().includes('session')) {
+        setInfoMessage(message)
+      } else {
+        setSuccessMessage(message)
+      }
+      // Clean up the URL by removing the message parameter
+      const { message: _, ...restQuery } = router.query
+      router.replace({ pathname: router.pathname, query: restQuery }, undefined, { shallow: true })
     }
   }, [router.query.message])
 
@@ -264,6 +274,12 @@ export default function SignIn() {
                 {error && (
                   <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">
                     {error}
+                  </div>
+                )}
+
+                {infoMessage && (
+                  <div className="p-3 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-md">
+                    {infoMessage}
                   </div>
                 )}
 

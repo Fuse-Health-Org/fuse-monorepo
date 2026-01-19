@@ -23,14 +23,14 @@ interface DashboardMetrics {
 }
 
 export function MetricCards({ startDate, endDate }: MetricCardsProps) {
-  const { user, token } = useAuth();
+  const { user, authenticatedFetch } = useAuth();
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchMetrics = async () => {
-      if (!user?.clinicId || !token) {
+      if (!user?.clinicId) {
         setLoading(false);
         return;
       }
@@ -39,14 +39,13 @@ export function MetricCards({ startDate, endDate }: MetricCardsProps) {
         setLoading(true);
         setError(null);
 
-        const response = await fetch(
+        const response = await authenticatedFetch(
           `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/dashboard/metrics?` +
           `clinicId=${user.clinicId}&` +
           `startDate=${startDate.toISOString()}&` +
           `endDate=${endDate.toISOString()}`,
           {
             headers: {
-              'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json'
             }
           }
@@ -63,6 +62,10 @@ export function MetricCards({ startDate, endDate }: MetricCardsProps) {
           setError('Failed to load metrics');
         }
       } catch (err) {
+        // If it's an unauthorized error, the user will be redirected by authenticatedFetch
+        if ((err as Error).message === 'unauthorized') {
+          return;
+        }
         console.error('Error fetching metrics:', err);
         setError('Failed to load metrics');
       } finally {
@@ -71,7 +74,7 @@ export function MetricCards({ startDate, endDate }: MetricCardsProps) {
     };
 
     fetchMetrics();
-  }, [user?.clinicId, token, startDate, endDate]);
+  }, [user?.clinicId, authenticatedFetch, startDate, endDate]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {

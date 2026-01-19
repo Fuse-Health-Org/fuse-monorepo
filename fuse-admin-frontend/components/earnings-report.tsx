@@ -27,14 +27,14 @@ interface EarningsData {
 }
 
 export function EarningsReport({ startDate, endDate }: EarningsReportProps) {
-  const { user, token } = useAuth();
+  const { user, authenticatedFetch } = useAuth();
   const [earningsData, setEarningsData] = useState<EarningsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchEarningsReport = async () => {
-      if (!user?.clinicId || !token) {
+      if (!user?.clinicId) {
         setLoading(false);
         return;
       }
@@ -43,14 +43,13 @@ export function EarningsReport({ startDate, endDate }: EarningsReportProps) {
         setLoading(true);
         setError(null);
 
-        const response = await fetch(
+        const response = await authenticatedFetch(
           `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/dashboard/earnings-report?` +
           `clinicId=${user.clinicId}&` +
           `startDate=${startDate.toISOString()}&` +
           `endDate=${endDate.toISOString()}`,
           {
             headers: {
-              'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json'
             }
           }
@@ -67,6 +66,10 @@ export function EarningsReport({ startDate, endDate }: EarningsReportProps) {
           setError('Failed to load earnings report');
         }
       } catch (err) {
+        // If it's an unauthorized error, the user will be redirected by authenticatedFetch
+        if ((err as Error).message === 'unauthorized') {
+          return;
+        }
         console.error('Error fetching earnings report:', err);
         setError('Failed to load earnings report');
       } finally {
@@ -75,7 +78,7 @@ export function EarningsReport({ startDate, endDate }: EarningsReportProps) {
     };
 
     fetchEarningsReport();
-  }, [user?.clinicId, token, startDate, endDate]);
+  }, [user?.clinicId, authenticatedFetch, startDate, endDate]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
