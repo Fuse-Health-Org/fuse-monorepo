@@ -277,15 +277,15 @@ export function Sidebar() {
   }
 
   return (
-    <div className="w-64 bg-sidebar border-r border-sidebar-border flex flex-col">
+    <div className="w-64 h-full bg-sidebar border-r border-sidebar-border flex flex-col overflow-hidden">
       <Tutorial runTutorial={runTutorial} setRunTutorial={setRunTutorial} initialStep={tutorialStep} />
       {/* Logo */}
-      <div className="p-6">
+      <div className="p-6 flex-shrink-0">
         <h1 className="text-xl font-bold text-sidebar-foreground">Fuse</h1>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-4 space-y-1">
+      <nav className="flex-1 px-4 space-y-1 overflow-y-auto overflow-x-hidden">
         {/* Main Navigation */}
         <div className="space-y-1">
           {(hasActiveSubscription ? navigation.filter((item) => item.name !== 'Plans') : navigation).map((item) =>
@@ -331,7 +331,7 @@ export function Sidebar() {
       </nav>
 
       {/* User Profile */}
-      <div className="p-4 border-t border-sidebar-border">
+      <div className="p-4 border-t border-sidebar-border flex-shrink-0">
         <div className="flex items-center justify-between space-x-3">
           <div className="flex items-center space-x-3 flex-1 min-w-0">
             <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
