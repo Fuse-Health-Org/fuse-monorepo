@@ -50,10 +50,10 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
     // Calculate program total - handles both unified and per-product pricing
     const calculateProgramTotal = () => {
         if (!programData) return 0;
-        
+
         const selectedProducts = programData.products.filter(p => selectedProgramProducts[p.id]);
         const productsTotal = selectedProducts.reduce((sum, p) => sum + p.displayPrice, 0);
-        
+
         // For per-product pricing, sum up each product's individual non-medical services fee
         if (hasPerProductPricing) {
             const nonMedicalTotal = selectedProducts.reduce((sum, p) => {
@@ -62,7 +62,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
             }, 0);
             return productsTotal + nonMedicalTotal;
         }
-        
+
         // For unified pricing, use the parent program's non-medical services fee
         return productsTotal + programData.nonMedicalServicesFee;
     };
@@ -70,14 +70,14 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
     // Calculate total non-medical services fee based on selected products
     const calculateNonMedicalServicesFee = () => {
         if (!programData) return 0;
-        
+
         if (hasPerProductPricing) {
             const selectedProducts = programData.products.filter(p => selectedProgramProducts[p.id]);
             return selectedProducts.reduce((sum, p) => {
                 return sum + (p.perProductProgram?.nonMedicalServicesFee || 0);
             }, 0);
         }
-        
+
         return programData.nonMedicalServicesFee;
     };
 
@@ -103,19 +103,19 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
     // Get enabled non-medical services for display - handles both unified and per-product pricing
     const getEnabledNonMedicalServices = () => {
         if (!programData) return [];
-        
+
         // For per-product pricing, aggregate services from all selected products
         if (hasPerProductPricing) {
             const selectedProducts = programData.products.filter(p => selectedProgramProducts[p.id]);
             const aggregatedServices: { name: string; price: number; productName?: string }[] = [];
-            
+
             for (const product of selectedProducts) {
                 const perProduct = product.perProductProgram;
                 if (!perProduct) continue;
-                
+
                 const productLabel = selectedProducts.length > 1 ? ` (${product.name})` : '';
                 const nms = perProduct.nonMedicalServices;
-                
+
                 if (nms.patientPortal.enabled) {
                     aggregatedServices.push({ name: `Patient Portal${productLabel}`, price: nms.patientPortal.price, productName: product.name });
                 }
@@ -132,10 +132,10 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                     aggregatedServices.push({ name: `Easy Shopping${productLabel}`, price: nms.easyShopping.price, productName: product.name });
                 }
             }
-            
+
             return aggregatedServices;
         }
-        
+
         // For unified pricing, use the parent program's services
         const services: { name: string; price: number }[] = [];
         if (programData.nonMedicalServices.patientPortal.enabled) {
@@ -222,42 +222,40 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                             {(() => {
                                 const productOfferType = programData.productOfferType || programData.medicalTemplate?.productOfferType || 'multiple_choice';
                                 const isSingleChoice = productOfferType === 'single_choice';
-                                
+
                                 // Helper function to calculate full price (product + services) for each product
                                 const getProductFullPrice = (product: any) => {
                                     const productPrice = product.displayPrice;
-                                    const servicesFee = hasPerProductPricing 
+                                    const servicesFee = hasPerProductPricing
                                         ? (product.perProductProgram?.nonMedicalServicesFee || 0)
                                         : programData.nonMedicalServicesFee;
                                     return productPrice + servicesFee;
                                 };
-                                
+
                                 return (
                                     <>
                                         <h3 className="text-lg font-medium text-gray-900 mb-2">
                                             {isSingleChoice ? 'Select Your Product' : 'Select Your Products'}
                                         </h3>
                                         <p className="text-sm text-gray-600 mb-6">
-                                            {isSingleChoice 
-                                                ? 'Choose one product for your subscription' 
+                                            {isSingleChoice
+                                                ? 'Choose one product for your subscription'
                                                 : 'Choose which products you\'d like to include in your subscription'}
                                         </p>
-                                        
+
                                         <div className="space-y-3">
                                             {programData.products.map((product) => {
                                                 const fullPrice = getProductFullPrice(product);
                                                 return (
                                                     <div
                                                         key={product.id}
-                                                        className={`relative rounded-lg border-2 p-4 transition-all cursor-pointer ${
-                                                            paymentStatus === 'processing' || !!clientSecret 
-                                                                ? 'opacity-60 cursor-not-allowed bg-gray-50' 
-                                                                : ''
-                                                        } ${
-                                                            selectedProgramProducts[product.id] 
-                                                                ? 'border-success-500 bg-success-50' 
+                                                        className={`relative rounded-lg border-2 p-4 transition-all cursor-pointer ${paymentStatus === 'processing' || !!clientSecret
+                                                            ? 'opacity-60 cursor-not-allowed bg-gray-50'
+                                                            : ''
+                                                            } ${selectedProgramProducts[product.id]
+                                                                ? 'border-success-500 bg-success-50'
                                                                 : 'border-gray-200 bg-white hover:border-gray-300'
-                                                        }`}
+                                                            }`}
                                                         onClick={() => {
                                                             if (paymentStatus !== 'processing' && !clientSecret && onProgramProductToggle) {
                                                                 onProgramProductToggle(product.id);
@@ -269,7 +267,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                                                                 type={isSingleChoice ? "radio" : "checkbox"}
                                                                 name={isSingleChoice ? "program-product-selection" : undefined}
                                                                 checked={!!selectedProgramProducts[product.id]}
-                                                                onChange={() => {}}
+                                                                onChange={() => { }}
                                                                 disabled={paymentStatus === 'processing' || !!clientSecret}
                                                                 className={`w-5 h-5 ${isSingleChoice ? '' : 'rounded'} border-gray-300`}
                                                                 style={{ accentColor: theme.primary }}
@@ -371,7 +369,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                                                             <span>{feature}</span>
                                                         </div>
                                                     ))}
-                                                    
+
                                                     {/* Display pharmacy coverages if multiple exist */}
                                                     {pharmacyCoverages && pharmacyCoverages.length > 1 && (
                                                         <div className="mt-4 pt-4 border-t border-gray-200">
@@ -607,8 +605,8 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                             <div className="text-center py-8 bg-gray-50 rounded-lg border border-gray-200">
                                 <Icon icon="lucide:mouse-pointer-click" className="text-3xl text-gray-400 mx-auto mb-2" />
                                 <p className="text-lg font-medium text-gray-700 mb-1">
-                                    {(programData?.productOfferType || programData?.medicalTemplate?.productOfferType) === 'single_choice' 
-                                        ? 'Select a Product Above' 
+                                    {(programData?.productOfferType || programData?.medicalTemplate?.productOfferType) === 'single_choice'
+                                        ? 'Select a Product Above'
                                         : 'Select Products Above'}
                                 </p>
                                 <p className="text-sm text-gray-500">
@@ -701,11 +699,11 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                                         .map((product) => {
                                             // Calculate full price including services for this product
                                             const productPrice = product.displayPrice;
-                                            const servicesFee = hasPerProductPricing 
+                                            const servicesFee = hasPerProductPricing
                                                 ? (product.perProductProgram?.nonMedicalServicesFee || 0)
                                                 : programData.nonMedicalServicesFee;
                                             const fullPrice = productPrice + servicesFee;
-                                            
+
                                             return (
                                                 <div key={product.id} className="flex gap-3 p-3 bg-gray-50 rounded-lg">
                                                     {product.imageUrl ? (
@@ -783,17 +781,17 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                                 <Divider className="my-4" />
 
                                 <div className="space-y-2 mb-4">
-                                <div className="flex justify-between items-center">
-                                    <span className="font-medium text-gray-900">Due Today</span>
-                                    <span className="text-xl font-semibold">$0.00</span>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                    <span className="text-sm text-gray-600">Due if approved</span>
-                                    <span className="text-sm font-medium" style={{ color: theme.primary }}>${dueIfApproved.toFixed(2)}</span>
-                                </div>
-                                <p className="text-xs text-gray-500">
-                                    Only charged if prescribed by a licensed physician. We'll securely hold your payment method. No charge until prescribed.
-                                </p>
+                                    <div className="flex justify-between items-center">
+                                        <span className="font-medium text-gray-900">Due Today</span>
+                                        <span className="text-xl font-semibold">$0.00</span>
+                                    </div>
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-sm text-gray-600">Due if approved</span>
+                                        <span className="text-sm font-medium" style={{ color: theme.primary }}>${dueIfApproved.toFixed(2)}</span>
+                                    </div>
+                                    <p className="text-xs text-gray-500">
+                                        Only charged if prescribed by a licensed physician. We'll securely hold your payment method. No charge until prescribed.
+                                    </p>
                                 </div>
                             </>
                         )}
@@ -808,7 +806,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                                         <div className="w-2 h-2 rounded-full bg-success-500"></div>
                                     </div>
                                     <div className="flex-1 space-y-0.5">
-                                        <div className="text-sm font-medium text-gray-900">Free medical consultation</div>
+                                        <div className="text-sm font-medium text-gray-900">Medical consultation</div>
                                         <div className="text-xs text-gray-500 leading-snug">Board-certified physicians licensed in your state</div>
                                     </div>
                                 </div>
@@ -817,7 +815,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                                         <div className="w-2 h-2 rounded-full bg-success-500"></div>
                                     </div>
                                     <div className="flex-1 space-y-0.5">
-                                        <div className="text-sm font-medium text-gray-900">Free expedited shipping</div>
+                                        <div className="text-sm font-medium text-gray-900">Expedited shipping</div>
                                         <div className="text-xs text-gray-500 leading-snug">2-day delivery included with every order</div>
                                     </div>
                                 </div>

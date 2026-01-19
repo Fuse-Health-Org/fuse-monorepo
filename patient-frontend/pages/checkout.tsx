@@ -1,13 +1,13 @@
 import React from "react";
 import { useState } from "react";
-import { 
-  Button, 
-  Card, 
-  CardBody, 
-  Input, 
-  RadioGroup, 
-  Radio, 
-  Select, 
+import {
+  Button,
+  Card,
+  CardBody,
+  Input,
+  RadioGroup,
+  Radio,
+  Select,
   SelectItem,
   Chip,
   Divider
@@ -36,13 +36,13 @@ const plans: Plan[] = [
     badgeColor: "success",
     features: [
       "Same active ingredient as Ozempic®",
-      "Free expedited shipping", 
+      "Expedited shipping",
       "HSA + FSA eligible",
       "Home injection kit included"
     ]
   },
   {
-    id: "quarterly", 
+    id: "quarterly",
     name: "Quarterly",
     description: "Billed quarterly",
     price: 269.00,
@@ -50,21 +50,21 @@ const plans: Plan[] = [
     badgeColor: "primary",
     features: [
       "Same active ingredient as Ozempic®",
-      "Free expedited shipping",
-      "HSA + FSA eligible", 
+      "Expedited shipping",
+      "HSA + FSA eligible",
       "Home injection kit included"
     ]
   },
   {
     id: "biannual",
-    name: "Bi-Annually", 
+    name: "Bi-Annually",
     description: "Billed every 6 months",
     price: 249.00,
     badge: "Save $309.00",
     badgeColor: "primary",
     features: [
       "Same active ingredient as Ozempic®",
-      "Free expedited shipping",
+      "Expedited shipping",
       "HSA + FSA eligible",
       "Home injection kit included"
     ]
@@ -164,19 +164,18 @@ export default function CheckoutPage() {
             <Card>
               <CardBody className="p-6">
                 <h2 className="text-lg font-medium text-gray-900 mb-6">Choose Your Plan</h2>
-                <RadioGroup 
-                  value={selectedPlan} 
+                <RadioGroup
+                  value={selectedPlan}
                   onValueChange={setSelectedPlan}
                   className="space-y-4"
                 >
                   {plans.map((plan) => (
                     <div
                       key={plan.id}
-                      className={`relative rounded-lg border-2 p-4 transition-all ${
-                        selectedPlan === plan.id 
-                          ? "border-success-500 bg-success-50" 
-                          : "border-gray-200 bg-white hover:border-gray-300"
-                      }`}
+                      className={`relative rounded-lg border-2 p-4 transition-all ${selectedPlan === plan.id
+                        ? "border-success-500 bg-success-50"
+                        : "border-gray-200 bg-white hover:border-gray-300"
+                        }`}
                     >
                       <div className="flex items-start gap-3">
                         <Radio value={plan.id} className="mt-1" />
@@ -243,7 +242,7 @@ export default function CheckoutPage() {
                     label="Street Address"
                     placeholder="Enter address"
                     value={shippingInfo.address}
-                    onValueChange={(value) => setShippingInfo(prev => ({...prev, address: value}))}
+                    onValueChange={(value) => setShippingInfo(prev => ({ ...prev, address: value }))}
                     variant="bordered"
                     isRequired
                   />
@@ -251,7 +250,7 @@ export default function CheckoutPage() {
                   <Input
                     label="Apartment / Suite / Unit (optional)"
                     value={shippingInfo.apartment}
-                    onValueChange={(value) => setShippingInfo(prev => ({...prev, apartment: value}))}
+                    onValueChange={(value) => setShippingInfo(prev => ({ ...prev, apartment: value }))}
                     variant="bordered"
                   />
 
@@ -259,7 +258,7 @@ export default function CheckoutPage() {
                     <Input
                       label="City"
                       value={shippingInfo.city}
-                      onValueChange={(value) => setShippingInfo(prev => ({...prev, city: value}))}
+                      onValueChange={(value) => setShippingInfo(prev => ({ ...prev, city: value }))}
                       variant="bordered"
                       isRequired
                     />
@@ -269,7 +268,7 @@ export default function CheckoutPage() {
                       selectedKeys={shippingInfo.state ? [shippingInfo.state] : []}
                       onSelectionChange={(keys) => {
                         const selectedKey = Array.from(keys)[0] as string;
-                        setShippingInfo(prev => ({...prev, state: selectedKey}));
+                        setShippingInfo(prev => ({ ...prev, state: selectedKey }));
                       }}
                       variant="bordered"
                       isRequired
@@ -284,7 +283,7 @@ export default function CheckoutPage() {
                     <Input
                       label="Zip Code"
                       value={shippingInfo.zipCode}
-                      onValueChange={(value) => setShippingInfo(prev => ({...prev, zipCode: value}))}
+                      onValueChange={(value) => setShippingInfo(prev => ({ ...prev, zipCode: value }))}
                       variant="bordered"
                       isRequired
                     />
@@ -293,7 +292,7 @@ export default function CheckoutPage() {
                       selectedKeys={[shippingInfo.country]}
                       onSelectionChange={(keys) => {
                         const selectedKey = Array.from(keys)[0] as string;
-                        setShippingInfo(prev => ({...prev, country: selectedKey}));
+                        setShippingInfo(prev => ({ ...prev, country: selectedKey }));
                       }}
                       variant="bordered"
                     >
@@ -329,7 +328,7 @@ export default function CheckoutPage() {
                       label="Card number"
                       placeholder="1234 1234 1234 1234"
                       value={paymentInfo.cardNumber}
-                      onValueChange={(value) => setPaymentInfo(prev => ({...prev, cardNumber: value}))}
+                      onValueChange={(value) => setPaymentInfo(prev => ({ ...prev, cardNumber: value }))}
                       variant="bordered"
                       endContent={
                         <div className="flex gap-1">
@@ -348,7 +347,7 @@ export default function CheckoutPage() {
                       label="Expiration date"
                       placeholder="MM / YY"
                       value={paymentInfo.expiryDate}
-                      onValueChange={(value) => setPaymentInfo(prev => ({...prev, expiryDate: value}))}
+                      onValueChange={(value) => setPaymentInfo(prev => ({ ...prev, expiryDate: value }))}
                       variant="bordered"
                       isRequired
                     />
@@ -356,7 +355,7 @@ export default function CheckoutPage() {
                       label="Security code"
                       placeholder="CVC"
                       value={paymentInfo.securityCode}
-                      onValueChange={(value) => setPaymentInfo(prev => ({...prev, securityCode: value}))}
+                      onValueChange={(value) => setPaymentInfo(prev => ({ ...prev, securityCode: value }))}
                       variant="bordered"
                       endContent={
                         <div className="w-6 h-4 border border-gray-300 rounded text-xs flex items-center justify-center">
@@ -372,7 +371,7 @@ export default function CheckoutPage() {
                     selectedKeys={[paymentInfo.country]}
                     onSelectionChange={(keys) => {
                       const selectedKey = Array.from(keys)[0] as string;
-                      setPaymentInfo(prev => ({...prev, country: selectedKey}));
+                      setPaymentInfo(prev => ({ ...prev, country: selectedKey }));
                     }}
                     variant="bordered"
                   >
@@ -389,7 +388,7 @@ export default function CheckoutPage() {
             </Card>
 
             {/* Complete Payment Button */}
-            <Button 
+            <Button
               className="w-full bg-success-600 hover:bg-success-700 text-white py-6 text-base font-medium"
               size="lg"
               onPress={handleCompletePayment}
@@ -506,7 +505,7 @@ export default function CheckoutPage() {
                         <div className="w-2 h-2 rounded-full bg-success-500"></div>
                       </div>
                       <div className="flex-1 space-y-0.5">
-                        <div className="text-sm font-medium text-gray-900">Free medical consultation</div>
+                        <div className="text-sm font-medium text-gray-900">Medical consultation</div>
                         <div className="text-xs text-gray-500 leading-snug">Board-certified physicians licensed in your state</div>
                       </div>
                     </div>
@@ -515,7 +514,7 @@ export default function CheckoutPage() {
                         <div className="w-2 h-2 rounded-full bg-success-500"></div>
                       </div>
                       <div className="flex-1 space-y-0.5">
-                        <div className="text-sm font-medium text-gray-900">Free expedited shipping</div>
+                        <div className="text-sm font-medium text-gray-900">Expedited shipping</div>
                         <div className="text-xs text-gray-500 leading-snug">2-day delivery included with every order</div>
                       </div>
                     </div>

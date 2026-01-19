@@ -39,7 +39,7 @@ export function useQuestionnairePlans(
           billingInterval: plan.billingInterval,
           features: [
             "Prescription medications included",
-            "Free expedited shipping",
+            "Expedited shipping",
             "HSA + FSA eligible",
             "Home delivery included"
           ]
@@ -62,7 +62,7 @@ export function useQuestionnairePlans(
         billingInterval: 'monthly',
         features: [
           "Prescription medications included",
-          "Free expedited shipping",
+          "Expedited shipping",
           "HSA + FSA eligible",
           "Home delivery included"
         ]

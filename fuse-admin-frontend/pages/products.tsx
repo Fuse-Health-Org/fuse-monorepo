@@ -838,7 +838,8 @@ export default function Products() {
                                 <Package className="h-4 w-4 mr-1.5" />
                                 Refresh
                             </Button>
-                            <Button
+                            {/* Hidden: Import from IronSail and Delete All from IronSail buttons */}
+                            {/* <Button
                                 size="sm"
                                 className="h-9 px-3 text-sm font-medium bg-emerald-600 hover:bg-emerald-700 text-white"
                                 onClick={handleImportFromIronSail}
@@ -855,7 +856,7 @@ export default function Products() {
                             >
                                 <X className="h-4 w-4 mr-1.5" />
                                 Delete All from IronSail
-                            </Button>
+                            </Button> */}
                             {/* COMMENTED OUT: Add Product button
                             {(() => {
                                 // Check tier configuration first, then custom features, then default to false
