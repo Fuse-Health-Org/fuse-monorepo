@@ -131,6 +131,7 @@ import { templateRoutes } from "./features/templates";
 import { contactRoutes } from "./features/contacts";
 import { tagRoutes } from "./features/tags";
 import { GlobalFees } from "./models/GlobalFees";
+import { WebsiteBuilderConfigs, DEFAULT_FOOTER_DISCLAIMER } from "./models/WebsiteBuilderConfigs";
 import SupportTicket from "./models/SupportTicket";
 import TicketMessage from "./models/TicketMessage";
 
@@ -3435,6 +3436,187 @@ app.get("/custom-website/by-slug/:slug", async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to fetch portal settings"
+    });
+  }
+});
+
+// ==========================================
+// Website Builder Global Configs
+// ==========================================
+
+// Get website builder configs (tenant/organization admin only)
+app.get("/website-builder-configs", authenticateJWT, async (req, res) => {
+  try {
+    const currentUser = getCurrentUser(req);
+    if (!currentUser) {
+      return res.status(401).json({
+        success: false,
+        message: "Not authenticated"
+      });
+    }
+
+    const user = await User.findByPk(currentUser.id, {
+      include: [{ model: UserRoles, as: 'userRoles', required: false }]
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+
+    // Only allow organizationUser or superAdmin to access website builder configs
+    if (!user.hasAnyRoleSync(['organizationUser', 'superAdmin'])) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. Only tenant administrators can access website builder configs."
+      });
+    }
+
+    // Get or create the single config row
+    let config = await WebsiteBuilderConfigs.findOne();
+    
+    if (!config) {
+      // Create default config if it doesn't exist
+      config = await WebsiteBuilderConfigs.create({
+        defaultFooterDisclaimer: DEFAULT_FOOTER_DISCLAIMER
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: config
+    });
+  } catch (error) {
+    console.error('Error fetching website builder configs:', error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch website builder configs"
+    });
+  }
+});
+
+// Update website builder configs (tenant/organization admin only)
+app.post("/website-builder-configs", authenticateJWT, async (req, res) => {
+  try {
+    const currentUser = getCurrentUser(req);
+    if (!currentUser) {
+      return res.status(401).json({
+        success: false,
+        message: "Not authenticated"
+      });
+    }
+
+    const user = await User.findByPk(currentUser.id, {
+      include: [{ model: UserRoles, as: 'userRoles', required: false }]
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+
+    // Only allow organizationUser or superAdmin to update website builder configs
+    if (!user.hasAnyRoleSync(['organizationUser', 'superAdmin'])) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. Only tenant administrators can update website builder configs."
+      });
+    }
+
+    const { defaultFooterDisclaimer } = req.body;
+
+    // Get or create the single config row
+    let config = await WebsiteBuilderConfigs.findOne();
+    
+    if (config) {
+      // Update existing config
+      await config.update({
+        defaultFooterDisclaimer: defaultFooterDisclaimer !== undefined ? defaultFooterDisclaimer : config.defaultFooterDisclaimer
+      });
+    } else {
+      // Create new config
+      config = await WebsiteBuilderConfigs.create({
+        defaultFooterDisclaimer: defaultFooterDisclaimer || DEFAULT_FOOTER_DISCLAIMER
+      });
+    }
+
+    console.log('🌐 Website builder configs updated by:', user.email);
+
+    res.status(200).json({
+      success: true,
+      message: "Website builder configs saved successfully",
+      data: config
+    });
+  } catch (error) {
+    console.error('Error saving website builder configs:', error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to save website builder configs"
+    });
+  }
+});
+
+// Restore default footer disclaimer (tenant/organization admin only)
+app.post("/website-builder-configs/restore-default", authenticateJWT, async (req, res) => {
+  try {
+    const currentUser = getCurrentUser(req);
+    if (!currentUser) {
+      return res.status(401).json({
+        success: false,
+        message: "Not authenticated"
+      });
+    }
+
+    const user = await User.findByPk(currentUser.id, {
+      include: [{ model: UserRoles, as: 'userRoles', required: false }]
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+
+    // Only allow organizationUser or superAdmin to restore defaults
+    if (!user.hasAnyRoleSync(['organizationUser', 'superAdmin'])) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. Only tenant administrators can restore defaults."
+      });
+    }
+
+    // Get or create the single config row
+    let config = await WebsiteBuilderConfigs.findOne();
+    
+    if (config) {
+      // Update existing config with default value
+      await config.update({
+        defaultFooterDisclaimer: DEFAULT_FOOTER_DISCLAIMER
+      });
+    } else {
+      // Create new config with default value
+      config = await WebsiteBuilderConfigs.create({
+        defaultFooterDisclaimer: DEFAULT_FOOTER_DISCLAIMER
+      });
+    }
+
+    console.log('🔄 Website builder configs restored to default by:', user.email);
+
+    res.status(200).json({
+      success: true,
+      message: "Default footer disclaimer restored successfully",
+      data: config
+    });
+  } catch (error) {
+    console.error('Error restoring default configs:', error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to restore default configs"
     });
   }
 });

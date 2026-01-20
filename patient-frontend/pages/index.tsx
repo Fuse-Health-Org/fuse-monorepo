@@ -97,7 +97,7 @@ type CarouselItem =
 
 export default function LandingPage() {
   const router = useRouter();
-  
+
   // Helper function to ensure URLs have proper protocol
   const ensureProtocol = (url: string): string => {
     if (!url || url === '#') return '#';
@@ -1313,9 +1313,9 @@ export default function LandingPage() {
                   <div style={{ display: "flex", gap: "1rem" }}>
                     {/* Instagram */}
                     {(websiteData?.socialMediaLinks?.instagram?.enabled ?? true) && (
-                      <a 
-                        href={ensureProtocol(websiteData?.socialMediaLinks?.instagram?.url || "#")} 
-                        target="_blank" 
+                      <a
+                        href={ensureProtocol(websiteData?.socialMediaLinks?.instagram?.url || "#")}
+                        target="_blank"
                         rel="noopener noreferrer"
                         style={{ color: "white", fontSize: "1.25rem" }}
                       >
@@ -1326,9 +1326,9 @@ export default function LandingPage() {
                     )}
                     {/* Facebook */}
                     {(websiteData?.socialMediaLinks?.facebook?.enabled ?? true) && (
-                      <a 
-                        href={ensureProtocol(websiteData?.socialMediaLinks?.facebook?.url || "#")} 
-                        target="_blank" 
+                      <a
+                        href={ensureProtocol(websiteData?.socialMediaLinks?.facebook?.url || "#")}
+                        target="_blank"
                         rel="noopener noreferrer"
                         style={{ color: "white", fontSize: "1.25rem" }}
                       >
@@ -1339,9 +1339,9 @@ export default function LandingPage() {
                     )}
                     {/* Twitter/X */}
                     {(websiteData?.socialMediaLinks?.twitter?.enabled ?? true) && (
-                      <a 
-                        href={ensureProtocol(websiteData?.socialMediaLinks?.twitter?.url || "#")} 
-                        target="_blank" 
+                      <a
+                        href={ensureProtocol(websiteData?.socialMediaLinks?.twitter?.url || "#")}
+                        target="_blank"
                         rel="noopener noreferrer"
                         style={{ color: "white", fontSize: "1.25rem" }}
                       >
@@ -1352,9 +1352,9 @@ export default function LandingPage() {
                     )}
                     {/* TikTok */}
                     {(websiteData?.socialMediaLinks?.tiktok?.enabled ?? true) && (
-                      <a 
-                        href={ensureProtocol(websiteData?.socialMediaLinks?.tiktok?.url || "#")} 
-                        target="_blank" 
+                      <a
+                        href={ensureProtocol(websiteData?.socialMediaLinks?.tiktok?.url || "#")}
+                        target="_blank"
                         rel="noopener noreferrer"
                         style={{ color: "white", fontSize: "1.25rem" }}
                       >
@@ -1365,9 +1365,9 @@ export default function LandingPage() {
                     )}
                     {/* YouTube */}
                     {(websiteData?.socialMediaLinks?.youtube?.enabled ?? true) && (
-                      <a 
-                        href={ensureProtocol(websiteData?.socialMediaLinks?.youtube?.url || "#")} 
-                        target="_blank" 
+                      <a
+                        href={ensureProtocol(websiteData?.socialMediaLinks?.youtube?.url || "#")}
+                        target="_blank"
                         rel="noopener noreferrer"
                         style={{ color: "white", fontSize: "1.25rem" }}
                       >

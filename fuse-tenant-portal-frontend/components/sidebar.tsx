@@ -15,6 +15,7 @@ import {
   UserCheck,
   CreditCard,
   ExternalLink,
+  Palette,
 } from "lucide-react"
 
 const navigation = [
@@ -24,6 +25,7 @@ const navigation = [
   { name: "Client Management", icon: Users, href: "/client-management" },
   { name: "Doctor Applications", icon: UserCheck, href: "/doctor-applications" },
   { name: "Tier Management", icon: Settings, href: "/tier-management" },
+  { name: "Website Builder", icon: Palette, href: "/website-builder" },
   { name: "Global Fees", icon: DollarSign, href: "/global-fees" },
   { name: "Payouts Tracking", icon: CreditCard, href: "/payouts" },
   { name: "Audit Logs", icon: Shield, href: "/audit-logs" },

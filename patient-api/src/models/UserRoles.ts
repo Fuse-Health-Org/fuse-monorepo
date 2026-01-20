@@ -58,41 +58,49 @@ export default class UserRoles extends Entity {
     })
     declare affiliate: boolean;
 
+    @Column({
+        type: DataType.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+    })
+    declare organizationUser: boolean;
+
     @BelongsTo(() => User)
     declare user: User;
 
     /**
      * Helper method to get all active roles for this user
      */
-    getActiveRoles(): Array<'patient' | 'doctor' | 'admin' | 'brand' | 'superAdmin' | 'affiliate'> {
-        const roles: Array<'patient' | 'doctor' | 'admin' | 'brand' | 'superAdmin' | 'affiliate'> = [];
+    getActiveRoles(): Array<'patient' | 'doctor' | 'admin' | 'brand' | 'superAdmin' | 'affiliate' | 'organizationUser'> {
+        const roles: Array<'patient' | 'doctor' | 'admin' | 'brand' | 'superAdmin' | 'affiliate' | 'organizationUser'> = [];
         if (this.patient) roles.push('patient');
         if (this.doctor) roles.push('doctor');
         if (this.admin) roles.push('admin');
         if (this.brand) roles.push('brand');
         if (this.superAdmin) roles.push('superAdmin');
         if (this.affiliate) roles.push('affiliate');
+        if (this.organizationUser) roles.push('organizationUser');
         return roles;
     }
 
     /**
      * Helper method to check if user has a specific role
      */
-    hasRole(role: 'patient' | 'doctor' | 'admin' | 'brand' | 'superAdmin' | 'affiliate'): boolean {
+    hasRole(role: 'patient' | 'doctor' | 'admin' | 'brand' | 'superAdmin' | 'affiliate' | 'organizationUser'): boolean {
         return this[role] === true;
     }
 
     /**
      * Helper method to check if user has any of the specified roles
      */
-    hasAnyRole(roles: Array<'patient' | 'doctor' | 'admin' | 'brand' | 'superAdmin' | 'affiliate'>): boolean {
+    hasAnyRole(roles: Array<'patient' | 'doctor' | 'admin' | 'brand' | 'superAdmin' | 'affiliate' | 'organizationUser'>): boolean {
         return roles.some(role => this[role] === true);
     }
 
     /**
      * Helper method to check if user has all of the specified roles
      */
-    hasAllRoles(roles: Array<'patient' | 'doctor' | 'admin' | 'brand' | 'superAdmin' | 'affiliate'>): boolean {
+    hasAllRoles(roles: Array<'patient' | 'doctor' | 'admin' | 'brand' | 'superAdmin' | 'affiliate' | 'organizationUser'>): boolean {
         return roles.every(role => this[role] === true);
     }
 }

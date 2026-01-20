@@ -353,7 +353,7 @@ export default class User extends Entity {
    * Check if user has a specific role (async)
    * Loads UserRoles from database if not already loaded
    */
-  public async hasRole(role: 'patient' | 'doctor' | 'admin' | 'brand'): Promise<boolean> {
+  public async hasRole(role: 'patient' | 'doctor' | 'admin' | 'brand' | 'superAdmin' | 'affiliate' | 'organizationUser'): Promise<boolean> {
     const roles = await this.getUserRoles();
     return roles.hasRole(role);
   }
@@ -362,7 +362,7 @@ export default class User extends Entity {
    * Check if user has any of the specified roles (async)
    * Loads UserRoles from database if not already loaded
    */
-  public async hasAnyRole(roles: Array<'patient' | 'doctor' | 'admin' | 'brand'>): Promise<boolean> {
+  public async hasAnyRole(roles: Array<'patient' | 'doctor' | 'admin' | 'brand' | 'superAdmin' | 'affiliate' | 'organizationUser'>): Promise<boolean> {
     const userRoles = await this.getUserRoles();
     return userRoles.hasAnyRole(roles);
   }
@@ -371,7 +371,7 @@ export default class User extends Entity {
    * Check if user has all of the specified roles (async)
    * Loads UserRoles from database if not already loaded
    */
-  public async hasAllRoles(roles: Array<'patient' | 'doctor' | 'admin' | 'brand'>): Promise<boolean> {
+  public async hasAllRoles(roles: Array<'patient' | 'doctor' | 'admin' | 'brand' | 'superAdmin' | 'affiliate' | 'organizationUser'>): Promise<boolean> {
     const userRoles = await this.getUserRoles();
     return userRoles.hasAllRoles(roles);
   }
@@ -383,7 +383,7 @@ export default class User extends Entity {
    * Note: Make sure to include UserRoles in your query or this will use the deprecated role field
    * Example: User.findByPk(id, { include: [{ model: UserRoles, as: 'userRoles' }] })
    */
-  public hasRoleSync(role: 'patient' | 'doctor' | 'admin' | 'brand' | 'superAdmin'): boolean {
+  public hasRoleSync(role: 'patient' | 'doctor' | 'admin' | 'brand' | 'superAdmin' | 'affiliate' | 'organizationUser'): boolean {
     // If userRoles is loaded, use it
     if (this.userRoles) {
       return this.userRoles.hasRole(role);
@@ -399,7 +399,7 @@ export default class User extends Entity {
    * Note: Make sure to include UserRoles in your query or this will use the deprecated role field
    * Example: User.findByPk(id, { include: [{ model: UserRoles, as: 'userRoles' }] })
    */
-  public hasAnyRoleSync(roles: Array<'patient' | 'doctor' | 'admin' | 'brand' | 'superAdmin' | 'affiliate'>): boolean {
+  public hasAnyRoleSync(roles: Array<'patient' | 'doctor' | 'admin' | 'brand' | 'superAdmin' | 'affiliate' | 'organizationUser'>): boolean {
     // If userRoles is loaded, use it
     if (this.userRoles) {
       return this.userRoles.hasAnyRole(roles);

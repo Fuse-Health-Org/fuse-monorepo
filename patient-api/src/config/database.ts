@@ -49,6 +49,7 @@ import SequenceRun from '../models/SequenceRun';
 import Tag from '../models/Tag';
 import UserTag from '../models/UserTag';
 import { GlobalFees } from '../models/GlobalFees';
+import { WebsiteBuilderConfigs, DEFAULT_FOOTER_DISCLAIMER } from '../models/WebsiteBuilderConfigs';
 import AffiliateProductImage from '../models/AffiliateProductImage';
 import UserRoles from '../models/UserRoles';
 import SupportTicket from '../models/SupportTicket';
@@ -144,7 +145,7 @@ export const sequelize = new Sequelize(databaseUrl, {
     UserPatient, TenantProduct, FormSectionTemplate,
     TenantProductForm, FormProducts, GlobalFormStructure, Sale, DoctorPatientChats, Pharmacy, PharmacyCoverage, PharmacyProduct,
     TenantCustomFeatures, TierConfiguration, TenantAnalyticsEvents, FormAnalyticsDaily,
-    MessageTemplate, Sequence, SequenceRun, Tag, UserTag, GlobalFees, UserRoles,
+    MessageTemplate, Sequence, SequenceRun, Tag, UserTag, GlobalFees, WebsiteBuilderConfigs, UserRoles,
     SupportTicket, TicketMessage, AuditLog, MfaToken, CustomWebsite, Like, BrandFavoritedProduct, Program, AffiliateProductImage
   ],
 });
@@ -745,6 +746,31 @@ export async function initializeDatabase() {
     } catch (e) {
       if (process.env.NODE_ENV === 'development') {
         console.error('❌ Error creating IronSail pharmacy:', e);
+      }
+      // ignore - don't fail startup
+    }
+
+    // Ensure WebsiteBuilderConfigs has a default row
+    try {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔄 Ensuring WebsiteBuilderConfigs default row exists...');
+      }
+      const existingConfig = await WebsiteBuilderConfigs.findOne();
+      if (!existingConfig) {
+        await WebsiteBuilderConfigs.create({
+          defaultFooterDisclaimer: DEFAULT_FOOTER_DISCLAIMER,
+        });
+        if (process.env.NODE_ENV === 'development') {
+          console.log('✅ WebsiteBuilderConfigs default row created');
+        }
+      } else {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('✅ WebsiteBuilderConfigs default row already exists');
+        }
+      }
+    } catch (e) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('❌ Error creating WebsiteBuilderConfigs default row:', e);
       }
       // ignore - don't fail startup
     }
