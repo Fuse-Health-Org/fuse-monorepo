@@ -56,6 +56,7 @@ interface PortalSettings {
   isActive: boolean
   footerColor?: string
   footerCategories?: FooterCategory[]
+  socialMediaSection?: string
 }
 
 export default function PortalPage() {
@@ -95,6 +96,7 @@ export default function PortalPage() {
     isActive: true,
     footerColor: "#000000",
     footerCategories: DEFAULT_FOOTER_CATEGORIES,
+    socialMediaSection: "SOCIAL MEDIA",
   })
   const [isTogglingActive, setIsTogglingActive] = useState(false)
   const [clinicSlug, setClinicSlug] = useState<string | null>(null)
@@ -196,6 +198,7 @@ export default function PortalPage() {
             isActive: data.data.isActive ?? true,
             footerColor: data.data.footerColor || settings.footerColor || "#000000",
             footerCategories: footerCategories,
+            socialMediaSection: data.data.socialMediaSection || settings.socialMediaSection || "SOCIAL MEDIA",
           })
         }
       }

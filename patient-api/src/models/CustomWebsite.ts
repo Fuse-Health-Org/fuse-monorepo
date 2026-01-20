@@ -96,30 +96,37 @@ export default class CustomWebsite extends Entity {
     @Column({
         type: DataType.STRING(100),
         allowNull: true,
-        defaultValue: 'Shop',
+        defaultValue: 'NAVIGATION',
     })
     declare section1?: string | null;
 
     @Column({
         type: DataType.STRING(100),
         allowNull: true,
-        defaultValue: 'Daily Health',
+        defaultValue: 'SECTION 2',
     })
     declare section2?: string | null;
 
     @Column({
         type: DataType.STRING(100),
         allowNull: true,
-        defaultValue: 'Rest & Restore',
+        defaultValue: 'SECTION 3',
     })
     declare section3?: string | null;
 
     @Column({
         type: DataType.STRING(100),
         allowNull: true,
-        defaultValue: 'Store',
+        defaultValue: 'SECTION 4',
     })
     declare section4?: string | null;
+
+    @Column({
+        type: DataType.STRING(100),
+        allowNull: true,
+        defaultValue: 'SOCIAL MEDIA',
+    })
+    declare socialMediaSection?: string | null;
 
     // Relations
     @BelongsTo(() => Clinic)

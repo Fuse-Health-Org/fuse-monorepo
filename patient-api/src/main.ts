@@ -3021,7 +3021,8 @@ app.post("/custom-website", authenticateJWT, async (req, res) => {
       section1,
       section2,
       section3,
-      section4
+      section4,
+      socialMediaSection
     } = req.body;
 
     let customWebsite = await CustomWebsite.findOne({
@@ -3045,7 +3046,8 @@ app.post("/custom-website", authenticateJWT, async (req, res) => {
         section1: section1 !== undefined ? section1 : customWebsite.section1,
         section2: section2 !== undefined ? section2 : customWebsite.section2,
         section3: section3 !== undefined ? section3 : customWebsite.section3,
-        section4: section4 !== undefined ? section4 : customWebsite.section4
+        section4: section4 !== undefined ? section4 : customWebsite.section4,
+        socialMediaSection: socialMediaSection !== undefined ? socialMediaSection : customWebsite.socialMediaSection
       });
     } else {
       // Create new
@@ -3062,10 +3064,11 @@ app.post("/custom-website", authenticateJWT, async (req, res) => {
         isActive: isActive !== undefined ? isActive : true,
         footerColor,
         footerCategories,
-        section1: section1 ?? 'Shop',
-        section2: section2 ?? 'Daily Health',
-        section3: section3 ?? 'Rest & Restore',
-        section4: section4 ?? 'Store'
+        section1: section1 ?? 'NAVIGATION',
+        section2: section2 ?? 'SECTION 2',
+        section3: section3 ?? 'SECTION 3',
+        section4: section4 ?? 'SECTION 4',
+        socialMediaSection: socialMediaSection ?? 'SOCIAL MEDIA'
       });
     }
 
