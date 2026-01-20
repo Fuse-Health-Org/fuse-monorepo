@@ -100,6 +100,15 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
         return programData.name;
     };
 
+    // Service descriptions mapping
+    const serviceDescriptions: Record<string, string> = {
+        'Patient Portal': 'Access your personalized health dashboard',
+        'BMI Calculator': 'Track your body mass index progress',
+        'Protein Intake Calculator': 'Optimize your daily protein consumption',
+        'Calorie Deficit Calculator': 'Calculate your ideal caloric intake',
+        'Easy Shopping': 'Simplified ordering and reordering process',
+    };
+
     // Get enabled non-medical services for display - handles both unified and per-product pricing
     const getEnabledNonMedicalServices = () => {
         if (!programData) return [];
@@ -107,7 +116,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
         // For per-product pricing, aggregate services from all selected products
         if (hasPerProductPricing) {
             const selectedProducts = programData.products.filter(p => selectedProgramProducts[p.id]);
-            const aggregatedServices: { name: string; price: number; productName?: string }[] = [];
+            const aggregatedServices: { name: string; price: number; description: string; productName?: string }[] = [];
 
             for (const product of selectedProducts) {
                 const perProduct = product.perProductProgram;
@@ -117,19 +126,44 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                 const nms = perProduct.nonMedicalServices;
 
                 if (nms.patientPortal.enabled) {
-                    aggregatedServices.push({ name: `Patient Portal${productLabel}`, price: nms.patientPortal.price, productName: product.name });
+                    aggregatedServices.push({ 
+                        name: `Patient Portal${productLabel}`, 
+                        price: nms.patientPortal.price, 
+                        description: serviceDescriptions['Patient Portal'],
+                        productName: product.name 
+                    });
                 }
                 if (nms.bmiCalculator.enabled) {
-                    aggregatedServices.push({ name: `BMI Calculator${productLabel}`, price: nms.bmiCalculator.price, productName: product.name });
+                    aggregatedServices.push({ 
+                        name: `BMI Calculator${productLabel}`, 
+                        price: nms.bmiCalculator.price,
+                        description: serviceDescriptions['BMI Calculator'],
+                        productName: product.name 
+                    });
                 }
                 if (nms.proteinIntakeCalculator.enabled) {
-                    aggregatedServices.push({ name: `Protein Intake Calculator${productLabel}`, price: nms.proteinIntakeCalculator.price, productName: product.name });
+                    aggregatedServices.push({ 
+                        name: `Protein Intake Calculator${productLabel}`, 
+                        price: nms.proteinIntakeCalculator.price,
+                        description: serviceDescriptions['Protein Intake Calculator'],
+                        productName: product.name 
+                    });
                 }
                 if (nms.calorieDeficitCalculator.enabled) {
-                    aggregatedServices.push({ name: `Calorie Deficit Calculator${productLabel}`, price: nms.calorieDeficitCalculator.price, productName: product.name });
+                    aggregatedServices.push({ 
+                        name: `Calorie Deficit Calculator${productLabel}`, 
+                        price: nms.calorieDeficitCalculator.price,
+                        description: serviceDescriptions['Calorie Deficit Calculator'],
+                        productName: product.name 
+                    });
                 }
                 if (nms.easyShopping.enabled) {
-                    aggregatedServices.push({ name: `Easy Shopping${productLabel}`, price: nms.easyShopping.price, productName: product.name });
+                    aggregatedServices.push({ 
+                        name: `Easy Shopping${productLabel}`, 
+                        price: nms.easyShopping.price,
+                        description: serviceDescriptions['Easy Shopping'],
+                        productName: product.name 
+                    });
                 }
             }
 
@@ -137,21 +171,41 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
         }
 
         // For unified pricing, use the parent program's services
-        const services: { name: string; price: number }[] = [];
+        const services: { name: string; price: number; description: string }[] = [];
         if (programData.nonMedicalServices.patientPortal.enabled) {
-            services.push({ name: 'Patient Portal', price: programData.nonMedicalServices.patientPortal.price });
+            services.push({ 
+                name: 'Patient Portal', 
+                price: programData.nonMedicalServices.patientPortal.price,
+                description: serviceDescriptions['Patient Portal']
+            });
         }
         if (programData.nonMedicalServices.bmiCalculator.enabled) {
-            services.push({ name: 'BMI Calculator', price: programData.nonMedicalServices.bmiCalculator.price });
+            services.push({ 
+                name: 'BMI Calculator', 
+                price: programData.nonMedicalServices.bmiCalculator.price,
+                description: serviceDescriptions['BMI Calculator']
+            });
         }
         if (programData.nonMedicalServices.proteinIntakeCalculator.enabled) {
-            services.push({ name: 'Protein Intake Calculator', price: programData.nonMedicalServices.proteinIntakeCalculator.price });
+            services.push({ 
+                name: 'Protein Intake Calculator', 
+                price: programData.nonMedicalServices.proteinIntakeCalculator.price,
+                description: serviceDescriptions['Protein Intake Calculator']
+            });
         }
         if (programData.nonMedicalServices.calorieDeficitCalculator.enabled) {
-            services.push({ name: 'Calorie Deficit Calculator', price: programData.nonMedicalServices.calorieDeficitCalculator.price });
+            services.push({ 
+                name: 'Calorie Deficit Calculator', 
+                price: programData.nonMedicalServices.calorieDeficitCalculator.price,
+                description: serviceDescriptions['Calorie Deficit Calculator']
+            });
         }
         if (programData.nonMedicalServices.easyShopping.enabled) {
-            services.push({ name: 'Easy Shopping', price: programData.nonMedicalServices.easyShopping.price });
+            services.push({ 
+                name: 'Easy Shopping', 
+                price: programData.nonMedicalServices.easyShopping.price,
+                description: serviceDescriptions['Easy Shopping']
+            });
         }
         return services;
     };
@@ -294,21 +348,12 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                                 );
                             })()}
 
-                            {/* Program Name + Non-Medical Services */}
+                            {/* Program Name */}
                             {(hasPerProductPricing ? currentNonMedicalServicesFee > 0 : programData.nonMedicalServicesFee > 0) && (
                                 <div className="mt-6 pt-6 border-t border-gray-200">
                                     <h4 className="text-md font-medium text-gray-900">Program Name</h4>
                                     <div className="text-sm font-semibold mb-3" style={{ color: theme.primary }}>
                                         {getDisplayProgramName()}
-                                    </div>
-                                    <h4 className="text-md font-medium text-gray-900 mb-3">Included Services</h4>
-                                    <div className="space-y-2">
-                                        {getEnabledNonMedicalServices().map((service, idx) => (
-                                            <div key={idx} className="flex items-center gap-2 text-sm">
-                                                <Icon icon="lucide:check-circle" className="w-4 h-4" style={{ color: theme.primary }} />
-                                                <span className="text-gray-700">{service.name}</span>
-                                            </div>
-                                        ))}
                                     </div>
                                 </div>
                             )}
@@ -837,6 +882,23 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                                         <div className="text-xs text-gray-500 leading-snug">Bank-level encryption & security</div>
                                     </div>
                                 </div>
+
+                                {/* Dynamic Program Services */}
+                                {isProgramCheckout && programData && (hasPerProductPricing ? currentNonMedicalServicesFee > 0 : programData.nonMedicalServicesFee > 0) && (
+                                    <>
+                                        {getEnabledNonMedicalServices().map((service, idx) => (
+                                            <div key={idx} className="flex items-start gap-3">
+                                                <div className="w-5 h-5 rounded-full bg-success-100 flex items-center justify-center flex-shrink-0">
+                                                    <div className="w-2 h-2 rounded-full bg-success-500"></div>
+                                                </div>
+                                                <div className="flex-1 space-y-0.5">
+                                                    <div className="text-sm font-medium text-gray-900">{service.name}</div>
+                                                    <div className="text-xs text-gray-500 leading-snug">{service.description}</div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </>
+                                )}
                             </div>
                         </div>
                     </CardBody>
