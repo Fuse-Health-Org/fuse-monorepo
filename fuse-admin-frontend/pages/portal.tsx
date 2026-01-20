@@ -5,7 +5,7 @@ import Layout from "@/components/Layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Monitor, Smartphone, Upload, Link as LinkIcon, Globe, Crown, ExternalLink, Trash2, Plus, ChevronDown, GripVertical } from "lucide-react"
+import { Monitor, Smartphone, Upload, Link as LinkIcon, Globe, Crown, ExternalLink, Trash2, Plus, ChevronDown, GripVertical, Pencil, Check, X } from "lucide-react"
 import { Switch } from "@/components/ui/switch"
 import { ToastManager } from "@/components/ui/toast"
 import { useToast } from "@/hooks/use-toast"
@@ -109,6 +109,9 @@ export default function PortalPage() {
   const [newUrlLabel, setNewUrlLabel] = useState("")
   const [newUrlValue, setNewUrlValue] = useState("")
   const [draggedCategoryIndex, setDraggedCategoryIndex] = useState<number | null>(null)
+  const [editingUrl, setEditingUrl] = useState<{ categoryIndex: number; urlIndex: number } | null>(null)
+  const [editingUrlLabel, setEditingUrlLabel] = useState("")
+  const [editingUrlValue, setEditingUrlValue] = useState("")
 
   // Check if user has access to Portal based on tier config, custom features, or plan type
   const hasPortalAccess =
@@ -334,8 +337,10 @@ export default function PortalPage() {
   const handleAddUrlToCategory = (categoryIndex: number) => {
     if (!newUrlLabel.trim() || !newUrlValue.trim()) return
     
-    if (!isValidUrl(newUrlValue.trim())) {
-      error("Please enter a valid URL (must start with http:// or https://)", "Invalid URL")
+    // Allow internal links (starting with # or /) without full URL validation
+    const isInternalLink = newUrlValue.trim().startsWith('#') || newUrlValue.trim().startsWith('/')
+    if (!isInternalLink && !isValidUrl(newUrlValue.trim())) {
+      error("Please enter a valid URL (must start with http://, https://, # or /)", "Invalid URL")
       return
     }
 
@@ -351,6 +356,45 @@ export default function PortalPage() {
       setNewUrlValue("")
       setAddingUrlToCategory(null)
     }
+  }
+
+  const handleStartEditUrl = (categoryIndex: number, urlIndex: number) => {
+    const category = settings.footerCategories?.[categoryIndex]
+    const urlItem = category?.urls?.[urlIndex]
+    if (urlItem) {
+      setEditingUrl({ categoryIndex, urlIndex })
+      setEditingUrlLabel(urlItem.label)
+      setEditingUrlValue(urlItem.url)
+    }
+  }
+
+  const handleSaveEditUrl = () => {
+    if (!editingUrl || !editingUrlLabel.trim() || !editingUrlValue.trim()) return
+    
+    // Allow internal links (starting with # or /) without full URL validation
+    const isInternalLink = editingUrlValue.trim().startsWith('#') || editingUrlValue.trim().startsWith('/')
+    if (!isInternalLink && !isValidUrl(editingUrlValue.trim())) {
+      error("Please enter a valid URL (must start with http://, https://, # or /)", "Invalid URL")
+      return
+    }
+
+    const newCategories = [...(settings.footerCategories || [])]
+    if (newCategories[editingUrl.categoryIndex]?.urls?.[editingUrl.urlIndex]) {
+      newCategories[editingUrl.categoryIndex].urls![editingUrl.urlIndex] = {
+        label: editingUrlLabel.trim(),
+        url: editingUrlValue.trim()
+      }
+      setSettings({ ...settings, footerCategories: newCategories })
+    }
+    setEditingUrl(null)
+    setEditingUrlLabel("")
+    setEditingUrlValue("")
+  }
+
+  const handleCancelEditUrl = () => {
+    setEditingUrl(null)
+    setEditingUrlLabel("")
+    setEditingUrlValue("")
   }
 
   const handleDragStart = (index: number) => {
@@ -990,25 +1034,84 @@ export default function PortalPage() {
                                 {(category.urls || []).length > 0 ? (
                                   <div className="space-y-2">
                                     {(category.urls || []).map((urlItem, urlIndex) => (
-                                      <div key={urlIndex} className="flex items-center gap-2 p-2 bg-background rounded border">
-                                        <div className="flex-1 min-w-0">
-                                          <div className="text-xs font-medium truncate">{urlItem.label}</div>
-                                          <div className="text-xs text-muted-foreground truncate">{urlItem.url}</div>
-                                        </div>
-                                        <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          className="h-6 w-6 hover:bg-red-50 hover:text-red-600"
-                                          onClick={() => {
-                                            const newCategories = [...(settings.footerCategories || [])]
-                                            if (newCategories[index]) {
-                                              newCategories[index].urls = (newCategories[index].urls || []).filter((_, i) => i !== urlIndex)
-                                              setSettings({ ...settings, footerCategories: newCategories })
-                                            }
-                                          }}
-                                        >
-                                          <Trash2 className="h-3 w-3" />
-                                        </Button>
+                                      <div key={urlIndex} className="p-2 bg-background rounded border">
+                                        {editingUrl?.categoryIndex === index && editingUrl?.urlIndex === urlIndex ? (
+                                          // Editing mode
+                                          <div className="space-y-2">
+                                            <Input
+                                              value={editingUrlLabel}
+                                              onChange={(e) => setEditingUrlLabel(e.target.value)}
+                                              placeholder="Label"
+                                              className="text-xs h-8"
+                                              autoFocus
+                                            />
+                                            <Input
+                                              value={editingUrlValue}
+                                              onChange={(e) => setEditingUrlValue(e.target.value)}
+                                              placeholder="URL (e.g., #bundles or https://...)"
+                                              className="text-xs h-8"
+                                              onKeyDown={(e) => {
+                                                if (e.key === "Enter") {
+                                                  e.preventDefault()
+                                                  handleSaveEditUrl()
+                                                } else if (e.key === "Escape") {
+                                                  handleCancelEditUrl()
+                                                }
+                                              }}
+                                            />
+                                            <div className="flex gap-1">
+                                              <Button
+                                                variant="default"
+                                                size="sm"
+                                                className="h-7 text-xs flex-1"
+                                                onClick={handleSaveEditUrl}
+                                                disabled={!editingUrlLabel.trim() || !editingUrlValue.trim()}
+                                              >
+                                                <Check className="h-3 w-3 mr-1" />
+                                                Save
+                                              </Button>
+                                              <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="h-7 text-xs flex-1"
+                                                onClick={handleCancelEditUrl}
+                                              >
+                                                <X className="h-3 w-3 mr-1" />
+                                                Cancel
+                                              </Button>
+                                            </div>
+                                          </div>
+                                        ) : (
+                                          // View mode
+                                          <div className="flex items-center gap-2">
+                                            <div className="flex-1 min-w-0">
+                                              <div className="text-xs font-medium truncate">{urlItem.label}</div>
+                                              <div className="text-xs text-muted-foreground truncate">{urlItem.url}</div>
+                                            </div>
+                                            <Button
+                                              variant="ghost"
+                                              size="icon"
+                                              className="h-6 w-6 hover:bg-blue-50 hover:text-blue-600"
+                                              onClick={() => handleStartEditUrl(index, urlIndex)}
+                                            >
+                                              <Pencil className="h-3 w-3" />
+                                            </Button>
+                                            <Button
+                                              variant="ghost"
+                                              size="icon"
+                                              className="h-6 w-6 hover:bg-red-50 hover:text-red-600"
+                                              onClick={() => {
+                                                const newCategories = [...(settings.footerCategories || [])]
+                                                if (newCategories[index]) {
+                                                  newCategories[index].urls = (newCategories[index].urls || []).filter((_, i) => i !== urlIndex)
+                                                  setSettings({ ...settings, footerCategories: newCategories })
+                                                }
+                                              }}
+                                            >
+                                              <Trash2 className="h-3 w-3" />
+                                            </Button>
+                                          </div>
+                                        )}
                                       </div>
                                     ))}
                                   </div>

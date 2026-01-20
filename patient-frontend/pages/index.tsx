@@ -113,6 +113,7 @@ export default function LandingPage() {
   const [isAutoScrollPaused, setIsAutoScrollPaused] = useState(false);
   const [activeFilter, setActiveFilter] = useState<'all' | 'bundles' | 'programs' | string>('all');
   const [shouldDuplicate, setShouldDuplicate] = useState(false);
+  const shopSectionRef = useRef<HTMLElement>(null);
 
   // Extract unique categories from all products
   const productCategories = useMemo(() => {
@@ -131,6 +132,48 @@ export default function LandingPage() {
     });
     return Array.from(categoriesSet).sort();
   }, [products]);
+
+  // Handle URL hash for category filtering
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace('#', '').toLowerCase();
+      if (hash) {
+        // Handle special cases first
+        if (hash === 'all') {
+          setActiveFilter('all');
+        } else if (hash === 'bundles') {
+          setActiveFilter('bundles');
+        } else if (hash === 'programs') {
+          setActiveFilter('programs');
+        } else {
+          // Try to find a matching category (case-insensitive)
+          // Handle both "weight-loss" and "weightloss" formats
+          const normalizedHash = hash.replace(/-/g, ' ');
+          const matchedCategory = productCategories.find(
+            cat => cat.toLowerCase() === normalizedHash || cat.toLowerCase() === hash
+          );
+          
+          if (matchedCategory) {
+            setActiveFilter(matchedCategory);
+          }
+        }
+        
+        // Scroll to the shop section
+        setTimeout(() => {
+          shopSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }, 100);
+      }
+    };
+
+    // Check hash on initial load (only when productCategories is loaded)
+    if (productCategories.length > 0 || window.location.hash) {
+      handleHashChange();
+    }
+
+    // Listen for hash changes
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, [productCategories]);
 
   // Format category name for display (capitalize and replace underscores with spaces)
   const formatCategoryName = (category: string): string => {
@@ -920,7 +963,7 @@ export default function LandingPage() {
       {/* Main Content */}
       <main style={{ maxWidth: "1280px", margin: "0 auto", padding: "3rem 1.5rem" }}>
         {/* Title Section */}
-        <div style={{ marginBottom: "2rem" }}>
+        <section ref={shopSectionRef} style={{ marginBottom: "2rem" }}>
           <p style={{ fontSize: "0.875rem", color: "#737373", marginBottom: "0.5rem" }}>SHOP</p>
           <h2 style={{ fontFamily: "Georgia, serif", fontSize: "3rem", marginBottom: "0.75rem", fontWeight: 400 }}>
             {programs.length > 0 ? "Trending Programs & Products" : "Trending Products"}
@@ -930,7 +973,7 @@ export default function LandingPage() {
               ? "Discover our health programs and member favorites here."
               : "AG1 is so much more than greens. Discover our member favorites here."}
           </p>
-        </div>
+        </section>
         {/* Filter Tabs */}
         <div style={{ display: "flex", gap: "0.5rem", marginBottom: "3rem" }}>
           <button
@@ -1052,13 +1095,21 @@ export default function LandingPage() {
                   </h4>
                   {visibleFooterCategories[0].urls && visibleFooterCategories[0].urls.length > 0 && (
                     <ul style={{ listStyle: "none", padding: 0, margin: 0, fontSize: "0.875rem" }}>
-                      {visibleFooterCategories[0].urls.map((urlItem, urlIndex) => (
-                        <li key={urlIndex} style={{ marginBottom: "0.5rem" }}>
-                          <a href={urlItem.url} target="_blank" rel="noopener noreferrer" style={{ color: "white", textDecoration: "none", opacity: 0.9 }}>
-                            {urlItem.label}
-                          </a>
-                        </li>
-                      ))}
+                      {visibleFooterCategories[0].urls.map((urlItem, urlIndex) => {
+                        const isInternal = urlItem.url.startsWith('#') || urlItem.url.startsWith('/');
+                        return (
+                          <li key={urlIndex} style={{ marginBottom: "0.5rem" }}>
+                            <a 
+                              href={urlItem.url} 
+                              target={isInternal ? undefined : "_blank"} 
+                              rel={isInternal ? undefined : "noopener noreferrer"} 
+                              style={{ color: "white", textDecoration: "none", opacity: 0.9 }}
+                            >
+                              {urlItem.label}
+                            </a>
+                          </li>
+                        );
+                      })}
                     </ul>
                   )}
                 </div>
@@ -1071,13 +1122,21 @@ export default function LandingPage() {
                   </h4>
                   {visibleFooterCategories[1].urls && visibleFooterCategories[1].urls.length > 0 && (
                     <ul style={{ listStyle: "none", padding: 0, margin: 0, fontSize: "0.875rem" }}>
-                      {visibleFooterCategories[1].urls.map((urlItem, urlIndex) => (
-                        <li key={urlIndex} style={{ marginBottom: "0.5rem" }}>
-                          <a href={urlItem.url} target="_blank" rel="noopener noreferrer" style={{ color: "white", textDecoration: "none", opacity: 0.9 }}>
-                            {urlItem.label}
-                          </a>
-                        </li>
-                      ))}
+                      {visibleFooterCategories[1].urls.map((urlItem, urlIndex) => {
+                        const isInternal = urlItem.url.startsWith('#') || urlItem.url.startsWith('/');
+                        return (
+                          <li key={urlIndex} style={{ marginBottom: "0.5rem" }}>
+                            <a 
+                              href={urlItem.url} 
+                              target={isInternal ? undefined : "_blank"} 
+                              rel={isInternal ? undefined : "noopener noreferrer"} 
+                              style={{ color: "white", textDecoration: "none", opacity: 0.9 }}
+                            >
+                              {urlItem.label}
+                            </a>
+                          </li>
+                        );
+                      })}
                     </ul>
                   )}
                 </div>
@@ -1167,13 +1226,21 @@ export default function LandingPage() {
                     </h4>
                     {visibleFooterCategories[2].urls && visibleFooterCategories[2].urls.length > 0 && (
                       <ul style={{ listStyle: "none", padding: 0, margin: 0, fontSize: "0.875rem" }}>
-                        {visibleFooterCategories[2].urls.map((urlItem, urlIndex) => (
-                          <li key={urlIndex} style={{ marginBottom: "0.5rem" }}>
-                            <a href={urlItem.url} target="_blank" rel="noopener noreferrer" style={{ color: "white", textDecoration: "none", opacity: 0.9 }}>
-                              {urlItem.label}
-                            </a>
-                          </li>
-                        ))}
+                        {visibleFooterCategories[2].urls.map((urlItem, urlIndex) => {
+                          const isInternal = urlItem.url.startsWith('#') || urlItem.url.startsWith('/');
+                          return (
+                            <li key={urlIndex} style={{ marginBottom: "0.5rem" }}>
+                              <a 
+                                href={urlItem.url} 
+                                target={isInternal ? undefined : "_blank"} 
+                                rel={isInternal ? undefined : "noopener noreferrer"} 
+                                style={{ color: "white", textDecoration: "none", opacity: 0.9 }}
+                              >
+                                {urlItem.label}
+                              </a>
+                            </li>
+                          );
+                        })}
                       </ul>
                     )}
                   </div>
@@ -1186,13 +1253,21 @@ export default function LandingPage() {
                     </h4>
                     {visibleFooterCategories[3].urls && visibleFooterCategories[3].urls.length > 0 && (
                       <ul style={{ listStyle: "none", padding: 0, margin: 0, fontSize: "0.875rem" }}>
-                        {visibleFooterCategories[3].urls.map((urlItem, urlIndex) => (
-                          <li key={urlIndex} style={{ marginBottom: "0.5rem" }}>
-                            <a href={urlItem.url} target="_blank" rel="noopener noreferrer" style={{ color: "white", textDecoration: "none", opacity: 0.9 }}>
-                              {urlItem.label}
-                            </a>
-                          </li>
-                        ))}
+                        {visibleFooterCategories[3].urls.map((urlItem, urlIndex) => {
+                          const isInternal = urlItem.url.startsWith('#') || urlItem.url.startsWith('/');
+                          return (
+                            <li key={urlIndex} style={{ marginBottom: "0.5rem" }}>
+                              <a 
+                                href={urlItem.url} 
+                                target={isInternal ? undefined : "_blank"} 
+                                rel={isInternal ? undefined : "noopener noreferrer"} 
+                                style={{ color: "white", textDecoration: "none", opacity: 0.9 }}
+                              >
+                                {urlItem.label}
+                              </a>
+                            </li>
+                          );
+                        })}
                       </ul>
                     )}
                   </div>
