@@ -97,6 +97,14 @@ type CarouselItem =
 
 export default function LandingPage() {
   const router = useRouter();
+  
+  // Helper function to ensure URLs have proper protocol
+  const ensureProtocol = (url: string): string => {
+    if (!url || url === '#') return '#';
+    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    return `https://${url}`;
+  };
+
   const [customWebsite, setCustomWebsite] = useState<CustomWebsite | null>(null);
   const [clinicInfo, setClinicInfo] = useState<ClinicInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -150,26 +158,26 @@ export default function LandingPage() {
           // Handle both "weight-loss", "weightloss", and "weight loss" formats
           const normalizedHash = hash.replace(/-/g, ' ');
           const hashNoSpaces = hash.replace(/\s+/g, '');
-          
+
           const matchedCategory = productCategories.find(cat => {
             const catLower = cat.toLowerCase();
             const catNoSpaces = catLower.replace(/[\s_-]+/g, ''); // Remove spaces, underscores, and hyphens
             const catNormalized = catLower.replace(/[-_]/g, ' '); // Convert hyphens and underscores to spaces
-            
-            const matches = catLower === hash || 
-                   catLower === normalizedHash || 
-                   catNoSpaces === hash ||
-                   catNoSpaces === hashNoSpaces ||
-                   catNormalized === hash ||
-                   catNormalized === normalizedHash;
-            
+
+            const matches = catLower === hash ||
+              catLower === normalizedHash ||
+              catNoSpaces === hash ||
+              catNoSpaces === hashNoSpaces ||
+              catNormalized === hash ||
+              catNormalized === normalizedHash;
+
             if (matches) {
               console.log('✅ MATCH FOUND:', cat, 'for hash:', hash);
             }
-            
+
             return matches;
           });
-          
+
           if (matchedCategory) {
             console.log('Setting active filter to:', matchedCategory);
             setActiveFilter(matchedCategory);
@@ -186,7 +194,7 @@ export default function LandingPage() {
             });
           }
         }
-        
+
         // Scroll to the shop section
         setTimeout(() => {
           shopSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -1137,10 +1145,10 @@ export default function LandingPage() {
                         }
                         return (
                           <li key={urlIndex} style={{ marginBottom: "0.5rem" }}>
-                            <a 
-                              href={urlItem.url} 
-                              target={isInternal ? undefined : "_blank"} 
-                              rel={isInternal ? undefined : "noopener noreferrer"} 
+                            <a
+                              href={urlItem.url}
+                              target={isInternal ? undefined : "_blank"}
+                              rel={isInternal ? undefined : "noopener noreferrer"}
                               style={{ color: "white", textDecoration: "none", opacity: 0.9 }}
                             >
                               {urlItem.label}
@@ -1173,10 +1181,10 @@ export default function LandingPage() {
                         }
                         return (
                           <li key={urlIndex} style={{ marginBottom: "0.5rem" }}>
-                            <a 
-                              href={urlItem.url} 
-                              target={isInternal ? undefined : "_blank"} 
-                              rel={isInternal ? undefined : "noopener noreferrer"} 
+                            <a
+                              href={urlItem.url}
+                              target={isInternal ? undefined : "_blank"}
+                              rel={isInternal ? undefined : "noopener noreferrer"}
                               style={{ color: "white", textDecoration: "none", opacity: 0.9 }}
                             >
                               {urlItem.label}
@@ -1192,49 +1200,8 @@ export default function LandingPage() {
 
             {/* Middle: Disclaimers */}
             <div>
-              <div style={{ fontSize: "0.625rem", lineHeight: "1.6", opacity: 0.7 }}>
-                <p style={{ marginBottom: "1rem" }}>
-                  * These statements have not been evaluated by the Food and Drug Administration. This product is not intended to diagnose, treat, cure or prevent any disease.
-                </p>
-                <p style={{ marginBottom: "1rem" }}>
-                  Information on this site is provided for informational purposes only. It is not meant to substitute for medical advice from your physician or other medical professional. You should not use the information contained herein for diagnosing or treating a health problem or disease, or prescribing any medication. Carefully read all product documentation. If you have or suspect that you have a medical problem, promptly contact your regular health care provider.
-                </p>
-                <p style={{ marginBottom: "1rem" }}>
-                  **Offer valid for new subscribers only. Valid on the first shipment only of one new AG1 and/or one new AGZ subscription. Renewals bill automatically at the then current rate until canceled. Cannot be combined with other offers or discounts and cannot be applied to prior purchases. One per customer. Non-transferable. Limited time only.
-                </p>
-                <p style={{ marginBottom: "1rem" }}>
-                  **AG1 Welcome Kit Offer valid for new AG1 subscribers only. AGZ frother Offer valid for first AGZ order only.
-                </p>
-                <p style={{ marginBottom: "1rem" }}>
-                  ◊According to IQVIA Pro Voice Survey of 248 primary care physicians in December 2025.
-                </p>
-                <p style={{ marginBottom: "1rem" }}>
-                  ††Free shipping on subscription purchases for new U.S. customers only.
-                </p>
-                <p style={{ marginBottom: "1rem" }}>
-                  In a triple-blind, randomized, placebo-controlled parallel-designed clinical trial evaluating nutrient biomarkers and microbiome shifts in 105 healthy adults ages 20-59 over the course of 12 weeks.
-                </p>
-                <p style={{ marginBottom: "1rem" }}>
-                  In a double-blind, randomized, placebo-controlled 2-week crossover clinical trial assessing nutrient gaps and microbiome shifts in 20 active adults ages 19-37.
-                </p>
-                <p style={{ marginBottom: "1rem" }}>
-                  In a double-blind, randomized, placebo-controlled 2-week crossover clinical trial assessing nutrient gaps and microbiome assessments of 24 healthy adults with occasional GI distress ages 26-59 over the course of 4 weeks.
-                </p>
-                <p style={{ marginBottom: "1rem" }}>
-                  In a double-blind, randomized, placebo-controlled crossover clinical trial assessing nutrient gaps and bioavailability in 16 healthy adults ages 18-42 over the course of 8 hours.
-                </p>
-                <p style={{ marginBottom: "1rem" }}>
-                  In a third-party, single-arm, closed label interventional study of 104 healthy adults ages 25-59 assessing self-perceived efficacy of AG1 Next Gen over 3 months.
-                </p>
-                <p style={{ marginBottom: "1rem" }}>
-                  ΔTruemed eligibility and approval required. This link will take you to a third party website hosted by Truemed (the "Site"). Linking to this Site does not constitute an endorsement or approval by AG1 or any of its employees of the content, products, services or opinions on the Site. This is being provided as a convenience and AG1 bears no responsibility for the accuracy, legality or content of the Site or for that of any subsequent links on the Site. Contact the owners of the Site for answers to questions regarding its content.
-                </p>
-                <p style={{ marginBottom: "1rem" }}>
-                  Actual Packaging May Vary
-                </p>
-                <p>
-                  Your privacy is our priority. Learn more:
-                </p>
+              <div style={{ fontSize: "0.625rem", lineHeight: "1.6", opacity: 0.7, whiteSpace: "pre-wrap" }}>
+                {websiteData?.footerDisclaimer || "* These statements have not been evaluated by the Food and Drug Administration. This product is not intended to diagnose, treat, cure or prevent any disease. The information provided on this site is for informational purposes only and is not intended as a substitute for advice from your physician or other health care professional."}
               </div>
             </div>
 
@@ -1286,10 +1253,10 @@ export default function LandingPage() {
                           }
                           return (
                             <li key={urlIndex} style={{ marginBottom: "0.5rem" }}>
-                              <a 
-                                href={urlItem.url} 
-                                target={isInternal ? undefined : "_blank"} 
-                                rel={isInternal ? undefined : "noopener noreferrer"} 
+                              <a
+                                href={urlItem.url}
+                                target={isInternal ? undefined : "_blank"}
+                                rel={isInternal ? undefined : "noopener noreferrer"}
                                 style={{ color: "white", textDecoration: "none", opacity: 0.9 }}
                               >
                                 {urlItem.label}
@@ -1322,10 +1289,10 @@ export default function LandingPage() {
                           }
                           return (
                             <li key={urlIndex} style={{ marginBottom: "0.5rem" }}>
-                              <a 
-                                href={urlItem.url} 
-                                target={isInternal ? undefined : "_blank"} 
-                                rel={isInternal ? undefined : "noopener noreferrer"} 
+                              <a
+                                href={urlItem.url}
+                                target={isInternal ? undefined : "_blank"}
+                                rel={isInternal ? undefined : "noopener noreferrer"}
                                 style={{ color: "white", textDecoration: "none", opacity: 0.9 }}
                               >
                                 {urlItem.label}
@@ -1344,31 +1311,71 @@ export default function LandingPage() {
                     {(websiteData?.socialMediaSection || "SOCIAL MEDIA").toUpperCase()}
                   </h4>
                   <div style={{ display: "flex", gap: "1rem" }}>
-                    <a href="#" style={{ color: "white", fontSize: "1.25rem" }}>
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
-                      </svg>
-                    </a>
-                    <a href="#" style={{ color: "white", fontSize: "1.25rem" }}>
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-                      </svg>
-                    </a>
-                    <a href="#" style={{ color: "white", fontSize: "1.25rem" }}>
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z" />
-                      </svg>
-                    </a>
-                    <a href="#" style={{ color: "white", fontSize: "1.25rem" }}>
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z" />
-                      </svg>
-                    </a>
-                    <a href="#" style={{ color: "white", fontSize: "1.25rem" }}>
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
-                      </svg>
-                    </a>
+                    {/* Instagram */}
+                    {(websiteData?.socialMediaLinks?.instagram?.enabled ?? true) && (
+                      <a 
+                        href={ensureProtocol(websiteData?.socialMediaLinks?.instagram?.url || "#")} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        style={{ color: "white", fontSize: "1.25rem" }}
+                      >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
+                        </svg>
+                      </a>
+                    )}
+                    {/* Facebook */}
+                    {(websiteData?.socialMediaLinks?.facebook?.enabled ?? true) && (
+                      <a 
+                        href={ensureProtocol(websiteData?.socialMediaLinks?.facebook?.url || "#")} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        style={{ color: "white", fontSize: "1.25rem" }}
+                      >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+                        </svg>
+                      </a>
+                    )}
+                    {/* Twitter/X */}
+                    {(websiteData?.socialMediaLinks?.twitter?.enabled ?? true) && (
+                      <a 
+                        href={ensureProtocol(websiteData?.socialMediaLinks?.twitter?.url || "#")} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        style={{ color: "white", fontSize: "1.25rem" }}
+                      >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                        </svg>
+                      </a>
+                    )}
+                    {/* TikTok */}
+                    {(websiteData?.socialMediaLinks?.tiktok?.enabled ?? true) && (
+                      <a 
+                        href={ensureProtocol(websiteData?.socialMediaLinks?.tiktok?.url || "#")} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        style={{ color: "white", fontSize: "1.25rem" }}
+                      >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z" />
+                        </svg>
+                      </a>
+                    )}
+                    {/* YouTube */}
+                    {(websiteData?.socialMediaLinks?.youtube?.enabled ?? true) && (
+                      <a 
+                        href={ensureProtocol(websiteData?.socialMediaLinks?.youtube?.url || "#")} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        style={{ color: "white", fontSize: "1.25rem" }}
+                      >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
+                        </svg>
+                      </a>
+                    )}
                   </div>
                 </div>
               </div>

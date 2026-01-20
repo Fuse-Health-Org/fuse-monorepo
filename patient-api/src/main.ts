@@ -3022,7 +3022,9 @@ app.post("/custom-website", authenticateJWT, async (req, res) => {
       section2,
       section3,
       section4,
-      socialMediaSection
+      socialMediaSection,
+      footerDisclaimer,
+      socialMediaLinks
     } = req.body;
 
     let customWebsite = await CustomWebsite.findOne({
@@ -3047,7 +3049,9 @@ app.post("/custom-website", authenticateJWT, async (req, res) => {
         section2: section2 !== undefined ? section2 : customWebsite.section2,
         section3: section3 !== undefined ? section3 : customWebsite.section3,
         section4: section4 !== undefined ? section4 : customWebsite.section4,
-        socialMediaSection: socialMediaSection !== undefined ? socialMediaSection : customWebsite.socialMediaSection
+        socialMediaSection: socialMediaSection !== undefined ? socialMediaSection : customWebsite.socialMediaSection,
+        footerDisclaimer: footerDisclaimer !== undefined ? footerDisclaimer : customWebsite.footerDisclaimer,
+        socialMediaLinks: socialMediaLinks !== undefined ? socialMediaLinks : customWebsite.socialMediaLinks
       });
     } else {
       // Create new
@@ -3068,7 +3072,15 @@ app.post("/custom-website", authenticateJWT, async (req, res) => {
         section2: section2 ?? 'SECTION 2',
         section3: section3 ?? 'SECTION 3',
         section4: section4 ?? 'SECTION 4',
-        socialMediaSection: socialMediaSection ?? 'SOCIAL MEDIA'
+        socialMediaSection: socialMediaSection ?? 'SOCIAL MEDIA',
+        footerDisclaimer: footerDisclaimer ?? null,
+        socialMediaLinks: socialMediaLinks ?? {
+          instagram: { enabled: true, url: '' },
+          facebook: { enabled: true, url: '' },
+          twitter: { enabled: true, url: '' },
+          tiktok: { enabled: true, url: '' },
+          youtube: { enabled: true, url: '' }
+        }
       });
     }
 
