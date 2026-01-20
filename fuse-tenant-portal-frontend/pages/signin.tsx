@@ -23,6 +23,20 @@ export default function SignIn() {
     }
   }, [user, router])
 
+  // Check for query parameter messages
+  useEffect(() => {
+    if (router.query.message && typeof router.query.message === 'string') {
+      setSuccessMessage(router.query.message)
+      // Clear the message from URL after showing it
+      router.replace('/signin', undefined, { shallow: true })
+      // Auto-hide message after 5 seconds
+      const timer = setTimeout(() => {
+        setSuccessMessage(null)
+      }, 5000)
+      return () => clearTimeout(timer)
+    }
+  }, [router.query.message, router])
+
   // Resend cooldown timer
   useEffect(() => {
     if (resendCooldown > 0) {
@@ -243,6 +257,12 @@ export default function SignIn() {
             </div>
             <div className="p-8">
               <form onSubmit={handleSubmit} className="space-y-5">
+                {successMessage && (
+                  <div className="p-4 text-sm text-green-700 bg-green-50 border border-green-200 rounded-2xl shadow-sm">
+                    {successMessage}
+                  </div>
+                )}
+                
                 {error && (
                   <div className="p-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-2xl shadow-sm">
                     {error}
@@ -289,6 +309,11 @@ export default function SignIn() {
                         <Eye className="h-5 w-5" />
                       )}
                     </button>
+                  </div>
+                  <div className="text-right">
+                    <Link href="/forgot-password" className="text-xs text-[#4FA59C] hover:underline font-medium">
+                      Forgot your password?
+                    </Link>
                   </div>
                 </div>
 

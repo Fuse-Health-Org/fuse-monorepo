@@ -9,7 +9,7 @@ import ProtectedRoute from '@/components/ProtectedRoute'
 import "../styles/globals.css"
 import { Toaster } from "sonner"
 
-const publicPages = ['/signin']
+const publicPages = ['/signin', '/forgot-password']
 
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter()
