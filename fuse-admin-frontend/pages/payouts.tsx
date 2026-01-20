@@ -141,7 +141,7 @@ export default function Payouts() {
       <Head>
         <title>Payouts - Fuse</title>
       </Head>
-      <div className="space-y-6">
+      <div className="p-6 space-y-6">
         {/* Page Header */}
         <div className="flex justify-between items-start">
           <div>
@@ -183,15 +183,18 @@ export default function Payouts() {
         <Card>
           <CardContent className="pt-6">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <input
-                  type="text"
-                  placeholder="Search orders..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border rounded-md focus:ring-2 focus:ring-primary focus:border-transparent"
-                />
+              <div>
+                <label className="block text-sm font-medium mb-1">Search</label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <input
+                    type="text"
+                    placeholder="Search orders..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 border border-input bg-background text-foreground rounded-md focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:border-transparent"
+                  />
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Date From</label>
@@ -199,7 +202,7 @@ export default function Payouts() {
                   type="date"
                   value={dateFrom}
                   onChange={(e) => setDateFrom(e.target.value)}
-                  className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-primary focus:border-transparent"
+                  className="w-full px-4 py-2 border border-input bg-background text-foreground rounded-md focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:border-transparent"
                 />
               </div>
               <div>
@@ -208,10 +211,11 @@ export default function Payouts() {
                   type="date"
                   value={dateTo}
                   onChange={(e) => setDateTo(e.target.value)}
-                  className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-primary focus:border-transparent"
+                  className="w-full px-4 py-2 border border-input bg-background text-foreground rounded-md focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:border-transparent"
                 />
               </div>
-              <div className="flex items-end">
+              <div className="flex flex-col">
+                <label className="block text-sm font-medium mb-1 opacity-0 pointer-events-none">Actions</label>
                 <button
                   onClick={() => {
                     setDateFrom("")

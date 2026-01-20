@@ -1494,7 +1494,7 @@ export default function Settings({
                                   }`}
                                 >
                                   {organizationData.patientPortalDashboardFormat === "fuse" && (
-                                    <div className="absolute top-3 right-3">
+                                    <div className="absolute bottom-3 right-3">
                                       <div className="w-6 h-6 rounded-full bg-purple-500 flex items-center justify-center">
                                         <Check className="w-4 h-4 text-white" />
                                       </div>
@@ -2021,13 +2021,13 @@ export default function Settings({
                                   )}
 
                                   <div className="absolute top-4 left-4">
-                                    <div className="bg-blue-100 text-blue-800 text-xs font-medium px-2 py-1 rounded-md">
+                                    <div className="bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 text-xs font-medium px-2 py-1 rounded-md">
                                       Monthly
                                     </div>
                                   </div>
 
                                   {isCurrentPlan && (
-                                    <div className="absolute top-4 right-4 bg-emerald-100 text-emerald-800 text-xs font-semibold px-3 py-1 rounded-full">
+                                    <div className="absolute top-4 right-4 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 text-xs font-semibold px-3 py-1 rounded-full">
                                       Active Plan
                                     </div>
                                   )}
@@ -2122,10 +2122,10 @@ export default function Settings({
 
                                     <Button
                                       className={`w-full mt-auto ${isCurrentPlan && isActive
-                                        ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                                        ? "bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-600"
                                         : isPopular
-                                          ? "bg-blue-600 hover:bg-blue-700 text-white"
-                                          : "bg-white border border-gray-300 text-foreground hover:bg-gray-50"
+                                          ? "bg-blue-600 hover:bg-blue-700 text-white dark:bg-blue-700 dark:hover:bg-blue-600"
+                                          : "bg-background border border-input text-foreground hover:bg-muted"
                                         }`}
                                       onClick={() => handlePlanSelect(plan)}
                                       disabled={
@@ -2160,11 +2160,11 @@ export default function Settings({
       {/* Logo Upload Modal */}
       {showLogoModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50 backdrop-blur-sm">
-          <div className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 animate-in fade-in zoom-in duration-200">
+          <div className="relative bg-background border border-border rounded-2xl shadow-2xl max-w-md w-full p-6 animate-in fade-in zoom-in duration-200">
             {/* Close button */}
             <button
               onClick={handleCancelLogoUpload}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+              className="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition-colors"
             >
               <X className="h-5 w-5" />
             </button>
@@ -2185,26 +2185,26 @@ export default function Settings({
             </div>
 
             {/* Requirements Card */}
-            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <h4 className="text-sm font-semibold text-blue-900 mb-3 flex items-center gap-2">
+            <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-300 mb-3 flex items-center gap-2">
                 <AlertCircle className="h-4 w-4" />
                 Image Requirements
               </h4>
-              <ul className="space-y-2 text-sm text-blue-800">
+              <ul className="space-y-2 text-sm text-blue-800 dark:text-blue-300">
                 <li className="flex items-start gap-2">
-                  <Check className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                  <Check className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
                   <span><strong>Format:</strong> PNG files only (.png)</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <Check className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                  <Check className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
                   <span><strong>Dimensions:</strong> Square image (1:1 ratio)</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <Check className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                  <Check className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
                   <span><strong>Examples:</strong> 512×512px, 1024×1024px</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <Check className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                  <Check className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
                   <span><strong>Size:</strong> Maximum 5MB (will be compressed automatically if larger)</span>
                 </li>
               </ul>
@@ -2224,17 +2224,17 @@ export default function Settings({
                 htmlFor="logo-upload-modal"
                 className={`block w-full ${loading ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
               >
-                <div className={`border-2 border-dashed border-gray-300 rounded-lg p-8 text-center transition-all ${loading ? '' : 'hover:border-primary hover:bg-primary/5'}`}>
+                <div className={`border-2 border-dashed border-input rounded-lg p-8 text-center transition-all ${loading ? '' : 'hover:border-primary hover:bg-primary/5'}`}>
                   {tempLogoPreview ? (
                     <div className="space-y-4">
                       <div className="flex justify-center">
                         <img
                           src={tempLogoPreview}
                           alt="Preview"
-                          className="w-32 h-32 object-cover rounded-lg border-2 border-green-500"
+                          className="w-32 h-32 object-cover rounded-lg border-2 border-green-500 dark:border-green-400"
                         />
                       </div>
-                      <div className="text-sm text-green-600 font-medium flex items-center justify-center gap-2">
+                      <div className="text-sm text-green-600 dark:text-green-400 font-medium flex items-center justify-center gap-2">
                         <Check className="h-4 w-4" />
                         Valid image - Ready to upload
                       </div>
@@ -2284,7 +2284,7 @@ export default function Settings({
                   <span className="text-sm text-muted-foreground">Uploading...</span>
                   <span className="text-sm font-medium text-foreground">{Math.round(uploadProgress)}%</span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
                   <div
                     className="bg-primary h-2 rounded-full transition-all duration-300 ease-out"
                     style={{ width: `${uploadProgress}%` }}
