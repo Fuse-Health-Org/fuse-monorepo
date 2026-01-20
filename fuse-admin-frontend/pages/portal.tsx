@@ -130,6 +130,7 @@ export default function PortalPage() {
   const [editingUrl, setEditingUrl] = useState<{ categoryIndex: number; urlIndex: number } | null>(null)
   const [editingUrlLabel, setEditingUrlLabel] = useState("")
   const [editingUrlValue, setEditingUrlValue] = useState("")
+  const [defaultDisclaimer, setDefaultDisclaimer] = useState<string>("")
 
   // Check if user has access to Portal based on tier config, custom features, or plan type
   const hasPortalAccess =
@@ -148,6 +149,7 @@ export default function PortalPage() {
   useEffect(() => {
     if (hasPortalAccess) {
       loadSettings()
+      loadDefaultDisclaimer()
       // Fetch clinic slug and custom domain info
       const fetchClinicData = async () => {
         if (!user?.clinicId) return
@@ -230,6 +232,20 @@ export default function PortalPage() {
       console.error("Error loading portal settings:", error)
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const loadDefaultDisclaimer = async () => {
+    try {
+      const response = await authenticatedFetch(`${API_URL}/website-builder-configs`)
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success && data.data?.defaultFooterDisclaimer) {
+          setDefaultDisclaimer(data.data.defaultFooterDisclaimer)
+        }
+      }
+    } catch (error) {
+      console.error("Error loading default disclaimer:", error)
     }
   }
 
@@ -1543,7 +1559,7 @@ export default function PortalPage() {
                       <div className="col-span-2 px-2">
                         <div className="opacity-60 text-[7px] leading-relaxed line-clamp-6">
                           {settings.useDefaultDisclaimer 
-                            ? "(Using global default disclaimer)" 
+                            ? (defaultDisclaimer || "Loading default disclaimer...") 
                             : (settings.footerDisclaimer || "No custom disclaimer set")}
                         </div>
                       </div>
