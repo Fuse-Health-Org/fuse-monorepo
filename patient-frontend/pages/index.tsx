@@ -178,7 +178,7 @@ export default function LandingPage() {
           } else if (result.success && result.data) {
             websiteData = result.data;
           }
-          
+
           // Check if custom website is active - if not, redirect to dashboard
           if (!websiteData || websiteData.isActive === false) {
             console.log('🔀 Custom website is not active, redirecting to dashboard...');
@@ -201,7 +201,7 @@ export default function LandingPage() {
           } catch (error) {
             console.log('ℹ️ No custom website found');
           }
-          
+
           // Check if custom website is active - if not, redirect to dashboard (default)
           if (!websiteData || websiteData.isActive === false) {
             console.log('🔀 Custom website is not active, redirecting to dashboard...');
@@ -390,7 +390,7 @@ export default function LandingPage() {
   // Helper function to check if a footer category should be shown
   const shouldShowFooterCategory = (categoryName: string, fallbackBoolean?: boolean): boolean => {
     if (websiteData?.footerCategories && Array.isArray(websiteData.footerCategories)) {
-      const category = websiteData.footerCategories.find(cat => 
+      const category = websiteData.footerCategories.find(cat =>
         cat.name.toLowerCase() === categoryName.toLowerCase()
       );
       return category ? category.visible : false;
@@ -412,12 +412,12 @@ export default function LandingPage() {
     if (websiteData?.footerShowStore !== false) categories.push({ name: "Store", visible: true, urls: [] });
     if (websiteData?.footerShowLearnMore !== false) categories.push({ name: "Learn More", visible: true, urls: [] });
     if (websiteData?.footerShowContact !== false || websiteData?.footerShowSupport !== false) {
-      categories.push({ 
-        name: websiteData?.footerShowContact !== false && websiteData?.footerShowSupport !== false 
-          ? "Contact & Support" 
-          : websiteData?.footerShowContact !== false ? "Contact" : "Support", 
-        visible: true, 
-        urls: [] 
+      categories.push({
+        name: websiteData?.footerShowContact !== false && websiteData?.footerShowSupport !== false
+          ? "Contact & Support"
+          : websiteData?.footerShowContact !== false ? "Contact" : "Support",
+        visible: true,
+        urls: []
       });
     }
     if (websiteData?.footerShowConnect !== false) categories.push({ name: "Connect", visible: true, urls: [] });
@@ -710,7 +710,7 @@ export default function LandingPage() {
   // Detect if carousel needs duplication (has overflow)
   useEffect(() => {
     if (!carouselRef.current) return;
-    
+
     const checkOverflow = () => {
       if (carouselRef.current) {
         const hasOverflow = carouselRef.current.scrollWidth > carouselRef.current.clientWidth;
@@ -720,10 +720,10 @@ export default function LandingPage() {
 
     // Check on mount and when items change
     checkOverflow();
-    
+
     // Also check after a short delay to ensure items are rendered
     const timeoutId = setTimeout(checkOverflow, 100);
-    
+
     return () => clearTimeout(timeoutId);
   }, [carouselItems.length, activeFilter]);
 
@@ -1029,174 +1029,223 @@ export default function LandingPage() {
       {/* Footer */}
       <footer style={{ backgroundColor: websiteData?.footerColor || "#0d3d3d", color: "white", padding: "4rem 0 2rem" }}>
         <div style={{ maxWidth: "1280px", margin: "0 auto", padding: "0 1.5rem" }}>
+          {/* Main Footer Grid: Left Sections | Middle Disclaimers | Right Sections */}
           <div
             style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-              gap: "3rem",
-              marginBottom: "3rem",
-            }}
-          >
-            {/* Render footer categories dynamically */}
-            {visibleFooterCategories.map((category, index) => {
-              // Special handling for Connect category (keep newsletter and social icons if it's the old format)
-              if (category.name.toLowerCase() === "connect" && (!category.urls || category.urls.length === 0)) {
-                return (
-                  <div key={index}>
-                    <h4 style={{ fontWeight: 600, marginBottom: "1.5rem", fontSize: "0.75rem", letterSpacing: "0.05em" }}>
-                      {category.name.toUpperCase()}
-                    </h4>
-                    <div style={{ marginBottom: "1.5rem" }}>
-                      <p style={{ fontSize: "0.875rem", marginBottom: "1rem", opacity: 0.9 }}>Join Our Newsletter</p>
-                      <input
-                        type="email"
-                        placeholder="Your Email"
-                        style={{
-                          width: "100%",
-                          padding: "0.75rem 1rem",
-                          borderRadius: "24px",
-                          border: "none",
-                          fontSize: "0.875rem",
-                        }}
-                      />
-                    </div>
-                    <div style={{ display: "flex", gap: "1rem" }}>
-                      <a href="#" style={{ color: "white", fontSize: "1.25rem" }}>
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
-                        </svg>
-                      </a>
-                      <a href="#" style={{ color: "white", fontSize: "1.25rem" }}>
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-                        </svg>
-                      </a>
-                      <a href="#" style={{ color: "white", fontSize: "1.25rem" }}>
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z" />
-                        </svg>
-                      </a>
-                      <a href="#" style={{ color: "white", fontSize: "1.25rem" }}>
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z" />
-                        </svg>
-                      </a>
-                      <a href="#" style={{ color: "white", fontSize: "1.25rem" }}>
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
-                        </svg>
-                      </a>
-                    </div>
-                  </div>
-                )
-              }
-
-              // Regular category with URLs
-              return (
-                <div key={index}>
-                  <h4 style={{ fontWeight: 600, marginBottom: "1.5rem", fontSize: "0.75rem", letterSpacing: "0.05em" }}>
-                    {category.name.toUpperCase()}
-                  </h4>
-                  {(category.urls && category.urls.length > 0) ? (
-                    <ul style={{ listStyle: "none", padding: 0, margin: 0, fontSize: "0.875rem" }}>
-                      {category.urls.map((urlItem, urlIndex) => (
-                        <li key={urlIndex} style={{ marginBottom: "0.75rem" }}>
-                          <a 
-                            href={urlItem.url} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            style={{ color: "white", textDecoration: "none", opacity: 0.9 }}
-                          >
-                            {urlItem.label}
-                          </a>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : null}
-                </div>
-              )
-            })}
-          </div>
-          
-          {/* Disclaimer Section */}
-          <div
-            style={{
-              borderTop: "1px solid rgba(255,255,255,0.2)",
-              marginTop: "3rem",
-              paddingTop: "3rem",
               display: "grid",
               gridTemplateColumns: "1fr 2fr 1fr",
               gap: "2rem",
               alignItems: "start",
             }}
           >
-            {/* Left: Logo */}
-            <div>
-              <h2 style={{ fontSize: "1.5rem", fontWeight: 700, margin: 0 }}>LOGO</h2>
+            {/* Left: Clinic Name + Section 1 & Section 2 */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
+              {/* Clinic Name */}
+              <div>
+                <h2 style={{ fontSize: "1.5rem", fontWeight: 700, margin: 0 }}>{(clinicInfo?.name || "LOGO").toUpperCase()}</h2>
+              </div>
+              {/* Section 1 */}
+              {visibleFooterCategories[0] && (
+                <div>
+                  <h4 style={{ fontWeight: 600, marginBottom: "1rem", fontSize: "0.75rem", letterSpacing: "0.05em" }}>
+                    {visibleFooterCategories[0].name.toUpperCase()}
+                  </h4>
+                  {visibleFooterCategories[0].urls && visibleFooterCategories[0].urls.length > 0 && (
+                    <ul style={{ listStyle: "none", padding: 0, margin: 0, fontSize: "0.875rem" }}>
+                      {visibleFooterCategories[0].urls.map((urlItem, urlIndex) => (
+                        <li key={urlIndex} style={{ marginBottom: "0.5rem" }}>
+                          <a href={urlItem.url} target="_blank" rel="noopener noreferrer" style={{ color: "white", textDecoration: "none", opacity: 0.9 }}>
+                            {urlItem.label}
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+              {/* Section 2 */}
+              {visibleFooterCategories[1] && (
+                <div>
+                  <h4 style={{ fontWeight: 600, marginBottom: "1rem", fontSize: "0.75rem", letterSpacing: "0.05em" }}>
+                    {visibleFooterCategories[1].name.toUpperCase()}
+                  </h4>
+                  {visibleFooterCategories[1].urls && visibleFooterCategories[1].urls.length > 0 && (
+                    <ul style={{ listStyle: "none", padding: 0, margin: 0, fontSize: "0.875rem" }}>
+                      {visibleFooterCategories[1].urls.map((urlItem, urlIndex) => (
+                        <li key={urlIndex} style={{ marginBottom: "0.5rem" }}>
+                          <a href={urlItem.url} target="_blank" rel="noopener noreferrer" style={{ color: "white", textDecoration: "none", opacity: 0.9 }}>
+                            {urlItem.label}
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Middle: Disclaimers */}
-            <div style={{ fontSize: "0.625rem", lineHeight: "1.6", opacity: 0.7 }}>
-              <p style={{ marginBottom: "1rem" }}>
-                * These statements have not been evaluated by the Food and Drug Administration. This product is not intended to diagnose, treat, cure or prevent any disease.
-              </p>
-              <p style={{ marginBottom: "1rem" }}>
-                Information on this site is provided for informational purposes only. It is not meant to substitute for medical advice from your physician or other medical professional. You should not use the information contained herein for diagnosing or treating a health problem or disease, or prescribing any medication. Carefully read all product documentation. If you have or suspect that you have a medical problem, promptly contact your regular health care provider.
-              </p>
-              <p style={{ marginBottom: "1rem" }}>
-                **Offer valid for new subscribers only. Valid on the first shipment only of one new AG1 and/or one new AGZ subscription. Renewals bill automatically at the then current rate until canceled. Cannot be combined with other offers or discounts and cannot be applied to prior purchases. One per customer. Non-transferable. Limited time only.
-              </p>
-              <p style={{ marginBottom: "1rem" }}>
-                **AG1 Welcome Kit Offer valid for new AG1 subscribers only. AGZ frother Offer valid for first AGZ order only.
-              </p>
-              <p style={{ marginBottom: "1rem" }}>
-                ◊According to IQVIA Pro Voice Survey of 248 primary care physicians in December 2025.
-              </p>
-              <p style={{ marginBottom: "1rem" }}>
-                ††Free shipping on subscription purchases for new U.S. customers only.
-              </p>
-              <p style={{ marginBottom: "1rem" }}>
-                In a triple-blind, randomized, placebo-controlled parallel-designed clinical trial evaluating nutrient biomarkers and microbiome shifts in 105 healthy adults ages 20-59 over the course of 12 weeks.
-              </p>
-              <p style={{ marginBottom: "1rem" }}>
-                In a double-blind, randomized, placebo-controlled 2-week crossover clinical trial assessing nutrient gaps and microbiome shifts in 20 active adults ages 19-37.
-              </p>
-              <p style={{ marginBottom: "1rem" }}>
-                In a double-blind, randomized, placebo-controlled 2-week crossover clinical trial assessing nutrient gaps and microbiome assessments of 24 healthy adults with occasional GI distress ages 26-59 over the course of 4 weeks.
-              </p>
-              <p style={{ marginBottom: "1rem" }}>
-                In a double-blind, randomized, placebo-controlled crossover clinical trial assessing nutrient gaps and bioavailability in 16 healthy adults ages 18-42 over the course of 8 hours.
-              </p>
-              <p style={{ marginBottom: "1rem" }}>
-                In a third-party, single-arm, closed label interventional study of 104 healthy adults ages 25-59 assessing self-perceived efficacy of AG1 Next Gen over 3 months.
-              </p>
-              <p style={{ marginBottom: "1rem" }}>
-                ΔTruemed eligibility and approval required. This link will take you to a third party website hosted by Truemed (the "Site"). Linking to this Site does not constitute an endorsement or approval by AG1 or any of its employees of the content, products, services or opinions on the Site. This is being provided as a convenience and AG1 bears no responsibility for the accuracy, legality or content of the Site or for that of any subsequent links on the Site. Contact the owners of the Site for answers to questions regarding its content.
-              </p>
-              <p style={{ marginBottom: "1rem" }}>
-                Actual Packaging May Vary
-              </p>
-              <p>
-                Your privacy is our priority. Learn more:
-              </p>
+            <div>
+              <div style={{ fontSize: "0.625rem", lineHeight: "1.6", opacity: 0.7 }}>
+                <p style={{ marginBottom: "1rem" }}>
+                  * These statements have not been evaluated by the Food and Drug Administration. This product is not intended to diagnose, treat, cure or prevent any disease.
+                </p>
+                <p style={{ marginBottom: "1rem" }}>
+                  Information on this site is provided for informational purposes only. It is not meant to substitute for medical advice from your physician or other medical professional. You should not use the information contained herein for diagnosing or treating a health problem or disease, or prescribing any medication. Carefully read all product documentation. If you have or suspect that you have a medical problem, promptly contact your regular health care provider.
+                </p>
+                <p style={{ marginBottom: "1rem" }}>
+                  **Offer valid for new subscribers only. Valid on the first shipment only of one new AG1 and/or one new AGZ subscription. Renewals bill automatically at the then current rate until canceled. Cannot be combined with other offers or discounts and cannot be applied to prior purchases. One per customer. Non-transferable. Limited time only.
+                </p>
+                <p style={{ marginBottom: "1rem" }}>
+                  **AG1 Welcome Kit Offer valid for new AG1 subscribers only. AGZ frother Offer valid for first AGZ order only.
+                </p>
+                <p style={{ marginBottom: "1rem" }}>
+                  ◊According to IQVIA Pro Voice Survey of 248 primary care physicians in December 2025.
+                </p>
+                <p style={{ marginBottom: "1rem" }}>
+                  ††Free shipping on subscription purchases for new U.S. customers only.
+                </p>
+                <p style={{ marginBottom: "1rem" }}>
+                  In a triple-blind, randomized, placebo-controlled parallel-designed clinical trial evaluating nutrient biomarkers and microbiome shifts in 105 healthy adults ages 20-59 over the course of 12 weeks.
+                </p>
+                <p style={{ marginBottom: "1rem" }}>
+                  In a double-blind, randomized, placebo-controlled 2-week crossover clinical trial assessing nutrient gaps and microbiome shifts in 20 active adults ages 19-37.
+                </p>
+                <p style={{ marginBottom: "1rem" }}>
+                  In a double-blind, randomized, placebo-controlled 2-week crossover clinical trial assessing nutrient gaps and microbiome assessments of 24 healthy adults with occasional GI distress ages 26-59 over the course of 4 weeks.
+                </p>
+                <p style={{ marginBottom: "1rem" }}>
+                  In a double-blind, randomized, placebo-controlled crossover clinical trial assessing nutrient gaps and bioavailability in 16 healthy adults ages 18-42 over the course of 8 hours.
+                </p>
+                <p style={{ marginBottom: "1rem" }}>
+                  In a third-party, single-arm, closed label interventional study of 104 healthy adults ages 25-59 assessing self-perceived efficacy of AG1 Next Gen over 3 months.
+                </p>
+                <p style={{ marginBottom: "1rem" }}>
+                  ΔTruemed eligibility and approval required. This link will take you to a third party website hosted by Truemed (the "Site"). Linking to this Site does not constitute an endorsement or approval by AG1 or any of its employees of the content, products, services or opinions on the Site. This is being provided as a convenience and AG1 bears no responsibility for the accuracy, legality or content of the Site or for that of any subsequent links on the Site. Contact the owners of the Site for answers to questions regarding its content.
+                </p>
+                <p style={{ marginBottom: "1rem" }}>
+                  Actual Packaging May Vary
+                </p>
+                <p>
+                  Your privacy is our priority. Learn more:
+                </p>
+              </div>
             </div>
 
-            {/* Right: Language/Currency & Copyright */}
-            <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", height: "100%", minHeight: "200px" }}>
-              <div style={{ fontSize: "0.75rem", opacity: 0.7 }}>
-                English | $ United States (USD)
+            {/* Right: Language/Currency + Section 3 & Section 4 + Newsletter + Social + Copyright */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "2rem", justifyContent: "space-between", minHeight: "100%" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
+                {/* Language/Currency - At Top */}
+                <div style={{ fontSize: "0.75rem", opacity: 0.7, display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                  <div style={{ 
+                    width: "20px", 
+                    height: "20px", 
+                    borderRadius: "50%", 
+                    border: "1px solid white", 
+                    display: "flex", 
+                    alignItems: "center", 
+                    justifyContent: "center",
+                    overflow: "hidden"
+                  }}>
+                    <span style={{ 
+                      fontSize: "1.5rem", 
+                      lineHeight: 1,
+                      transform: "scale(1.5)",
+                      display: "block"
+                    }}>
+                      🇺🇸
+                    </span>
+                  </div>
+                  English | $ United States (USD)
+                </div>
+
+                {/* Section 3 */}
+                {visibleFooterCategories[2] && (
+                  <div>
+                    <h4 style={{ fontWeight: 600, marginBottom: "1rem", fontSize: "0.75rem", letterSpacing: "0.05em" }}>
+                      {visibleFooterCategories[2].name.toUpperCase()}
+                    </h4>
+                    {visibleFooterCategories[2].urls && visibleFooterCategories[2].urls.length > 0 && (
+                      <ul style={{ listStyle: "none", padding: 0, margin: 0, fontSize: "0.875rem" }}>
+                        {visibleFooterCategories[2].urls.map((urlItem, urlIndex) => (
+                          <li key={urlIndex} style={{ marginBottom: "0.5rem" }}>
+                            <a href={urlItem.url} target="_blank" rel="noopener noreferrer" style={{ color: "white", textDecoration: "none", opacity: 0.9 }}>
+                              {urlItem.label}
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+                {/* Section 4 */}
+                {visibleFooterCategories[3] && (
+                  <div>
+                    <h4 style={{ fontWeight: 600, marginBottom: "1rem", fontSize: "0.75rem", letterSpacing: "0.05em" }}>
+                      {visibleFooterCategories[3].name.toUpperCase()}
+                    </h4>
+                    {visibleFooterCategories[3].urls && visibleFooterCategories[3].urls.length > 0 && (
+                      <ul style={{ listStyle: "none", padding: 0, margin: 0, fontSize: "0.875rem" }}>
+                        {visibleFooterCategories[3].urls.map((urlItem, urlIndex) => (
+                          <li key={urlIndex} style={{ marginBottom: "0.5rem" }}>
+                            <a href={urlItem.url} target="_blank" rel="noopener noreferrer" style={{ color: "white", textDecoration: "none", opacity: 0.9 }}>
+                              {urlItem.label}
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+
+                {/* Social Media */}
+                <div>
+                  <h4 style={{ fontWeight: 600, marginBottom: "1rem", fontSize: "0.75rem", letterSpacing: "0.05em" }}>
+                    SOCIAL MEDIA
+                  </h4>
+                  <div style={{ display: "flex", gap: "1rem" }}>
+                  <a href="#" style={{ color: "white", fontSize: "1.25rem" }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
+                    </svg>
+                  </a>
+                  <a href="#" style={{ color: "white", fontSize: "1.25rem" }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+                    </svg>
+                  </a>
+                  <a href="#" style={{ color: "white", fontSize: "1.25rem" }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z" />
+                    </svg>
+                  </a>
+                  <a href="#" style={{ color: "white", fontSize: "1.25rem" }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z" />
+                    </svg>
+                  </a>
+                  <a href="#" style={{ color: "white", fontSize: "1.25rem" }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
+                    </svg>
+                  </a>
+                  </div>
+                </div>
               </div>
+
+              {/* Copyright - At Bottom */}
               <div style={{ fontSize: "0.75rem", opacity: 0.7 }}>
-                © {new Date().getFullYear()} AG1
+                © {new Date().getFullYear()} {(clinicInfo?.name || "").toUpperCase()}
               </div>
             </div>
           </div>
-          
+
+          {/* Bottom Copyright */}
           <div
             style={{
               borderTop: "1px solid rgba(255,255,255,0.2)",
               paddingTop: "2rem",
-              marginTop: "2rem",
+              marginTop: "3rem",
               fontSize: "0.75rem",
               opacity: 0.8,
               textAlign: "center",

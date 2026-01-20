@@ -38,14 +38,10 @@ interface FooterCategory {
 }
 
 const DEFAULT_FOOTER_CATEGORIES: FooterCategory[] = [
-  { name: "Shop", visible: true, urls: [] },
-  { name: "Daily Health", visible: true, urls: [] },
-  { name: "Rest & Restore", visible: true, urls: [] },
-  { name: "Store", visible: true, urls: [] },
-  { name: "Learn More", visible: true, urls: [] },
-  { name: "Contact", visible: true, urls: [] },
-  { name: "Support", visible: true, urls: [] },
-  { name: "Connect", visible: true, urls: [] },
+  { name: "Section 1", visible: true, urls: [] },
+  { name: "Section 2", visible: true, urls: [] },
+  { name: "Section 3", visible: true, urls: [] },
+  { name: "Section 4", visible: true, urls: [] },
 ]
 
 interface PortalSettings {
@@ -156,28 +152,26 @@ export default function PortalPage() {
 
   // Helper function to convert old format (boolean fields) to new format (array)
   const convertToFooterCategories = (data: any): FooterCategory[] => {
-    // If footerCategories exists, use it
+    // If footerCategories exists, use it (limit to 4 categories max)
     if (data.footerCategories && Array.isArray(data.footerCategories)) {
-      return data.footerCategories
+      return data.footerCategories.slice(0, 4)
     }
     
-    // Otherwise, convert from old boolean fields
+    // Otherwise, convert from section1-4 string fields
     const categories: FooterCategory[] = []
-    const categoryMapping: { [key: string]: string } = {
-      footerShowShop: "Shop",
-      footerShowDailyHealth: "Daily Health",
-      footerShowRestRestore: "Rest & Restore",
-      footerShowStore: "Store",
-      footerShowLearnMore: "Learn More",
-      footerShowContact: "Contact",
-      footerShowSupport: "Support",
-      footerShowConnect: "Connect",
-    }
+    const sectionFields = ['section1', 'section2', 'section3', 'section4']
+    const defaultNames = ['Shop', 'Daily Health', 'Rest & Restore', 'Store']
     
-    Object.entries(categoryMapping).forEach(([key, name]) => {
-      if (data[key] !== false) { // Only add if not explicitly false
-        categories.push({ name, visible: data[key] ?? true, urls: [] })
+    sectionFields.forEach((field, index) => {
+      const sectionName = data[field]
+      if (sectionName !== null && sectionName !== undefined) {
+        // Section has a name, so it's visible
+        categories.push({ name: sectionName, visible: true, urls: [] })
+      } else if (sectionName === undefined) {
+        // Field doesn't exist yet, use default
+        categories.push({ name: defaultNames[index], visible: true, urls: [] })
       }
+      // If sectionName is null, the section is hidden (don't add it)
     })
     
     return categories.length > 0 ? categories : DEFAULT_FOOTER_CATEGORIES
@@ -215,10 +209,19 @@ export default function PortalPage() {
   const handleSave = async () => {
     setIsSaving(true)
     try {
+      // Convert footerCategories to section1-4 fields
+      const payload = {
+        ...settings,
+        section1: settings.footerCategories?.[0]?.visible ? settings.footerCategories[0].name : null,
+        section2: settings.footerCategories?.[1]?.visible ? settings.footerCategories[1].name : null,
+        section3: settings.footerCategories?.[2]?.visible ? settings.footerCategories[2].name : null,
+        section4: settings.footerCategories?.[3]?.visible ? settings.footerCategories[3].name : null,
+      }
+
       const response = await authenticatedFetch(`${API_URL}/custom-website`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(settings),
+        body: JSON.stringify(payload),
       })
 
       if (response.ok) {
@@ -282,6 +285,12 @@ export default function PortalPage() {
   const handleToggleFooterCategory = (index: number, checked: boolean) => {
     const newCategories = [...(settings.footerCategories || [])]
     newCategories[index] = { ...newCategories[index], visible: checked }
+    setSettings({ ...settings, footerCategories: newCategories })
+  }
+
+  const handleUpdateCategoryName = (index: number, newName: string) => {
+    const newCategories = [...(settings.footerCategories || [])]
+    newCategories[index] = { ...newCategories[index], name: newName }
     setSettings({ ...settings, footerCategories: newCategories })
   }
 
@@ -833,6 +842,8 @@ export default function PortalPage() {
                       size="sm"
                       onClick={() => setIsAddingCategory(true)}
                       className="h-8"
+                      disabled={(settings.footerCategories || []).length >= 4}
+                      title={(settings.footerCategories || []).length >= 4 ? "Maximum 4 sections allowed" : "Add Category"}
                     >
                       <Plus className="h-4 w-4 mr-1" />
                       Add Category
@@ -865,7 +876,17 @@ export default function PortalPage() {
                               <ChevronDown 
                                 className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} 
                               />
-                              <label className="text-sm font-medium">{category.name}</label>
+                              <input
+                                type="text"
+                                value={category.name}
+                                onChange={(e) => {
+                                  e.stopPropagation()
+                                  handleUpdateCategoryName(index, e.target.value)
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                                className="text-sm font-medium bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-primary rounded px-2 py-1 flex-1"
+                                placeholder="Section name"
+                              />
                             </div>
                             <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                               <Button

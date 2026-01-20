@@ -94,60 +94,32 @@ export default class CustomWebsite extends Entity {
     }>;
 
     @Column({
-        type: DataType.BOOLEAN,
-        allowNull: false,
-        defaultValue: true,
+        type: DataType.STRING(100),
+        allowNull: true,
+        defaultValue: 'Shop',
     })
-    declare footerShowShop?: boolean;
+    declare section1?: string | null;
 
     @Column({
-        type: DataType.BOOLEAN,
-        allowNull: false,
-        defaultValue: true,
+        type: DataType.STRING(100),
+        allowNull: true,
+        defaultValue: 'Daily Health',
     })
-    declare footerShowDailyHealth?: boolean;
+    declare section2?: string | null;
 
     @Column({
-        type: DataType.BOOLEAN,
-        allowNull: false,
-        defaultValue: true,
+        type: DataType.STRING(100),
+        allowNull: true,
+        defaultValue: 'Rest & Restore',
     })
-    declare footerShowRestRestore?: boolean;
+    declare section3?: string | null;
 
     @Column({
-        type: DataType.BOOLEAN,
-        allowNull: false,
-        defaultValue: true,
+        type: DataType.STRING(100),
+        allowNull: true,
+        defaultValue: 'Store',
     })
-    declare footerShowStore?: boolean;
-
-    @Column({
-        type: DataType.BOOLEAN,
-        allowNull: false,
-        defaultValue: true,
-    })
-    declare footerShowLearnMore?: boolean;
-
-    @Column({
-        type: DataType.BOOLEAN,
-        allowNull: false,
-        defaultValue: true,
-    })
-    declare footerShowContact?: boolean;
-
-    @Column({
-        type: DataType.BOOLEAN,
-        allowNull: false,
-        defaultValue: true,
-    })
-    declare footerShowSupport?: boolean;
-
-    @Column({
-        type: DataType.BOOLEAN,
-        allowNull: false,
-        defaultValue: true,
-    })
-    declare footerShowConnect?: boolean;
+    declare section4?: string | null;
 
     // Relations
     @BelongsTo(() => Clinic)

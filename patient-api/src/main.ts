@@ -3018,14 +3018,10 @@ app.post("/custom-website", authenticateJWT, async (req, res) => {
       isActive,
       footerColor,
       footerCategories,
-      footerShowShop,
-      footerShowDailyHealth,
-      footerShowRestRestore,
-      footerShowStore,
-      footerShowLearnMore,
-      footerShowContact,
-      footerShowSupport,
-      footerShowConnect
+      section1,
+      section2,
+      section3,
+      section4
     } = req.body;
 
     let customWebsite = await CustomWebsite.findOne({
@@ -3046,14 +3042,10 @@ app.post("/custom-website", authenticateJWT, async (req, res) => {
         isActive: isActive !== undefined ? isActive : customWebsite.isActive,
         footerColor,
         footerCategories: footerCategories !== undefined ? footerCategories : customWebsite.footerCategories,
-        footerShowShop,
-        footerShowDailyHealth,
-        footerShowRestRestore,
-        footerShowStore,
-        footerShowLearnMore,
-        footerShowContact,
-        footerShowSupport,
-        footerShowConnect
+        section1: section1 !== undefined ? section1 : customWebsite.section1,
+        section2: section2 !== undefined ? section2 : customWebsite.section2,
+        section3: section3 !== undefined ? section3 : customWebsite.section3,
+        section4: section4 !== undefined ? section4 : customWebsite.section4
       });
     } else {
       // Create new
@@ -3070,14 +3062,10 @@ app.post("/custom-website", authenticateJWT, async (req, res) => {
         isActive: isActive !== undefined ? isActive : true,
         footerColor,
         footerCategories,
-        footerShowShop,
-        footerShowDailyHealth,
-        footerShowRestRestore,
-        footerShowStore,
-        footerShowLearnMore,
-        footerShowContact,
-        footerShowSupport,
-        footerShowConnect
+        section1: section1 ?? 'Shop',
+        section2: section2 ?? 'Daily Health',
+        section3: section3 ?? 'Rest & Restore',
+        section4: section4 ?? 'Store'
       });
     }
 
