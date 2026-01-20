@@ -831,6 +831,60 @@ app.post("/auth/signup", async (req, res) => {
       if (process.env.NODE_ENV === "development") {
         console.log("✅ Clinic created successfully with ID:", clinic.id);
       }
+
+      // Create default CustomWebsite for the new clinic
+      try {
+        await CustomWebsite.create({
+          clinicId: clinic.id,
+          portalTitle: "Welcome to Our Portal",
+          portalDescription: "Your trusted healthcare partner. Browse our products and services below.",
+          primaryColor: "#000000",
+          fontFamily: "Playfair Display",
+          logo: "",
+          heroImageUrl: "https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=1920&q=80",
+          heroTitle: "Your Daily Health, Simplified",
+          heroSubtitle: "All-in-one nutritional support in one simple drink",
+          isActive: true,
+          footerColor: "#000000",
+          footerCategories: [
+            {
+              name: "NAVIGATION LINKS",
+              visible: true,
+              urls: [
+                { label: "Bundles", url: "/#bundles" },
+                { label: "Programs", url: "/#programs" },
+                { label: "Performance", url: "/#performance" },
+                { label: "Weight Loss", url: "/#weightloss" },
+                { label: "Wellness", url: "/#wellness" }
+              ]
+            },
+            { name: "Section 2", visible: false, urls: [] },
+            { name: "Section 3", visible: false, urls: [] },
+            { name: "Section 4", visible: false, urls: [] }
+          ],
+          section1: "NAVIGATION LINKS",
+          section2: null,
+          section3: null,
+          section4: null,
+          socialMediaSection: "SOCIAL MEDIA",
+          useDefaultDisclaimer: true,
+          footerDisclaimer: null,
+          socialMediaLinks: {
+            instagram: { enabled: true, url: "" },
+            facebook: { enabled: true, url: "" },
+            twitter: { enabled: true, url: "" },
+            tiktok: { enabled: true, url: "" },
+            youtube: { enabled: true, url: "" }
+          }
+        });
+        if (process.env.NODE_ENV === "development") {
+          console.log("✅ CustomWebsite created for clinic:", clinic.id);
+        }
+      } catch (customWebsiteError) {
+        // Log but don't fail signup if CustomWebsite creation fails
+        console.error("⚠️ Failed to create CustomWebsite for clinic:", clinic.id, customWebsiteError);
+      }
+
       if (process.env.NODE_ENV === "development") {
         console.log("🚀 Creating new user");
       }
