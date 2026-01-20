@@ -147,14 +147,43 @@ export default function LandingPage() {
           setActiveFilter('programs');
         } else {
           // Try to find a matching category (case-insensitive)
-          // Handle both "weight-loss" and "weightloss" formats
+          // Handle both "weight-loss", "weightloss", and "weight loss" formats
           const normalizedHash = hash.replace(/-/g, ' ');
-          const matchedCategory = productCategories.find(
-            cat => cat.toLowerCase() === normalizedHash || cat.toLowerCase() === hash
-          );
+          const hashNoSpaces = hash.replace(/\s+/g, '');
+          
+          const matchedCategory = productCategories.find(cat => {
+            const catLower = cat.toLowerCase();
+            const catNoSpaces = catLower.replace(/[\s_-]+/g, ''); // Remove spaces, underscores, and hyphens
+            const catNormalized = catLower.replace(/[-_]/g, ' '); // Convert hyphens and underscores to spaces
+            
+            const matches = catLower === hash || 
+                   catLower === normalizedHash || 
+                   catNoSpaces === hash ||
+                   catNoSpaces === hashNoSpaces ||
+                   catNormalized === hash ||
+                   catNormalized === normalizedHash;
+            
+            if (matches) {
+              console.log('✅ MATCH FOUND:', cat, 'for hash:', hash);
+            }
+            
+            return matches;
+          });
           
           if (matchedCategory) {
+            console.log('Setting active filter to:', matchedCategory);
             setActiveFilter(matchedCategory);
+          } else {
+            console.log('❌ No match found for hash:', hash);
+            console.log('Available categories:', productCategories);
+            console.log('Normalized hash (with spaces):', normalizedHash);
+            console.log('Hash (no spaces):', hashNoSpaces);
+            console.log('Checking each category:');
+            productCategories.forEach(cat => {
+              const catLower = cat.toLowerCase();
+              const catNoSpaces = catLower.replace(/\s+/g, '');
+              console.log(`  - "${cat}" -> lower: "${catLower}", no spaces: "${catNoSpaces}"`);
+            });
           }
         }
         
@@ -1096,7 +1125,16 @@ export default function LandingPage() {
                   {visibleFooterCategories[0].urls && visibleFooterCategories[0].urls.length > 0 && (
                     <ul style={{ listStyle: "none", padding: 0, margin: 0, fontSize: "0.875rem" }}>
                       {visibleFooterCategories[0].urls.map((urlItem, urlIndex) => {
-                        const isInternal = urlItem.url.startsWith('#') || urlItem.url.startsWith('/');
+                        // Check if link is internal (same domain or relative)
+                        let isInternal = urlItem.url.startsWith('#') || urlItem.url.startsWith('/');
+                        if (!isInternal && typeof window !== 'undefined') {
+                          try {
+                            const linkUrl = new URL(urlItem.url, window.location.origin);
+                            isInternal = linkUrl.hostname === window.location.hostname;
+                          } catch (e) {
+                            // Invalid URL, treat as external
+                          }
+                        }
                         return (
                           <li key={urlIndex} style={{ marginBottom: "0.5rem" }}>
                             <a 
@@ -1123,7 +1161,16 @@ export default function LandingPage() {
                   {visibleFooterCategories[1].urls && visibleFooterCategories[1].urls.length > 0 && (
                     <ul style={{ listStyle: "none", padding: 0, margin: 0, fontSize: "0.875rem" }}>
                       {visibleFooterCategories[1].urls.map((urlItem, urlIndex) => {
-                        const isInternal = urlItem.url.startsWith('#') || urlItem.url.startsWith('/');
+                        // Check if link is internal (same domain or relative)
+                        let isInternal = urlItem.url.startsWith('#') || urlItem.url.startsWith('/');
+                        if (!isInternal && typeof window !== 'undefined') {
+                          try {
+                            const linkUrl = new URL(urlItem.url, window.location.origin);
+                            isInternal = linkUrl.hostname === window.location.hostname;
+                          } catch (e) {
+                            // Invalid URL, treat as external
+                          }
+                        }
                         return (
                           <li key={urlIndex} style={{ marginBottom: "0.5rem" }}>
                             <a 
@@ -1227,7 +1274,16 @@ export default function LandingPage() {
                     {visibleFooterCategories[2].urls && visibleFooterCategories[2].urls.length > 0 && (
                       <ul style={{ listStyle: "none", padding: 0, margin: 0, fontSize: "0.875rem" }}>
                         {visibleFooterCategories[2].urls.map((urlItem, urlIndex) => {
-                          const isInternal = urlItem.url.startsWith('#') || urlItem.url.startsWith('/');
+                          // Check if link is internal (same domain or relative)
+                          let isInternal = urlItem.url.startsWith('#') || urlItem.url.startsWith('/');
+                          if (!isInternal && typeof window !== 'undefined') {
+                            try {
+                              const linkUrl = new URL(urlItem.url, window.location.origin);
+                              isInternal = linkUrl.hostname === window.location.hostname;
+                            } catch (e) {
+                              // Invalid URL, treat as external
+                            }
+                          }
                           return (
                             <li key={urlIndex} style={{ marginBottom: "0.5rem" }}>
                               <a 
@@ -1254,7 +1310,16 @@ export default function LandingPage() {
                     {visibleFooterCategories[3].urls && visibleFooterCategories[3].urls.length > 0 && (
                       <ul style={{ listStyle: "none", padding: 0, margin: 0, fontSize: "0.875rem" }}>
                         {visibleFooterCategories[3].urls.map((urlItem, urlIndex) => {
-                          const isInternal = urlItem.url.startsWith('#') || urlItem.url.startsWith('/');
+                          // Check if link is internal (same domain or relative)
+                          let isInternal = urlItem.url.startsWith('#') || urlItem.url.startsWith('/');
+                          if (!isInternal && typeof window !== 'undefined') {
+                            try {
+                              const linkUrl = new URL(urlItem.url, window.location.origin);
+                              isInternal = linkUrl.hostname === window.location.hostname;
+                            } catch (e) {
+                              // Invalid URL, treat as external
+                            }
+                          }
                           return (
                             <li key={urlIndex} style={{ marginBottom: "0.5rem" }}>
                               <a 
