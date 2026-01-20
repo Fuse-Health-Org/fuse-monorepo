@@ -57,6 +57,7 @@ interface PortalSettings {
   footerColor?: string
   footerCategories?: FooterCategory[]
   socialMediaSection?: string
+  useDefaultDisclaimer?: boolean
   footerDisclaimer?: string
   socialMediaLinks?: {
     instagram?: { enabled: boolean; url: string }
@@ -105,7 +106,8 @@ export default function PortalPage() {
     footerColor: "#000000",
     footerCategories: DEFAULT_FOOTER_CATEGORIES,
     socialMediaSection: "SOCIAL MEDIA",
-    footerDisclaimer: "* These statements have not been evaluated by the Food and Drug Administration. This product is not intended to diagnose, treat, cure or prevent any disease. The information provided on this site is for informational purposes only and is not intended as a substitute for advice from your physician or other health care professional.",
+    useDefaultDisclaimer: true,
+    footerDisclaimer: "",
     socialMediaLinks: {
       instagram: { enabled: true, url: "" },
       facebook: { enabled: true, url: "" },
@@ -218,7 +220,8 @@ export default function PortalPage() {
             footerColor: data.data.footerColor || settings.footerColor || "#000000",
             footerCategories: footerCategories,
             socialMediaSection: data.data.socialMediaSection || settings.socialMediaSection || "SOCIAL MEDIA",
-            footerDisclaimer: data.data.footerDisclaimer || settings.footerDisclaimer,
+            useDefaultDisclaimer: data.data.useDefaultDisclaimer ?? true,
+            footerDisclaimer: data.data.footerDisclaimer || "",
             socialMediaLinks: data.data.socialMediaLinks || settings.socialMediaLinks,
           })
         }
@@ -1187,16 +1190,38 @@ export default function PortalPage() {
                 </div>
 
                 {/* Footer Disclaimer Text */}
-                <div className="space-y-2 pt-4 border-t">
+                <div className="space-y-3 pt-4 border-t">
                   <label className="text-sm font-medium">Footer Disclaimer Text</label>
                   <CardDescription className="text-xs">This text appears in the middle section of the footer</CardDescription>
-                  <textarea
-                    value={settings.footerDisclaimer || ""}
-                    onChange={(e) => setSettings({ ...settings, footerDisclaimer: e.target.value })}
-                    placeholder="Enter disclaimer text..."
-                    className="w-full min-h-[100px] p-2 text-sm border rounded-md resize-y"
-                    rows={4}
-                  />
+                  
+                  {/* Toggle for default vs custom disclaimer */}
+                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-gray-700">Use Default Disclaimer</p>
+                      <p className="text-xs text-gray-500">Use the global default disclaimer set by your organization</p>
+                    </div>
+                    <Switch
+                      checked={settings.useDefaultDisclaimer ?? true}
+                      onCheckedChange={(checked) => setSettings({ ...settings, useDefaultDisclaimer: checked })}
+                    />
+                  </div>
+
+                  {/* Custom disclaimer textarea - only shown when not using default */}
+                  {!settings.useDefaultDisclaimer && (
+                    <div className="space-y-2">
+                      <label className="text-xs text-muted-foreground">Custom Disclaimer Text</label>
+                      <textarea
+                        value={settings.footerDisclaimer || ""}
+                        onChange={(e) => setSettings({ ...settings, footerDisclaimer: e.target.value })}
+                        placeholder="Enter your custom disclaimer text..."
+                        className="w-full min-h-[150px] p-3 text-sm border rounded-md resize-y"
+                        rows={6}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        {(settings.footerDisclaimer || "").length} characters
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Social Media Links */}
@@ -1517,7 +1542,9 @@ export default function PortalPage() {
                       {/* Middle Column - Disclaimer */}
                       <div className="col-span-2 px-2">
                         <div className="opacity-60 text-[7px] leading-relaxed line-clamp-6">
-                          {settings.footerDisclaimer || "* These statements have not been evaluated by the Food and Drug Administration..."}
+                          {settings.useDefaultDisclaimer 
+                            ? "(Using global default disclaimer)" 
+                            : (settings.footerDisclaimer || "No custom disclaimer set")}
                         </div>
                       </div>
 

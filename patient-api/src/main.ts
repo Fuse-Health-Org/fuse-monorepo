@@ -3024,6 +3024,7 @@ app.post("/custom-website", authenticateJWT, async (req, res) => {
       section3,
       section4,
       socialMediaSection,
+      useDefaultDisclaimer,
       footerDisclaimer,
       socialMediaLinks
     } = req.body;
@@ -3051,6 +3052,7 @@ app.post("/custom-website", authenticateJWT, async (req, res) => {
         section3: section3 !== undefined ? section3 : customWebsite.section3,
         section4: section4 !== undefined ? section4 : customWebsite.section4,
         socialMediaSection: socialMediaSection !== undefined ? socialMediaSection : customWebsite.socialMediaSection,
+        useDefaultDisclaimer: useDefaultDisclaimer !== undefined ? useDefaultDisclaimer : customWebsite.useDefaultDisclaimer,
         footerDisclaimer: footerDisclaimer !== undefined ? footerDisclaimer : customWebsite.footerDisclaimer,
         socialMediaLinks: socialMediaLinks !== undefined ? socialMediaLinks : customWebsite.socialMediaLinks
       });
@@ -3074,6 +3076,7 @@ app.post("/custom-website", authenticateJWT, async (req, res) => {
         section3: section3 ?? 'SECTION 3',
         section4: section4 ?? 'SECTION 4',
         socialMediaSection: socialMediaSection ?? 'SOCIAL MEDIA',
+        useDefaultDisclaimer: useDefaultDisclaimer ?? true,
         footerDisclaimer: footerDisclaimer ?? null,
         socialMediaLinks: socialMediaLinks ?? {
           instagram: { enabled: true, url: '' },
@@ -3416,9 +3419,18 @@ app.get("/custom-website/by-slug/:slug", async (req, res) => {
       }
     }
 
+    // If useDefaultDisclaimer is true, fetch and include the default disclaimer
+    let responseData = customWebsite ? customWebsite.toJSON() : null;
+    if (responseData && responseData.useDefaultDisclaimer) {
+      const globalConfig = await WebsiteBuilderConfigs.findOne();
+      if (globalConfig) {
+        responseData.footerDisclaimer = globalConfig.defaultFooterDisclaimer;
+      }
+    }
+
     res.status(200).json({
       success: true,
-      data: customWebsite || null,
+      data: responseData,
       clinic: {
         id: clinic.id,
         name: clinic.name,
@@ -3476,7 +3488,7 @@ app.get("/website-builder-configs", authenticateJWT, async (req, res) => {
 
     // Get or create the single config row
     let config = await WebsiteBuilderConfigs.findOne();
-    
+
     if (!config) {
       // Create default config if it doesn't exist
       config = await WebsiteBuilderConfigs.create({
@@ -3531,7 +3543,7 @@ app.post("/website-builder-configs", authenticateJWT, async (req, res) => {
 
     // Get or create the single config row
     let config = await WebsiteBuilderConfigs.findOne();
-    
+
     if (config) {
       // Update existing config
       await config.update({
@@ -3592,7 +3604,7 @@ app.post("/website-builder-configs/restore-default", authenticateJWT, async (req
 
     // Get or create the single config row
     let config = await WebsiteBuilderConfigs.findOne();
-    
+
     if (config) {
       // Update existing config with default value
       await config.update({

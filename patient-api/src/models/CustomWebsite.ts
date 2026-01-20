@@ -129,9 +129,18 @@ export default class CustomWebsite extends Entity {
     declare socialMediaSection?: string | null;
 
     @Column({
+        type: DataType.BOOLEAN,
+        allowNull: false,
+        defaultValue: true,
+        comment: 'When true, use the global default disclaimer from WebsiteBuilderConfigs. When false, use the custom footerDisclaimer field.',
+    })
+    declare useDefaultDisclaimer: boolean;
+
+    @Column({
         type: DataType.TEXT,
         allowNull: true,
-        defaultValue: '* These statements have not been evaluated by the Food and Drug Administration. This product is not intended to diagnose, treat, cure or prevent any disease. The information provided on this site is for informational purposes only and is not intended as a substitute for advice from your physician or other health care professional. You should not use the information on this site for diagnosis or treatment of any health problem or for prescription of any medication or other treatment. You should consult with a healthcare professional before starting any diet, exercise or supplementation program, before taking any medication, or if you have or suspect you might have a health problem.',
+        defaultValue: null,
+        comment: 'Custom footer disclaimer text. Only used when useDefaultDisclaimer is false.',
     })
     declare footerDisclaimer?: string | null;
 
