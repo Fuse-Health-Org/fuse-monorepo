@@ -181,9 +181,55 @@ export default function IronSailAdmin() {
     }
   }
 
+  const handleClearSearch = () => {
+    setMedicationSearch("")
+    if (selectedPharmacy) {
+      fetchMedications(selectedPharmacy.id, 1)
+    }
+  }
+
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text)
     toast.success(`${label} copied to clipboard`)
+  }
+
+  const copyMedicationAsSpreadsheetRow = (med: IronSailMedication) => {
+    // Create tab-separated values (TSV) format for pasting into spreadsheets
+    const headers = [
+      "Name",
+      "Type", 
+      "Formulation",
+      "Strength",
+      "Form",
+      "Quantity",
+      "Quantity Units",
+      "Schedule",
+      "Medication ID",
+      "Price",
+      "Pharmacy"
+    ]
+    
+    const values = [
+      med.name,
+      med.type,
+      med.formulation,
+      med.strength,
+      med.form,
+      med.quantity,
+      med.quantity_units,
+      med.schedule_code,
+      med.medication_id,
+      med.price,
+      med.pharmacy
+    ]
+    
+    // Join with tabs for spreadsheet paste
+    const headerRow = headers.join("\t")
+    const valueRow = values.join("\t")
+    const tsvContent = `${headerRow}\n${valueRow}`
+    
+    navigator.clipboard.writeText(tsvContent)
+    toast.success("Medication data copied! Paste into spreadsheet.")
   }
 
   const formatPrice = (price: string) => {
@@ -596,19 +642,36 @@ export default function IronSailAdmin() {
                   </CardHeader>
                   <CardContent>
                     {/* Search */}
-                    <div className="flex gap-2 mb-4">
-                      <div className="flex-1">
-                        <Input
-                          placeholder="Search medications..."
-                          value={medicationSearch}
-                          onChange={(e) => setMedicationSearch(e.target.value)}
-                          onKeyDown={(e) => e.key === "Enter" && handleSearchMedications()}
-                        />
+                    <div className="space-y-3 mb-4">
+                      <div className="flex gap-2">
+                        <div className="flex-1">
+                          <Input
+                            placeholder="Search medications..."
+                            value={medicationSearch}
+                            onChange={(e) => setMedicationSearch(e.target.value)}
+                            onKeyDown={(e) => e.key === "Enter" && handleSearchMedications()}
+                          />
+                        </div>
+                        <Button onClick={handleSearchMedications} disabled={loadingMedications}>
+                          <Search className="h-4 w-4 mr-2" />
+                          Search
+                        </Button>
+                        {medicationSearch && (
+                          <Button onClick={handleClearSearch} disabled={loadingMedications} variant="outline">
+                            Clear
+                          </Button>
+                        )}
                       </div>
-                      <Button onClick={handleSearchMedications} disabled={loadingMedications}>
-                        <Search className="h-4 w-4 mr-2" />
-                        Search
-                      </Button>
+                      {medicationSearch && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <Badge variant="secondary" className="font-normal">
+                            Searching: {medicationSearch}
+                          </Badge>
+                          <p className="text-xs text-amber-600">
+                            Note: The IronSail API may return partial matches or related products
+                          </p>
+                        </div>
+                      )}
                     </div>
 
                     {/* Medications Grid */}
@@ -657,18 +720,28 @@ export default function IronSailAdmin() {
                                       <strong>Schedule:</strong> {med.schedule_code}
                                     </span>
                                   </div>
-                                  <div className="mt-2">
-                                    <code className="px-2 py-1 bg-gray-50 rounded text-xs font-mono text-gray-500">
-                                      ID: {med.medication_id.substring(0, 20)}...
-                                    </code>
+                                  <div className="mt-3 flex items-center gap-2">
                                     <Button
-                                      onClick={() => copyToClipboard(med.medication_id, "Medication ID")}
-                                      variant="ghost"
+                                      onClick={() => copyMedicationAsSpreadsheetRow(med)}
+                                      variant="outline"
                                       size="sm"
-                                      className="h-6 text-xs ml-1"
+                                      className="h-7 text-xs bg-teal-50 border-teal-200 hover:bg-teal-100 text-teal-700"
                                     >
-                                      Copy
+                                      📊 Copy as Spreadsheet Row
                                     </Button>
+                                    <div className="flex-1">
+                                      <code className="px-2 py-1 bg-gray-50 rounded text-xs font-mono text-gray-500">
+                                        ID: {med.medication_id.substring(0, 20)}...
+                                      </code>
+                                      <Button
+                                        onClick={() => copyToClipboard(med.medication_id, "Medication ID")}
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-6 text-xs ml-1"
+                                      >
+                                        Copy ID
+                                      </Button>
+                                    </div>
                                   </div>
                                 </div>
                                 <div className="text-right ml-4">
