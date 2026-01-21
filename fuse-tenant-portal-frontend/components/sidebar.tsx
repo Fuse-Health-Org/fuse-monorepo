@@ -16,6 +16,7 @@ import {
   CreditCard,
   ExternalLink,
   Palette,
+  Ship,
 } from "lucide-react"
 
 const navigation = [
@@ -31,6 +32,7 @@ const navigation = [
   { name: "Audit Logs", icon: Shield, href: "/audit-logs" },
   { name: "Support", icon: MessageSquare, href: "/support" },
   { name: "MDI Admin Area", icon: ExternalLink, href: "/mdi-admin" },
+  { name: "IronSail Admin", icon: Ship, href: "/ironsail-admin" },
 ]
 
 export function Sidebar() {
