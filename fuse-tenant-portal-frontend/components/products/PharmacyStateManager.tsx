@@ -577,20 +577,20 @@ export function PharmacyStateManager({ productId }: PharmacyStateManagerProps) {
 
     const isExisting = formContext.mode === 'existing'
     const wrapperClasses = embedded
-      ? "mt-4 p-6 border border-dashed border-[#4FA59C] rounded-2xl bg-[#F9FAFB] space-y-4"
-      : "p-6 border border-[#E5E7EB] rounded-2xl space-y-4 bg-[#F9FAFB]"
+      ? "mt-4 p-6 border border-dashed border-[#4FA59C] rounded-2xl bg-muted/50 space-y-4"
+      : "p-6 border border-border rounded-2xl space-y-4 bg-muted/50"
 
     return (
       <div className={wrapperClasses}>
             <div>
-              <label className="text-sm font-medium text-[#4B5563] mb-2 block">Select Pharmacy</label>
+              <label className="text-sm font-medium text-foreground mb-2 block">Select Pharmacy</label>
               <select
                 value={selectedPharmacy}
                 onChange={(e) => {
                   setSelectedPharmacy(e.target.value)
               setSelectedStates([])
                 }}
-            className="w-full rounded-xl border border-[#E5E7EB] bg-white px-4 py-2.5 text-sm text-[#1F2937] focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all disabled:bg-[#F3F4F6] disabled:text-[#9CA3AF]"
+            className="w-full rounded-xl border border-input bg-background px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all disabled:bg-muted disabled:text-muted-foreground"
               >
                 <option value="">Choose a pharmacy...</option>
                 {pharmacies.map((pharmacy) => (
@@ -603,17 +603,17 @@ export function PharmacyStateManager({ productId }: PharmacyStateManagerProps) {
 
             {selectedPharmacy && (
               <div>
-                <label className="text-sm font-medium text-[#4B5563] mb-2 block">
+                <label className="text-sm font-medium text-foreground mb-2 block">
                   Select States (available for this pharmacy)
                 </label>
-                <div className="max-h-48 overflow-y-auto border border-[#E5E7EB] rounded-xl p-3 bg-white">
+                <div className="max-h-48 overflow-y-auto border border-border rounded-xl p-3 bg-background">
                   {availableStatesForSelectedPharmacy.length === 0 ? (
-                    <p className="text-sm text-[#6B7280] p-2">
+                    <p className="text-sm text-muted-foreground p-2">
                       All states supported by this pharmacy are already assigned.
                     </p>
                   ) : (
                     <>
-                      <label className="flex items-center gap-2 text-sm font-medium cursor-pointer hover:bg-[#F3F4F6] p-2 rounded-xl mb-2 border-b border-[#E5E7EB]">
+                      <label className="flex items-center gap-2 text-sm font-medium cursor-pointer hover:bg-muted p-2 rounded-xl mb-2 border-b border-border">
                         <input
                           type="checkbox"
                           checked={selectedStates.length === availableStatesForSelectedPharmacy.length}
@@ -624,13 +624,13 @@ export function PharmacyStateManager({ productId }: PharmacyStateManagerProps) {
                               setSelectedStates([])
                             }
                           }}
-                          className="w-4 h-4 rounded border-[#E5E7EB] text-[#4FA59C] focus:ring-[#4FA59C] focus:ring-2 focus:ring-opacity-50"
+                          className="w-4 h-4 rounded border-input text-[#4FA59C] focus:ring-[#4FA59C] focus:ring-2 focus:ring-opacity-50 bg-background"
                         />
-                        <span className="text-[#1F2937]">Select All ({availableStatesForSelectedPharmacy.length} states)</span>
+                        <span className="text-foreground">Select All ({availableStatesForSelectedPharmacy.length} states)</span>
                       </label>
                       <div className="grid grid-cols-3 gap-2">
                         {availableStatesForSelectedPharmacy.map((state) => (
-                          <label key={state.code} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-[#F3F4F6] p-2 rounded-xl transition-colors">
+                          <label key={state.code} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-muted p-2 rounded-xl transition-colors">
                             <input
                               type="checkbox"
                               checked={selectedStates.includes(state.code)}
@@ -641,9 +641,9 @@ export function PharmacyStateManager({ productId }: PharmacyStateManagerProps) {
                                   setSelectedStates(selectedStates.filter(s => s !== state.code))
                                 }
                               }}
-                              className="w-4 h-4 rounded border-[#E5E7EB] text-[#4FA59C] focus:ring-[#4FA59C] focus:ring-2 focus:ring-opacity-50"
+                              className="w-4 h-4 rounded border-input text-[#4FA59C] focus:ring-[#4FA59C] focus:ring-2 focus:ring-opacity-50 bg-background"
                             />
-                            <span className="text-[#1F2937]">{state.code}</span>
+                            <span className="text-foreground">{state.code}</span>
                           </label>
                         ))}
                       </div>
@@ -655,13 +655,13 @@ export function PharmacyStateManager({ productId }: PharmacyStateManagerProps) {
 
             {selectedPharmacy && selectedStates.length > 0 && (
               <div>
-                <label className="text-sm font-medium text-[#4B5563] mb-2 block">
+                <label className="text-sm font-medium text-foreground mb-2 block">
                   Select Pharmacy Product (Optional)
                 </label>
                 {loadingProducts ? (
-                  <div className="flex items-center justify-center p-4 border border-[#E5E7EB] rounded-xl bg-white">
+                  <div className="flex items-center justify-center p-4 border border-border rounded-xl bg-background">
                     <Loader2 className="h-5 w-5 animate-spin text-[#4FA59C] mr-2" />
-                    <span className="text-sm text-[#6B7280]">Loading products...</span>
+                    <span className="text-sm text-muted-foreground">Loading products...</span>
                   </div>
                 ) : (
                   <>
@@ -670,19 +670,19 @@ export function PharmacyStateManager({ productId }: PharmacyStateManagerProps) {
                       placeholder="Search products by name or SKU..."
                       value={productSearchQuery}
                       onChange={(e) => setProductSearchQuery(e.target.value)}
-                      className="w-full px-4 py-2.5 rounded-xl border border-[#E5E7EB] bg-white text-sm text-[#1F2937] mb-2 focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all"
+                      className="w-full px-4 py-2.5 rounded-xl border border-input bg-background text-sm text-foreground mb-2 focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all"
                     />
-                    <div className="max-h-64 overflow-y-auto border border-[#E5E7EB] rounded-xl bg-white">
+                    <div className="max-h-64 overflow-y-auto border border-border rounded-xl bg-background">
                       {filteredPharmacyProducts.length === 0 ? (
-                        <p className="text-sm text-[#6B7280] p-4 text-center">
+                        <p className="text-sm text-muted-foreground p-4 text-center">
                           {productSearchQuery ? "No products found matching your search." : "No products available."}
                         </p>
                       ) : (
-                        <div className="divide-y divide-[#E5E7EB]">
+                        <div className="divide-y divide-border">
                           {filteredPharmacyProducts.map((product) => (
                             <label
                               key={product.id}
-                          className={`flex items-start gap-3 p-3 cursor-pointer hover:bg-[#F9FAFB] transition-colors ${selectedPharmacyProduct?.id === product.id ? 'bg-[#F3F4F6]' : ''
+                          className={`flex items-start gap-3 p-3 cursor-pointer hover:bg-muted/50 transition-colors ${selectedPharmacyProduct?.id === product.id ? 'bg-muted' : ''
                               }`}
                             >
                               <input
@@ -699,24 +699,24 @@ export function PharmacyStateManager({ productId }: PharmacyStateManagerProps) {
                                 setCustomSig(product.sig || 'Take as directed by your healthcare provider')
                               }
                             }}
-                                className="mt-1 w-4 h-4 border-[#E5E7EB] text-[#4FA59C] focus:ring-[#4FA59C]"
+                                className="mt-1 w-4 h-4 border-input text-[#4FA59C] focus:ring-[#4FA59C] bg-background"
                               />
                               <div className="flex-1 min-w-0">
-                                <div className="font-medium text-sm text-[#1F2937]">
+                                <div className="font-medium text-sm text-foreground">
                                   {product.nameWithStrength || product.name}
                                 </div>
-                                <div className="text-xs text-[#9CA3AF] mt-1">
+                                <div className="text-xs text-muted-foreground mt-1">
                                   SKU: {product.sku}
                                   {product.dispense && ` • ${product.dispense}`}
                                   {product.wholesalePrice && ` • $${product.wholesalePrice}`}
                                 </div>
                                 {product.sig && (
-                                  <div className="text-xs text-[#6B7280] mt-1 italic">
+                                  <div className="text-xs text-muted-foreground mt-1 italic">
                                     SIG: {product.sig}
                                   </div>
                                 )}
                                 {product.label && (
-                                  <div className="text-xs text-[#9CA3AF] mt-1">
+                                  <div className="text-xs text-muted-foreground mt-1">
                                     {product.label}
                                   </div>
                                 )}
@@ -729,7 +729,7 @@ export function PharmacyStateManager({ productId }: PharmacyStateManagerProps) {
                     {selectedPharmacyProduct && (
                       <button
                         onClick={() => setSelectedPharmacyProduct(null)}
-                        className="mt-2 px-4 py-2 rounded-full border border-[#E5E7EB] text-[#4B5563] hover:bg-[#F3F4F6] transition-all text-sm font-medium"
+                        className="mt-2 px-4 py-2 rounded-full border border-border text-foreground hover:bg-muted transition-all text-sm font-medium"
                       >
                         Clear Selection
                       </button>
@@ -741,7 +741,7 @@ export function PharmacyStateManager({ productId }: PharmacyStateManagerProps) {
 
         <div className="grid gap-4 md:grid-cols-2">
           <div>
-            <label className="text-sm font-medium text-[#4B5563] mb-2 block">
+            <label className="text-sm font-medium text-foreground mb-2 block">
               Coverage Display Name
             </label>
             <input
@@ -749,15 +749,15 @@ export function PharmacyStateManager({ productId }: PharmacyStateManagerProps) {
               value={customProductName}
               onChange={(e) => setCustomProductName(e.target.value)}
               placeholder="e.g. IronSail Weight Loss Coverage"
-              className="w-full px-4 py-2.5 rounded-xl border border-[#E5E7EB] bg-white text-sm text-[#1F2937] focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all"
+              className="w-full px-4 py-2.5 rounded-xl border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all"
               maxLength={120}
             />
-            <p className="text-xs text-[#9CA3AF] mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               Displayed on the coverage card header. Keep it short and descriptive.
             </p>
           </div>
           <div>
-            <label className="text-sm font-medium text-[#4B5563] mb-2 block">
+            <label className="text-sm font-medium text-foreground mb-2 block">
               Coverage Note / SIG
             </label>
             <textarea
@@ -765,10 +765,10 @@ export function PharmacyStateManager({ productId }: PharmacyStateManagerProps) {
               onChange={(e) => setCustomSig(e.target.value)}
               placeholder="e.g. Take as directed by your healthcare provider"
               rows={3}
-              className="w-full px-4 py-2.5 rounded-xl border border-[#E5E7EB] bg-white text-sm text-[#1F2937] focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all resize-none"
+              className="w-full px-4 py-2.5 rounded-xl border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all resize-none"
               maxLength={500}
             />
-            <p className="text-xs text-[#9CA3AF] mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               This will appear below the coverage title and is saved with the coverage.
             </p>
           </div>
@@ -797,7 +797,7 @@ export function PharmacyStateManager({ productId }: PharmacyStateManagerProps) {
               </button>
               <button 
             onClick={closeForm}
-                className="px-4 py-2.5 rounded-full border border-[#E5E7EB] text-[#4B5563] hover:bg-[#F3F4F6] transition-all text-sm font-medium"
+                className="px-4 py-2.5 rounded-full border border-border text-foreground hover:bg-muted transition-all text-sm font-medium"
               >
                 Cancel
               </button>
@@ -808,7 +808,7 @@ export function PharmacyStateManager({ productId }: PharmacyStateManagerProps) {
 
   if (loading) {
     return (
-      <div className="bg-white rounded-2xl shadow-sm border border-[#E5E7EB] overflow-hidden">
+      <div className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden">
         <div className="p-12 flex items-center justify-center">
           <Loader2 className="h-6 w-6 animate-spin text-[#4FA59C]" />
         </div>
@@ -820,16 +820,16 @@ export function PharmacyStateManager({ productId }: PharmacyStateManagerProps) {
 
   return (
     <div className="space-y-6">
-      <div className="bg-white rounded-2xl shadow-sm border border-[#E5E7EB] overflow-hidden">
-        <div className="p-6 pb-4 border-b border-[#E5E7EB]">
+      <div className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden">
+        <div className="p-6 pb-4 border-b border-border">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="bg-[#F3F4F6] rounded-xl p-2">
+              <div className="bg-muted rounded-xl p-2">
                 <MapPin className="h-5 w-5 text-[#4FA59C]" />
               </div>
               <div>
-                <h2 className="text-xl font-semibold text-[#1F2937] mb-2">Pharmacy & State Coverage</h2>
-                <p className="text-sm text-[#6B7280]">
+                <h2 className="text-xl font-semibold text-foreground mb-2">Pharmacy & State Coverage</h2>
+                <p className="text-sm text-muted-foreground">
                   Configure which pharmacies can fulfill this product in each state. This determines where patients can get their medication based on their location. Each coverage entry links a pharmacy, product details, and the states where it's available.
                 </p>
               </div>
@@ -851,7 +851,7 @@ export function PharmacyStateManager({ productId }: PharmacyStateManagerProps) {
         </div>
         <div className="p-6 space-y-4">
           {error && (
-            <div className="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-sm shadow-sm">
+            <div className="p-4 rounded-2xl bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-sm shadow-sm">
               {error}
           </div>
         )}
@@ -861,13 +861,13 @@ export function PharmacyStateManager({ productId }: PharmacyStateManagerProps) {
       </div>
 
       <div className="space-y-4">
-          <h3 className="text-sm font-semibold text-[#9CA3AF] uppercase tracking-wider">Current Coverage</h3>
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Current Coverage</h3>
         {sortedCoverageGroups.length === 0 ? (
-            <div className="text-center p-8 border-2 border-dashed border-[#E5E7EB] rounded-2xl bg-[#F9FAFB]">
-              <div className="bg-white rounded-full p-4 mx-auto w-fit mb-3">
-                <Building2 className="h-8 w-8 text-[#9CA3AF]" />
+            <div className="text-center p-8 border-2 border-dashed border-border rounded-2xl bg-muted/50">
+              <div className="bg-card rounded-full p-4 mx-auto w-fit mb-3">
+                <Building2 className="h-8 w-8 text-muted-foreground" />
               </div>
-              <p className="text-sm text-[#6B7280]">
+              <p className="text-sm text-muted-foreground">
                 No pharmacy coverage assigned yet. Add coverage to make this product available in specific states.
               </p>
             </div>
@@ -884,45 +884,45 @@ export function PharmacyStateManager({ productId }: PharmacyStateManagerProps) {
             const isEditingHeader = editingCoverageId === group.coverageId
 
               return (
-              <div key={group.key} className="bg-white rounded-2xl shadow-sm border border-[#E5E7EB] overflow-hidden">
-                <div className="p-6 pb-4 border-b border-[#E5E7EB] flex items-start justify-between">
+              <div key={group.key} className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden">
+                <div className="p-6 pb-4 border-b border-border flex items-start justify-between">
                   <div className="flex-1 pr-4">
                     {isEditingHeader ? (
                       <div className="space-y-3">
                         <div>
-                          <label className="text-sm font-medium text-[#4B5563] mb-2 block">Coverage Display Name</label>
+                          <label className="text-sm font-medium text-foreground mb-2 block">Coverage Display Name</label>
                           <input
                             type="text"
                             value={headerNameInput}
                             onChange={(e) => setHeaderNameInput(e.target.value)}
                             placeholder="e.g. IronSail Weight Loss Coverage"
-                            className="w-full px-4 py-2.5 rounded-xl border border-[#E5E7EB] bg-white text-sm text-[#1F2937] focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all"
+                            className="w-full px-4 py-2.5 rounded-xl border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all"
                             maxLength={120}
                           />
                         </div>
                         <div>
-                          <label className="text-sm font-medium text-[#4B5563] mb-2 block">Coverage Note / SIG</label>
+                          <label className="text-sm font-medium text-foreground mb-2 block">Coverage Note / SIG</label>
                           <textarea
                             value={headerSigInput}
                             onChange={(e) => setHeaderSigInput(e.target.value)}
                             placeholder="e.g. Take as directed by your healthcare provider"
                             rows={3}
-                            className="w-full px-4 py-2.5 rounded-xl border border-[#E5E7EB] bg-white text-sm text-[#1F2937] focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all resize-none"
+                            className="w-full px-4 py-2.5 rounded-xl border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all resize-none"
                             maxLength={500}
                           />
                         </div>
-                        <p className="text-xs text-[#9CA3AF]">
+                        <p className="text-xs text-muted-foreground">
                           Applies to this coverage header. Product entries keep their own details below.
                         </p>
                       </div>
                     ) : (
                       <>
-                        <h4 className="text-lg font-semibold text-[#1F2937]">{coverageTitle}</h4>
-                        <p className="text-sm text-[#6B7280] mt-1">
-                          Pharmacies: <span className="font-medium text-[#1F2937]">{defaultPharmacyName || 'N/A'}</span> • {totalStates} states covered
+                        <h4 className="text-lg font-semibold text-foreground">{coverageTitle}</h4>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Pharmacies: <span className="font-medium text-foreground">{defaultPharmacyName || 'N/A'}</span> • {totalStates} states covered
                         </p>
                         {group.coverageSig && (
-                          <p className="text-sm text-[#4B5563] mt-2 italic">
+                          <p className="text-sm text-foreground mt-2 italic">
                             Coverage note: {group.coverageSig}
                           </p>
                         )}
@@ -942,7 +942,7 @@ export function PharmacyStateManager({ productId }: PharmacyStateManagerProps) {
                         <button
                           onClick={cancelEditCoverageHeader}
                           disabled={headerSaving}
-                          className="px-4 py-2 rounded-full border border-[#E5E7EB] text-[#4B5563] hover:bg-[#F3F4F6] transition-all text-sm font-medium disabled:opacity-50"
+                          className="px-4 py-2 rounded-full border border-border text-foreground hover:bg-muted transition-all text-sm font-medium disabled:opacity-50"
                         >
                           Cancel
                         </button>
@@ -952,14 +952,14 @@ export function PharmacyStateManager({ productId }: PharmacyStateManagerProps) {
                         <button
                           onClick={() => openExistingCoverageForm(group)}
                           disabled={!group.coverageId}
-                          className={`px-4 py-2 rounded-full border border-[#4FA59C] text-[#4FA59C] transition-all text-sm font-medium ${group.coverageId ? 'hover:bg-[#ECFDF5]' : 'opacity-50 cursor-not-allowed'}`}
+                          className={`px-4 py-2 rounded-full border border-[#4FA59C] text-[#4FA59C] transition-all text-sm font-medium ${group.coverageId ? 'hover:bg-[#4FA59C]/10 dark:hover:bg-[#4FA59C]/20' : 'opacity-50 cursor-not-allowed'}`}
                         >
                           Add states/products
                         </button>
                         <button
                           onClick={() => startEditCoverageHeader(group)}
                           disabled={!group.coverageId}
-                          className={`px-4 py-2 rounded-full border border-[#E5E7EB] text-[#4B5563] transition-all text-sm font-medium ${group.coverageId ? 'hover:bg-[#F3F4F6]' : 'opacity-50 cursor-not-allowed'}`}
+                          className={`px-4 py-2 rounded-full border border-border text-foreground transition-all text-sm font-medium ${group.coverageId ? 'hover:bg-muted' : 'opacity-50 cursor-not-allowed'}`}
                         >
                           Edit name / note
                         </button>
@@ -972,7 +972,7 @@ export function PharmacyStateManager({ productId }: PharmacyStateManagerProps) {
                               coverageName: group.coverageName || undefined,
                             })
                           }
-                          className="p-2 text-[#6B7280] hover:text-[#EF4444] hover:bg-[#FEF2F2] rounded-xl transition-all"
+                          className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-xl transition-all"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
@@ -984,46 +984,46 @@ export function PharmacyStateManager({ productId }: PharmacyStateManagerProps) {
                   {group.entries.map((entry) => {
                     const priceAssignmentId = entry.states[0]?.assignmentId
                     return (
-                      <div key={entry.key} className="border border-[#E5E7EB] rounded-xl p-4 space-y-3">
+                      <div key={entry.key} className="border border-border rounded-xl p-4 space-y-3">
                         <div>
-                          <h5 className="text-base font-semibold text-[#1F2937]">{entry.productName || entry.pharmacy.name}</h5>
-                          <p className="text-sm text-[#6B7280] mt-1">
-                            Managed by <span className="font-medium text-[#1F2937]">{entry.pharmacy.name}</span> • {entry.states.length} states covered
+                          <h5 className="text-base font-semibold text-foreground">{entry.productName || entry.pharmacy.name}</h5>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            Managed by <span className="font-medium text-foreground">{entry.pharmacy.name}</span> • {entry.states.length} states covered
                           </p>
                           {entry.sig && (
-                            <p className="text-sm text-[#4B5563] mt-2 italic">SIG: {entry.sig}</p>
+                            <p className="text-sm text-foreground mt-2 italic">SIG: {entry.sig}</p>
                           )}
                         </div>
 
-                        <div className="space-y-1 text-sm text-[#4B5563]">
+                        <div className="space-y-1 text-sm text-foreground">
                           {entry.productSku && (
                             <div>
-                              <span className="text-[#9CA3AF]">SKU: </span>
+                              <span className="text-muted-foreground">SKU: </span>
                               <span>{entry.productSku}</span>
                             </div>
                           )}
                           {entry.form && (
                             <div>
-                                <span className="text-[#9CA3AF]">Medication Form: </span>
+                                <span className="text-muted-foreground">Medication Form: </span>
                               <span>{entry.form}</span>
                               </div>
                             )}
                           {entry.rxId && (
                             <div>
-                                <span className="text-[#9CA3AF]">RX ID: </span>
+                                <span className="text-muted-foreground">RX ID: </span>
                               <span className="font-mono">{entry.rxId}</span>
                               </div>
                             )}
                           <div className="flex items-center gap-2">
-                            <span className="text-[#9CA3AF] text-sm">Wholesale Price:</span>
+                            <span className="text-muted-foreground text-sm">Wholesale Price:</span>
                             <div className="flex items-center gap-1">
-                              <span className="text-sm text-[#4B5563]">$</span>
+                              <span className="text-sm text-foreground">$</span>
                               <input
                                 type="number"
                                 step="0.01"
                                 min="0"
                                 placeholder="0.00"
-                                className="w-24 h-8 text-sm px-3 py-1 rounded-lg border border-[#E5E7EB] bg-[#F9FAFB] focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all"
+                                className="w-24 h-8 text-sm px-3 py-1 rounded-lg border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all"
                                 defaultValue={entry.wholesaleCost ?? ''}
                                 onBlur={(e) => {
                                   const customPrice = parseFloat(e.target.value)
@@ -1034,7 +1034,7 @@ export function PharmacyStateManager({ productId }: PharmacyStateManagerProps) {
                               />
                             </div>
                             {entry.wholesaleCost != null && (
-                              <span className="inline-block px-2 py-0.5 bg-green-50 text-green-700 border border-green-200 rounded-full text-xs">From Spreadsheet</span>
+                              <span className="inline-block px-2 py-0.5 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800 rounded-full text-xs">From Spreadsheet</span>
                             )}
                           </div>
                       </div>
@@ -1043,14 +1043,14 @@ export function PharmacyStateManager({ productId }: PharmacyStateManagerProps) {
                           {entry.states.map(({ state, assignmentId }) => (
                         <div
                               key={assignmentId}
-                          className="group relative inline-flex items-center gap-1 px-3 py-1.5 bg-[#F3F4F6] text-[#4B5563] rounded-full border border-[#E5E7EB] text-xs font-medium hover:bg-white hover:border-[#4FA59C] transition-all"
+                          className="group relative inline-flex items-center gap-1 px-3 py-1.5 bg-muted text-foreground rounded-full border border-border text-xs font-medium hover:bg-card hover:border-[#4FA59C] transition-all"
                         >
                           <span>{state}</span>
                           <button
                                 onClick={() => handleRemoveAssignment(assignmentId)}
                             className="opacity-0 group-hover:opacity-100 transition-opacity ml-1"
                           >
-                            <Trash2 className="h-3 w-3 text-[#EF4444]" />
+                            <Trash2 className="h-3 w-3 text-destructive" />
                           </button>
                             </div>
                           ))}

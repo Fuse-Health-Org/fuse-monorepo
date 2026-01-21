@@ -141,7 +141,7 @@ export default function WebsiteBuilder() {
   };
 
   return (
-    <div className="flex h-screen bg-[#F9FAFB]">
+    <div className="flex h-screen bg-background">
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header />
@@ -155,8 +155,8 @@ export default function WebsiteBuilder() {
                   <Palette className="h-5 w-5 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-2xl font-bold text-[#1F2937]">Website Builder Configuration</h1>
-                  <p className="text-sm text-[#6B7280]">Manage global defaults for client custom websites</p>
+                  <h1 className="text-2xl font-bold text-foreground">Website Builder Configuration</h1>
+                  <p className="text-sm text-muted-foreground">Manage global defaults for client custom websites</p>
                 </div>
               </div>
             </div>
@@ -165,8 +165,8 @@ export default function WebsiteBuilder() {
             {message && (
               <div className={`mb-6 p-4 rounded-xl border ${
                 message.type === 'success' 
-                  ? 'bg-green-50 border-green-200 text-green-800' 
-                  : 'bg-red-50 border-red-200 text-red-800'
+                  ? 'bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800 text-green-800 dark:text-green-300' 
+                  : 'bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800 text-red-800 dark:text-red-300'
               }`}>
                 <div className="flex items-center space-x-2">
                   <AlertCircle className="h-5 w-5" />
@@ -178,20 +178,20 @@ export default function WebsiteBuilder() {
             {/* Configuration Card */}
             {loading ? (
               <Card className="p-8">
-                <div className="text-center text-[#6B7280]">Loading configuration...</div>
+                <div className="text-center text-muted-foreground">Loading configuration...</div>
               </Card>
             ) : (
               <Card className="p-8">
                 <div className="space-y-8">
                   {/* Info Banner */}
-                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                  <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-xl p-4">
                     <div className="flex items-start space-x-3">
-                      <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5" />
+                      <AlertCircle className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5" />
                       <div className="flex-1">
-                        <p className="text-sm font-medium text-blue-900 mb-1">
+                        <p className="text-sm font-medium text-blue-900 dark:text-blue-300 mb-1">
                           Global Default Configuration
                         </p>
-                        <p className="text-sm text-blue-700">
+                        <p className="text-sm text-blue-700 dark:text-blue-400">
                           This configuration sets the default footer disclaimer text that will be used across all client 
                           custom websites. Clients can override this text individually from their admin portal.
                         </p>
@@ -201,10 +201,10 @@ export default function WebsiteBuilder() {
 
                   {/* Footer Disclaimer */}
                   <div>
-                    <label className="block text-sm font-semibold text-[#1F2937] mb-2">
+                    <label className="block text-sm font-semibold text-foreground mb-2">
                       Default Footer Disclaimer Text
                     </label>
-                    <p className="text-sm text-[#6B7280] mb-3">
+                    <p className="text-sm text-muted-foreground mb-3">
                       This text appears in the middle section of the footer on all custom landing pages. 
                       It typically contains legal disclaimers, FDA statements, and important product information.
                     </p>
@@ -212,20 +212,20 @@ export default function WebsiteBuilder() {
                       value={config?.defaultFooterDisclaimer || ''}
                       onChange={(e) => handleTextChange(e.target.value)}
                       rows={20}
-                      className="w-full px-4 py-3 border border-[#D1D5DB] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:border-transparent text-[#1F2937] text-sm font-mono resize-y"
+                      className="w-full px-4 py-3 border border-input rounded-xl focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:border-transparent text-foreground text-sm font-mono resize-y bg-background"
                       placeholder="Enter default footer disclaimer text..."
                     />
-                    <p className="text-xs text-[#9CA3AF] mt-2">
+                    <p className="text-xs text-muted-foreground mt-2">
                       {config?.defaultFooterDisclaimer?.length || 0} characters
                     </p>
                   </div>
 
                   {/* Preview Section */}
-                  <div className="bg-[#F9FAFB] border border-[#E5E7EB] rounded-xl p-5">
-                    <h3 className="text-sm font-semibold text-[#1F2937] mb-4">
+                  <div className="bg-muted/50 border border-border rounded-xl p-5">
+                    <h3 className="text-sm font-semibold text-foreground mb-4">
                       Preview (Footer Middle Section)
                     </h3>
-                    <div className="bg-[#1F2937] text-white p-6 rounded-lg">
+                    <div className="bg-[#1F2937] dark:bg-gray-800 text-white p-6 rounded-lg">
                       <div className="text-xs leading-relaxed opacity-70 whitespace-pre-wrap max-h-64 overflow-y-auto">
                         {config?.defaultFooterDisclaimer || 'No disclaimer text set'}
                       </div>
@@ -233,11 +233,11 @@ export default function WebsiteBuilder() {
                   </div>
 
                   {/* Action Buttons */}
-                  <div className="flex items-center justify-between pt-4 border-t border-[#E5E7EB]">
+                  <div className="flex items-center justify-between pt-4 border-t border-border">
                     <button
                       onClick={handleRestoreDefault}
                       disabled={restoring || saving}
-                      className="flex items-center space-x-2 px-5 py-2.5 bg-white text-[#6B7280] font-medium rounded-xl hover:bg-[#F3F4F6] border border-[#D1D5DB] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex items-center space-x-2 px-5 py-2.5 bg-background text-muted-foreground font-medium rounded-xl hover:bg-muted border border-input transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <RotateCcw className="h-4 w-4" />
                       <span>{restoring ? 'Restoring...' : 'Restore Default'}</span>

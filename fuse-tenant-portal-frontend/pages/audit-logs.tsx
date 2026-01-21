@@ -62,22 +62,22 @@ interface AuditStats {
 }
 
 const ACTION_COLORS: Record<string, string> = {
-  LOGIN: 'bg-green-100 text-green-800 border-green-200',
-  LOGOUT: 'bg-gray-100 text-gray-800 border-gray-200',
-  LOGIN_FAILED: 'bg-red-100 text-red-800 border-red-200',
-  VIEW: 'bg-blue-100 text-blue-800 border-blue-200',
-  CREATE: 'bg-purple-100 text-purple-800 border-purple-200',
-  UPDATE: 'bg-amber-100 text-amber-800 border-amber-200',
-  DELETE: 'bg-red-100 text-red-800 border-red-200',
-  EXPORT: 'bg-indigo-100 text-indigo-800 border-indigo-200',
-  EMAIL_SENT: 'bg-cyan-100 text-cyan-800 border-cyan-200',
-  SMS_SENT: 'bg-teal-100 text-teal-800 border-teal-200',
-  PASSWORD_CHANGE: 'bg-orange-100 text-orange-800 border-orange-200',
-  PASSWORD_RESET: 'bg-orange-100 text-orange-800 border-orange-200',
-  MFA_CODE_SENT: 'bg-violet-100 text-violet-800 border-violet-200',
-  MFA_VERIFIED: 'bg-green-100 text-green-800 border-green-200',
-  MFA_FAILED: 'bg-red-100 text-red-800 border-red-200',
-  ROLE_CHANGE: 'bg-pink-100 text-pink-800 border-pink-200',
+  LOGIN: 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800',
+  LOGOUT: 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 border-gray-200 dark:border-gray-700',
+  LOGIN_FAILED: 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800',
+  VIEW: 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800',
+  CREATE: 'bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 border-purple-200 dark:border-purple-800',
+  UPDATE: 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800',
+  DELETE: 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800',
+  EXPORT: 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800',
+  EMAIL_SENT: 'bg-cyan-50 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-400 border-cyan-200 dark:border-cyan-800',
+  SMS_SENT: 'bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400 border-teal-200 dark:border-teal-800',
+  PASSWORD_CHANGE: 'bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-800',
+  PASSWORD_RESET: 'bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-800',
+  MFA_CODE_SENT: 'bg-violet-50 dark:bg-violet-900/30 text-violet-700 dark:text-violet-400 border-violet-200 dark:border-violet-800',
+  MFA_VERIFIED: 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800',
+  MFA_FAILED: 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800',
+  ROLE_CHANGE: 'bg-pink-50 dark:bg-pink-900/30 text-pink-700 dark:text-pink-400 border-pink-200 dark:border-pink-800',
 }
 
 const RESOURCE_ICONS: Record<string, string> = {
@@ -265,7 +265,7 @@ export default function AuditLogs() {
   }
 
   return (
-    <div className="flex h-screen bg-[#F9FAFB]">
+    <div className="flex h-screen bg-background">
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header />
@@ -273,11 +273,11 @@ export default function AuditLogs() {
           {/* Header */}
           <div className="flex items-start justify-between">
             <div>
-              <h1 className="text-3xl font-semibold text-[#1F2937] mb-2 flex items-center gap-3">
+              <h1 className="text-3xl font-semibold text-foreground mb-2 flex items-center gap-3">
                 <Shield className="h-8 w-8 text-[#4FA59C]" />
                 Audit Logs
               </h1>
-              <p className="text-[#6B7280] text-base">
+              <p className="text-muted-foreground text-base">
                 HIPAA-compliant audit trail for PHI access and system events
               </p>
             </div>
@@ -288,7 +288,7 @@ export default function AuditLogs() {
                   fetchStats()
                 }}
                 variant="outline"
-                className="rounded-full px-6 border-[#E5E7EB] text-[#4B5563] hover:bg-[#F3F4F6] transition-all"
+                className="rounded-full px-6 border-border text-foreground hover:bg-muted transition-all"
               >
                 <RefreshCw className="mr-2 h-4 w-4" />
                 Refresh
@@ -306,61 +306,61 @@ export default function AuditLogs() {
           {/* Stats Cards */}
           {stats && (
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <Card className="border-[#E5E7EB] shadow-sm">
+              <Card className="border-border shadow-sm">
                 <CardContent className="p-5">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-[#6B7280] mb-1">Total Events</p>
-                      <p className="text-2xl font-bold text-[#1F2937]">
+                      <p className="text-sm text-muted-foreground mb-1">Total Events</p>
+                      <p className="text-2xl font-bold text-foreground">
                         {stats.totalLogs.toLocaleString()}
                       </p>
                     </div>
-                    <div className="p-3 bg-[#F0FDF4] rounded-xl">
+                    <div className="p-3 bg-green-50 dark:bg-green-900/30 rounded-xl">
                       <Activity className="h-6 w-6 text-[#4FA59C]" />
                     </div>
                   </div>
                 </CardContent>
               </Card>
-              <Card className="border-[#E5E7EB] shadow-sm">
+              <Card className="border-border shadow-sm">
                 <CardContent className="p-5">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-[#6B7280] mb-1">Last 30 Days</p>
-                      <p className="text-2xl font-bold text-[#1F2937]">
+                      <p className="text-sm text-muted-foreground mb-1">Last 30 Days</p>
+                      <p className="text-2xl font-bold text-foreground">
                         {stats.last30DaysLogs.toLocaleString()}
                       </p>
                     </div>
-                    <div className="p-3 bg-[#EFF6FF] rounded-xl">
+                    <div className="p-3 bg-blue-50 dark:bg-blue-900/30 rounded-xl">
                       <Calendar className="h-6 w-6 text-[#3B82F6]" />
                     </div>
                   </div>
                 </CardContent>
               </Card>
-              <Card className="border-[#E5E7EB] shadow-sm">
+              <Card className="border-border shadow-sm">
                 <CardContent className="p-5">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-[#6B7280] mb-1">PHI Accesses</p>
-                      <p className="text-2xl font-bold text-[#1F2937]">
+                      <p className="text-sm text-muted-foreground mb-1">PHI Accesses</p>
+                      <p className="text-2xl font-bold text-foreground">
                         {stats.phiAccesses.toLocaleString()}
                       </p>
                     </div>
-                    <div className="p-3 bg-[#F5F3FF] rounded-xl">
+                    <div className="p-3 bg-purple-50 dark:bg-purple-900/30 rounded-xl">
                       <Eye className="h-6 w-6 text-[#8B5CF6]" />
                     </div>
                   </div>
                 </CardContent>
               </Card>
-              <Card className="border-[#E5E7EB] shadow-sm">
+              <Card className="border-border shadow-sm">
                 <CardContent className="p-5">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-[#6B7280] mb-1">Failed Logins</p>
-                      <p className="text-2xl font-bold text-[#1F2937]">
+                      <p className="text-sm text-muted-foreground mb-1">Failed Logins</p>
+                      <p className="text-2xl font-bold text-foreground">
                         {stats.failedLogins.toLocaleString()}
                       </p>
                     </div>
-                    <div className="p-3 bg-[#FEF2F2] rounded-xl">
+                    <div className="p-3 bg-red-50 dark:bg-red-900/30 rounded-xl">
                       <AlertTriangle className="h-6 w-6 text-[#EF4444]" />
                     </div>
                   </div>
@@ -370,23 +370,23 @@ export default function AuditLogs() {
           )}
 
           {/* Search and Filters */}
-          <Card className="border-[#E5E7EB] shadow-sm">
+          <Card className="border-border shadow-sm">
             <CardContent className="p-5">
               <div className="flex flex-col gap-4">
                 <div className="flex items-center gap-4">
                   <div className="relative flex-1">
-                    <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[#9CA3AF]" />
+                    <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                       placeholder="Search by email, resource ID, or IP address..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-11 rounded-xl border-[#E5E7EB]"
+                      className="pl-11 rounded-xl border-input"
                     />
                   </div>
                   <Button
                     onClick={() => setShowFilters(!showFilters)}
                     variant="outline"
-                    className={`rounded-xl border-[#E5E7EB] ${showFilters ? 'bg-[#4FA59C] text-white' : ''}`}
+                    className={`rounded-xl border-border ${showFilters ? 'bg-[#4FA59C] text-white border-[#4FA59C]' : ''}`}
                   >
                     <Filter className="h-4 w-4 mr-2" />
                     Filters
@@ -395,7 +395,7 @@ export default function AuditLogs() {
                     <Button
                       onClick={resetFilters}
                       variant="ghost"
-                      className="text-[#EF4444] hover:bg-[#FEF2F2] rounded-xl"
+                      className="text-destructive hover:bg-destructive/10 rounded-xl"
                     >
                       Clear Filters
                     </Button>
@@ -403,13 +403,13 @@ export default function AuditLogs() {
                 </div>
 
                 {showFilters && (
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4 pt-4 border-t border-[#E5E7EB]">
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4 pt-4 border-t border-border">
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-[#4B5563]">Action</label>
+                      <label className="text-sm font-medium text-foreground">Action</label>
                       <select
                         value={selectedAction}
                         onChange={(e) => setSelectedAction(e.target.value)}
-                        className="w-full rounded-xl border border-[#E5E7EB] bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4FA59C]"
+                        className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[#4FA59C]"
                       >
                         <option value="">All Actions</option>
                         {actions.map((action) => (
@@ -420,11 +420,11 @@ export default function AuditLogs() {
                       </select>
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-[#4B5563]">Resource Type</label>
+                      <label className="text-sm font-medium text-foreground">Resource Type</label>
                       <select
                         value={selectedResourceType}
                         onChange={(e) => setSelectedResourceType(e.target.value)}
-                        className="w-full rounded-xl border border-[#E5E7EB] bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4FA59C]"
+                        className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[#4FA59C]"
                       >
                         <option value="">All Types</option>
                         {resourceTypes.map((type) => (
@@ -435,11 +435,11 @@ export default function AuditLogs() {
                       </select>
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-[#4B5563]">Status</label>
+                      <label className="text-sm font-medium text-foreground">Status</label>
                       <select
                         value={selectedSuccess}
                         onChange={(e) => setSelectedSuccess(e.target.value)}
-                        className="w-full rounded-xl border border-[#E5E7EB] bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4FA59C]"
+                        className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[#4FA59C]"
                       >
                         <option value="">All</option>
                         <option value="true">Success</option>
@@ -447,21 +447,21 @@ export default function AuditLogs() {
                       </select>
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-[#4B5563]">Start Date</label>
+                      <label className="text-sm font-medium text-foreground">Start Date</label>
                       <Input
                         type="date"
                         value={startDate}
                         onChange={(e) => setStartDate(e.target.value)}
-                        className="rounded-xl border-[#E5E7EB]"
+                        className="rounded-xl border-input"
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-[#4B5563]">End Date</label>
+                      <label className="text-sm font-medium text-foreground">End Date</label>
                       <Input
                         type="date"
                         value={endDate}
                         onChange={(e) => setEndDate(e.target.value)}
-                        className="rounded-xl border-[#E5E7EB]"
+                        className="rounded-xl border-input"
                       />
                     </div>
                   </div>
@@ -471,11 +471,11 @@ export default function AuditLogs() {
           </Card>
 
           {/* Logs Table */}
-          <Card className="border-[#E5E7EB] shadow-sm">
+          <Card className="border-border shadow-sm">
             <CardHeader className="pb-0">
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle className="text-lg text-[#1F2937]">Event Log</CardTitle>
+                  <CardTitle className="text-lg text-foreground">Event Log</CardTitle>
                   <CardDescription>
                     {pagination.total.toLocaleString()} total events
                   </CardDescription>
@@ -488,7 +488,7 @@ export default function AuditLogs() {
                   <Loader2 className="h-8 w-8 animate-spin text-[#4FA59C]" />
                 </div>
               ) : logs.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 text-[#9CA3AF]">
+                <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
                   <Shield className="h-12 w-12 mb-4" />
                   <p className="text-lg font-medium">No audit logs found</p>
                   <p className="text-sm mt-2">Try adjusting your filters</p>
@@ -496,61 +496,61 @@ export default function AuditLogs() {
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[900px]">
-                    <thead className="bg-[#F9FAFB] border-y border-[#E5E7EB]">
+                    <thead className="bg-muted/50 border-y border-border">
                       <tr>
-                        <th className="text-left py-3 px-5 text-xs font-semibold text-[#6B7280] uppercase tracking-wider">
+                        <th className="text-left py-3 px-5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                           Timestamp
                         </th>
-                        <th className="text-left py-3 px-5 text-xs font-semibold text-[#6B7280] uppercase tracking-wider">
+                        <th className="text-left py-3 px-5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                           User
                         </th>
-                        <th className="text-left py-3 px-5 text-xs font-semibold text-[#6B7280] uppercase tracking-wider">
+                        <th className="text-left py-3 px-5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                           Action
                         </th>
-                        <th className="text-left py-3 px-5 text-xs font-semibold text-[#6B7280] uppercase tracking-wider">
+                        <th className="text-left py-3 px-5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                           Resource
                         </th>
-                        <th className="text-left py-3 px-5 text-xs font-semibold text-[#6B7280] uppercase tracking-wider">
+                        <th className="text-left py-3 px-5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                           IP Address
                         </th>
-                        <th className="text-left py-3 px-5 text-xs font-semibold text-[#6B7280] uppercase tracking-wider">
+                        <th className="text-left py-3 px-5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                           Status
                         </th>
-                        <th className="text-left py-3 px-5 text-xs font-semibold text-[#6B7280] uppercase tracking-wider">
+                        <th className="text-left py-3 px-5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                           Details
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-[#E5E7EB]">
+                    <tbody className="divide-y divide-border">
                       {logs.map((log) => (
                         <tr
                           key={log.id}
                           className={`transition-colors cursor-pointer ${log.isSuperAdmin
-                            ? 'bg-red-100 hover:bg-red-200 border-l-4 border-red-600'
-                            : 'hover:bg-[#F9FAFB]'
+                            ? 'bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 border-l-4 border-red-600 dark:border-red-500'
+                            : 'hover:bg-muted/50'
                             }`}
                           onClick={() => setSelectedLog(log)}
                         >
                           <td className="py-3 px-5 whitespace-nowrap">
-                            <span className="text-sm text-[#4B5563]">
+                            <span className="text-sm text-foreground">
                               {formatDate(log.createdAt)}
                             </span>
                           </td>
                           <td className="py-3 px-5">
                             <div className="flex flex-col">
-                              <span className="text-sm font-medium text-[#1F2937]">
+                              <span className="text-sm font-medium text-foreground">
                                 {log.user
                                   ? `${log.user.firstName} ${log.user.lastName}`
                                   : log.userEmail || 'Unknown'}
                               </span>
                               {log.userEmail && (
-                                <span className="text-xs text-[#6B7280]">{log.userEmail}</span>
+                                <span className="text-xs text-muted-foreground">{log.userEmail}</span>
                               )}
                             </div>
                           </td>
                           <td className="py-3 px-5">
                             <span
-                              className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${ACTION_COLORS[log.action] || 'bg-gray-100 text-gray-800 border-gray-200'
+                              className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${ACTION_COLORS[log.action] || 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 border-gray-200 dark:border-gray-700'
                                 }`}
                             >
                               {log.action.replace(/_/g, ' ')}
@@ -562,9 +562,9 @@ export default function AuditLogs() {
                                 {RESOURCE_ICONS[log.resourceType] || '📄'}
                               </span>
                               <div className="flex flex-col">
-                                <span className="text-sm text-[#1F2937]">{log.resourceType}</span>
+                                <span className="text-sm text-foreground">{log.resourceType}</span>
                                 {log.resourceId && (
-                                  <span className="text-xs text-[#6B7280] font-mono truncate max-w-[150px]">
+                                  <span className="text-xs text-muted-foreground font-mono truncate max-w-[150px]">
                                     {log.resourceId}
                                   </span>
                                 )}
@@ -572,18 +572,18 @@ export default function AuditLogs() {
                             </div>
                           </td>
                           <td className="py-3 px-5">
-                            <span className="text-sm text-[#6B7280] font-mono">
+                            <span className="text-sm text-muted-foreground font-mono">
                               {log.ipAddress || '—'}
                             </span>
                           </td>
                           <td className="py-3 px-5">
                             {log.success ? (
-                              <span className="inline-flex items-center gap-1 text-green-700 text-sm">
+                              <span className="inline-flex items-center gap-1 text-green-700 dark:text-green-400 text-sm">
                                 <CheckCircle className="h-4 w-4" />
                                 Success
                               </span>
                             ) : (
-                              <span className="inline-flex items-center gap-1 text-red-700 text-sm">
+                              <span className="inline-flex items-center gap-1 text-red-700 dark:text-red-400 text-sm">
                                 <XCircle className="h-4 w-4" />
                                 Failed
                               </span>
@@ -593,14 +593,14 @@ export default function AuditLogs() {
                             {log.details && Object.keys(log.details).length > 0 ? (
                               <div className="flex items-center gap-2">
                                 {log.details.templateName && (
-                                  <span className="text-sm text-[#374151] max-w-[200px] truncate" title={log.details.templateName}>
+                                  <span className="text-sm text-foreground max-w-[200px] truncate" title={log.details.templateName}>
                                     {log.details.templateName}
                                   </span>
                                 )}
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  className="text-[#4FA59C] hover:bg-[#F0FDF4] rounded-lg"
+                                  className="text-[#4FA59C] hover:bg-green-50 dark:hover:bg-green-900/30 rounded-lg"
                                   onClick={(e) => {
                                     e.stopPropagation()
                                     setSelectedLog(log)
@@ -610,7 +610,7 @@ export default function AuditLogs() {
                                 </Button>
                               </div>
                             ) : (
-                              <span className="text-[#9CA3AF]">—</span>
+                              <span className="text-muted-foreground">—</span>
                             )}
                           </td>
                         </tr>
@@ -622,8 +622,8 @@ export default function AuditLogs() {
 
               {/* Pagination */}
               {pagination.totalPages > 1 && (
-                <div className="flex items-center justify-between px-5 py-4 border-t border-[#E5E7EB] bg-[#F9FAFB]">
-                  <p className="text-sm text-[#6B7280]">
+                <div className="flex items-center justify-between px-5 py-4 border-t border-border bg-muted/50">
+                  <p className="text-sm text-muted-foreground">
                     Showing {((pagination.page - 1) * pagination.limit) + 1} to{" "}
                     {Math.min(pagination.page * pagination.limit, pagination.total)} of{" "}
                     {pagination.total.toLocaleString()} results
@@ -638,7 +638,7 @@ export default function AuditLogs() {
                     >
                       <ChevronLeft className="h-4 w-4" />
                     </Button>
-                    <span className="text-sm text-[#4B5563]">
+                    <span className="text-sm text-foreground">
                       Page {pagination.page} of {pagination.totalPages}
                     </span>
                     <Button
@@ -666,19 +666,19 @@ export default function AuditLogs() {
         >
           <div
             className={`w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl ${selectedLog.isSuperAdmin
-              ? 'bg-red-50 border-2 border-red-500'
-              : 'bg-white border border-[#E5E7EB]'
+              ? 'bg-red-50 dark:bg-red-900/30 border-2 border-red-500 dark:border-red-600'
+              : 'bg-card border border-border'
               }`}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-6 space-y-6">
-              <div className={`flex items-center justify-between pb-4 border-b ${selectedLog.isSuperAdmin ? 'border-red-300' : 'border-[#E5E7EB]'
+              <div className={`flex items-center justify-between pb-4 border-b ${selectedLog.isSuperAdmin ? 'border-red-300 dark:border-red-700' : 'border-border'
                 }`}>
-                <h2 className={`text-xl font-semibold ${selectedLog.isSuperAdmin ? 'text-red-800' : 'text-[#1F2937]'
+                <h2 className={`text-xl font-semibold ${selectedLog.isSuperAdmin ? 'text-red-800 dark:text-red-300' : 'text-foreground'
                   }`}>Audit Log Details</h2>
                 <button
                   onClick={() => setSelectedLog(null)}
-                  className="rounded-full px-4 py-2 border border-[#E5E7EB] text-[#6B7280] hover:bg-[#F3F4F6] transition-all text-sm font-medium"
+                  className="rounded-full px-4 py-2 border border-input text-muted-foreground hover:bg-muted transition-all text-sm font-medium"
                 >
                   Close
                 </button>
@@ -686,64 +686,64 @@ export default function AuditLogs() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <p className="text-xs font-medium text-[#6B7280] uppercase">Timestamp</p>
-                  <p className="text-sm text-[#1F2937]">{formatDate(selectedLog.createdAt)}</p>
+                  <p className="text-xs font-medium text-muted-foreground uppercase">Timestamp</p>
+                  <p className="text-sm text-foreground">{formatDate(selectedLog.createdAt)}</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs font-medium text-[#6B7280] uppercase">Status</p>
+                  <p className="text-xs font-medium text-muted-foreground uppercase">Status</p>
                   <p className="text-sm">
                     {selectedLog.success ? (
-                      <span className="inline-flex items-center gap-1 text-green-700">
+                      <span className="inline-flex items-center gap-1 text-green-700 dark:text-green-400">
                         <CheckCircle className="h-4 w-4" /> Success
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 text-red-700">
+                      <span className="inline-flex items-center gap-1 text-red-700 dark:text-red-400">
                         <XCircle className="h-4 w-4" /> Failed
                       </span>
                     )}
                   </p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs font-medium text-[#6B7280] uppercase">User</p>
-                  <p className="text-sm text-[#1F2937]">
+                  <p className="text-xs font-medium text-muted-foreground uppercase">User</p>
+                  <p className="text-sm text-foreground">
                     {selectedLog.user
                       ? `${selectedLog.user.firstName} ${selectedLog.user.lastName}`
                       : 'Unknown'}
                   </p>
                   {selectedLog.userEmail && (
-                    <p className="text-xs text-[#6B7280]">{selectedLog.userEmail}</p>
+                    <p className="text-xs text-muted-foreground">{selectedLog.userEmail}</p>
                   )}
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs font-medium text-[#6B7280] uppercase">Action</p>
+                  <p className="text-xs font-medium text-muted-foreground uppercase">Action</p>
                   <span
-                    className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${ACTION_COLORS[selectedLog.action] || 'bg-gray-100 text-gray-800 border-gray-200'
+                    className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${ACTION_COLORS[selectedLog.action] || 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 border-gray-200 dark:border-gray-700'
                       }`}
                   >
                     {selectedLog.action.replace(/_/g, ' ')}
                   </span>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs font-medium text-[#6B7280] uppercase">Resource Type</p>
-                  <p className="text-sm text-[#1F2937]">
+                  <p className="text-xs font-medium text-muted-foreground uppercase">Resource Type</p>
+                  <p className="text-sm text-foreground">
                     {RESOURCE_ICONS[selectedLog.resourceType] || '📄'} {selectedLog.resourceType}
                   </p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs font-medium text-[#6B7280] uppercase">Resource ID</p>
-                  <p className="text-sm text-[#1F2937] font-mono break-all">
+                  <p className="text-xs font-medium text-muted-foreground uppercase">Resource ID</p>
+                  <p className="text-sm text-foreground font-mono break-all">
                     {selectedLog.resourceId || '—'}
                   </p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs font-medium text-[#6B7280] uppercase">IP Address</p>
-                  <p className="text-sm text-[#1F2937] font-mono">
+                  <p className="text-xs font-medium text-muted-foreground uppercase">IP Address</p>
+                  <p className="text-sm text-foreground font-mono">
                     {selectedLog.ipAddress || '—'}
                   </p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs font-medium text-[#6B7280] uppercase">Clinic ID</p>
-                  <p className="text-sm text-[#1F2937] font-mono break-all">
+                  <p className="text-xs font-medium text-muted-foreground uppercase">Clinic ID</p>
+                  <p className="text-sm text-foreground font-mono break-all">
                     {selectedLog.clinicId || '—'}
                   </p>
                 </div>
@@ -751,8 +751,8 @@ export default function AuditLogs() {
 
               {selectedLog.userAgent && (
                 <div className="space-y-1">
-                  <p className="text-xs font-medium text-[#6B7280] uppercase">User Agent</p>
-                  <p className="text-xs text-[#4B5563] bg-[#F9FAFB] p-3 rounded-lg font-mono break-all">
+                  <p className="text-xs font-medium text-muted-foreground uppercase">User Agent</p>
+                  <p className="text-xs text-foreground bg-muted/50 p-3 rounded-lg font-mono break-all">
                     {selectedLog.userAgent}
                   </p>
                 </div>
@@ -760,8 +760,8 @@ export default function AuditLogs() {
 
               {selectedLog.errorMessage && (
                 <div className="space-y-1">
-                  <p className="text-xs font-medium text-[#6B7280] uppercase">Error Message</p>
-                  <p className="text-sm text-red-700 bg-red-50 p-3 rounded-lg">
+                  <p className="text-xs font-medium text-muted-foreground uppercase">Error Message</p>
+                  <p className="text-sm text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/30 p-3 rounded-lg">
                     {selectedLog.errorMessage}
                   </p>
                 </div>
@@ -769,8 +769,8 @@ export default function AuditLogs() {
 
               {selectedLog.details && Object.keys(selectedLog.details).length > 0 && (
                 <div className="space-y-2">
-                  <p className="text-xs font-medium text-[#6B7280] uppercase">Additional Details</p>
-                  <pre className="text-xs text-[#4B5563] bg-[#F9FAFB] p-4 rounded-lg overflow-x-auto">
+                  <p className="text-xs font-medium text-muted-foreground uppercase">Additional Details</p>
+                  <pre className="text-xs text-foreground bg-muted/50 p-4 rounded-lg overflow-x-auto">
                     {JSON.stringify(selectedLog.details, null, 2)}
                   </pre>
                 </div>

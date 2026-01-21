@@ -511,7 +511,7 @@ export default function ClientManagement() {
   })
 
   return (
-    <div className="flex h-screen bg-[#F3F4F6]">
+    <div className="flex h-screen bg-background">
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header />
@@ -524,7 +524,7 @@ export default function ClientManagement() {
                   <CardTitle>Users</CardTitle>
                   <CardDescription>Select a user to manage</CardDescription>
                   <div className="relative mt-4">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[#9CA3AF]" />
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                       placeholder="Search users..."
                       value={searchTerm}
@@ -546,7 +546,7 @@ export default function ClientManagement() {
                           onClick={() => handleSelectUser(user)}
                           className={`w-full text-left p-3 rounded-lg transition-all ${selectedUser?.id === user.id
                             ? 'bg-[#4FA59C] text-white'
-                            : 'bg-[#F9FAFB] hover:bg-[#E5E7EB] text-[#1F2937]'
+                            : 'bg-muted/50 hover:bg-muted text-foreground'
                             }`}
                         >
                           <div className="flex items-center space-x-3">
@@ -565,13 +565,13 @@ export default function ClientManagement() {
                               </p>
                               <p className={`text-xs truncate ${selectedUser?.id === user.id
                                 ? 'text-white/80'
-                                : 'text-[#9CA3AF]'
+                                : 'text-muted-foreground'
                                 }`}>
                                 {user.email}
                               </p>
                               <p className={`text-xs mt-1 ${selectedUser?.id === user.id
                                 ? 'text-white/70'
-                                : 'text-[#6B7280]'
+                                : 'text-muted-foreground'
                                 }`}>
                                 Role: {user.role}
                               </p>
@@ -580,7 +580,7 @@ export default function ClientManagement() {
                         </button>
                       ))}
                       {filteredUsers.length === 0 && (
-                        <p className="text-center text-[#9CA3AF] py-8">No users found</p>
+                        <p className="text-center text-muted-foreground py-8">No users found</p>
                       )}
                     </div>
                   )}
@@ -600,52 +600,52 @@ export default function ClientManagement() {
                     <div className="space-y-6">
                       {/* User Info */}
                       {loadingClinicData ? (
-                        <div className="bg-[#F9FAFB] rounded-lg p-4 border border-[#E5E7EB] animate-pulse">
-                          <div className="h-6 bg-gray-200 rounded w-1/3 mb-4"></div>
+                        <div className="bg-muted/50 rounded-lg p-4 border border-border animate-pulse">
+                          <div className="h-6 bg-muted rounded w-1/3 mb-4"></div>
                           <div className="grid grid-cols-2 gap-3 text-sm">
                             <div>
-                              <div className="h-4 bg-gray-200 rounded w-24 mb-1"></div>
-                              <div className="h-4 bg-gray-200 rounded w-32"></div>
+                              <div className="h-4 bg-muted rounded w-24 mb-1"></div>
+                              <div className="h-4 bg-muted rounded w-32"></div>
                             </div>
                             <div>
-                              <div className="h-4 bg-gray-200 rounded w-20 mb-1"></div>
-                              <div className="h-4 bg-gray-200 rounded w-40"></div>
+                              <div className="h-4 bg-muted rounded w-20 mb-1"></div>
+                              <div className="h-4 bg-muted rounded w-40"></div>
                             </div>
                             <div className="col-span-2 mt-2">
-                              <div className="h-4 bg-gray-200 rounded w-32 mb-3"></div>
+                              <div className="h-4 bg-muted rounded w-32 mb-3"></div>
                               <div className="space-y-2">
-                                <div className="h-4 bg-gray-200 rounded w-20"></div>
-                                <div className="h-4 bg-gray-200 rounded w-20"></div>
-                                <div className="h-4 bg-gray-200 rounded w-20"></div>
-                                <div className="h-4 bg-gray-200 rounded w-20"></div>
+                                <div className="h-4 bg-muted rounded w-20"></div>
+                                <div className="h-4 bg-muted rounded w-20"></div>
+                                <div className="h-4 bg-muted rounded w-20"></div>
+                                <div className="h-4 bg-muted rounded w-20"></div>
                               </div>
-                              <div className="h-8 bg-gray-200 rounded w-32 mt-4"></div>
+                              <div className="h-8 bg-muted rounded w-32 mt-4"></div>
                             </div>
                             <div>
-                              <div className="h-4 bg-gray-200 rounded w-28 mb-1"></div>
-                              <div className="h-4 bg-gray-200 rounded w-20"></div>
+                              <div className="h-4 bg-muted rounded w-28 mb-1"></div>
+                              <div className="h-4 bg-muted rounded w-20"></div>
                             </div>
                           </div>
-                          <div className="h-10 bg-gray-200 rounded w-full mt-4"></div>
+                          <div className="h-10 bg-muted rounded w-full mt-4"></div>
                         </div>
                       ) : (
-                        <div className="bg-[#F9FAFB] rounded-lg p-4 border border-[#E5E7EB]">
-                          <h3 className="font-semibold text-[#1F2937] mb-2">User Information</h3>
+                        <div className="bg-muted/50 rounded-lg p-4 border border-border">
+                          <h3 className="font-semibold text-foreground mb-2">User Information</h3>
                           <div className="grid grid-cols-2 gap-3 text-sm">
                             <div>
-                              <span className="text-[#6B7280]">Name:</span>
-                              <span className="ml-2 text-[#1F2937] font-medium">
+                              <span className="text-muted-foreground">Name:</span>
+                              <span className="ml-2 text-foreground font-medium">
                                 {selectedUser.firstName} {selectedUser.lastName}
                               </span>
                             </div>
                             <div>
-                              <span className="text-[#6B7280]">Email:</span>
-                              <span className="ml-2 text-[#1F2937] font-medium">
+                              <span className="text-muted-foreground">Email:</span>
+                              <span className="ml-2 text-foreground font-medium">
                                 {selectedUser.email}
                               </span>
                             </div>
                           <div className="col-span-2">
-                            <label className="block text-[#6B7280] mb-2">Roles (select all that apply):</label>
+                            <label className="block text-muted-foreground mb-2">Roles (select all that apply):</label>
                             <div className="space-y-2">
                               <label className="flex items-center space-x-3 cursor-pointer">
                                 <input
@@ -653,9 +653,9 @@ export default function ClientManagement() {
                                   checked={userRolesData.patient}
                                   onChange={(e) => setUserRolesData({ ...userRolesData, patient: e.target.checked })}
                                   disabled={updatingRole}
-                                  className="w-4 h-4 text-[#4FA59C] border-[#D1D5DB] rounded focus:ring-[#4FA59C]"
+                                  className="w-4 h-4 text-[#4FA59C] border-input rounded focus:ring-[#4FA59C] bg-background"
                                 />
-                                <span className="text-sm text-[#374151]">Patient</span>
+                                <span className="text-sm text-foreground">Patient</span>
                               </label>
                               <label className="flex items-center space-x-3 cursor-pointer">
                                 <input
@@ -663,9 +663,9 @@ export default function ClientManagement() {
                                   checked={userRolesData.doctor}
                                   onChange={(e) => setUserRolesData({ ...userRolesData, doctor: e.target.checked })}
                                   disabled={updatingRole}
-                                  className="w-4 h-4 text-[#4FA59C] border-[#D1D5DB] rounded focus:ring-[#4FA59C]"
+                                  className="w-4 h-4 text-[#4FA59C] border-input rounded focus:ring-[#4FA59C] bg-background"
                                 />
-                                <span className="text-sm text-[#374151]">Doctor</span>
+                                <span className="text-sm text-foreground">Doctor</span>
                               </label>
                               <label className="flex items-center space-x-3 cursor-pointer">
                                 <input
@@ -673,9 +673,9 @@ export default function ClientManagement() {
                                   checked={userRolesData.admin}
                                   onChange={(e) => setUserRolesData({ ...userRolesData, admin: e.target.checked })}
                                   disabled={updatingRole}
-                                  className="w-4 h-4 text-[#4FA59C] border-[#D1D5DB] rounded focus:ring-[#4FA59C]"
+                                  className="w-4 h-4 text-[#4FA59C] border-input rounded focus:ring-[#4FA59C] bg-background"
                                 />
-                                <span className="text-sm text-[#374151]">Admin</span>
+                                <span className="text-sm text-foreground">Admin</span>
                               </label>
                               <label className="flex items-center space-x-3 cursor-pointer">
                                 <input
@@ -683,23 +683,23 @@ export default function ClientManagement() {
                                   checked={userRolesData.brand}
                                   onChange={(e) => setUserRolesData({ ...userRolesData, brand: e.target.checked })}
                                   disabled={updatingRole}
-                                  className="w-4 h-4 text-[#4FA59C] border-[#D1D5DB] rounded focus:ring-[#4FA59C]"
+                                  className="w-4 h-4 text-[#4FA59C] border-input rounded focus:ring-[#4FA59C] bg-background"
                                 />
-                                <span className="text-sm text-[#374151]">Brand</span>
+                                <span className="text-sm text-foreground">Brand</span>
                               </label>
                               {/* Super Admin - Special styling to indicate elevated privileges */}
-                              <div className="mt-3 pt-3 border-t border-red-200">
+                              <div className="mt-3 pt-3 border-t border-red-200 dark:border-red-800">
                                 <label className="flex items-center space-x-3 cursor-pointer">
                                   <input
                                     type="checkbox"
                                     checked={userRolesData.superAdmin}
                                     onChange={(e) => setUserRolesData({ ...userRolesData, superAdmin: e.target.checked })}
                                     disabled={updatingRole}
-                                    className="w-4 h-4 text-red-600 border-red-300 rounded focus:ring-red-500"
+                                    className="w-4 h-4 text-red-600 dark:text-red-400 border-red-300 dark:border-red-700 rounded focus:ring-red-500 bg-background"
                                   />
-                                  <span className="text-sm font-semibold text-red-700">Super Admin</span>
+                                  <span className="text-sm font-semibold text-red-700 dark:text-red-400">Super Admin</span>
                                 </label>
-                                <p className="text-xs text-red-600 mt-1 ml-7">
+                                <p className="text-xs text-red-600 dark:text-red-400 mt-1 ml-7">
                                   Bypasses audit logging and 2FA requirements
                                 </p>
                               </div>
@@ -711,13 +711,13 @@ export default function ClientManagement() {
                             >
                               {updatingRole ? 'Updating...' : 'Update Roles'}
                             </Button>
-                            <p className="text-xs text-[#6B7280] mt-2">
+                            <p className="text-xs text-muted-foreground mt-2">
                               Users can have multiple roles. Changes take effect immediately.
                             </p>
                           </div>
                           <div>
-                            <span className="text-[#6B7280]">Business Type:</span>
-                            <span className="ml-2 text-[#1F2937] font-medium">
+                            <span className="text-muted-foreground">Business Type:</span>
+                            <span className="ml-2 text-foreground font-medium">
                               {selectedUser.businessType || 'N/A'}
                             </span>
                           </div>
@@ -742,7 +742,7 @@ export default function ClientManagement() {
                               </>
                             )}
                           </Button>
-                          <p className="text-xs text-[#6B7280] text-center">
+                          <p className="text-xs text-muted-foreground text-center">
                             Opens a new tab to view the portal as this user
                           </p>
                         </div>
@@ -752,66 +752,66 @@ export default function ClientManagement() {
                       {loadingClinicData ? (
                         <div className="space-y-6 animate-pulse">
                           {/* Skeleton for User Info */}
-                          <div className="bg-[#F9FAFB] rounded-lg p-4 border border-[#E5E7EB]">
-                            <div className="h-6 bg-gray-200 rounded w-1/3 mb-4"></div>
+                          <div className="bg-muted/50 rounded-lg p-4 border border-border">
+                            <div className="h-6 bg-muted rounded w-1/3 mb-4"></div>
                             <div className="space-y-3">
-                              <div className="h-4 bg-gray-200 rounded w-1/2"></div>
-                              <div className="h-4 bg-gray-200 rounded w-1/2"></div>
-                              <div className="h-4 bg-gray-200 rounded w-1/3"></div>
+                              <div className="h-4 bg-muted rounded w-1/2"></div>
+                              <div className="h-4 bg-muted rounded w-1/2"></div>
+                              <div className="h-4 bg-muted rounded w-1/3"></div>
                             </div>
                           </div>
                           {/* Skeleton for Subscription Details */}
-                          <div className="bg-[#F9FAFB] rounded-lg p-4 border border-[#E5E7EB]">
-                            <div className="h-6 bg-gray-200 rounded w-1/3 mb-4"></div>
+                          <div className="bg-muted/50 rounded-lg p-4 border border-border">
+                            <div className="h-6 bg-muted rounded w-1/3 mb-4"></div>
                             <div className="grid grid-cols-2 gap-3">
-                              <div className="h-4 bg-gray-200 rounded"></div>
-                              <div className="h-4 bg-gray-200 rounded"></div>
-                              <div className="h-4 bg-gray-200 rounded"></div>
-                              <div className="h-4 bg-gray-200 rounded"></div>
+                              <div className="h-4 bg-muted rounded"></div>
+                              <div className="h-4 bg-muted rounded"></div>
+                              <div className="h-4 bg-muted rounded"></div>
+                              <div className="h-4 bg-muted rounded"></div>
                             </div>
                           </div>
                           {/* Skeleton for Settings */}
                           <div className="space-y-4">
-                            <div className="h-6 bg-gray-200 rounded w-1/4"></div>
+                            <div className="h-6 bg-muted rounded w-1/4"></div>
                             <div className="space-y-4">
-                              <div className="h-10 bg-gray-200 rounded"></div>
-                              <div className="h-10 bg-gray-200 rounded w-3/4"></div>
-                              <div className="h-10 bg-gray-200 rounded w-2/3"></div>
-                              <div className="h-20 bg-gray-200 rounded"></div>
+                              <div className="h-10 bg-muted rounded"></div>
+                              <div className="h-10 bg-muted rounded w-3/4"></div>
+                              <div className="h-10 bg-muted rounded w-2/3"></div>
+                              <div className="h-20 bg-muted rounded"></div>
                             </div>
                           </div>
                         </div>
                       ) : selectedUser.brandSubscriptions && selectedUser.brandSubscriptions.length > 0 ? (
                         <>
                           {/* Subscription Info */}
-                          <div className="bg-[#F9FAFB] rounded-lg p-4 border border-[#E5E7EB]">
-                            <h3 className="font-semibold text-[#1F2937] mb-2">Subscription Details</h3>
+                          <div className="bg-muted/50 rounded-lg p-4 border border-border">
+                            <h3 className="font-semibold text-foreground mb-2">Subscription Details</h3>
                             <div className="grid grid-cols-2 gap-3 text-sm">
                               <div>
-                                <span className="text-[#6B7280]">Plan Type:</span>
-                                <span className="ml-2 text-[#1F2937] font-medium">
+                                <span className="text-muted-foreground">Plan Type:</span>
+                                <span className="ml-2 text-foreground font-medium">
                                   {selectedUser.brandSubscriptions[0].planType}
                                   {!selectedUser.brandSubscriptions[0].plan && (
-                                    <span className="ml-2 text-red-600 text-xs">⚠️ Plan not found</span>
+                                    <span className="ml-2 text-destructive text-xs">⚠️ Plan not found</span>
                                   )}
                                 </span>
                               </div>
                               <div>
-                                <span className="text-[#6B7280]">Status:</span>
-                                <span className="ml-2 text-[#1F2937] font-medium">
+                                <span className="text-muted-foreground">Status:</span>
+                                <span className="ml-2 text-foreground font-medium">
                                   {selectedUser.brandSubscriptions[0].status}
                                 </span>
                               </div>
                               <div>
-                                <span className="text-[#6B7280]">Monthly Price:</span>
-                                <span className="ml-2 text-[#1F2937] font-medium">
+                                <span className="text-muted-foreground">Monthly Price:</span>
+                                <span className="ml-2 text-foreground font-medium">
                                   ${selectedUser.brandSubscriptions[0].monthlyPrice}
                                 </span>
                               </div>
                               {selectedUser.brandSubscriptions[0].plan && (
                                 <div>
-                                  <span className="text-[#6B7280]">Plan Name:</span>
-                                  <span className="ml-2 text-[#1F2937] font-medium">
+                                  <span className="text-muted-foreground">Plan Name:</span>
+                                  <span className="ml-2 text-foreground font-medium">
                                     {selectedUser.brandSubscriptions[0].plan.name}
                                   </span>
                                 </div>
@@ -821,11 +821,11 @@ export default function ClientManagement() {
 
                           {/* Editable Settings */}
                           <div className="space-y-4">
-                            <h3 className="font-semibold text-[#1F2937]">Subscription Settings</h3>
+                            <h3 className="font-semibold text-foreground">Subscription Settings</h3>
 
                             {/* Plan Type Selector */}
                             <div>
-                              <label className="block text-sm font-medium text-[#374151] mb-2">
+                              <label className="block text-sm font-medium text-foreground mb-2">
                                 Subscription Plan Type
                               </label>
                               <select
@@ -834,7 +834,7 @@ export default function ClientManagement() {
                                   ...formData,
                                   planType: e.target.value
                                 })}
-                                className="w-full max-w-md px-3 py-2 border border-[#D1D5DB] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4FA59C] bg-white"
+                                className="w-full max-w-md px-3 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4FA59C] bg-background text-foreground"
                               >
                                 <option value="">Select a plan...</option>
                                 {availablePlans.map((plan) => (
@@ -843,12 +843,12 @@ export default function ClientManagement() {
                                   </option>
                                 ))}
                               </select>
-                              <p className="text-xs text-[#6B7280] mt-1">
+                              <p className="text-xs text-muted-foreground mt-1">
                                 Change the subscription plan type. This determines the default limits and features.
                               </p>
                               {selectedUser?.brandSubscriptions?.[0]?.planType &&
                                 !availablePlans.find(p => p.planType === selectedUser.brandSubscriptions![0].planType) && (
-                                  <p className="text-xs text-red-600 mt-1">
+                                  <p className="text-xs text-destructive mt-1">
                                     ⚠️ Current plan type "{selectedUser.brandSubscriptions[0].planType}" does not exist in available plans!
                                   </p>
                                 )}
@@ -856,7 +856,7 @@ export default function ClientManagement() {
 
                             {/* Products Changed Amount */}
                             <div>
-                              <label className="block text-sm font-medium text-[#374151] mb-2">
+                              <label className="block text-sm font-medium text-foreground mb-2">
                                 Products Changed Amount on Current Cycle
                               </label>
                               <Input
@@ -868,14 +868,14 @@ export default function ClientManagement() {
                                 })}
                                 className="max-w-xs"
                               />
-                              <p className="text-xs text-[#6B7280] mt-1">
+                              <p className="text-xs text-muted-foreground mt-1">
                                 Number of times products have been changed in the current billing cycle
                               </p>
                             </div>
 
                             {/* Custom Max Products */}
                             <div>
-                              <label className="block text-sm font-medium text-[#374151] mb-2">
+                              <label className="block text-sm font-medium text-foreground mb-2">
                                 Custom Max Products Override
                               </label>
                               <div className="flex items-center gap-3">
@@ -899,7 +899,7 @@ export default function ClientManagement() {
                                   </Button>
                                 )}
                               </div>
-                              <p className="text-xs text-[#6B7280] mt-1">
+                              <p className="text-xs text-muted-foreground mt-1">
                                 Override the max products from the subscription plan. Leave empty to use plan default. Use -1 for unlimited.
                               </p>
                               {selectedUser?.brandSubscriptions?.[0]?.plan && (
@@ -919,13 +919,13 @@ export default function ClientManagement() {
                                     ...formData,
                                     retriedProductSelectionForCurrentCycle: e.target.checked
                                   })}
-                                  className="w-4 h-4 text-[#4FA59C] border-[#D1D5DB] rounded focus:ring-[#4FA59C]"
+                                  className="w-4 h-4 text-[#4FA59C] border-input rounded focus:ring-[#4FA59C] bg-background"
                                 />
                                 <div>
-                                  <span className="text-sm font-medium text-[#374151]">
+                                  <span className="text-sm font-medium text-foreground">
                                     Retried Product Selection for Current Cycle
                                   </span>
-                                  <p className="text-xs text-[#6B7280]">
+                                  <p className="text-xs text-muted-foreground">
                                     Whether the user has retried product selection in the current cycle
                                   </p>
                                 </div>
@@ -942,13 +942,13 @@ export default function ClientManagement() {
                                     ...formData,
                                     tutorialFinished: e.target.checked
                                   })}
-                                  className="w-4 h-4 text-[#4FA59C] border-[#D1D5DB] rounded focus:ring-[#4FA59C]"
+                                  className="w-4 h-4 text-[#4FA59C] border-input rounded focus:ring-[#4FA59C] bg-background"
                                 />
                                 <div>
-                                  <span className="text-sm font-medium text-[#374151]">
+                                  <span className="text-sm font-medium text-foreground">
                                     Tutorial Finished
                                   </span>
-                                  <p className="text-xs text-[#6B7280]">
+                                  <p className="text-xs text-muted-foreground">
                                     Whether the user has completed the onboarding tutorial
                                   </p>
                                 </div>
@@ -956,9 +956,9 @@ export default function ClientManagement() {
                             </div>
 
                             {/* Custom Features Section */}
-                            <div className="space-y-4 pt-6 border-t border-[#E5E7EB]">
-                              <h3 className="font-semibold text-[#1F2937]">Custom Feature Overrides</h3>
-                              <p className="text-sm text-[#6B7280]">
+                            <div className="space-y-4 pt-6 border-t border-border">
+                              <h3 className="font-semibold text-foreground">Custom Feature Overrides</h3>
+                              <p className="text-sm text-muted-foreground">
                                 Enable or disable specific features for this user, regardless of their plan.
                               </p>
 
@@ -972,13 +972,13 @@ export default function ClientManagement() {
                                       ...customFeaturesData,
                                       canAddCustomProducts: e.target.checked
                                     })}
-                                    className="w-4 h-4 text-[#4FA59C] border-[#D1D5DB] rounded focus:ring-[#4FA59C]"
+                                    className="w-4 h-4 text-[#4FA59C] border-input rounded focus:ring-[#4FA59C] bg-background"
                                   />
                                   <div>
-                                    <span className="text-sm font-medium text-[#374151]">
+                                    <span className="text-sm font-medium text-foreground">
                                       Can Add Custom Products
                                     </span>
-                                    <p className="text-xs text-[#6B7280]">
+                                    <p className="text-xs text-muted-foreground">
                                       Allow this user to create custom products (normally restricted to Premium/Enterprise plans)
                                     </p>
                                   </div>
@@ -995,13 +995,13 @@ export default function ClientManagement() {
                                       ...customFeaturesData,
                                       hasAccessToAnalytics: e.target.checked
                                     })}
-                                    className="w-4 h-4 text-[#4FA59C] border-[#D1D5DB] rounded focus:ring-[#4FA59C]"
+                                    className="w-4 h-4 text-[#4FA59C] border-input rounded focus:ring-[#4FA59C] bg-background"
                                   />
                                   <div>
-                                    <span className="text-sm font-medium text-[#374151]">
+                                    <span className="text-sm font-medium text-foreground">
                                       Has Access To Analytics
                                     </span>
-                                    <p className="text-xs text-[#6B7280]">
+                                    <p className="text-xs text-muted-foreground">
                                       Allow this user to access the Analytics section
                                     </p>
                                   </div>
@@ -1018,13 +1018,13 @@ export default function ClientManagement() {
                                       ...customFeaturesData,
                                       canUploadCustomProductImages: e.target.checked
                                     })}
-                                    className="w-4 h-4 text-[#4FA59C] border-[#D1D5DB] rounded focus:ring-[#4FA59C]"
+                                    className="w-4 h-4 text-[#4FA59C] border-input rounded focus:ring-[#4FA59C] bg-background"
                                   />
                                   <div>
-                                    <span className="text-sm font-medium text-[#374151]">
+                                    <span className="text-sm font-medium text-foreground">
                                       Can Upload Custom Product Images
                                     </span>
-                                    <p className="text-xs text-[#6B7280]">
+                                    <p className="text-xs text-muted-foreground">
                                       Allow this user to upload custom images for products
                                     </p>
                                   </div>
@@ -1041,13 +1041,13 @@ export default function ClientManagement() {
                                       ...customFeaturesData,
                                       hasCustomPortal: e.target.checked
                                     })}
-                                    className="w-4 h-4 text-[#4FA59C] border-[#D1D5DB] rounded focus:ring-[#4FA59C]"
+                                    className="w-4 h-4 text-[#4FA59C] border-input rounded focus:ring-[#4FA59C] bg-background"
                                   />
                                   <div>
-                                    <span className="text-sm font-medium text-[#374151]">
+                                    <span className="text-sm font-medium text-foreground">
                                       Has Custom Portal
                                     </span>
-                                    <p className="text-xs text-[#6B7280]">
+                                    <p className="text-xs text-muted-foreground">
                                       Allow this user to customize their portal (normally restricted to Standard+ plans)
                                     </p>
                                   </div>
@@ -1064,13 +1064,13 @@ export default function ClientManagement() {
                                       ...customFeaturesData,
                                       hasPrograms: e.target.checked
                                     })}
-                                    className="w-4 h-4 text-[#4FA59C] border-[#D1D5DB] rounded focus:ring-[#4FA59C]"
+                                    className="w-4 h-4 text-[#4FA59C] border-input rounded focus:ring-[#4FA59C] bg-background"
                                   />
                                   <div>
-                                    <span className="text-sm font-medium text-[#374151]">
+                                    <span className="text-sm font-medium text-foreground">
                                       Has Programs
                                     </span>
-                                    <p className="text-xs text-[#6B7280]">
+                                    <p className="text-xs text-muted-foreground">
                                       Allow this user to access and manage Programs
                                     </p>
                                   </div>
@@ -1087,13 +1087,13 @@ export default function ClientManagement() {
                                       ...customFeaturesData,
                                       canCustomizeFormStructure: e.target.checked
                                     })}
-                                    className="w-4 h-4 text-[#4FA59C] border-[#D1D5DB] rounded focus:ring-[#4FA59C]"
+                                    className="w-4 h-4 text-[#4FA59C] border-input rounded focus:ring-[#4FA59C] bg-background"
                                   />
                                   <div>
-                                    <span className="text-sm font-medium text-[#374151]">
+                                    <span className="text-sm font-medium text-foreground">
                                       Can Customize Form Structure
                                     </span>
-                                    <p className="text-xs text-[#6B7280]">
+                                    <p className="text-xs text-muted-foreground">
                                       Allow this user to customize product form structures (add/edit form layouts)
                                     </p>
                                   </div>
@@ -1102,33 +1102,33 @@ export default function ClientManagement() {
                             </div>
 
                             {/* Patient Portal Dashboard Format */}
-                            <div className="space-y-4 pt-6 border-t border-[#E5E7EB]">
-                              <h3 className="font-semibold text-[#1F2937]">Patient Portal Dashboard Format</h3>
-                              <p className="text-sm text-[#6B7280]">
+                            <div className="space-y-4 pt-6 border-t border-border">
+                              <h3 className="font-semibold text-foreground">Patient Portal Dashboard Format</h3>
+                              <p className="text-sm text-muted-foreground">
                                 Choose the dashboard format for the patient portal. Changing this setting is strongly discouraged if there are existing Orders, Payments, or Prescriptions.
                               </p>
                               
                               <div>
-                                <label className="block text-sm font-medium text-[#374151] mb-2">
+                                <label className="block text-sm font-medium text-foreground mb-2">
                                   Dashboard Format
                                 </label>
                                 <select
                                   value={patientPortalDashboardFormat}
                                   onChange={(e) => setPatientPortalDashboardFormat(e.target.value)}
                                   disabled={saving || checkingData}
-                                  className="w-full max-w-md px-3 py-2 border border-[#D1D5DB] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4FA59C] bg-white"
+                                  className="w-full max-w-md px-3 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4FA59C] bg-background text-foreground"
                                 >
                                   <option value="fuse">Fuse Dashboard</option>
                                   <option value="md-integrations">MD Integrations</option>
                                 </select>
-                                <p className="text-xs text-[#6B7280] mt-1">
+                                <p className="text-xs text-muted-foreground mt-1">
                                   Fuse Dashboard: Internal messaging, treatments, and subscription management.
                                   <br />
                                   MD Integrations: Connects with external medical systems.
                                 </p>
                                 {clinicDataCheck?.hasData && (
-                                  <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                                    <p className="text-xs text-yellow-800">
+                                  <div className="mt-2 p-3 bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800 rounded-md">
+                                    <p className="text-xs text-yellow-800 dark:text-yellow-300">
                                       <strong>Warning:</strong> This brand has existing data:
                                       <br />
                                       • {clinicDataCheck.ordersCount} Orders
@@ -1145,7 +1145,7 @@ export default function ClientManagement() {
                             </div>
 
                             {/* Save Button */}
-                            <div className="flex justify-end pt-4 border-t border-[#E5E7EB]">
+                            <div className="flex justify-end pt-4 border-t border-border">
                               <Button
                                 onClick={() => handleSave()}
                                 disabled={saving}
@@ -1167,14 +1167,14 @@ export default function ClientManagement() {
                           </div>
                         </>
                       ) : (
-                        <div className="flex flex-col items-center justify-center py-12 text-[#9CA3AF]">
+                        <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                           <p className="text-lg font-medium">No Brand Subscription Found</p>
                           <p className="text-sm mt-2">This user doesn't have a brand subscription yet.</p>
                         </div>
                       )}
                     </div>
                   ) : (
-                    <div className="flex flex-col items-center justify-center py-12 text-[#9CA3AF]">
+                    <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                       <UserIcon className="h-12 w-12 mb-4" />
                       <p className="text-lg font-medium">No User Selected</p>
                       <p className="text-sm mt-2">Select a user from the list to view and edit their settings</p>
@@ -1190,15 +1190,15 @@ export default function ClientManagement() {
       {/* Warning Modal */}
       {showWarningModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 p-6">
+          <div className="bg-card rounded-lg shadow-xl max-w-2xl w-full mx-4 p-6">
             <div className="mb-4">
-              <h2 className="text-2xl font-bold text-red-600 mb-2">⚠️ WARNING: Critical Configuration Change</h2>
-              <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4">
-                <p className="text-lg font-semibold text-red-800 mb-2">
+              <h2 className="text-2xl font-bold text-red-600 dark:text-red-400 mb-2">⚠️ WARNING: Critical Configuration Change</h2>
+              <div className="bg-red-50 dark:bg-red-900/30 border-l-4 border-red-500 dark:border-red-800 p-4 mb-4">
+                <p className="text-lg font-semibold text-red-800 dark:text-red-300 mb-2">
                   You should NOT change the Patient Portal Dashboard Format if there are already Orders, Payments, or Prescriptions for this brand.
                 </p>
                 {clinicDataCheck && (
-                  <div className="text-sm text-red-700 space-y-1">
+                  <div className="text-sm text-red-700 dark:text-red-400 space-y-1">
                     <p><strong>Current Data:</strong></p>
                     <ul className="list-disc list-inside ml-2">
                       <li>{clinicDataCheck.ordersCount} Order(s)</li>
@@ -1208,8 +1208,8 @@ export default function ClientManagement() {
                   </div>
                 )}
               </div>
-              <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4 mb-4">
-                <p className="text-sm text-yellow-800">
+              <div className="bg-yellow-50 dark:bg-yellow-900/30 border-l-4 border-yellow-500 dark:border-yellow-800 p-4 mb-4">
+                <p className="text-sm text-yellow-800 dark:text-yellow-300">
                   <strong>Why this is risky:</strong> Changing the dashboard format after data has been created can cause:
                   <br />
                   • Data inconsistencies
@@ -1221,7 +1221,7 @@ export default function ClientManagement() {
                   • Potential data loss or corruption
                 </p>
               </div>
-              <p className="text-sm text-gray-700 mb-4">
+              <p className="text-sm text-foreground mb-4">
                 <strong>We strongly advise against this change.</strong> If you absolutely must proceed, ensure you have:
                 <br />
                 • Backed up all data
@@ -1235,14 +1235,14 @@ export default function ClientManagement() {
               <Button
                 onClick={handleCancelFormatChange}
                 disabled={saving}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                className="px-4 py-2 border border-border rounded-lg text-foreground hover:bg-muted"
               >
                 Cancel (Recommended)
               </Button>
               <Button
                 onClick={handleConfirmFormatChange}
                 disabled={saving}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+                className="px-4 py-2 bg-red-600 dark:bg-red-700 text-white rounded-lg hover:bg-red-700 dark:hover:bg-red-800 disabled:opacity-50"
               >
                 {saving ? 'Updating...' : 'Yes, I Understand the Risks - Proceed Anyway'}
               </Button>

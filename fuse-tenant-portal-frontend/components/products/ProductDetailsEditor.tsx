@@ -274,19 +274,19 @@ export function ProductDetailsEditor({ product, onUpdate }: ProductDetailsEditor
     }
 
     return (
-        <div className="bg-white rounded-2xl shadow-sm border border-[#E5E7EB] overflow-hidden mb-6">
-            <div className="p-6 pb-4 border-b border-[#E5E7EB]">
+        <div className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden mb-6">
+            <div className="p-6 pb-4 border-b border-border">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <div className="bg-[#F3F4F6] rounded-xl p-2">
+                        <div className="bg-muted rounded-xl p-2">
                             <Package className="h-5 w-5 text-[#4FA59C]" />
                         </div>
-                        <h2 className="text-xl font-semibold text-[#1F2937]">Product Details</h2>
+                        <h2 className="text-xl font-semibold text-foreground">Product Details</h2>
                     </div>
                     <div className="flex items-center gap-3">
                         <span className={`px-3 py-1 rounded-full text-xs font-medium border ${product.isActive
-                                ? 'bg-green-50 text-green-700 border-green-200'
-                                : 'bg-gray-100 text-gray-600 border-gray-200'
+                                ? 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800'
+                                : 'bg-muted text-muted-foreground border-border'
                             }`}>
                             {product.isActive ? 'Active' : 'Inactive'}
                         </span>
@@ -302,7 +302,7 @@ export function ProductDetailsEditor({ product, onUpdate }: ProductDetailsEditor
                                 <button
                                     onClick={handleCancel}
                                     disabled={saving}
-                                    className="px-4 py-2 rounded-full border border-[#E5E7EB] text-[#4B5563] hover:bg-[#F3F4F6] transition-all text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="px-4 py-2 rounded-full border border-border text-foreground hover:bg-muted transition-all text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     Cancel
                                 </button>
@@ -331,7 +331,7 @@ export function ProductDetailsEditor({ product, onUpdate }: ProductDetailsEditor
             <div className="p-6 space-y-5">
                 {/* Error Message */}
                 {error && (
-                    <div className="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-sm flex items-start gap-2 shadow-sm">
+                    <div className="p-4 rounded-2xl bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-sm flex items-start gap-2 shadow-sm">
                         <span className="font-semibold">Error:</span>
                         <span>{error}</span>
                     </div>
@@ -340,24 +340,24 @@ export function ProductDetailsEditor({ product, onUpdate }: ProductDetailsEditor
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     {/* Product Name */}
                     <div className="md:col-span-2">
-                        <label className="text-sm font-medium text-[#4B5563] mb-2 block">Product Name *</label>
+                        <label className="text-sm font-medium text-foreground mb-2 block">Product Name *</label>
                         {editing ? (
                             <input
                                 value={formData.name}
                                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                                 placeholder="e.g., Semaglutide 2.5mg"
-                                className="w-full px-4 py-2.5 rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] text-sm text-[#1F2937] focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all"
+                                className="w-full px-4 py-2.5 rounded-xl border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all"
                             />
                         ) : (
-                            <p className="text-[#1F2937] font-semibold">{product.name}</p>
+                            <p className="text-foreground font-semibold">{product.name}</p>
                         )}
                     </div>
 
                     {/* URL Slug */}
                     <div className="md:col-span-2">
-                        <label className="text-sm font-medium text-[#4B5563] mb-2 block">
+                        <label className="text-sm font-medium text-foreground mb-2 block">
                             URL Slug
-                            <span className="text-xs text-[#9CA3AF] ml-2">(used in preview URLs)</span>
+                            <span className="text-xs text-muted-foreground ml-2">(used in preview URLs)</span>
                         </label>
                         {editing ? (
                             <div className="space-y-2">
@@ -366,24 +366,24 @@ export function ProductDetailsEditor({ product, onUpdate }: ProductDetailsEditor
                                         value={formData.slug}
                                         onChange={(e) => setFormData({ ...formData, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-') })}
                                         placeholder="e.g., my-tirzepatide-10ml"
-                                        className="flex-1 px-4 py-2.5 rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] text-sm text-[#1F2937] font-mono focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all"
+                                        className="flex-1 px-4 py-2.5 rounded-xl border border-input bg-background text-sm text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all"
                                     />
                                     <button
                                         type="button"
                                         onClick={handleRegenerateSlug}
-                                        className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#E5E7EB] bg-white hover:bg-[#F9FAFB] text-[#4B5563] transition-all text-sm font-medium"
+                                        className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-border bg-card hover:bg-muted text-foreground transition-all text-sm font-medium"
                                         title="Generate slug from Product Name and Medication Size"
                                     >
                                         <RefreshCw className="h-4 w-4" />
                                         Regenerate
                                     </button>
                                 </div>
-                                <p className="text-xs text-[#9CA3AF]">
+                                <p className="text-xs text-muted-foreground">
                                     Auto-generated from Product Name and Medication Size. Click "Regenerate" to reset.
                                 </p>
                             </div>
                         ) : (
-                            <p className="text-[#6B7280] font-mono text-sm">{product.slug || "——"}</p>
+                            <p className="text-muted-foreground font-mono text-sm">{product.slug || "——"}</p>
                         )}
                     </div>
 
@@ -438,7 +438,7 @@ export function ProductDetailsEditor({ product, onUpdate }: ProductDetailsEditor
                                     type="button"
                                     onClick={() => fileInputRef.current?.click()}
                                     disabled={!features.canUploadCustomProductImages || uploadingImage || featuresLoading}
-                                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#E5E7EB] bg-white hover:bg-[#F9FAFB] text-[#4B5563] transition-all text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-border bg-card hover:bg-muted text-foreground transition-all text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {uploadingImage ? (
                                         <>
@@ -452,10 +452,10 @@ export function ProductDetailsEditor({ product, onUpdate }: ProductDetailsEditor
                                         </>
                                     )}
                                 </button>
-                                <p className="text-xs text-[#9CA3AF] mt-2">
+                                <p className="text-xs text-muted-foreground mt-2">
                                     JPG, PNG or WebP. Max 5MB.
                                     {!features.canUploadCustomProductImages && (
-                                        <span className="block text-[#F59E0B] mt-1">
+                                        <span className="block text-amber-600 dark:text-amber-400 mt-1">
                                             ⚠️ Upgrade to Premium or Enterprise to upload custom product images
                                         </span>
                                     )}
@@ -466,28 +466,28 @@ export function ProductDetailsEditor({ product, onUpdate }: ProductDetailsEditor
 
                     {/* Description */}
                     <div className="md:col-span-2">
-                        <label className="text-sm font-medium text-[#4B5563] mb-2 block">Description *</label>
+                        <label className="text-sm font-medium text-foreground mb-2 block">Description *</label>
                         {editing ? (
                             <textarea
                                 value={formData.description}
                                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                                 placeholder="Detailed product description..."
-                                className="w-full rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] px-4 py-2.5 text-sm text-[#1F2937] min-h-[100px] focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all resize-none"
+                                className="w-full rounded-xl border border-input bg-background px-4 py-2.5 text-sm text-foreground min-h-[100px] focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all resize-none"
                             />
                         ) : (
-                            <p className="text-[#6B7280]">{product.description}</p>
+                            <p className="text-muted-foreground">{product.description}</p>
                         )}
                     </div>
 
                     {/* Categories */}
                     <div>
-                        <label className="text-sm font-medium text-[#4B5563] mb-2 block">Categories</label>
+                        <label className="text-sm font-medium text-foreground mb-2 block">Categories</label>
                         {editing ? (
-                            <div className="space-y-2 rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] p-4">
+                            <div className="space-y-2 rounded-xl border border-border bg-muted/50 p-4">
                                 {CATEGORY_OPTIONS.filter((cat) => cat.value).map((cat) => {
                                     const isChecked = formData.categories.includes(cat.value)
                                     return (
-                                        <label key={cat.value} className="flex items-center gap-3 text-sm text-[#1F2937]">
+                                        <label key={cat.value} className="flex items-center gap-3 text-sm text-foreground">
                                             <input
                                                 type="checkbox"
                                                 checked={isChecked}
@@ -503,14 +503,14 @@ export function ProductDetailsEditor({ product, onUpdate }: ProductDetailsEditor
                                                         categories: Array.from(next),
                                                     })
                                                 }}
-                                                className="h-4 w-4 rounded border-[#D1D5DB] text-[#4FA59C] focus:ring-[#4FA59C]"
+                                                className="h-4 w-4 rounded border-input text-[#4FA59C] focus:ring-[#4FA59C] bg-background"
                                             />
                                             <span>{cat.label}</span>
                                         </label>
                                     )
                                 })}
                                 {formData.categories.length === 0 && (
-                                    <p className="text-xs text-[#9CA3AF]">Select at least one category if applicable.</p>
+                                    <p className="text-xs text-muted-foreground">Select at least one category if applicable.</p>
                                 )}
                             </div>
                         ) : (
@@ -522,14 +522,14 @@ export function ProductDetailsEditor({ product, onUpdate }: ProductDetailsEditor
                                             ? [product.category]
                                             : []
                                     if (categories.length === 0) {
-                                        return <span className="text-[#6B7280]">No Categories</span>
+                                        return <span className="text-muted-foreground">No Categories</span>
                                     }
                                     return categories.map((value) => {
                                         const option = CATEGORY_OPTIONS.find((opt) => opt.value === value)
                                         return (
                                             <span
                                                 key={value}
-                                                className="inline-flex items-center rounded-full bg-[#E0F2F1] text-[#196459] px-3 py-1 text-xs font-medium"
+                                                className="inline-flex items-center rounded-full bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400 px-3 py-1 text-xs font-medium"
                                             >
                                                 {option?.label || value}
                                             </span>
@@ -542,46 +542,46 @@ export function ProductDetailsEditor({ product, onUpdate }: ProductDetailsEditor
 
                     {/* Placeholder Sig */}
                     <div>
-                        <label className="text-sm font-medium text-[#4B5563] mb-2 block">Placeholder Sig *</label>
+                        <label className="text-sm font-medium text-foreground mb-2 block">Placeholder Sig *</label>
                         {editing ? (
                             <input
                                 value={formData.placeholderSig}
                                 onChange={(e) => setFormData({ ...formData, placeholderSig: e.target.value })}
                                 placeholder="e.g., 2.5mg/0.5ml"
-                                className="w-full px-4 py-2.5 rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] text-sm text-[#1F2937] focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all"
+                                className="w-full px-4 py-2.5 rounded-xl border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all"
                             />
                         ) : (
-                            <p className="text-[#1F2937]">{product.placeholderSig || "——"}</p>
+                            <p className="text-foreground">{product.placeholderSig || "——"}</p>
                         )}
                     </div>
 
                     {/* Medication Size */}
                     <div className="md:col-span-2">
-                        <label className="text-sm font-medium text-[#4B5563] mb-2 block">Medication Size</label>
+                        <label className="text-sm font-medium text-foreground mb-2 block">Medication Size</label>
                         {editing ? (
                             <input
                                 value={formData.medicationSize}
                                 onChange={(e) => setFormData({ ...formData, medicationSize: e.target.value })}
                                 placeholder="e.g., 10ml vial, 30 tablets"
-                                className="w-full px-4 py-2.5 rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] text-sm text-[#1F2937] focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all"
+                                className="w-full px-4 py-2.5 rounded-xl border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all"
                             />
                         ) : (
-                            <p className="text-[#1F2937]">{product.medicationSize || "——"}</p>
+                            <p className="text-foreground">{product.medicationSize || "——"}</p>
                         )}
                     </div>
 
                     {/* Active Ingredients */}
                     <div className="md:col-span-2">
-                        <label className="text-sm font-medium text-[#4B5563] mb-2 block">Active Ingredients *</label>
+                        <label className="text-sm font-medium text-foreground mb-2 block">Active Ingredients *</label>
                         {editing ? (
                             <input
                                 value={formData.activeIngredients}
                                 onChange={(e) => setFormData({ ...formData, activeIngredients: e.target.value })}
                                 placeholder="Comma separated: Ingredient1, Ingredient2"
-                                className="w-full px-4 py-2.5 rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] text-sm text-[#1F2937] focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all"
+                                className="w-full px-4 py-2.5 rounded-xl border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all"
                             />
                         ) : (
-                            <p className="text-[#1F2937]">{product.activeIngredients?.join(", ") || "——"}</p>
+                            <p className="text-foreground">{product.activeIngredients?.join(", ") || "——"}</p>
                         )}
                     </div>
                 </div>

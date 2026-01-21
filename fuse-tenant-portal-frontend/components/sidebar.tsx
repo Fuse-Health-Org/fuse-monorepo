@@ -38,7 +38,7 @@ export function Sidebar() {
   const { user, logout } = useAuth()
   
   return (
-    <div className="w-72 bg-white border-r border-[#E5E7EB] flex flex-col shadow-sm">
+    <div className="w-72 bg-background border-r border-border flex flex-col shadow-sm">
       {/* Logo */}
       <div className="p-8 pb-6">
         <div className="flex items-center space-x-3">
@@ -46,8 +46,8 @@ export function Sidebar() {
             <Building2 className="h-6 w-6 text-white" />
           </div>
           <div>
-            <h1 className="text-xl font-semibold text-[#1F2937]">Tenant Portal</h1>
-            <p className="text-sm text-[#9CA3AF]">Clinic Management</p>
+            <h1 className="text-xl font-semibold text-foreground">Tenant Portal</h1>
+            <p className="text-sm text-muted-foreground">Clinic Management</p>
           </div>
         </div>
       </div>
@@ -56,7 +56,7 @@ export function Sidebar() {
       <nav className="flex-1 px-5 py-4 space-y-2">
         {/* Main Navigation */}
         <div className="space-y-1.5">
-          <p className="px-3 text-xs font-semibold text-[#9CA3AF] uppercase tracking-wider mb-3">
+          <p className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
             Main Menu
           </p>
           {navigation.map((item) => {
@@ -69,12 +69,12 @@ export function Sidebar() {
                   "group flex items-center px-4 py-3 text-[15px] font-medium rounded-xl transition-all duration-200",
                   isActive
                     ? "bg-[#4FA59C] text-white shadow-sm"
-                    : "text-[#4B5563] hover:bg-[#F3F4F6] hover:text-[#1F2937]",
+                    : "text-foreground hover:bg-muted hover:text-foreground",
                 )}
               >
                 <item.icon className={cn(
                   "mr-3 h-5 w-5 transition-all",
-                  isActive ? "text-white" : "text-[#6B7280] group-hover:text-[#4FA59C]"
+                  isActive ? "text-white" : "text-muted-foreground group-hover:text-[#4FA59C]"
                 )} />
                 {item.name}
               </a>
@@ -84,8 +84,8 @@ export function Sidebar() {
       </nav>
 
       {/* User Profile */}
-      <div className="p-5 border-t border-[#E5E7EB] bg-[#F9FAFB]">
-        <div className="bg-white rounded-2xl p-4 border border-[#E5E7EB] shadow-sm">
+      <div className="p-5 border-t border-border bg-muted/50">
+        <div className="bg-background rounded-2xl p-4 border border-border shadow-sm">
           <div className="flex items-center justify-between space-x-3">
             <div className="flex items-center space-x-3 flex-1 min-w-0">
               <div className="w-10 h-10 bg-gradient-to-br from-[#4FA59C] to-[#3d8580] rounded-xl flex items-center justify-center shadow-sm">
@@ -94,17 +94,17 @@ export function Sidebar() {
                 </span>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-[#1F2937] truncate">
+                <p className="text-sm font-semibold text-foreground truncate">
                   {user?.name || 'Tenant User'}
                 </p>
-                <p className="text-xs text-[#9CA3AF] truncate">
+                <p className="text-xs text-muted-foreground truncate">
                   {user?.organization || 'Organization'}
                 </p>
               </div>
             </div>
             <button
               onClick={logout}
-              className="p-2 text-[#6B7280] hover:text-[#EF4444] hover:bg-[#FEF2F2] rounded-xl transition-all"
+              className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-xl transition-all"
               title="Logout"
             >
               <LogOut className="h-4 w-4" />

@@ -2092,14 +2092,14 @@ export default function ProductEditor() {
 
   if (loadingProduct) {
     return (
-      <div className="flex h-screen bg-[#F9FAFB]">
+      <div className="flex h-screen bg-background">
         <Sidebar />
         <div className="flex-1 flex flex-col overflow-hidden">
           <Header />
           <main className="flex-1 overflow-y-auto p-8 flex items-center justify-center">
             <div className="text-center">
               <Loader2 className="mx-auto h-8 w-8 animate-spin text-[#4FA59C] mb-4" />
-              <p className="text-[#6B7280]">Loading product...</p>
+              <p className="text-muted-foreground">Loading product...</p>
             </div>
           </main>
         </div>
@@ -2114,15 +2114,15 @@ export default function ProductEditor() {
         <div className="flex-1 flex flex-col overflow-hidden">
           <Header />
           <main className="flex-1 overflow-y-auto p-8">
-            <div className="bg-white rounded-2xl shadow-sm border border-red-200 overflow-hidden max-w-2xl">
-              <div className="p-6 pb-4 border-b border-red-200 bg-red-50">
-                <h2 className="text-lg font-semibold text-red-900">Error Loading Product</h2>
+            <div className="bg-card rounded-2xl shadow-sm border border-destructive overflow-hidden max-w-2xl">
+              <div className="p-6 pb-4 border-b border-destructive bg-destructive/10">
+                <h2 className="text-lg font-semibold text-destructive">Error Loading Product</h2>
               </div>
               <div className="p-6">
-                <p className="text-sm text-red-700 mb-4">{error || "Product not found"}</p>
+                <p className="text-sm text-destructive mb-4">{error || "Product not found"}</p>
                 <button
                   onClick={handleBack}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-full border border-[#E5E7EB] text-[#4B5563] hover:bg-[#F3F4F6] transition-all text-sm font-medium"
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-full border border-border text-foreground hover:bg-muted transition-all text-sm font-medium"
                 >
                   <ArrowLeft className="h-4 w-4" />
                   Back to Products
@@ -2136,7 +2136,7 @@ export default function ProductEditor() {
   }
 
   return (
-    <div className="flex h-screen bg-[#F9FAFB]">
+    <div className="flex h-screen bg-background">
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header />
@@ -2144,7 +2144,7 @@ export default function ProductEditor() {
           {/* Back Button */}
           <button
             onClick={handleBack}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-[#6B7280] hover:text-[#1F2937] hover:bg-white rounded-xl transition-all -ml-2"
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-card rounded-xl transition-all -ml-2"
           >
             <ArrowLeft className="h-5 w-5" />
             Back to Products
@@ -2173,16 +2173,16 @@ export default function ProductEditor() {
 
           {/* Inactive Product Banner */}
           {product && !product.isActive && (
-            <div className="bg-blue-50 rounded-2xl border border-blue-200 overflow-hidden mb-4 shadow-sm">
+            <div className="bg-blue-50 dark:bg-blue-900/30 rounded-2xl border border-blue-200 dark:border-blue-800 overflow-hidden mb-4 shadow-sm">
               <div className="p-6 flex items-start gap-3">
-                <div className="bg-blue-100 rounded-xl p-2 flex-shrink-0">
-                  <Info className="h-5 w-5 text-blue-600" />
+                <div className="bg-blue-100 dark:bg-blue-900/50 rounded-xl p-2 flex-shrink-0">
+                  <Info className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                 </div>
                 <div className="flex-1">
-                  <h3 className="font-semibold text-blue-900 mb-1">
+                  <h3 className="font-semibold text-blue-900 dark:text-blue-300 mb-1">
                     Product Not Active
                   </h3>
-                  <p className="text-sm text-blue-700">
+                  <p className="text-sm text-blue-700 dark:text-blue-400">
                     <strong>{product.name}</strong> is currently inactive. Build your form, then click "Activate Product" to make it available in your catalog.
                   </p>
                 </div>
@@ -2193,8 +2193,8 @@ export default function ProductEditor() {
           {/* Save Message */}
           {saveMessage && (
             <div className={`mb-4 p-4 rounded-2xl border shadow-sm ${saveMessage.includes('✅')
-              ? 'bg-green-50 border-green-200 text-green-800'
-              : 'bg-red-50 border-red-200 text-red-800'
+              ? 'bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800 text-green-800 dark:text-green-400'
+              : 'bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800 text-red-800 dark:text-red-400'
               }`}>
               <p className="text-sm font-medium">{saveMessage}</p>
             </div>
@@ -2207,8 +2207,8 @@ export default function ProductEditor() {
               <div className="mb-8">
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
-                    <h1 className="text-3xl font-semibold text-[#1F2937] mb-2">Intake Form</h1>
-                    <p className="text-[#6B7280] text-base">
+                    <h1 className="text-3xl font-semibold text-foreground mb-2">Intake Form</h1>
+                    <p className="text-muted-foreground text-base">
                       {template.title || "Build your product intake form"}
                     </p>
                   </div>
@@ -2228,7 +2228,7 @@ export default function ProductEditor() {
                     <div className="relative">
                       <button
                         onClick={() => setShowFormSelector(!showFormSelector)}
-                        className="flex items-center gap-2 px-4 py-2.5 rounded-full border border-[#E5E7EB] bg-white text-[#4B5563] hover:bg-[#F3F4F6] transition-all text-sm font-medium"
+                        className="flex items-center gap-2 px-4 py-2.5 rounded-full border border-border bg-card text-foreground hover:bg-muted transition-all text-sm font-medium"
                       >
                         <FileText className="h-4 w-4" />
                         Choose Template
@@ -2244,14 +2244,14 @@ export default function ProductEditor() {
                           />
 
                           {/* Dropdown Menu */}
-                          <div className="absolute right-0 z-[100] mt-2 w-80 bg-white rounded-2xl shadow-xl border border-[#E5E7EB] overflow-visible">
-                            <div className="p-4 border-b border-[#E5E7EB]">
+                          <div className="absolute right-0 z-[100] mt-2 w-80 bg-card rounded-2xl shadow-xl border border-border overflow-visible">
+                            <div className="p-4 border-b border-border">
                               <input
                                 type="text"
                                 placeholder="Search templates..."
                                 value={formSearchQuery}
                                 onChange={(e) => setFormSearchQuery(e.target.value)}
-                                className="w-full px-3 py-2 rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] text-sm focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50"
+                                className="w-full px-3 py-2 rounded-xl border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50"
                               />
                             </div>
                             <div className="max-h-64 overflow-y-auto" style={{ zIndex: 101 }}>
@@ -2267,18 +2267,18 @@ export default function ProductEditor() {
                                       await handleSwitchForm(form.id)
                                     }}
                                     disabled={attachingForm}
-                                    className="w-full text-left px-4 py-3 hover:bg-[#F9FAFB] border-b border-[#E5E7EB] last:border-b-0 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="w-full text-left px-4 py-3 hover:bg-muted/50 border-b border-border last:border-b-0 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                   >
-                                    <div className="font-medium text-sm text-[#1F2937]">{form.title}</div>
+                                    <div className="font-medium text-sm text-foreground">{form.title}</div>
                                     {form.description && (
-                                      <div className="text-xs text-[#9CA3AF] mt-1">{form.description}</div>
+                                      <div className="text-xs text-muted-foreground mt-1">{form.description}</div>
                                     )}
                                     {attachingForm && (
                                       <div className="text-xs text-[#4FA59C] mt-1">Switching template...</div>
                                     )}
                                   </button>
                                 ))}
-                              <div className="p-2 border-t-2 border-[#E5E7EB] bg-[#F9FAFB]">
+                              <div className="p-2 border-t-2 border-border bg-muted/50">
                                 <button
                                   onClick={() => {
                                     handleCreateNewForm()
@@ -2300,7 +2300,7 @@ export default function ProductEditor() {
                 </div>
 
                 {/* Action Buttons */}
-                <div className="mt-6 pb-6 border-b border-[#E5E7EB]">
+                <div className="mt-6 pb-6 border-b border-border">
                   <div className="flex gap-3 flex-wrap">
                     {formStatus === 'in_progress' && (
                       <button
@@ -2361,7 +2361,7 @@ export default function ProductEditor() {
                         const previewUrl = `${patientFrontendUrl}/preview/questionnaire/${templateId}`
                         window.open(previewUrl, '_blank')
                       }}
-                      className="flex items-center gap-2 rounded-full px-6 py-2.5 border border-[#E5E7EB] text-[#4B5563] hover:bg-[#F3F4F6] shadow-sm hover:shadow-md transition-all text-sm font-medium"
+                      className="flex items-center gap-2 rounded-full px-6 py-2.5 border border-border text-foreground hover:bg-muted shadow-sm hover:shadow-md transition-all text-sm font-medium"
                     >
                       <Eye className="h-4 w-4" />
                       Preview
@@ -2894,7 +2894,7 @@ export default function ProductEditor() {
 
                                                   {/* Show rules inline */}
                                                   {conditionalLogic && (
-                                                    <div className="bg-white/50 dark:bg-blue-900/30 rounded p-2 border border-blue-200/50">
+                                                    <div className="bg-blue-50/50 dark:bg-blue-900/30 rounded p-2 border border-blue-200/50 dark:border-blue-800/50">
                                                       <div className="flex flex-wrap items-center gap-1 text-[10px]">
                                                         <span className="text-muted-foreground">IF:</span>
                                                         <span className="px-1.5 py-0.5 bg-blue-100/50 dark:bg-blue-800/30 rounded font-medium">
@@ -3271,10 +3271,10 @@ export default function ProductEditor() {
       {/* Save as Template Modal */}
       {showSaveTemplateModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl border border-[#E5E7EB] w-full max-w-lg">
-            <div className="p-8 pb-6 border-b border-[#E5E7EB]">
+          <div className="bg-card rounded-2xl shadow-2xl border border-border w-full max-w-lg">
+            <div className="p-8 pb-6 border-b border-border">
               <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-semibold text-[#1F2937]">Save as Template</h2>
+                <h2 className="text-2xl font-semibold text-foreground">Save as Template</h2>
                 <button
                   onClick={() => {
                     setShowSaveTemplateModal(false)
@@ -3283,12 +3283,12 @@ export default function ProductEditor() {
                     setNewTemplateDescription("")
                     setSelectedTemplateToUpdate("")
                   }}
-                  className="p-2 text-[#6B7280] hover:text-[#1F2937] hover:bg-[#F3F4F6] rounded-xl transition-all"
+                  className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-xl transition-all"
                 >
                   <X className="h-5 w-5" />
                 </button>
               </div>
-              <p className="text-sm text-[#6B7280] mt-2">
+              <p className="text-sm text-muted-foreground mt-2">
                 Save your current form structure as a reusable template for other products
               </p>
             </div>
@@ -3299,15 +3299,15 @@ export default function ProductEditor() {
                 <div className="space-y-4">
                   <button
                     onClick={() => setSaveTemplateMode('new')}
-                    className="w-full p-6 rounded-2xl border-2 border-[#E5E7EB] hover:border-[#4FA59C] hover:bg-[#F9FAFB] transition-all text-left group"
+                    className="w-full p-6 rounded-2xl border-2 border-border hover:border-[#4FA59C] hover:bg-muted/50 transition-all text-left group"
                   >
                     <div className="flex items-start gap-4">
                       <div className="bg-[#4FA59C] rounded-xl p-3 group-hover:scale-110 transition-transform">
                         <Plus className="h-6 w-6 text-white" />
                       </div>
                       <div>
-                        <h3 className="text-lg font-semibold text-[#1F2937] mb-1">Create New Template</h3>
-                        <p className="text-sm text-[#6B7280]">
+                        <h3 className="text-lg font-semibold text-foreground mb-1">Create New Template</h3>
+                        <p className="text-sm text-muted-foreground">
                           Save this form as a brand new template that can be imported into other products
                         </p>
                       </div>
@@ -3316,15 +3316,15 @@ export default function ProductEditor() {
 
                   <button
                     onClick={() => setSaveTemplateMode('update')}
-                    className="w-full p-6 rounded-2xl border-2 border-[#E5E7EB] hover:border-[#4FA59C] hover:bg-[#F9FAFB] transition-all text-left group"
+                    className="w-full p-6 rounded-2xl border-2 border-border hover:border-[#4FA59C] hover:bg-muted/50 transition-all text-left group"
                   >
                     <div className="flex items-start gap-4">
                       <div className="bg-blue-500 rounded-xl p-3 group-hover:scale-110 transition-transform">
                         <RefreshCw className="h-6 w-6 text-white" />
                       </div>
                       <div>
-                        <h3 className="text-lg font-semibold text-[#1F2937] mb-1">Update Existing Template</h3>
-                        <p className="text-sm text-[#6B7280]">
+                        <h3 className="text-lg font-semibold text-foreground mb-1">Update Existing Template</h3>
+                        <p className="text-sm text-muted-foreground">
                           Replace an existing template with this form's current structure
                         </p>
                       </div>
@@ -3335,33 +3335,33 @@ export default function ProductEditor() {
                 // Create New Template Form
                 <div className="space-y-5">
                   <div>
-                    <label className="text-sm font-medium text-[#4B5563] mb-2 block">Template Name *</label>
+                    <label className="text-sm font-medium text-foreground mb-2 block">Template Name *</label>
                     <input
                       value={newTemplateName}
                       onChange={(e) => setNewTemplateName(e.target.value)}
                       placeholder="e.g., Weight Loss Product Template"
-                      className="w-full px-4 py-2.5 rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] text-sm text-[#1F2937] focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all"
+                      className="w-full px-4 py-2.5 rounded-xl border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all"
                     />
                   </div>
 
                   <div>
-                    <label className="text-sm font-medium text-[#4B5563] mb-2 block">Description (Optional)</label>
+                    <label className="text-sm font-medium text-foreground mb-2 block">Description (Optional)</label>
                     <textarea
                       value={newTemplateDescription}
                       onChange={(e) => setNewTemplateDescription(e.target.value)}
                       placeholder="Describe this template..."
-                      className="w-full px-4 py-2.5 rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] text-sm text-[#1F2937] min-h-[100px] focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all resize-none"
+                      className="w-full px-4 py-2.5 rounded-xl border border-input bg-background text-sm text-foreground min-h-[100px] focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all resize-none"
                     />
                   </div>
 
-                  <div className="flex gap-3 pt-4 border-t border-[#E5E7EB]">
+                  <div className="flex gap-3 pt-4 border-t border-border">
                     <button
                       onClick={() => {
                         setSaveTemplateMode(null)
                         setNewTemplateName("")
                         setNewTemplateDescription("")
                       }}
-                      className="flex-1 px-4 py-2.5 rounded-full border border-[#E5E7EB] text-[#4B5563] hover:bg-[#F3F4F6] transition-all text-sm font-medium"
+                      className="flex-1 px-4 py-2.5 rounded-full border border-border text-foreground hover:bg-muted transition-all text-sm font-medium"
                     >
                       Back
                     </button>
@@ -3385,11 +3385,11 @@ export default function ProductEditor() {
                 // Update Existing Template Form
                 <div className="space-y-5">
                   <div>
-                    <label className="text-sm font-medium text-[#4B5563] mb-2 block">Select Template to Update</label>
+                    <label className="text-sm font-medium text-foreground mb-2 block">Select Template to Update</label>
                     <select
                       value={selectedTemplateToUpdate}
                       onChange={(e) => setSelectedTemplateToUpdate(e.target.value)}
-                      className="w-full rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] px-4 py-2.5 text-sm text-[#1F2937] focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all"
+                      className="w-full rounded-xl border border-input bg-background px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all"
                     >
                       <option value="">Choose a template...</option>
                       {availableForms.map((form) => (
@@ -3401,21 +3401,21 @@ export default function ProductEditor() {
                   </div>
 
                   {selectedTemplateToUpdate && (
-                    <div className="p-4 rounded-2xl bg-yellow-50 border border-yellow-200">
-                      <p className="text-sm text-yellow-800">
+                    <div className="p-4 rounded-2xl bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800">
+                      <p className="text-sm text-yellow-800 dark:text-yellow-300">
                         <strong>⚠️ Warning:</strong> This will replace the selected template's structure with your current form.
                         This change will affect all future products that import this template.
                       </p>
                     </div>
                   )}
 
-                  <div className="flex gap-3 pt-4 border-t border-[#E5E7EB]">
+                  <div className="flex gap-3 pt-4 border-t border-border">
                     <button
                       onClick={() => {
                         setSaveTemplateMode(null)
                         setSelectedTemplateToUpdate("")
                       }}
-                      className="flex-1 px-4 py-2.5 rounded-full border border-[#E5E7EB] text-[#4B5563] hover:bg-[#F3F4F6] transition-all text-sm font-medium"
+                      className="flex-1 px-4 py-2.5 rounded-full border border-border text-foreground hover:bg-muted transition-all text-sm font-medium"
                     >
                       Back
                     </button>
