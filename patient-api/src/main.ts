@@ -17825,10 +17825,10 @@ async function startServer() {
   // Production: Will be provided when ready to go live
   const IRONSAIL_API_BASE = process.env.IRONSAIL_API_BASE_URL || "https://sandbox.api.impetusrx.com/pharmacy/fuse-sandbox/api/v1";
   const IRONSAIL_TENANT = process.env.IRONSAIL_TENANT || "fuse-sandbox";
-  
+
   // In-memory token cache (in production, use Redis or database)
   let ironSailTokenCache: { token: string; expiresAt: number } | null = null;
-  
+
   // Helper to get IronSail auth token
   const getIronSailToken = async (): Promise<string | null> => {
     try {
@@ -17836,16 +17836,16 @@ async function startServer() {
       if (ironSailTokenCache && ironSailTokenCache.expiresAt > Date.now()) {
         return ironSailTokenCache.token;
       }
-      
+
       // Check if we have stored credentials
       const clientId = process.env.IRONSAIL_CLIENT_ID;
       const clientSecret = process.env.IRONSAIL_CLIENT_SECRET;
-      
+
       if (!clientId || !clientSecret) {
         console.log("[IronSail] No credentials configured. Use /ironsail/setup to create credentials with setup token.");
         return null;
       }
-      
+
       // Get access token
       console.log("[IronSail] Fetching new access token...");
       const tokenResponse = await fetch(`${IRONSAIL_API_BASE}/auth/token`, {
@@ -17853,30 +17853,30 @@ async function startServer() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ client_id: clientId, client_secret: clientSecret })
       });
-      
+
       if (!tokenResponse.ok) {
         const errorText = await tokenResponse.text();
         console.error("[IronSail] Failed to get token:", errorText);
         return null;
       }
-      
+
       const tokenData = await tokenResponse.json() as Record<string, any>;
       console.log("[IronSail] Token response structure:", JSON.stringify(tokenData, null, 2));
-      
+
       // Handle nested data structure - token might be in tokenData.data.access_token
       const accessToken = tokenData.data?.access_token || tokenData.access_token;
-      
+
       if (!accessToken) {
         console.error("[IronSail] No access_token found in response:", tokenData);
         return null;
       }
-      
+
       // Cache the token (30 days validity, cache for 29 days to be safe)
       ironSailTokenCache = {
         token: accessToken,
         expiresAt: Date.now() + (29 * 24 * 60 * 60 * 1000) // 29 days
       };
-      
+
       console.log("[IronSail] Access token obtained and cached:", accessToken.substring(0, 20) + "...");
       return accessToken;
     } catch (error) {
@@ -17890,14 +17890,14 @@ async function startServer() {
     try {
       const hasCredentials = !!(process.env.IRONSAIL_CLIENT_ID && process.env.IRONSAIL_CLIENT_SECRET);
       const hasSetupToken = !!process.env.IRONSAIL_SETUP_TOKEN;
-      
+
       // Try to get a token to verify credentials work
       let tokenValid = false;
       if (hasCredentials) {
         const token = await getIronSailToken();
         tokenValid = !!token;
       }
-      
+
       // Try to ping the pharmacies endpoint (requires auth)
       let apiAccessible = false;
       if (tokenValid) {
@@ -17905,7 +17905,7 @@ async function startServer() {
           const token = await getIronSailToken();
           const response = await fetch(`${IRONSAIL_API_BASE}/pharmacies`, {
             method: "GET",
-            headers: { 
+            headers: {
               "Accept": "application/json",
               "Authorization": `Bearer ${token}`
             }
@@ -17915,15 +17915,15 @@ async function startServer() {
           apiAccessible = false;
         }
       }
-      
+
       return res.json({
         success: true,
         connected: tokenValid && apiAccessible,
-        message: tokenValid && apiAccessible 
+        message: tokenValid && apiAccessible
           ? "IronSail API is connected and accessible"
-          : !hasCredentials 
+          : !hasCredentials
             ? "Credentials not configured. Use setup token to create credentials."
-            : !tokenValid 
+            : !tokenValid
               ? "Credentials configured but token validation failed"
               : "API connection issue",
         tenant: IRONSAIL_TENANT,
@@ -17951,37 +17951,37 @@ async function startServer() {
   app.post("/ironsail/setup", authenticateJWT, async (req, res) => {
     try {
       const { setup_token, name } = req.body;
-      
+
       // Use provided token or fall back to env var
       const tokenToUse = setup_token || process.env.IRONSAIL_SETUP_TOKEN;
-      
+
       if (!tokenToUse) {
         return res.status(400).json({
           success: false,
           message: "Setup token is required. Provide 'setup_token' in request body or set IRONSAIL_SETUP_TOKEN env var."
         });
       }
-      
+
       console.log("[IronSail] Creating credentials with setup token...");
-      
+
       const response = await fetch(`${IRONSAIL_API_BASE}/auth/credentials`, {
         method: "POST",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
           "Accept": "application/json",
           "Authorization": `Bearer ${tokenToUse}`,
           "X-Setup-Token": tokenToUse
         },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           name: name || "Fuse Health Tenant Portal"
         })
       });
-      
+
       const responseData = await response.json() as Record<string, any>;
-      
+
       // Log the full response to see the structure
       console.log("[IronSail] Full API response:", JSON.stringify(responseData, null, 2));
-      
+
       if (!response.ok) {
         console.error("[IronSail] Failed to create credentials:", responseData);
         return res.status(response.status).json({
@@ -17990,18 +17990,18 @@ async function startServer() {
           error: responseData?.errors?.messages || responseData?.message || responseData?.error || JSON.stringify(responseData)
         });
       }
-      
+
       // Handle nested data structure - credentials might be in responseData.data
       const credentials = responseData.data || responseData;
       const clientId = credentials.client_id;
       const clientSecret = credentials.client_secret;
       const credentialName = credentials.name;
-      
+
       console.log("[IronSail] Credentials created successfully!");
       console.log("[IronSail] ⚠️  IMPORTANT: Save these credentials securely!");
       console.log("[IronSail] Client ID:", clientId);
       console.log("[IronSail] Client Secret:", clientSecret?.substring(0, 10) + "...");
-      
+
       // Return the credentials (user needs to save these as env vars)
       return res.json({
         success: true,
@@ -18034,22 +18034,22 @@ async function startServer() {
   app.get("/ironsail/credentials", authenticateJWT, async (req, res) => {
     try {
       const token = await getIronSailToken();
-      
+
       if (!token) {
         return res.status(401).json({
           success: false,
           message: "Not authenticated with IronSail. Configure credentials first."
         });
       }
-      
+
       const response = await fetch(`${IRONSAIL_API_BASE}/auth/credentials`, {
         method: "GET",
-        headers: { 
+        headers: {
           "Accept": "application/json",
           "Authorization": `Bearer ${token}`
         }
       });
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         return res.status(response.status).json({
@@ -18058,7 +18058,7 @@ async function startServer() {
           error: errorText
         });
       }
-      
+
       const data = await response.json() as { data?: any[] };
       return res.json({
         success: true,
@@ -18078,21 +18078,21 @@ async function startServer() {
   app.get("/ironsail/pharmacies", authenticateJWT, async (req, res) => {
     try {
       const token = await getIronSailToken();
-      
+
       const headers: Record<string, string> = {
         "Accept": "application/json",
         "Content-Type": "application/json"
       };
-      
+
       if (token) {
         headers["Authorization"] = `Bearer ${token}`;
       }
-      
+
       const response = await fetch(`${IRONSAIL_API_BASE}/pharmacies`, {
         method: "GET",
         headers
       });
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error("[IronSail] Failed to fetch pharmacies:", errorText);
@@ -18102,10 +18102,10 @@ async function startServer() {
           error: errorText
         });
       }
-      
+
       const data = await response.json() as { data?: any[] };
       console.log(`[IronSail] Fetched ${data.data?.length || 0} pharmacies`);
-      
+
       return res.json({
         success: true,
         data: data.data || [],
@@ -18126,30 +18126,30 @@ async function startServer() {
     try {
       const { pharmacyId } = req.params;
       const { page = "1", search } = req.query;
-      
+
       const token = await getIronSailToken();
-      
+
       const headers: Record<string, string> = {
         "Accept": "application/json",
         "Content-Type": "application/json"
       };
-      
+
       if (token) {
         headers["Authorization"] = `Bearer ${token}`;
       }
-      
+
       let url = `${IRONSAIL_API_BASE}/pharmacies/${pharmacyId}/medications?page=${page}`;
       if (search) {
         url += `&search=${encodeURIComponent(search as string)}`;
       }
-      
+
       console.log(`[IronSail] Fetching medications from: ${url}`);
-      
+
       const response = await fetch(url, {
         method: "GET",
         headers
       });
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error("[IronSail] Failed to fetch medications:", errorText);
@@ -18159,13 +18159,13 @@ async function startServer() {
           error: errorText
         });
       }
-      
-      const data = await response.json() as { 
-        data?: any[]; 
-        pagination?: { page: number; per_page: number; total: number; total_pages: number } 
+
+      const data = await response.json() as {
+        data?: any[];
+        pagination?: { page: number; per_page: number; total: number; total_pages: number }
       };
       console.log(`[IronSail] Fetched ${data.data?.length || 0} medications for pharmacy ${pharmacyId}`);
-      
+
       return res.json({
         success: true,
         data: data.data || [],
@@ -18191,48 +18191,48 @@ async function startServer() {
     try {
       const { medicationId } = req.params;
       const { pharmacyId } = req.query;
-      
+
       if (!pharmacyId) {
         return res.status(400).json({
           success: false,
           message: "pharmacyId query parameter is required"
         });
       }
-      
+
       const token = await getIronSailToken();
-      
+
       const headers: Record<string, string> = {
         "Accept": "application/json",
         "Content-Type": "application/json"
       };
-      
+
       if (token) {
         headers["Authorization"] = `Bearer ${token}`;
       }
-      
+
       // Fetch all medications and find the specific one
       const response = await fetch(`${IRONSAIL_API_BASE}/pharmacies/${pharmacyId}/medications`, {
         method: "GET",
         headers
       });
-      
+
       if (!response.ok) {
         return res.status(response.status).json({
           success: false,
           message: "Failed to fetch medication details"
         });
       }
-      
+
       const data = await response.json() as { data?: any[] };
       const medication = data.data?.find((med: any) => med.medication_id === medicationId);
-      
+
       if (!medication) {
         return res.status(404).json({
           success: false,
           message: "Medication not found"
         });
       }
-      
+
       return res.json({
         success: true,
         data: medication

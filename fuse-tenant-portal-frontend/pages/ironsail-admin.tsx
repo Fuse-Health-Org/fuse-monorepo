@@ -9,7 +9,6 @@ import {
   Loader2, 
   Ship, 
   RefreshCw, 
-  Database, 
   Package, 
   CheckCircle2,
   XCircle,
@@ -21,11 +20,7 @@ import {
   Pill,
   Building2,
   ExternalLink,
-  Settings,
-  Key,
-  Copy,
-  Eye,
-  EyeOff
+  Settings
 } from "lucide-react"
 import { useAuth } from "@/contexts/AuthContext"
 import { toast } from "sonner"
@@ -90,12 +85,6 @@ export default function IronSailAdmin() {
   // Connection status
   const [connectionStatus, setConnectionStatus] = useState<"connected" | "disconnected" | "checking">("checking")
   const [connectionConfig, setConnectionConfig] = useState<ConnectionConfig | null>(null)
-  
-  // Setup state
-  const [setupToken, setSetupToken] = useState("")
-  const [creatingCredentials, setCreatingCredentials] = useState(false)
-  const [newCredentials, setNewCredentials] = useState<{ client_id: string; client_secret: string } | null>(null)
-  const [showSecret, setShowSecret] = useState(false)
 
   useEffect(() => {
     checkConnection()
@@ -120,43 +109,6 @@ export default function IronSailAdmin() {
       setConnectionStatus("disconnected")
       setConnectionConfig(null)
     }
-  }
-
-  const handleCreateCredentials = async () => {
-    if (!setupToken.trim()) {
-      toast.error("Please enter the setup token")
-      return
-    }
-    
-    setCreatingCredentials(true)
-    try {
-      const res = await fetch(`${baseUrl}/ironsail/setup`, {
-        method: "POST",
-        headers: { 
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ setup_token: setupToken.trim() })
-      })
-      const data = await res.json()
-      
-      if (data.success) {
-        setNewCredentials(data.data)
-        toast.success("Credentials created successfully!")
-        setSetupToken("")
-      } else {
-        toast.error(data.message || "Failed to create credentials")
-      }
-    } catch (err: any) {
-      toast.error(err.message || "Failed to create credentials")
-    } finally {
-      setCreatingCredentials(false)
-    }
-  }
-
-  const copyToClipboardText = (text: string, label: string) => {
-    navigator.clipboard.writeText(text)
-    toast.success(`${label} copied to clipboard`)
   }
 
   const fetchPharmacies = async () => {
@@ -862,118 +814,44 @@ export default function IronSailAdmin() {
                 </CardContent>
               </Card>
 
-              {/* Setup Credentials Card */}
+              {/* Setup Credentials Warning */}
               {!connectionConfig?.hasCredentials && (
-                <Card>
+                <Card className="border-red-200 bg-red-50">
                   <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Key className="h-5 w-5" />
-                      Create API Credentials
+                    <CardTitle className="flex items-center gap-2 text-red-800">
+                      <AlertCircle className="h-5 w-5" />
+                      Credentials Not Configured
                     </CardTitle>
-                    <CardDescription>
-                      Use your setup token to generate permanent API credentials
-                    </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-4">
-                      <div>
-                        <label className="text-sm font-medium mb-2 block">Setup Token</label>
-                        <Input
-                          placeholder="st_397456255883ad1414e1bbf3b53ac22f..."
-                          value={setupToken}
-                          onChange={(e) => setSetupToken(e.target.value)}
-                          type="password"
-                        />
-                        <p className="text-xs text-gray-500 mt-1">
-                          This is the one-time setup token provided by IronSail. It will be consumed after use.
-                        </p>
-                      </div>
-                      <Button 
-                        onClick={handleCreateCredentials} 
-                        disabled={creatingCredentials || !setupToken.trim()}
-                        className="bg-teal-600 hover:bg-teal-700"
+                    <div className="space-y-4 text-sm text-red-900">
+                      <p>
+                        <strong>Important:</strong> The setup token can only be used to create a maximum of 
+                        <strong> 20 credential pairs</strong> total, and we don't know how many have already been used.
+                      </p>
+                      <p>
+                        To create new credentials, use the <strong>Swagger API Documentation</strong> directly 
+                        and call the <code className="px-1 py-0.5 bg-red-100 rounded">POST /auth/credentials</code> endpoint 
+                        with your setup token.
+                      </p>
+                      <p className="text-red-700">
+                        Use this sparingly - only create new credentials when absolutely necessary.
+                      </p>
+                      <a 
+                        href="https://sandbox.api.impetusrx.com/pharmacy/api/documentation?tenant=fuse-sandbox" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-red-100 hover:bg-red-200 border border-red-300 rounded-lg transition-colors"
                       >
-                        {creatingCredentials ? (
-                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                        ) : (
-                          <Key className="h-4 w-4 mr-2" />
-                        )}
-                        Create Credentials
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* New Credentials Display */}
-              {newCredentials && (
-                <Card className="border-green-200 bg-green-50">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-green-800">
-                      <CheckCircle2 className="h-5 w-5" />
-                      Credentials Created Successfully!
-                    </CardTitle>
-                    <CardDescription className="text-green-700">
-                      Save these credentials securely. You will need to add them to your environment variables.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <div>
-                        <label className="text-sm font-medium mb-2 block text-green-800">Client ID</label>
-                        <div className="flex gap-2">
-                          <code className="flex-1 px-3 py-2 bg-white border rounded font-mono text-sm">
-                            {newCredentials.client_id}
-                          </code>
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => copyToClipboardText(newCredentials.client_id, "Client ID")}
-                          >
-                            <Copy className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium mb-2 block text-green-800">Client Secret</label>
-                        <div className="flex gap-2">
-                          <code className="flex-1 px-3 py-2 bg-white border rounded font-mono text-sm">
-                            {showSecret ? newCredentials.client_secret : "••••••••••••••••••••••••••••••••"}
-                          </code>
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => setShowSecret(!showSecret)}
-                          >
-                            {showSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                          </Button>
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => copyToClipboardText(newCredentials.client_secret, "Client Secret")}
-                          >
-                            <Copy className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                      <div className="p-4 bg-white border border-green-200 rounded-lg">
-                        <p className="font-medium text-green-800 mb-2">Add to your .env file:</p>
-                        <pre className="text-sm bg-gray-100 p-3 rounded overflow-x-auto">
-{`IRONSAIL_CLIENT_ID=${newCredentials.client_id}
-IRONSAIL_CLIENT_SECRET=${newCredentials.client_secret}`}
+                        <ExternalLink className="h-4 w-4" />
+                        Open Swagger Docs to Create Credentials
+                      </a>
+                      <div className="p-3 bg-white border border-red-200 rounded-lg mt-4">
+                        <p className="font-medium mb-2">After creating credentials, add to your .env file:</p>
+                        <pre className="text-xs bg-gray-100 p-2 rounded overflow-x-auto">
+{`IRONSAIL_CLIENT_ID=<your_client_id>
+IRONSAIL_CLIENT_SECRET=<your_client_secret>`}
                         </pre>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          className="mt-2"
-                          onClick={() => copyToClipboardText(
-                            `IRONSAIL_CLIENT_ID=${newCredentials.client_id}\nIRONSAIL_CLIENT_SECRET=${newCredentials.client_secret}`,
-                            "Environment variables"
-                          )}
-                        >
-                          <Copy className="h-4 w-4 mr-2" />
-                          Copy Both
-                        </Button>
                       </div>
                     </div>
                   </CardContent>
