@@ -1,0 +1,289 @@
+UNITEDPHARMACY
+DEVELOPER HUB
+Getting Started
+Account Setup
+Quick Start Guide
+Step 1: Create Your API Credentials
+Step 2: Obtain Access Token
+Step 3: List Available Pharmacies
+Step 4: Browse Medications
+Step 5: Create a Patient
+Step 6: Submit Your Order
+Webhooks (Recommended)
+Need Help?
+Key Features & Endpoints
+1. Authentication
+2. Patient Management
+3. Pharmacy Network
+4. Order Processing
+5. Webhooks
+Rate Limiting
+Sandbox Environment
+Release Notes
+v1.1.0
+v1.0.0
+United Pharmacy API Client Guide
+Welcome to the United Pharmacy API. This service enables partners to seamlessly integrate pharmacy services into their applications, handling everything from patient management to prescription order fulfillment.
+Getting Started
+Account Setup
+To begin integrating, you must first have an active account. The Impetus team will create your account and provide you with:
+	1	Your Setup Token: A secure token used to generate your initial API credentials.
+	2	Your Swagger API Documentation: A full technical reference for all available endpoints.
+Once you have received these materials, you can proceed with the integration.
+
+Quick Start Guide
+Follow these steps to place your first order:
+Step 1: Create Your API Credentials
+Use the Setup Token we provided to generate your Client ID and Client Secret:
+POST /pharmacy/{tenant}/api/v1/auth/credentials
+Step 2: Obtain Access Token
+Exchange your credentials for a JWT access token:
+POST /pharmacy/{tenant}/api/v1/auth/token
+Use this token in the Authorization: Bearer {token} header for all subsequent requests.
+Step 3: List Available Pharmacies
+Discover which pharmacies you can route orders to:
+GET /pharmacy/{tenant}/api/v1/pharmacies
+Save the id of your preferred pharmacy — you'll need it for the order.
+Step 4: Browse Medications
+Get the medication catalog with real-time pricing:
+GET /pharmacy/{tenant}/api/v1/pharmacies/{pharmacy_id}/medications
+Save the medication_id for the product you want to order.
+Step 5: Create a Patient
+Register the patient who will receive the order:
+POST /pharmacy/{tenant}/api/v1/patients
+Save the patient uuid from the response.
+Step 6: Submit Your Order
+You now have everything needed to create an order:
+{
+  "patient_id": "135fef3b-b4ac-485f-b9bf-e8beef4990c7",
+  "pharmacy_id": "a4f57791-c5a6-4e6a-8841-5a0d6bf5b9d1",
+  "medication_id": "eyJpIjoiMTI1MCJ9",
+  "dispense_quantity": 4,
+  "days_supply": 28,
+  "order_id": "ORD-12345",
+  "customer_id": "CUST-789",
+  "memo": "Draft created via automation",
+  "clinical_notes": "Patient tolerates therapy. Continue same dose.",
+  "webhook_urls": [
+    "https://your-app.com/webhooks/orders"
+  ]
+}
+POST /pharmacy/{tenant}/api/v1/orders
+Webhooks (Recommended)
+We strongly recommend providing webhook_urls when creating orders. This allows you to receive real-time notifications when order status changes (confirmed, shipped, delivered, etc.) without polling our API.
+Need Help?
+If you run into any issues during integration, our team is here to help. Reach out to your integration contact and we'll get you sorted.
+
+Key Features & Endpoints
+1. Authentication
+Secure your access to our platform.
+Initial Setup
+	•	Create Credentials (POST /pharmacy/{tenant}/api/v1/auth/credentials): Use your Setup Token (provided by Impetus) to generate a Client ID and Client Secret. This is a one-time setup step.
+Token Management
+	•	Obtain Token (POST /pharmacy/{tenant}/api/v1/auth/token): Exchange your Client ID and Secret for a Bearer Access Token.
+	•	Access Token Validity: 30 days.
+	•	Refresh Token Validity: 60 days.
+	•	Refresh Usage: When refreshing (POST /pharmacy/{tenant}/api/v1/auth/refresh), the old refresh token is revoked, and a new one is issued (Rotating Refresh Token).
+Credential Management & Security Rotation
+For enhanced security, you can manage multiple API credentials and rotate them as needed. Limit: 20 credentials per tenant.
+	•	List Credentials (GET /pharmacy/{tenant}/api/v1/auth/credentials): View all active API credentials for your account.
+	•	Use ?include_revoked=true to also include revoked credentials in the response.
+	•	Update Credential (PATCH /pharmacy/{tenant}/api/v1/auth/credentials/{client_id}): Update the display name of a credential for better organization.
+	•	Revoke Credential (DELETE /pharmacy/{tenant}/api/v1/auth/credentials/{client_id}): Immediately revoke a credential. This is useful for:
+	•	Security Rotation: Regularly rotate credentials to minimize exposure risk.
+	•	Compromised Credentials: Instantly revoke if you suspect a credential has been compromised.
+	•	Employee Offboarding: Revoke access when team members leave.
+Security Best Practice: We recommend rotating your API credentials every 90 days. Create new credentials before revoking old ones to ensure zero downtime.
+2. Patient Management
+Manage the patients you are serving.
+Listing & Search
+	•	List Patients (GET /pharmacy/{tenant}/api/v1/patients): Retrieve a paginated list of your patients.
+	•	Pagination: Use page and per_page query parameters (default: 15 items per page, max: 100).
+	•	Search by Email: Use email query parameter to filter patients by email address.
+	•	Supports partial matching (e.g., ?email=example.com matches john@example.com)
+	•	Case-insensitive search
+	•	Max 80 characters
+Individual Patient Operations
+	•	Get Patient Details (GET /pharmacy/{tenant}/api/v1/patients/{uuid}): Retrieve complete details for a specific patient.
+	•	Create Patient (POST /pharmacy/{tenant}/api/v1/patients): Create a new patient record.
+	•	Update Patient (PUT /pharmacy/{tenant}/api/v1/patients/{uuid}): Update an existing patient's information.
+	•	Delete Patient (DELETE /pharmacy/{tenant}/api/v1/patients/{uuid}): Remove a patient from your records.
+Integration Management
+	•	Sync Patient with Impetus (POST /pharmacy/{tenant}/api/v1/patients/{uuid}/sync): Manually trigger synchronization with the Impetus pharmacy system. This is automatically handled during order creation, but can be triggered manually if needed.
+Validation Rules
+	•	Name: Max 35 chars, letters/spaces/hyphens/apostrophes only.
+	•	Date of Birth: Must be in the past (YYYY-MM-DD).
+	•	Gender: M (Male), F (Female), or U (Unknown).
+	•	Phone Numbers: Exact 10 digits required for Home, Work, and Cell.
+	•	Address: State must be 2-letter code; ZIP must be 5 or 9 digits.
+3. Pharmacy Network
+Access our network of fulfilled pharmacies with real-time medication pricing.
+Pharmacy Discovery
+	•	List Pharmacies (GET /pharmacy/{tenant}/api/v1/pharmacies): Get a list of available pharmacies where orders can be routed. Example Response: {
+	•	  "data": [
+	•	    {
+	•	      "id": "d9d7d36f-c86b-49f7-a464-f0beb6cb2097",
+	•	      "name": "Main Street Pharmacy",
+	•	      "slug": "main-street-pharmacy",
+	•	      "status": "active"
+	•	    }
+	•	  ]
+	•	}
+	•	 Usage: Use the id value as pharmacy_id when creating orders.
+Medication Catalog with Real-Time Pricing
+	•	Browse Medications (GET /pharmacy/{tenant}/api/v1/pharmacies/{pharmacy}/medications): View the complete medication catalog for a specific pharmacy. Real-Time Pricing: All medication prices are automatically fetched from the pharmacy and update in real-time. This ensures you always have current pricing without manual updates. Pagination: Results are paginated at 25 items per page. Use the page query parameter to navigate (e.g., ?page=2). Example Request: GET /pharmacy/{tenant}/api/v1/pharmacies/{pharmacy_uuid}/medications?page=1
+	•	 Example Response: {
+	•	  "data": [
+	•	    {
+	•	      "medication_id": "eyJpdiI6ImlwMzI2NnpF...",
+	•	      "name": "Tirzepatide w/ NAD+ Vial",
+	•	      "strength": "20mg/ml",
+	•	      "form": "Injectable",
+	•	      "formulation": "Tirzepatide 20mg/ml 3ml (60mg) w/ NAD+ Vial",
+	•	      "quantity": "3",
+	•	      "quantity_units": "Milliliter",
+	•	      "schedule_code": "L",
+	•	      "type": "Compound",
+	•	      "pharmacy": "Kaduceus",
+	•	      "price": "188.00"
+	•	    }
+	•	  ],
+	•	  "pagination": {
+	•	    "page": 1,
+	•	    "per_page": 25,
+	•	    "total": 163,
+	•	    "total_pages": 7
+	•	  }
+	•	}
+	•	 Usage: Use the medication_id value when creating orders via POST /pharmacy/{tenant}/api/v1/orders.
+4. Order Processing
+The core of the integration.
+	•	Submit Order (POST /pharmacy/{tenant}/api/v1/orders): Send prescription orders to the pharmacy.
+	•	Required Fields:
+	•	patient_id: Patient UUID (from /patients endpoint)
+	•	pharmacy_id: Pharmacy UUID (from /pharmacies endpoint)
+	•	medication_id: Encoded medication ID (from /pharmacies/{id}/medications endpoint)
+	•	dispense_quantity: Total quantity to dispense
+	•	Optional Fields:
+	•	order_id: Your order reference (max 100 chars)
+	•	customer_id: Your customer reference (max 100 chars)
+	•	days_supply: Days supply for the prescription
+	•	memo: Internal memo (max 1024 chars)
+	•	clinical_notes: Notes for the pharmacist (max 2048 chars)
+	•	webhook_urls: Array of URLs to receive order events
+	•	Constraints:
+	•	Dispense Quantity (dispense_quantity): Integer between 1 and 1000.
+	•	Days Supply (days_supply): Integer between 1 and 365.
+	•	Memo (memo): Max 1024 chars.
+	•	Clinical Notes (clinical_notes): Max 2048 chars.
+	•	Webhooks: You can provide up to 5 webhook URLs in the webhook_urls field to receive status updates.
+	•	Retry Policy: If a webhook delivery fails, we retry 3 times with a 60-second delay between attempts.
+Order Statuses
+Orders progress through the following statuses:
+Status
+Description
+pending
+Order received, awaiting processing
+confirmed
+Order confirmed by the pharmacy
+processing
+Order is being prepared
+shipped
+Order has been shipped
+delivered
+Order has been delivered
+cancelled
+Order was cancelled
+failed
+Order processing failed
+refunded
+Order has been refunded
+5. Webhooks
+Receive real-time order status updates at your specified endpoints.
+Webhook Payload
+When an order status changes, we send a POST request to your webhook URL with the following payload:
+{
+  "event": "order.shipped",
+  "order": {
+    "uuid": "fd44a635-6d0c-47fa-8343-e0d604d46992",
+    "order_id": "ORD-12345",
+    "customer_id": "CUST-789",
+    "status": "shipped"
+  },
+  "shipping": {
+    "carrier": "USPS",
+    "tracking": "9400111899223033005012",
+    "shipping_status": "In Transit"
+  },
+  "timestamp": "2025-12-22T17:15:01+00:00"
+}
+Note: The shipping object is only included when shipping information is available (typically with order.shipped and order.delivered events).
+Payload Fields
+Field
+Description
+event
+The event type (see list below)
+order.uuid
+Unique identifier assigned by our system
+order.order_id
+Your order reference (as provided during order creation)
+order.customer_id
+Your customer reference (as provided during order creation)
+order.status
+Current order status
+shipping.carrier
+Shipping carrier (e.g., USPS, FedEx, UPS)
+shipping.tracking
+Tracking number
+shipping.shipping_status
+Current shipping status (e.g., "In Transit", "Delivered")
+timestamp
+ISO 8601 timestamp of when the event occurred
+Event Types
+Event
+Description
+order.created
+Order has been received
+order.confirmed
+Order has been confirmed by the pharmacy
+order.processing
+Order is being prepared
+order.shipped
+Order has been shipped
+order.delivered
+Order has been delivered
+order.cancelled
+Order has been cancelled
+order.failed
+Order processing failed
+order.refunded
+Order has been refunded
+Webhook Headers
+Each webhook request includes these headers:
+	•	X-Webhook-Event: The event type (e.g., order.shipped)
+	•	X-Webhook-Signature: HMAC-SHA256 signature for payload verification
+Verifying Webhook Signatures
+To verify the webhook is from us, compute the HMAC-SHA256 of the raw JSON payload using your webhook secret and compare it to the X-Webhook-Signature header.
+Rate Limiting
+To ensure fair usage and system stability, the API implements rate limiting on all endpoints. When you exceed the rate limit, you will receive a 429 Too Many Requests response.
+Best Practices:
+	•	Implement exponential backoff when receiving 429 responses
+	•	Cache responses where appropriate to reduce API calls
+	•	Batch operations when possible
+Sandbox Environment
+We provide a Sandbox environment for you to test your integration before going live.
+	•	Access: You can access the sandbox using the tenant sandbox.
+	•	Base URL: http://localhost:8082/pharmacy/sandbox/api/v1 (Local Development)
+	•	Example: http://localhost:8082/pharmacy/sandbox/api/v1/ping
+	•	Production: https://api.yourcompany.com/pharmacy/{tenant}/api/v1
+	•	Data Policy: The sandbox is a transient environment. All data is wiped periodically (e.g., every 24 hours).
+	•	Setup: The sandbox tenant is pre-provisioned. You do not need to request access.
+	•	Setup Token: Contact integration support or check your dashboard for the current sandbox token. (For local dev: check terminal output).
+Release Notes
+v1.1.0
+	•	Patient Search: Added email search functionality to the List Patients endpoint.
+	•	Documentation: Improved API documentation with detailed field descriptions and examples.
+v1.0.0
+	•	Launch: Initial release of the Partner API.
+	•	Core Modules: Patient, Order, and Pharmacy management modules enabled.
+© 2026 United Pharmacy API. All rights reserved.
