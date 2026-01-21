@@ -5,11 +5,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { 
-  Loader2, 
-  Ship, 
-  RefreshCw, 
-  Package, 
+import {
+  Loader2,
+  Ship,
+  RefreshCw,
+  Package,
   CheckCircle2,
   XCircle,
   Search,
@@ -65,11 +65,11 @@ export default function IronSailAdmin() {
   const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
 
   const [activeTab, setActiveTab] = useState<"overview" | "pharmacies" | "products" | "config">("overview")
-  
+
   // Pharmacies state
   const [pharmacies, setPharmacies] = useState<IronSailPharmacy[]>([])
   const [loadingPharmacies, setLoadingPharmacies] = useState(false)
-  
+
   // Products state
   const [selectedPharmacy, setSelectedPharmacy] = useState<IronSailPharmacy | null>(null)
   const [medications, setMedications] = useState<IronSailMedication[]>([])
@@ -197,7 +197,7 @@ export default function IronSailAdmin() {
     // Create tab-separated values (TSV) format for pasting into spreadsheets
     const headers = [
       "Name",
-      "Type", 
+      "Type",
       "Formulation",
       "Strength",
       "Form",
@@ -208,7 +208,7 @@ export default function IronSailAdmin() {
       "Price",
       "Pharmacy"
     ]
-    
+
     const values = [
       med.name,
       med.type,
@@ -222,12 +222,12 @@ export default function IronSailAdmin() {
       med.price,
       med.pharmacy
     ]
-    
+
     // Join with tabs for spreadsheet paste
     const headerRow = headers.join("\t")
     const valueRow = values.join("\t")
     const tsvContent = `${headerRow}\n${valueRow}`
-    
+
     navigator.clipboard.writeText(tsvContent)
     toast.success("Medication data copied! Paste into spreadsheet.")
   }
@@ -283,11 +283,10 @@ export default function IronSailAdmin() {
           <div className="flex gap-2 mb-6 border-b">
             <button
               onClick={() => setActiveTab("overview")}
-              className={`px-4 py-2 font-medium transition-colors ${
-                activeTab === "overview"
+              className={`px-4 py-2 font-medium transition-colors ${activeTab === "overview"
                   ? "text-teal-600 border-b-2 border-teal-600"
                   : "text-gray-600 hover:text-gray-900"
-              }`}
+                }`}
             >
               <div className="flex items-center gap-2">
                 <Ship className="h-4 w-4" />
@@ -296,11 +295,10 @@ export default function IronSailAdmin() {
             </button>
             <button
               onClick={() => setActiveTab("pharmacies")}
-              className={`px-4 py-2 font-medium transition-colors ${
-                activeTab === "pharmacies"
+              className={`px-4 py-2 font-medium transition-colors ${activeTab === "pharmacies"
                   ? "text-teal-600 border-b-2 border-teal-600"
                   : "text-gray-600 hover:text-gray-900"
-              }`}
+                }`}
             >
               <div className="flex items-center gap-2">
                 <Building2 className="h-4 w-4" />
@@ -309,11 +307,10 @@ export default function IronSailAdmin() {
             </button>
             <button
               onClick={() => setActiveTab("products")}
-              className={`px-4 py-2 font-medium transition-colors ${
-                activeTab === "products"
+              className={`px-4 py-2 font-medium transition-colors ${activeTab === "products"
                   ? "text-teal-600 border-b-2 border-teal-600"
                   : "text-gray-600 hover:text-gray-900"
-              }`}
+                }`}
             >
               <div className="flex items-center gap-2">
                 <Package className="h-4 w-4" />
@@ -322,11 +319,10 @@ export default function IronSailAdmin() {
             </button>
             <button
               onClick={() => setActiveTab("config")}
-              className={`px-4 py-2 font-medium transition-colors ${
-                activeTab === "config"
+              className={`px-4 py-2 font-medium transition-colors ${activeTab === "config"
                   ? "text-teal-600 border-b-2 border-teal-600"
                   : "text-gray-600 hover:text-gray-900"
-              }`}
+                }`}
             >
               <div className="flex items-center gap-2">
                 <Settings className="h-4 w-4" />
@@ -467,8 +463,8 @@ export default function IronSailAdmin() {
                     <div className="text-sm text-teal-900">
                       <p className="font-medium mb-1">About IronSail Integration</p>
                       <p className="text-teal-700">
-                        IronSail (United Pharmacy API) provides access to a network of partner pharmacies 
-                        with real-time medication pricing. Use this admin area to browse available pharmacies 
+                        IronSail (United Pharmacy API) provides access to a network of partner pharmacies
+                        with real-time medication pricing. Use this admin area to browse available pharmacies
                         and their product catalogs. Product prices are fetched live from the pharmacy network.
                       </p>
                     </div>
@@ -620,7 +616,7 @@ export default function IronSailAdmin() {
                           {selectedPharmacy.name} - Medications
                         </CardTitle>
                         <CardDescription>
-                          {pagination.total > 0 
+                          {pagination.total > 0
                             ? `Showing ${medications.length} of ${pagination.total} medications`
                             : "Browse available medications with real-time pricing"
                           }
@@ -798,8 +794,8 @@ export default function IronSailAdmin() {
                     <div className="text-sm text-teal-900">
                       <p className="font-medium mb-1">About Medication Pricing</p>
                       <p className="text-teal-700">
-                        All medication prices are fetched in real-time from the IronSail pharmacy network. 
-                        Prices may vary by pharmacy and are subject to change. Use the medication_id 
+                        All medication prices are fetched in real-time from the IronSail pharmacy network.
+                        Prices may vary by pharmacy and are subject to change. Use the medication_id
                         when creating orders through the IronSail API.
                       </p>
                     </div>
@@ -899,20 +895,20 @@ export default function IronSailAdmin() {
                   <CardContent>
                     <div className="space-y-4 text-sm text-red-900">
                       <p>
-                        <strong>Important:</strong> The setup token can only be used to create a maximum of 
+                        <strong>Important:</strong> The setup token can only be used to create a maximum of
                         <strong> 20 credential pairs</strong> total, and we don't know how many have already been used.
                       </p>
                       <p>
-                        To create new credentials, use the <strong>Swagger API Documentation</strong> directly 
-                        and call the <code className="px-1 py-0.5 bg-red-100 rounded">POST /auth/credentials</code> endpoint 
+                        To create new credentials, use the <strong>Swagger API Documentation</strong> directly
+                        and call the <code className="px-1 py-0.5 bg-red-100 rounded">POST /auth/credentials</code> endpoint
                         with your setup token.
                       </p>
                       <p className="text-red-700">
                         Use this sparingly - only create new credentials when absolutely necessary.
                       </p>
-                      <a 
-                        href="https://sandbox.api.impetusrx.com/pharmacy/api/documentation?tenant=fuse-sandbox" 
-                        target="_blank" 
+                      <a
+                        href="https://sandbox.api.impetusrx.com/pharmacy/api/documentation?tenant=fuse-sandbox"
+                        target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-2 px-4 py-2 bg-red-100 hover:bg-red-200 border border-red-300 rounded-lg transition-colors"
                       >
@@ -922,7 +918,7 @@ export default function IronSailAdmin() {
                       <div className="p-3 bg-white border border-red-200 rounded-lg mt-4">
                         <p className="font-medium mb-2">After creating credentials, add to your .env file:</p>
                         <pre className="text-xs bg-gray-100 p-2 rounded overflow-x-auto">
-{`IRONSAIL_CLIENT_ID=<your_client_id>
+                          {`IRONSAIL_CLIENT_ID=<your_client_id>
 IRONSAIL_CLIENT_SECRET=<your_client_secret>`}
                         </pre>
                       </div>
@@ -941,9 +937,9 @@ IRONSAIL_CLIENT_SECRET=<your_client_secret>`}
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    <a 
-                      href="https://sandbox.api.impetusrx.com/pharmacy#quick-start-guide" 
-                      target="_blank" 
+                    <a
+                      href="https://sandbox.api.impetusrx.com/pharmacy#quick-start-guide"
+                      target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center gap-2 p-3 border rounded-lg hover:bg-gray-50 transition-colors"
                     >
@@ -953,9 +949,9 @@ IRONSAIL_CLIENT_SECRET=<your_client_secret>`}
                         <p className="text-sm text-gray-500">Main documentation for the United Pharmacy API</p>
                       </div>
                     </a>
-                    <a 
-                      href="https://sandbox.api.impetusrx.com/pharmacy/api/documentation?tenant=fuse-sandbox" 
-                      target="_blank" 
+                    <a
+                      href="https://sandbox.api.impetusrx.com/pharmacy/api/documentation?tenant=fuse-sandbox"
+                      target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center gap-2 p-3 border rounded-lg hover:bg-gray-50 transition-colors"
                     >
