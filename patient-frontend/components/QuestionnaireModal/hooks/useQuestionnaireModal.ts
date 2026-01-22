@@ -534,10 +534,10 @@ export function useQuestionnaireModal(
     setPatientFirstName(firstName);
     setPatientName(`${firstName} ${lastName}`.trim());
     const result = await createUserAccountAPI(
-      answers['firstName'], 
-      answers['lastName'], 
-      answers['email'], 
-      answers['mobile'], 
+      answers['firstName'],
+      answers['lastName'],
+      answers['email'],
+      answers['mobile'],
       domainClinic?.id,
       answers['dob'] || answers['dateOfBirth'],
       answers['gender']
@@ -591,12 +591,12 @@ export function useQuestionnaireModal(
         if (subscriptionData.clientSecret) {
           const intentId = subscriptionData.paymentIntentId || subscriptionData.subscriptionId || subscriptionData.id;
           const orderIdValue = subscriptionData.orderId;
-          
+
           setClientSecret(subscriptionData.clientSecret);
           setPaymentIntentId(intentId);
           if (orderIdValue) setOrderId(orderIdValue);
           setPaymentStatus('idle');
-          
+
           // Return full data for deferred payment flow
           return {
             clientSecret: subscriptionData.clientSecret,
@@ -726,7 +726,7 @@ export function useQuestionnaireModal(
     // Use passed data or fall back to state
     const finalPaymentIntentId = data?.paymentIntentId || paymentIntentId;
     const finalOrderId = data?.orderId || orderId;
-    
+
     console.log('🎉 [CHECKOUT] ========== PAYMENT SUCCESS ==========');
     console.log('🎉 [CHECKOUT] Payment Intent ID:', finalPaymentIntentId);
     console.log('🎉 [CHECKOUT] Order ID:', finalOrderId);
@@ -750,7 +750,7 @@ export function useQuestionnaireModal(
       // Create MD Integrations case if clinic uses md-integrations format
       const dashboardFormat = (domainClinic as any)?.patientPortalDashboardFormat;
       const needsMDCase = dashboardFormat === 'md-integrations' || dashboardFormat === 'MD_INTEGRATIONS';
-      
+
       if (needsMDCase && finalOrderId) {
         console.log('🎉 [CHECKOUT] Clinic uses MD Integrations, creating case...');
         setPaymentStatus('creatingMDCase'); // Update status to show MD case creation in progress
@@ -763,7 +763,7 @@ export function useQuestionnaireModal(
       // Set status to ready - all steps complete, user can now continue to dashboard
       setPaymentStatus('ready');
       console.log('🎉 [CHECKOUT] ========== CHECKOUT COMPLETE - READY TO REDIRECT ==========');
-      
+
     } catch (error) {
       console.error('❌ [CHECKOUT] Payment success handler error:', error);
       setPaymentStatus('failed');
@@ -791,9 +791,9 @@ export function useQuestionnaireModal(
       // 1. Get clinic from order (most reliable)
       // 2. Get clinic from authenticated user
       // 3. Fallback to domainClinic
-      
+
       let clinicForRedirect = domainClinic;
-      
+
       console.log('🔍 [CHECKOUT] Determining redirect clinic:', {
         hasOrderId: !!orderId,
         orderId: orderId,
@@ -804,7 +804,7 @@ export function useQuestionnaireModal(
         domainClinicName: domainClinic?.name,
         domainClinicSlug: domainClinic?.slug,
       });
-      
+
       // Try to get clinic from order first (if we have orderId)
       if (orderId) {
         try {
@@ -825,7 +825,7 @@ export function useQuestionnaireModal(
           console.warn('⚠️ [CHECKOUT] Could not fetch clinic from order:', error);
         }
       }
-      
+
       // If we still don't have clinic, try getting it from user
       if (!clinicForRedirect || (clinicForRedirect === domainClinic && userId)) {
         try {
@@ -845,17 +845,17 @@ export function useQuestionnaireModal(
           console.warn('⚠️ [CHECKOUT] Could not fetch user clinic:', error);
         }
       }
-      
+
       // Determine the correct dashboard based on clinic's patientPortalDashboardFormat
       const dashboardFormat = (clinicForRedirect as any)?.patientPortalDashboardFormat;
       let dashboardPrefix = getDashboardPrefix(clinicForRedirect);
-      
+
       // For MD Integrations, redirect to messages tab after checkout
       // Normalize format to handle both 'md-integrations' and 'MD_INTEGRATIONS'
       if (dashboardFormat === 'md-integrations' || dashboardFormat === 'MD_INTEGRATIONS') {
         dashboardPrefix = `${dashboardPrefix}?tab=messages`;
       }
-      
+
       console.log('🎉 [CHECKOUT] Final redirect decision:', {
         dashboardPrefix,
         patientPortalDashboardFormat: dashboardFormat,
@@ -864,14 +864,14 @@ export function useQuestionnaireModal(
         usedDomainClinic: clinicForRedirect === domainClinic,
         source: clinicForRedirect === domainClinic ? 'domainClinic' : 'order/user',
       });
-      
+
       // Build full URL to handle subdomain correctly BEFORE closing modals
       const protocol = typeof window !== 'undefined' ? window.location.protocol : 'http:';
       const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
       const port = typeof window !== 'undefined' && window.location.port ? `:${window.location.port}` : '';
       const baseUrl = `${protocol}//${hostname}${port}`;
       const fullUrl = `${baseUrl}${dashboardPrefix}`;
-      
+
       console.log('🎉 [CHECKOUT] Prepared redirect URL:', {
         dashboardPrefix,
         fullUrl,
@@ -879,15 +879,15 @@ export function useQuestionnaireModal(
         hostname,
         willRedirectIn: '300ms',
       });
-      
+
       // Close success modal and main modal
       setShowSuccessModal(false);
       onClose();
-      
+
       // Check if user is authenticated before redirecting
       // If not authenticated, redirect to signin with return URL
       const isAuthenticated = typeof window !== 'undefined' && localStorage.getItem('auth-token');
-      
+
       if (!isAuthenticated) {
         console.log('⚠️ [CHECKOUT] User not authenticated, redirecting to signin with return URL');
         const signinUrl = `${baseUrl}/signin?redirect=${encodeURIComponent(dashboardPrefix)}`;
@@ -900,7 +900,7 @@ export function useQuestionnaireModal(
         }, 500);
         return;
       }
-      
+
       // Redirect after a short delay to allow modals to close
       // Use a longer timeout to ensure modals are fully closed
       setTimeout(() => {
@@ -913,7 +913,7 @@ export function useQuestionnaireModal(
             timestamp: new Date().toISOString(),
             isAuthenticated: true,
           });
-          
+
           // Use window.location.replace to avoid adding to history
           // This prevents back button issues
           window.location.replace(fullUrl);
@@ -926,13 +926,13 @@ export function useQuestionnaireModal(
       // Fallback to domainClinic if there's an error
       let dashboardPrefix = getDashboardPrefix(domainClinic);
       const dashboardFormat = (domainClinic as any)?.patientPortalDashboardFormat;
-      
+
       // For MD Integrations, redirect to messages tab after checkout
       // Normalize format to handle both 'md-integrations' and 'MD_INTEGRATIONS'
       if (dashboardFormat === 'md-integrations' || dashboardFormat === 'MD_INTEGRATIONS') {
         dashboardPrefix = `${dashboardPrefix}?tab=messages`;
       }
-      
+
       console.warn('⚠️ [CHECKOUT] Using fallback domainClinic for redirect:', {
         dashboardPrefix,
         patientPortalDashboardFormat: dashboardFormat,
@@ -947,13 +947,13 @@ export function useQuestionnaireModal(
           const port = window.location.port ? `:${window.location.port}` : '';
           const baseUrl = `${protocol}//${hostname}${port}`;
           const fullUrl = `${baseUrl}${dashboardPrefix}`;
-          
+
           console.log('⚠️ [CHECKOUT] Fallback redirect:', {
             dashboardPrefix,
             fullUrl,
             currentUrl: window.location.href,
           });
-          
+
           window.location.href = fullUrl;
         }
       }, 300);
@@ -1096,7 +1096,7 @@ export function useQuestionnaireModal(
       const hasPerProductPricing = programData.hasPerProductPricing || false;
       const selectedProductsList = programData.products.filter(p => selectedProgramProducts[p.id]);
       const productsTotal = selectedProductsList.reduce((sum, p) => sum + p.displayPrice, 0);
-      
+
       // Calculate non-medical services fee based on pricing model
       let nonMedicalServicesFee: number;
       if (hasPerProductPricing) {
@@ -1108,7 +1108,7 @@ export function useQuestionnaireModal(
         // For unified pricing, use the parent program's non-medical services fee
         nonMedicalServicesFee = programData.nonMedicalServicesFee;
       }
-      
+
       const totalAmount = productsTotal + nonMedicalServicesFee;
 
       console.log('💰 [PROGRAM SUB] Price calculation:', {
@@ -1157,12 +1157,12 @@ export function useQuestionnaireModal(
         if (subscriptionData.clientSecret) {
           const intentId = subscriptionData.paymentIntentId || subscriptionData.subscriptionId || subscriptionData.id;
           const orderIdValue = subscriptionData.orderId;
-          
+
           setClientSecret(subscriptionData.clientSecret);
           setPaymentIntentId(intentId);
           if (orderIdValue) setOrderId(orderIdValue);
           setPaymentStatus('idle');
-          
+
           // Return full data for deferred payment flow
           return {
             clientSecret: subscriptionData.clientSecret,
