@@ -3,7 +3,7 @@ import { Button } from "@heroui/react";
 import { ProgressBar } from "./ProgressBar";
 import { StepHeader } from "./StepHeader";
 import { CheckoutView } from "./CheckoutView";
-import { PlanOption, ProgramData, PaymentStatus } from "../types";
+import { PlanOption, ProgramData, PaymentStatus, PaymentIntentResult } from "../types";
 
 interface CheckoutStepViewProps {
   progressPercent: number;
@@ -20,8 +20,8 @@ interface CheckoutStepViewProps {
   shippingInfo: any;
   onShippingInfoChange: (field: string, value: any) => void;
   onRetryPaymentSetup: () => void;
-  onCreateSubscription: (planId: string) => Promise<void>;
-  onPaymentSuccess: () => Promise<void>;
+  onCreateSubscription: (planId: string) => Promise<PaymentIntentResult | null>;
+  onPaymentSuccess: (data?: { paymentIntentId?: string; orderId?: string }) => Promise<void>;
   onPaymentError: (error: string) => void;
   onPaymentConfirm?: () => void;
   stripePromise: any;
@@ -34,7 +34,7 @@ interface CheckoutStepViewProps {
   programData?: ProgramData;
   selectedProgramProducts?: Record<string, boolean>;
   onProgramProductToggle?: (productId: string) => void;
-  onCreateProgramSubscription?: () => Promise<void>;
+  onCreateProgramSubscription?: () => Promise<PaymentIntentResult | null>;
 }
 
 export const CheckoutStepView: React.FC<CheckoutStepViewProps> = ({

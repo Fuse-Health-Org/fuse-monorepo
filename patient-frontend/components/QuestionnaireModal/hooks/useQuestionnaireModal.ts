@@ -589,11 +589,20 @@ export function useQuestionnaireModal(
       if (result.success && result.data) {
         const subscriptionData = result.data.data || result.data;
         if (subscriptionData.clientSecret) {
+          const intentId = subscriptionData.paymentIntentId || subscriptionData.subscriptionId || subscriptionData.id;
+          const orderIdValue = subscriptionData.orderId;
+          
           setClientSecret(subscriptionData.clientSecret);
-          setPaymentIntentId(subscriptionData.paymentIntentId || subscriptionData.subscriptionId || subscriptionData.id);
-          if (subscriptionData.orderId) setOrderId(subscriptionData.orderId);
+          setPaymentIntentId(intentId);
+          if (orderIdValue) setOrderId(orderIdValue);
           setPaymentStatus('idle');
-          return subscriptionData.clientSecret;
+          
+          // Return full data for deferred payment flow
+          return {
+            clientSecret: subscriptionData.clientSecret,
+            paymentIntentId: intentId,
+            orderId: orderIdValue,
+          };
         }
       }
       setPaymentStatus('failed');
@@ -604,11 +613,14 @@ export function useQuestionnaireModal(
     }
   }, [plans, answers, domainClinic, tenantProductId, shippingInfo, affiliateSlug, buildQuestionnaireAnswers]);
 
-  const handlePlanSelection = useCallback(async (planId: string) => {
+  const handlePlanSelection = useCallback((planId: string) => {
+    console.log('📋 [PLAN SELECTION] Plan changed to:', planId);
     setSelectedPlan(planId);
-    setClientSecret(null);
-    setTimeout(async () => { await createSubscriptionForPlan(planId); }, 100);
-  }, [setSelectedPlan, createSubscriptionForPlan]);
+    // Reset payment state when plan changes (in case of previous failure)
+    if (paymentStatus === 'failed') {
+      setPaymentStatus('idle');
+    }
+  }, [setSelectedPlan, paymentStatus]);
 
   const triggerCheckoutSequenceRun = useCallback(async () => {
     if (!domainClinic?.id) return;
@@ -710,15 +722,18 @@ export function useQuestionnaireModal(
     console.log('🔵 [MDI] ========== END ==========');
   }, [domainClinic, answers]);
 
-  const handlePaymentSuccess = useCallback(async () => {
+  const handlePaymentSuccess = useCallback(async (data?: { paymentIntentId?: string; orderId?: string }) => {
+    // Use passed data or fall back to state
+    const finalPaymentIntentId = data?.paymentIntentId || paymentIntentId;
+    const finalOrderId = data?.orderId || orderId;
+    
     console.log('🎉 [CHECKOUT] ========== PAYMENT SUCCESS ==========');
-    console.log('🎉 [CHECKOUT] Payment Intent ID:', paymentIntentId);
-    console.log('🎉 [CHECKOUT] Order ID:', orderId);
+    console.log('🎉 [CHECKOUT] Payment Intent ID:', finalPaymentIntentId);
+    console.log('🎉 [CHECKOUT] Order ID:', finalOrderId);
     console.log('🎉 [CHECKOUT] User ID:', userId);
     console.log('🎉 [CHECKOUT] Account Created:', accountCreated);
 
     try {
-      if (!paymentIntentId) throw new Error('No payment intent ID');
       setPaymentStatus('succeeded');
       console.log('🎉 [CHECKOUT] Payment status set to succeeded');
 
@@ -726,18 +741,20 @@ export function useQuestionnaireModal(
       await triggerCheckoutSequenceRun();
       console.log('🎉 [CHECKOUT] Checkout sequence triggered');
 
-      console.log('🎉 [CHECKOUT] Tracking conversion...');
-      await trackConversion(paymentIntentId, orderId || undefined);
-      console.log('🎉 [CHECKOUT] Conversion tracked');
+      if (finalPaymentIntentId) {
+        console.log('🎉 [CHECKOUT] Tracking conversion...');
+        await trackConversion(finalPaymentIntentId, finalOrderId || undefined);
+        console.log('🎉 [CHECKOUT] Conversion tracked');
+      }
 
       // Create MD Integrations case if clinic uses md-integrations format
       const dashboardFormat = (domainClinic as any)?.patientPortalDashboardFormat;
       const needsMDCase = dashboardFormat === 'md-integrations' || dashboardFormat === 'MD_INTEGRATIONS';
       
-      if (needsMDCase && orderId) {
+      if (needsMDCase && finalOrderId) {
         console.log('🎉 [CHECKOUT] Clinic uses MD Integrations, creating case...');
         setPaymentStatus('creatingMDCase'); // Update status to show MD case creation in progress
-        await createMDCase(orderId);
+        await createMDCase(finalOrderId);
         console.log('✅ [CHECKOUT] MD case creation complete');
       } else {
         console.log('ℹ️ [CHECKOUT] Skipping MD case creation (not md-integrations format or no orderId)');
@@ -751,9 +768,9 @@ export function useQuestionnaireModal(
       console.error('❌ [CHECKOUT] Payment success handler error:', error);
       setPaymentStatus('failed');
       setShowSuccessModal(false); // Ensure modal is closed on error
-      alert('Payment authorization failed. Please contact support.');
+      alert('Payment processing error. Please contact support.');
     }
-  }, [paymentIntentId, orderId, userId, accountCreated, triggerCheckoutSequenceRun, trackConversion, createMDCase]);
+  }, [paymentIntentId, orderId, userId, accountCreated, triggerCheckoutSequenceRun, trackConversion, createMDCase, domainClinic]);
 
   const handlePaymentConfirm = useCallback(() => {
     // Open modal with processing state when payment confirmation starts
@@ -1037,7 +1054,13 @@ export function useQuestionnaireModal(
 
   // Program product toggle - handles both single_choice and multiple_choice modes
   const handleProgramProductToggle = useCallback((productId: string) => {
+    console.log('📦 [PRODUCT TOGGLE] Toggling product:', productId);
     const offerType = programData?.productOfferType || programData?.medicalTemplate?.productOfferType || 'multiple_choice';
+
+    // Reset payment state when product selection changes (in case of previous failure)
+    if (paymentStatus === 'failed') {
+      setPaymentStatus('idle');
+    }
 
     if (offerType === 'single_choice') {
       // In single_choice mode, selecting a product deselects all others
@@ -1059,7 +1082,7 @@ export function useQuestionnaireModal(
       // In multiple_choice mode, toggle the product
       setSelectedProgramProducts(prev => ({ ...prev, [productId]: !prev[productId] }));
     }
-  }, [programData]);
+  }, [programData, paymentStatus]);
 
   // Create program subscription with dynamic pricing
   const createProgramSubscription = useCallback(async () => {
@@ -1069,9 +1092,36 @@ export function useQuestionnaireModal(
       setPaymentStatus('processing');
 
       // Calculate total from selected products + non-medical services fee
+      // Handles both unified pricing and per-product pricing
+      const hasPerProductPricing = programData.hasPerProductPricing || false;
       const selectedProductsList = programData.products.filter(p => selectedProgramProducts[p.id]);
       const productsTotal = selectedProductsList.reduce((sum, p) => sum + p.displayPrice, 0);
-      const totalAmount = productsTotal + programData.nonMedicalServicesFee;
+      
+      // Calculate non-medical services fee based on pricing model
+      let nonMedicalServicesFee: number;
+      if (hasPerProductPricing) {
+        // For per-product pricing, sum up each product's individual non-medical services fee
+        nonMedicalServicesFee = selectedProductsList.reduce((sum, p) => {
+          return sum + (p.perProductProgram?.nonMedicalServicesFee || 0);
+        }, 0);
+      } else {
+        // For unified pricing, use the parent program's non-medical services fee
+        nonMedicalServicesFee = programData.nonMedicalServicesFee;
+      }
+      
+      const totalAmount = productsTotal + nonMedicalServicesFee;
+
+      console.log('💰 [PROGRAM SUB] Price calculation:', {
+        hasPerProductPricing,
+        productsTotal,
+        nonMedicalServicesFee,
+        totalAmount,
+        selectedProducts: selectedProductsList.map(p => ({
+          name: p.name,
+          displayPrice: p.displayPrice,
+          perProductFee: p.perProductProgram?.nonMedicalServicesFee
+        }))
+      });
 
       const userDetails = {
         firstName: answers['firstName'],
@@ -1086,7 +1136,7 @@ export function useQuestionnaireModal(
         selectedProductIds: selectedProductsList.map(p => p.id),
         totalAmount,
         productsTotal,
-        nonMedicalServicesFee: programData.nonMedicalServicesFee,
+        nonMedicalServicesFee,
         userDetails,
         questionnaireAnswers: questionnaireAnswersData.structured,
         shippingInfo,
@@ -1105,11 +1155,20 @@ export function useQuestionnaireModal(
       if (result.success && result.data) {
         const subscriptionData = result.data.data || result.data;
         if (subscriptionData.clientSecret) {
+          const intentId = subscriptionData.paymentIntentId || subscriptionData.subscriptionId || subscriptionData.id;
+          const orderIdValue = subscriptionData.orderId;
+          
           setClientSecret(subscriptionData.clientSecret);
-          setPaymentIntentId(subscriptionData.paymentIntentId || subscriptionData.subscriptionId || subscriptionData.id);
-          if (subscriptionData.orderId) setOrderId(subscriptionData.orderId);
+          setPaymentIntentId(intentId);
+          if (orderIdValue) setOrderId(orderIdValue);
           setPaymentStatus('idle');
-          return subscriptionData.clientSecret;
+          
+          // Return full data for deferred payment flow
+          return {
+            clientSecret: subscriptionData.clientSecret,
+            paymentIntentId: intentId,
+            orderId: orderIdValue,
+          };
         }
       }
       setPaymentStatus('failed');

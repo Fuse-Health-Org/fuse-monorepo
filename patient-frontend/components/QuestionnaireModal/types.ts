@@ -185,6 +185,13 @@ export interface PharmacyCoverage {
 
 export type PaymentStatus = "idle" | "processing" | "succeeded" | "creatingMDCase" | "ready" | "failed";
 
+/** Result from creating a PaymentIntent/subscription */
+export interface PaymentIntentResult {
+    clientSecret: string;
+    paymentIntentId?: string;
+    orderId?: string;
+}
+
 export interface CheckoutViewProps {
     plans: PlanOption[];
     selectedPlan: string;
@@ -194,8 +201,10 @@ export interface CheckoutViewProps {
     shippingInfo: Record<string, string>;
     onShippingInfoChange: ShippingInfoUpdater;
     onRetryPaymentSetup: () => void;
-    onCreateSubscription: (planId: string) => Promise<void>;
-    onPaymentSuccess: () => Promise<void>;
+    /** Creates a subscription and returns payment data for confirmation */
+    onCreateSubscription: (planId: string) => Promise<PaymentIntentResult | null>;
+    /** Called on successful payment with the payment data */
+    onPaymentSuccess: (data?: { paymentIntentId?: string; orderId?: string }) => Promise<void>;
     onPaymentError: (error: string) => void;
     onPaymentConfirm?: () => void;
     stripePromise: any;
@@ -208,7 +217,8 @@ export interface CheckoutViewProps {
     programData?: ProgramData;
     selectedProgramProducts?: Record<string, boolean>;
     onProgramProductToggle?: (productId: string) => void;
-    onCreateProgramSubscription?: () => Promise<void>;
+    /** Creates a program subscription and returns payment data for confirmation */
+    onCreateProgramSubscription?: () => Promise<PaymentIntentResult | null>;
 }
 
 

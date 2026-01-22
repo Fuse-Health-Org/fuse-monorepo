@@ -13,7 +13,7 @@ import {
 } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { Elements } from "@stripe/react-stripe-js";
-import { StripePaymentForm } from "../../StripePaymentForm";
+import { StripeDeferredPaymentForm } from "../../StripeDeferredPaymentForm";
 import { CheckoutViewProps } from "../types";
 import { US_STATES } from "@fuse/enums";
 
@@ -545,26 +545,11 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                             <span>Secure, fast checkout with Link</span>
                         </div>
 
-                        {paymentStatus === 'processing' && (
-                            <div className="bg-blue-50 border border-blue-200 p-6 rounded-lg text-center">
-                                <Icon icon="lucide:loader-2" className="text-4xl text-blue-500 mx-auto mb-3 animate-spin" />
-                                <h4 className="text-lg font-semibold text-blue-800 mb-2">Initializing Payment</h4>
-                                <p className="text-blue-600">Setting up secure payment processing...</p>
-                                <div className="mt-3 flex justify-center">
-                                    <div className="flex space-x-1">
-                                        <div className="w-2 h-2" style={{ backgroundColor: theme.primary }}></div>
-                                        <div className="w-2 h-2" style={{ backgroundColor: theme.primary, animationDelay: '0.1s' }}></div>
-                                        <div className="w-2 h-2" style={{ backgroundColor: theme.primary, animationDelay: '0.2s' }}></div>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
                         {paymentStatus === 'failed' && (
                             <div className="bg-red-50 border border-red-200 p-6 rounded-lg text-center">
-                                <Icon icon="lucide:alert-circle" className="text-4l text-red-500 mx-auto mb-3" />
-                                <h4 className="text-lg font-semibold text-red-800 mb-2">Payment Setup Failed</h4>
-                                <p className="text-red-600 mb-4">Unable to initialize payment processing</p>
+                                <Icon icon="lucide:alert-circle" className="text-4xl text-red-500 mx-auto mb-3" />
+                                <h4 className="text-lg font-semibold text-red-800 mb-2">Payment Failed</h4>
+                                <p className="text-red-600 mb-4">Unable to process payment. Please try again.</p>
                                 <Button
                                     color="danger"
                                     variant="light"
@@ -576,113 +561,9 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                             </div>
                         )}
 
-                        {!clientSecret && paymentStatus === 'processing' && (
-                            <div className="text-center py-8 bg-blue-50 rounded-lg border border-blue-200">
-                                <Icon icon="lucide:loader-2" className="text-3xl text-blue-500 mx-auto mb-2 animate-spin" />
-                                <p className="text-lg font-medium text-blue-900 mb-1">Setting up your subscription...</p>
-                                <p className="text-sm text-blue-700">Please wait while we prepare your payment</p>
-                            </div>
-                        )}
-
-                        {/* Regular product flow */}
-                        {!isProgramCheckout && !clientSecret && paymentStatus === 'idle' && selectedPlan && (
-                            <div className="space-y-4">
-                                <div className="text-center py-6 bg-blue-50 rounded-lg border border-blue-200">
-                                    <Icon icon="lucide:check-circle" className="text-3xl text-blue-500 mx-auto mb-2" />
-                                    <p className="text-lg font-medium text-blue-900 mb-1">Plan Selected</p>
-                                    <p className="text-sm text-blue-700">
-                                        {selectedPlanData?.name} - ${selectedPlanData?.price}/mo
-                                    </p>
-                                </div>
-                                <Button
-                                    color="primary"
-                                    size="lg"
-                                    className="w-full"
-                                    isDisabled={!canContinue}
-                                    onPress={() => onCreateSubscription(selectedPlan)}
-                                >
-                                    Continue with {selectedPlanData?.name} - ${selectedPlanData?.price}/mo
-                                </Button>
-                                {!canContinue && (
-                                    <div className="text-center text-xs text-gray-500">
-                                        Fill out shipping address to continue
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        {!isProgramCheckout && !clientSecret && paymentStatus === 'idle' && !selectedPlan && (
-                            <div className="text-center py-8 bg-gray-50 rounded-lg border border-gray-200">
-                                <Icon icon="lucide:mouse-pointer-click" className="text-3xl text-gray-400 mx-auto mb-2" />
-                                <p className="text-lg font-medium text-gray-700 mb-1">Select a Plan Above</p>
-                                <p className="text-sm text-gray-500">Choose your preferred billing cycle to continue</p>
-                            </div>
-                        )}
-
-                        {/* Program flow */}
-                        {isProgramCheckout && !clientSecret && paymentStatus === 'idle' && hasSelectedProgramProducts && (
-                            <div className="space-y-4">
-                                <div className="text-center py-6 bg-blue-50 rounded-lg border border-blue-200">
-                                    <Icon icon="lucide:check-circle" className="text-3xl text-blue-500 mx-auto mb-2" />
-                                    <p className="text-lg font-medium text-blue-900 mb-1">Products Selected</p>
-                                    <p className="text-sm text-blue-700">
-                                        {Object.values(selectedProgramProducts).filter(v => v).length} product(s) - ${programTotal.toFixed(2)}/mo
-                                    </p>
-                                </div>
-                                <Button
-                                    color="primary"
-                                    size="lg"
-                                    className="w-full"
-                                    isDisabled={!canContinue}
-                                    onPress={() => onCreateProgramSubscription?.()}
-                                >
-                                    Continue - ${programTotal.toFixed(2)}/mo
-                                </Button>
-                                {!canContinue && (
-                                    <div className="text-center text-xs text-gray-500">
-                                        Fill out shipping address to continue
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        {isProgramCheckout && !clientSecret && paymentStatus === 'idle' && !hasSelectedProgramProducts && (
-                            <div className="text-center py-8 bg-gray-50 rounded-lg border border-gray-200">
-                                <Icon icon="lucide:mouse-pointer-click" className="text-3xl text-gray-400 mx-auto mb-2" />
-                                <p className="text-lg font-medium text-gray-700 mb-1">
-                                    {(programData?.productOfferType || programData?.medicalTemplate?.productOfferType) === 'single_choice'
-                                        ? 'Select a Product Above'
-                                        : 'Select Products Above'}
-                                </p>
-                                <p className="text-sm text-gray-500">
-                                    {(programData?.productOfferType || programData?.medicalTemplate?.productOfferType) === 'single_choice'
-                                        ? 'Choose one product to continue'
-                                        : 'Choose at least one product to continue'}
-                                </p>
-                            </div>
-                        )}
-
-                        {clientSecret && paymentStatus === 'idle' && (
-                            <div className="space-y-4">
-                                <div className="bg-green-50 border border-green-200 p-3 rounded-lg text-center">
-                                    <Icon icon="lucide:shield-check" className="text-2l text-green-500 mx-auto mb-1" />
-                                    <p className="text-sm text-green-700 font-medium">Secure Payment Ready</p>
-                                </div>
-                                <Elements stripe={stripePromise} options={{ clientSecret }}>
-                                    <StripePaymentForm
-                                        amount={isProgramCheckout ? programTotal : (selectedPlanData?.price || 0)}
-                                        onSuccess={onPaymentSuccess}
-                                        onError={onPaymentError}
-                                        onConfirm={onPaymentConfirm}
-                                        loading={false}
-                                    />
-                                </Elements>
-                            </div>
-                        )}
-
                         {paymentStatus === 'succeeded' && (
                             <div className="bg-green-50 border border-green-200 p-6 rounded-lg text-center">
-                                <Icon icon="lucide:check-circle" className="text-4l text-green-500 mx-auto mb-3" />
+                                <Icon icon="lucide:check-circle" className="text-4xl text-green-500 mx-auto mb-3" />
                                 <h4 className="text-lg font-semibold text-green-800 mb-2">Payment Successful!</h4>
                                 <p className="text-green-600 mb-4">Your order has been processed successfully</p>
                                 <div className="flex items-center justify-center gap-2 text-sm text-green-600 mb-4">
@@ -691,6 +572,65 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                                 </div>
                             </div>
                         )}
+
+                        {/* Deferred Payment Form - Renders immediately without clientSecret */}
+                        {paymentStatus !== 'succeeded' && paymentStatus !== 'failed' && (() => {
+                            const paymentAmount = isProgramCheckout ? programTotal : dueIfApproved;
+                            const hasValidAmount = paymentAmount > 0;
+                            
+                            // Show placeholder when no valid amount yet
+                            if (!hasValidAmount) {
+                                return (
+                                    <div className="text-center py-8 bg-gray-50 rounded-lg border border-gray-200">
+                                        <Icon icon="lucide:credit-card" className="text-3xl text-gray-400 mx-auto mb-2" />
+                                        <p className="text-lg font-medium text-gray-700 mb-1">
+                                            {isProgramCheckout ? 'Select a Product' : 'Select a Plan'}
+                                        </p>
+                                        <p className="text-sm text-gray-500">
+                                            {isProgramCheckout 
+                                                ? 'Choose a product above to see payment options'
+                                                : 'Choose a plan above to see payment options'}
+                                        </p>
+                                    </div>
+                                );
+                            }
+                            
+                            return (
+                                <Elements 
+                                    stripe={stripePromise} 
+                                    options={{
+                                        mode: 'payment', // PaymentIntent mode (server creates PI, not Subscription)
+                                        amount: Math.round(paymentAmount * 100), // Convert to cents
+                                        currency: 'usd',
+                                        setupFutureUsage: 'off_session', // Save card for future recurring payments
+                                        captureMethod: 'manual', // Pre-authorization: charge only if approved by doctor
+                                        appearance: {
+                                            theme: 'stripe',
+                                            variables: {
+                                                colorPrimary: theme.primary,
+                                            },
+                                        },
+                                    }}
+                                >
+                                    <StripeDeferredPaymentForm
+                                        amount={paymentAmount}
+                                        onCreatePaymentIntent={async () => {
+                                            // Create subscription when user submits payment
+                                            if (isProgramCheckout) {
+                                                return onCreateProgramSubscription ? await onCreateProgramSubscription() : null;
+                                            } else {
+                                                return selectedPlan ? await onCreateSubscription(selectedPlan) : null;
+                                            }
+                                        }}
+                                        onSuccess={onPaymentSuccess}
+                                        onError={onPaymentError}
+                                        onConfirm={onPaymentConfirm}
+                                        disabled={!canContinue}
+                                        disabledReason={!canContinue ? 'Please fill out shipping address' : undefined}
+                                    />
+                                </Elements>
+                            );
+                        })()}
 
                         <p className="text-xs text-gray-500">
                             By providing your card information, you allow the clinic to charge your card for future payments in
