@@ -23,6 +23,20 @@ export default function SignIn() {
     }
   }, [user, router])
 
+  // Check for query parameter messages
+  useEffect(() => {
+    if (router.query.message && typeof router.query.message === 'string') {
+      setSuccessMessage(router.query.message)
+      // Clear the message from URL after showing it
+      router.replace('/signin', undefined, { shallow: true })
+      // Auto-hide message after 5 seconds
+      const timer = setTimeout(() => {
+        setSuccessMessage(null)
+      }, 5000)
+      return () => clearTimeout(timer)
+    }
+  }, [router.query.message, router])
+
   // Resend cooldown timer
   useEffect(() => {
     if (resendCooldown > 0) {
@@ -111,7 +125,7 @@ export default function SignIn() {
           <meta name="description" content="Enter verification code" />
         </Head>
         
-        <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center p-4">
+        <div className="min-h-screen bg-background flex items-center justify-center p-4">
           <div className="w-full max-w-md space-y-8">
             <div className="text-center">
               <div className="flex justify-center mb-6">
@@ -119,30 +133,30 @@ export default function SignIn() {
                   <Mail className="h-8 w-8 text-white" />
                 </div>
               </div>
-              <h1 className="text-3xl font-semibold text-[#1F2937] mb-2">Check Your Email</h1>
-              <p className="text-[#6B7280]">
+              <h1 className="text-3xl font-semibold text-foreground mb-2">Check Your Email</h1>
+              <p className="text-muted-foreground">
                 We sent a 6-digit verification code to<br />
-                <span className="font-medium text-[#1F2937]">{email}</span>
+                <span className="font-medium text-foreground">{email}</span>
               </p>
-              <p className="text-sm text-[#6B7280] mt-2">
+              <p className="text-sm text-muted-foreground mt-2">
                 (Please check your spam folder)
               </p>
             </div>
 
-            <div className="bg-white rounded-2xl shadow-sm border border-[#E5E7EB] overflow-hidden">
-              <div className="p-8 pb-6 border-b border-[#E5E7EB]">
-                <h2 className="text-xl font-semibold text-[#1F2937] text-center">Enter Verification Code</h2>
+            <div className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden">
+              <div className="p-8 pb-6 border-b border-border">
+                <h2 className="text-xl font-semibold text-foreground text-center">Enter Verification Code</h2>
               </div>
               <div className="p-8">
                 <form onSubmit={handleMfaSubmit} className="space-y-6">
                   {error && (
-                    <div className="p-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-2xl shadow-sm">
+                    <div className="p-4 text-sm text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-2xl shadow-sm">
                       {error}
                     </div>
                   )}
 
                   {successMessage && (
-                    <div className="p-4 text-sm text-green-700 bg-green-50 border border-green-200 rounded-2xl shadow-sm">
+                    <div className="p-4 text-sm text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-2xl shadow-sm">
                       {successMessage}
                     </div>
                   )}
@@ -159,13 +173,13 @@ export default function SignIn() {
                         onChange={(e) => handleMfaCodeChange(index, e.target.value)}
                         onKeyDown={(e) => handleMfaKeyDown(index, e)}
                         onPaste={handleMfaPaste}
-                        className="w-12 h-14 text-center text-2xl font-bold border-2 border-[#E5E7EB] rounded-xl bg-[#F9FAFB] text-[#1F2937] focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
+                        className="w-12 h-14 text-center text-2xl font-bold border-2 border-input rounded-xl bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
                         autoFocus={index === 0}
                       />
                     ))}
                   </div>
 
-                  <p className="text-xs text-center text-[#6B7280]">
+                  <p className="text-xs text-center text-muted-foreground">
                     Code expires in 5 minutes
                   </p>
 
@@ -183,7 +197,7 @@ export default function SignIn() {
                     type="button"
                     onClick={handleResendCode}
                     disabled={resendCooldown > 0 || isLoading || mfa.resendsRemaining <= 0}
-                    className="w-full flex items-center justify-center gap-2 text-sm text-[#6B7280] hover:text-[#1F2937] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="w-full flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     <RefreshCw className="h-4 w-4" />
                     {resendCooldown > 0 
@@ -197,7 +211,7 @@ export default function SignIn() {
                   <button
                     type="button"
                     onClick={handleBackToLogin}
-                    className="w-full flex items-center justify-center gap-2 text-sm text-[#6B7280] hover:text-[#1F2937] transition-colors"
+                    className="w-full flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
                   >
                     <ArrowLeft className="h-4 w-4" />
                     Back to sign in
@@ -206,7 +220,7 @@ export default function SignIn() {
               </div>
             </div>
 
-            <p className="text-xs text-center text-[#6B7280]">
+            <p className="text-xs text-center text-muted-foreground">
               🔒 Two-factor authentication required for HIPAA compliance
             </p>
           </div>
@@ -222,7 +236,7 @@ export default function SignIn() {
         <meta name="description" content="Sign in to tenant management portal" />
       </Head>
       
-      <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center p-4">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="w-full max-w-md space-y-8">
           {/* Logo/Header */}
           <div className="text-center">
@@ -231,26 +245,32 @@ export default function SignIn() {
                 <Building2 className="h-8 w-8 text-white" />
               </div>
             </div>
-            <h1 className="text-3xl font-semibold text-[#1F2937] mb-2">Tenant Portal</h1>
-            <p className="text-[#6B7280]">Sign in to manage your clinics</p>
+            <h1 className="text-3xl font-semibold text-foreground mb-2">Tenant Portal</h1>
+            <p className="text-muted-foreground">Sign in to manage your clinics</p>
           </div>
 
           {/* Sign In Form */}
-          <div className="bg-white rounded-2xl shadow-sm border border-[#E5E7EB] overflow-hidden">
-            <div className="p-8 pb-6 border-b border-[#E5E7EB]">
-              <h2 className="text-xl font-semibold text-[#1F2937] text-center">Welcome Back</h2>
-              <p className="text-sm text-[#6B7280] text-center mt-1">Enter your credentials to continue</p>
+          <div className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden">
+            <div className="p-8 pb-6 border-b border-border">
+              <h2 className="text-xl font-semibold text-foreground text-center">Welcome Back</h2>
+              <p className="text-sm text-muted-foreground text-center mt-1">Enter your credentials to continue</p>
             </div>
             <div className="p-8">
               <form onSubmit={handleSubmit} className="space-y-5">
+                {successMessage && (
+                  <div className="p-4 text-sm text-green-700 bg-green-50 border border-green-200 rounded-2xl shadow-sm">
+                    {successMessage}
+                  </div>
+                )}
+                
                 {error && (
-                  <div className="p-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-2xl shadow-sm">
+                  <div className="p-4 text-sm text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-2xl shadow-sm">
                     {error}
                   </div>
                 )}
                 
                 <div className="space-y-2">
-                  <label htmlFor="email" className="text-sm font-medium text-[#4B5563] block">
+                  <label htmlFor="email" className="text-sm font-medium text-foreground block">
                     Email Address
                   </label>
                   <input
@@ -258,14 +278,14 @@ export default function SignIn() {
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full px-4 py-3 border border-[#E5E7EB] rounded-xl bg-[#F9FAFB] text-[#1F2937] placeholder:text-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all"
+                    className="w-full px-4 py-3 border border-input rounded-xl bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all"
                     placeholder="tenant@example.com"
                     required
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <label htmlFor="password" className="text-sm font-medium text-[#4B5563] block">
+                  <label htmlFor="password" className="text-sm font-medium text-foreground block">
                     Password
                   </label>
                   <div className="relative">
@@ -274,14 +294,14 @@ export default function SignIn() {
                       type={showPassword ? 'text' : 'password'}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="w-full px-4 py-3 pr-12 border border-[#E5E7EB] rounded-xl bg-[#F9FAFB] text-[#1F2937] placeholder:text-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all"
+                      className="w-full px-4 py-3 pr-12 border border-input rounded-xl bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all"
                       placeholder="Enter your password"
                       required
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute inset-y-0 right-0 pr-4 flex items-center text-[#6B7280] hover:text-[#1F2937] transition-colors"
+                      className="absolute inset-y-0 right-0 pr-4 flex items-center text-muted-foreground hover:text-foreground transition-colors"
                     >
                       {showPassword ? (
                         <EyeOff className="h-5 w-5" />
@@ -289,6 +309,11 @@ export default function SignIn() {
                         <Eye className="h-5 w-5" />
                       )}
                     </button>
+                  </div>
+                  <div className="text-right">
+                    <Link href="/forgot-password" className="text-xs text-[#4FA59C] hover:underline font-medium">
+                      Forgot your password?
+                    </Link>
                   </div>
                 </div>
 

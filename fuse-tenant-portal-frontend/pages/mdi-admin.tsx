@@ -192,7 +192,7 @@ export default function MDIAdmin() {
   }
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="flex min-h-screen bg-background">
       <Sidebar />
       <div className="flex-1">
         <Header />
@@ -200,12 +200,12 @@ export default function MDIAdmin() {
           {/* Page Header */}
           <div className="mb-6">
             <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <ExternalLink className="h-6 w-6 text-blue-600" />
+              <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                <ExternalLink className="h-6 w-6 text-blue-600 dark:text-blue-400" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold text-gray-900">MDI Admin Area</h1>
-                <p className="text-gray-600 mt-1">
+                <h1 className="text-3xl font-bold text-foreground">MDI Admin Area</h1>
+                <p className="text-muted-foreground mt-1">
                   Manage MD Integrations offerings, products, and utilities
                 </p>
               </div>
@@ -213,13 +213,13 @@ export default function MDIAdmin() {
           </div>
 
           {/* Tabs */}
-          <div className="flex gap-2 mb-6 border-b">
+          <div className="flex gap-2 mb-6 border-b border-border">
             <button
               onClick={() => setActiveTab("offerings")}
               className={`px-4 py-2 font-medium transition-colors ${
                 activeTab === "offerings"
-                  ? "text-blue-600 border-b-2 border-blue-600"
-                  : "text-gray-600 hover:text-gray-900"
+                  ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
             >
               <div className="flex items-center gap-2">
@@ -231,8 +231,8 @@ export default function MDIAdmin() {
               onClick={() => setActiveTab("pharmacies")}
               className={`px-4 py-2 font-medium transition-colors ${
                 activeTab === "pharmacies"
-                  ? "text-blue-600 border-b-2 border-blue-600"
-                  : "text-gray-600 hover:text-gray-900"
+                  ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
             >
               <div className="flex items-center gap-2">
@@ -244,8 +244,8 @@ export default function MDIAdmin() {
               onClick={() => setActiveTab("utils")}
               className={`px-4 py-2 font-medium transition-colors ${
                 activeTab === "utils"
-                  ? "text-blue-600 border-b-2 border-blue-600"
-                  : "text-gray-600 hover:text-gray-900"
+                  ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
             >
               <div className="flex items-center gap-2">
@@ -300,12 +300,12 @@ export default function MDIAdmin() {
                 <CardContent>
                   {loadingOfferings ? (
                     <div className="flex items-center justify-center py-12">
-                      <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+                      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                     </div>
                   ) : offerings.length === 0 ? (
                     <div className="text-center py-12">
-                      <Package className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                      <p className="text-gray-600">No offerings found</p>
+                      <Package className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                      <p className="text-foreground">No offerings found</p>
                       <Button onClick={fetchOfferings} variant="outline" className="mt-4">
                         Load Offerings
                       </Button>
@@ -318,12 +318,12 @@ export default function MDIAdmin() {
                         return (
                           <div
                             key={id}
-                            className="p-4 border rounded-lg hover:border-blue-300 transition-colors"
+                            className="p-4 border border-border rounded-lg hover:border-blue-300 dark:hover:border-blue-600 transition-colors"
                           >
                             <div className="flex items-start justify-between">
                               <div className="flex-1">
                                 <div className="flex items-center gap-3 mb-2">
-                                  <h3 className="font-semibold text-lg">{name}</h3>
+                                  <h3 className="font-semibold text-lg text-foreground">{name}</h3>
                                   {offering.status && (
                                     <Badge
                                       variant={
@@ -335,12 +335,12 @@ export default function MDIAdmin() {
                                   )}
                                 </div>
                                 {offering.description && (
-                                  <p className="text-sm text-gray-600 mb-3">
+                                  <p className="text-sm text-muted-foreground mb-3">
                                     {offering.description}
                                   </p>
                                 )}
                                 <div className="flex items-center gap-2">
-                                  <code className="px-2 py-1 bg-gray-100 rounded text-xs font-mono">
+                                  <code className="px-2 py-1 bg-muted rounded text-xs font-mono text-foreground">
                                     {id}
                                   </code>
                                   <Button
@@ -363,13 +363,13 @@ export default function MDIAdmin() {
               </Card>
 
               {/* Info Card */}
-              <Card className="bg-blue-50 border-blue-200">
+              <Card className="bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800">
                 <CardContent className="pt-6">
                   <div className="flex gap-3">
-                    <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5" />
-                    <div className="text-sm text-blue-900">
+                    <AlertCircle className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5" />
+                    <div className="text-sm text-blue-900 dark:text-blue-300">
                       <p className="font-medium mb-1">About Offerings</p>
-                      <p className="text-blue-700">
+                      <p className="text-blue-700 dark:text-blue-400">
                         Offerings are treatment types configured in the MD Integrations dashboard. 
                         Link these to your products to enable telehealth case creation. Use the offering_id 
                         when linking products.
@@ -453,37 +453,37 @@ export default function MDIAdmin() {
                     {/* Results */}
                     {loadingPharmacies ? (
                       <div className="flex items-center justify-center py-12">
-                        <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+                        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                       </div>
                     ) : pharmacies.length === 0 ? (
                       <div className="text-center py-12">
-                        <Database className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                        <p className="text-gray-600 mb-2">Search for DoseSpot pharmacies</p>
-                        <p className="text-sm text-gray-500">
+                        <Database className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                        <p className="text-foreground mb-2">Search for DoseSpot pharmacies</p>
+                        <p className="text-sm text-muted-foreground">
                           Enter at least one search parameter to find pharmacies
                         </p>
                       </div>
                     ) : (
                       <div className="space-y-3">
-                        <div className="text-sm text-gray-600 mb-2">
+                        <div className="text-sm text-muted-foreground mb-2">
                           Found {pharmacies.length} pharmacies
                         </div>
                         {pharmacies.map((pharmacy: any, idx: number) => (
                           <div
                             key={pharmacy.id || idx}
-                            className="p-4 border rounded-lg hover:border-blue-300 transition-colors"
+                            className="p-4 border border-border rounded-lg hover:border-blue-300 dark:hover:border-blue-600 transition-colors"
                           >
                             <div className="flex items-start justify-between">
                               <div className="flex-1">
-                                <div className="font-semibold text-lg mb-1">
+                                <div className="font-semibold text-lg mb-1 text-foreground">
                                   {pharmacy.name || pharmacy.store_name}
                                 </div>
                                 {pharmacy.store_name && pharmacy.name !== pharmacy.store_name && (
-                                  <div className="text-sm text-gray-600 mb-2">
+                                  <div className="text-sm text-muted-foreground mb-2">
                                     {pharmacy.store_name}
                                   </div>
                                 )}
-                                <div className="text-sm text-gray-700 space-y-1">
+                                <div className="text-sm text-foreground space-y-1">
                                   {pharmacy.address1 && (
                                     <div>{pharmacy.address1}</div>
                                   )}
@@ -496,7 +496,7 @@ export default function MDIAdmin() {
                                 </div>
                                 {pharmacy.id && (
                                   <div className="mt-2">
-                                    <code className="px-2 py-1 bg-gray-100 rounded text-xs font-mono">
+                                    <code className="px-2 py-1 bg-muted rounded text-xs font-mono text-foreground">
                                       ID: {pharmacy.id}
                                     </code>
                                   </div>
@@ -512,13 +512,13 @@ export default function MDIAdmin() {
               </Card>
 
               {/* Info Card */}
-              <Card className="bg-blue-50 border-blue-200">
+              <Card className="bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800">
                 <CardContent className="pt-6">
                   <div className="flex gap-3">
-                    <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5" />
-                    <div className="text-sm text-blue-900">
+                    <AlertCircle className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5" />
+                    <div className="text-sm text-blue-900 dark:text-blue-300">
                       <p className="font-medium mb-1">About Pharmacy Search</p>
-                      <p className="text-blue-700">
+                      <p className="text-blue-700 dark:text-blue-400">
                         Search the DoseSpot pharmacy network to find pharmacies for prescriptions. 
                         This searches the same database clinicians use when prescribing medications through MD Integrations.
                       </p>
@@ -555,7 +555,7 @@ export default function MDIAdmin() {
                         onChange={(e) => setTestPdfEmail(e.target.value)}
                         type="email"
                       />
-                      <p className="text-xs text-gray-500 mt-1">
+                      <p className="text-xs text-muted-foreground mt-1">
                         PDF will be sent with sample prescription data to test formatting
                       </p>
                     </div>
@@ -596,7 +596,7 @@ export default function MDIAdmin() {
                         value={patientIdForLicense}
                         onChange={(e) => setPatientIdForLicense(e.target.value)}
                       />
-                      <p className="text-xs text-gray-500 mt-1">
+                      <p className="text-xs text-muted-foreground mt-1">
                         Find this in the User table as mdPatientId field
                       </p>
                     </div>
@@ -617,9 +617,9 @@ export default function MDIAdmin() {
               </Card>
 
               {/* API Info */}
-              <Card className="bg-amber-50 border-amber-200">
+              <Card className="bg-amber-50 dark:bg-amber-900/30 border-amber-200 dark:border-amber-800">
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-amber-900">
+                  <CardTitle className="flex items-center gap-2 text-amber-900 dark:text-amber-300">
                     <AlertCircle className="h-5 w-5" />
                     Available API Endpoints
                   </CardTitle>
@@ -627,40 +627,40 @@ export default function MDIAdmin() {
                 <CardContent className="space-y-2">
                   <div className="space-y-3 text-sm">
                     <div>
-                      <code className="px-2 py-1 bg-amber-100 rounded text-xs">
+                      <code className="px-2 py-1 bg-amber-100 dark:bg-amber-900/50 rounded text-xs text-foreground">
                         GET /md/admin/offerings
                       </code>
-                      <p className="text-amber-800 mt-1">List all available MDI offerings</p>
+                      <p className="text-amber-800 dark:text-amber-300 mt-1">List all available MDI offerings</p>
                     </div>
                     <div>
-                      <code className="px-2 py-1 bg-amber-100 rounded text-xs">
+                      <code className="px-2 py-1 bg-amber-100 dark:bg-amber-900/50 rounded text-xs text-foreground">
                         GET /md/admin/pharmacies
                       </code>
-                      <p className="text-amber-800 mt-1">Search DoseSpot pharmacies</p>
+                      <p className="text-amber-800 dark:text-amber-300 mt-1">Search DoseSpot pharmacies</p>
                     </div>
                     <div>
-                      <code className="px-2 py-1 bg-amber-100 rounded text-xs">
+                      <code className="px-2 py-1 bg-amber-100 dark:bg-amber-900/50 rounded text-xs text-foreground">
                         GET /md/admin/products/:productId/offering
                       </code>
-                      <p className="text-amber-800 mt-1">Get offering linked to a product</p>
+                      <p className="text-amber-800 dark:text-amber-300 mt-1">Get offering linked to a product</p>
                     </div>
                     <div>
-                      <code className="px-2 py-1 bg-amber-100 rounded text-xs">
+                      <code className="px-2 py-1 bg-amber-100 dark:bg-amber-900/50 rounded text-xs text-foreground">
                         POST /md/admin/products/:productId/offering/link
                       </code>
-                      <p className="text-amber-800 mt-1">Link existing offering to product</p>
+                      <p className="text-amber-800 dark:text-amber-300 mt-1">Link existing offering to product</p>
                     </div>
                     <div>
-                      <code className="px-2 py-1 bg-amber-100 rounded text-xs">
+                      <code className="px-2 py-1 bg-amber-100 dark:bg-amber-900/50 rounded text-xs text-foreground">
                         DELETE /md/admin/products/:productId/offering
                       </code>
-                      <p className="text-amber-800 mt-1">Unlink offering from product</p>
+                      <p className="text-amber-800 dark:text-amber-300 mt-1">Unlink offering from product</p>
                     </div>
                     <div>
-                      <code className="px-2 py-1 bg-amber-100 rounded text-xs">
+                      <code className="px-2 py-1 bg-amber-100 dark:bg-amber-900/50 rounded text-xs text-foreground">
                         DELETE /md/admin/patient/:patientId/driver-license
                       </code>
-                      <p className="text-amber-800 mt-1">Clear driver license for testing</p>
+                      <p className="text-amber-800 dark:text-amber-300 mt-1">Clear driver license for testing</p>
                     </div>
                   </div>
                 </CardContent>

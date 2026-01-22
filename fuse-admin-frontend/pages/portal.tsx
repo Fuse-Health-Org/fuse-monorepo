@@ -555,15 +555,15 @@ export default function PortalPage() {
         </div>
 
         {/* Custom Website Activation Toggle */}
-        <Card className={`mb-6 ${settings.isActive ? 'border-green-200 bg-green-50/30' : 'border-gray-200'}`}>
+        <Card className={`mb-6 ${settings.isActive ? 'border-green-200 dark:border-green-800 bg-green-50/30 dark:bg-green-900/20' : 'border-border'}`}>
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <div className={`p-3 rounded-full ${settings.isActive ? 'bg-green-100' : 'bg-gray-100'}`}>
-                  <Globe className={`h-6 w-6 ${settings.isActive ? 'text-green-600' : 'text-gray-400'}`} />
+                <div className={`p-3 rounded-full ${settings.isActive ? 'bg-green-100 dark:bg-green-900/40' : 'bg-muted'}`}>
+                  <Globe className={`h-6 w-6 ${settings.isActive ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`} />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold">Custom Website</h3>
+                  <h3 className="text-lg font-semibold text-foreground">Custom Website</h3>
                   <p className="text-sm text-muted-foreground">
                     {settings.isActive
                       ? "Your custom landing page is live and visible to visitors"
@@ -572,7 +572,7 @@ export default function PortalPage() {
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <span className={`text-sm font-medium ${settings.isActive ? 'text-green-600' : 'text-gray-500'}`}>
+                <span className={`text-sm font-medium ${settings.isActive ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}>
                   {settings.isActive ? "Activated" : "Deactivated"}
                 </span>
                 <Switch
@@ -610,7 +610,7 @@ export default function PortalPage() {
               </CardHeader>
               <CardContent>
                 <textarea
-                  className="w-full p-3 border rounded-md text-sm min-h-[80px] resize-none"
+                  className="w-full p-3 border border-input bg-background text-foreground rounded-md text-sm min-h-[80px] resize-none focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                   value={settings.portalDescription}
                   onChange={(e) => setSettings({ ...settings, portalDescription: e.target.value })}
                   placeholder="Enter portal description"
@@ -632,7 +632,7 @@ export default function PortalPage() {
                     className="w-10 h-10 rounded cursor-pointer border-0"
                   />
                   <div
-                    className="w-10 h-10 rounded border"
+                    className="w-10 h-10 rounded border border-input"
                     style={{ backgroundColor: settings.primaryColor }}
                   />
                   <Input
@@ -653,7 +653,7 @@ export default function PortalPage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 <select
-                  className="w-full p-3 border rounded-md text-sm"
+                  className="w-full p-3 border border-input bg-background text-foreground rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                   value={settings.fontFamily}
                   onChange={(e) => setSettings({ ...settings, fontFamily: e.target.value })}
                 >
@@ -1211,10 +1211,10 @@ export default function PortalPage() {
                   <CardDescription className="text-xs">This text appears in the middle section of the footer</CardDescription>
                   
                   {/* Toggle for default vs custom disclaimer */}
-                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
+                  <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border border-border">
                     <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-700">Use Default Disclaimer</p>
-                      <p className="text-xs text-gray-500">Use the global default disclaimer set by your organization</p>
+                      <p className="text-sm font-medium text-foreground">Use Default Disclaimer</p>
+                      <p className="text-xs text-muted-foreground">Use the global default disclaimer set by your organization</p>
                     </div>
                     <Switch
                       checked={settings.useDefaultDisclaimer ?? true}
@@ -1230,7 +1230,7 @@ export default function PortalPage() {
                         value={settings.footerDisclaimer || ""}
                         onChange={(e) => setSettings({ ...settings, footerDisclaimer: e.target.value })}
                         placeholder="Enter your custom disclaimer text..."
-                        className="w-full min-h-[150px] p-3 text-sm border rounded-md resize-y"
+                        className="w-full min-h-[150px] p-3 text-sm border border-input bg-background text-foreground rounded-md resize-y focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                         rows={6}
                       />
                       <p className="text-xs text-muted-foreground">

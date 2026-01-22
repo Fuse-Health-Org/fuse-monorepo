@@ -2,6 +2,7 @@ export const PUBLIC_PATH_PATTERNS = [
   '/',
   '/signin',
   '/signup',
+  '/forgot-password',
   '/privacy',
   '/terms',
   '/hipaa-notice',

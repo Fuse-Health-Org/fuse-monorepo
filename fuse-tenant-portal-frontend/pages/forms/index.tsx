@@ -369,34 +369,34 @@ export default function Forms() {
   }
 
   return (
-    <div className="flex h-screen bg-[#F9FAFB]">
+    <div className="flex h-screen bg-background">
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header />
         <main className="flex-1 overflow-y-auto p-8 space-y-8">
           <div className="flex items-start justify-between">
             <div>
-              <h1 className="text-3xl font-semibold text-[#1F2937] mb-2">Form Management</h1>
-              <p className="text-[#6B7280] text-base">
+              <h1 className="text-3xl font-semibold text-foreground mb-2">Form Management</h1>
+              <p className="text-muted-foreground text-base">
                 Configure product-specific forms and manage standardized question templates.
               </p>
             </div>
             <button 
               onClick={refresh} 
               disabled={loading}
-              className="rounded-full px-6 py-2.5 border border-[#E5E7EB] text-[#4B5563] hover:bg-[#F3F4F6] transition-all text-sm font-medium flex items-center gap-2 disabled:opacity-50"
+              className="rounded-full px-6 py-2.5 border border-border text-foreground hover:bg-muted transition-all text-sm font-medium flex items-center gap-2 disabled:opacity-50"
             >
               <RefreshCcw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Refresh
             </button>
           </div>
 
           {/* Tabs */}
-          <div className="flex items-center gap-2 bg-white rounded-2xl p-1.5 w-fit shadow-sm border border-[#E5E7EB]">
+          <div className="flex items-center gap-2 bg-card rounded-2xl p-1.5 w-fit shadow-sm border border-border">
             <button
               onClick={() => setActiveTab("products")}
               className={`px-6 py-2 text-sm font-medium rounded-xl transition-all ${activeTab === "products"
                   ? "bg-[#4FA59C] text-white shadow-sm"
-                  : "text-[#6B7280] hover:bg-[#F3F4F6]"
+                  : "text-muted-foreground hover:bg-muted"
               }`}
             >
               Medical Questions Templates
@@ -405,7 +405,7 @@ export default function Forms() {
               onClick={() => setActiveTab("templates")}
               className={`px-6 py-2 text-sm font-medium rounded-xl transition-all ${activeTab === "templates"
                   ? "bg-[#4FA59C] text-white shadow-sm"
-                  : "text-[#6B7280] hover:bg-[#F3F4F6]"
+                  : "text-muted-foreground hover:bg-muted"
               }`}
             >
               Standardized Questions
@@ -414,7 +414,7 @@ export default function Forms() {
               onClick={() => setActiveTab("account")}
               className={`px-6 py-2 text-sm font-medium rounded-xl transition-all ${activeTab === "account"
                   ? "bg-[#4FA59C] text-white shadow-sm"
-                  : "text-[#6B7280] hover:bg-[#F3F4F6]"
+                  : "text-muted-foreground hover:bg-muted"
               }`}
             >
               Account Questions
@@ -423,7 +423,7 @@ export default function Forms() {
               onClick={() => setActiveTab("structure")}
               className={`px-6 py-2 text-sm font-medium rounded-xl transition-all ${activeTab === "structure"
                   ? "bg-[#4FA59C] text-white shadow-sm"
-                  : "text-[#6B7280] hover:bg-[#F3F4F6]"
+                  : "text-muted-foreground hover:bg-muted"
               }`}
             >
               Global Structure
@@ -431,7 +431,7 @@ export default function Forms() {
           </div>
 
           {error && (
-            <div className="rounded-2xl p-4 bg-red-50 border border-red-200 text-red-700 shadow-sm">
+            <div className="rounded-2xl p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 shadow-sm">
               <p className="text-sm font-medium">{error}</p>
             </div>
           )}
@@ -440,34 +440,34 @@ export default function Forms() {
           {activeTab === "products" && (
             <>
               {/* Filters */}
-              <div className="bg-white rounded-2xl shadow-sm border border-[#E5E7EB] overflow-hidden">
-                <div className="p-6 pb-4 border-b border-[#E5E7EB]">
-                  <h2 className="text-lg font-semibold text-[#1F2937]">Filter & Sort</h2>
-                  <p className="text-sm text-[#6B7280] mt-0.5">Find the template you want to edit</p>
+              <div className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden">
+                <div className="p-6 pb-4 border-b border-border">
+                  <h2 className="text-lg font-semibold text-foreground">Filter & Sort</h2>
+                  <p className="text-sm text-muted-foreground mt-0.5">Find the template you want to edit</p>
                 </div>
                 <div className="p-6">
                   <div className="grid gap-4 md:grid-cols-2">
                     {/* Search */}
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-[#4B5563]">Search Templates</label>
+                      <label className="text-sm font-medium text-foreground">Search Templates</label>
                       <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#9CA3AF]" />
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <input
                           value={searchQuery}
                           onChange={(e) => setSearchQuery(e.target.value)}
                           placeholder="Search by name..."
-                          className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] text-sm text-[#1F2937] focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all"
+                          className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all"
                         />
                       </div>
                     </div>
 
                     {/* Sort */}
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-[#4B5563]">Sort By</label>
+                      <label className="text-sm font-medium text-foreground">Sort By</label>
                       <select
                         value={selectedSort}
                         onChange={(e) => setSelectedSort(e.target.value)}
-                        className="w-full rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] px-4 py-2.5 text-sm text-[#1F2937] focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all"
+                        className="w-full rounded-xl border border-input bg-background px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all"
                       >
                         {SORT_OPTIONS.map((option) => (
                           <option key={option.value} value={option.value}>
@@ -481,7 +481,7 @@ export default function Forms() {
               </div>
 
               {/* Results Summary and Create Button */}
-              <div className="flex items-center justify-between text-sm text-[#6B7280]">
+              <div className="flex items-center justify-between text-sm text-muted-foreground">
                 <span>
                   Showing {(() => {
                     const filtered = productFormTemplates.filter((q: any) => {
@@ -499,7 +499,7 @@ export default function Forms() {
                       onClick={() => {
                         setSearchQuery("")
                       }}
-                      className="px-4 py-2 text-sm font-medium text-[#6B7280] hover:text-[#1F2937] hover:bg-[#F3F4F6] rounded-xl transition-all"
+                      className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted rounded-xl transition-all"
                     >
                       Clear Filters
                     </button>
@@ -549,7 +549,7 @@ export default function Forms() {
 
               {/* Templates List */}
               {loading ? (
-                <div className="flex h-64 items-center justify-center text-[#6B7280]">
+                <div className="flex h-64 items-center justify-center text-muted-foreground">
                   <Loader2 className="mr-3 h-6 w-6 animate-spin text-[#4FA59C]" />
                   <span className="text-base">Loading templates...</span>
                 </div>
@@ -573,24 +573,24 @@ export default function Forms() {
                 })
 
                 return filtered.length === 0 ? (
-                <div className="bg-white rounded-2xl shadow-sm border border-[#E5E7EB] p-16">
-                  <div className="flex flex-col items-center justify-center text-[#6B7280]">
-                    <div className="bg-[#F3F4F6] rounded-full p-6 mb-4">
-                      <Search className="h-12 w-12 text-[#9CA3AF]" />
+                <div className="bg-card rounded-2xl shadow-sm border border-border p-16">
+                  <div className="flex flex-col items-center justify-center text-muted-foreground">
+                    <div className="bg-muted rounded-full p-6 mb-4">
+                      <Search className="h-12 w-12 text-muted-foreground" />
                     </div>
-                      <p className="text-lg text-[#4B5563]">No templates found matching your filters.</p>
+                      <p className="text-lg text-foreground">No templates found matching your filters.</p>
                   </div>
                 </div>
               ) : (
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                     {filtered.map((template: any) => (
-                      <div key={template.id} className="bg-white rounded-2xl shadow-sm border border-[#E5E7EB] overflow-hidden hover:shadow-md hover:border-[#4FA59C] transition-all">
-                        <div className="p-6 pb-4 border-b border-[#E5E7EB]">
+                      <div key={template.id} className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden hover:shadow-md hover:border-[#4FA59C] transition-all">
+                        <div className="p-6 pb-4 border-b border-border">
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
-                              <h3 className="text-lg font-semibold text-[#1F2937]">{template.title || "Untitled Template"}</h3>
+                              <h3 className="text-lg font-semibold text-foreground">{template.title || "Untitled Template"}</h3>
                               {template.description && !template.description.startsWith('Questionnaire for') && (
-                                <p className="text-sm text-[#6B7280] mt-2">{template.description}</p>
+                                <p className="text-sm text-muted-foreground mt-2">{template.description}</p>
                                 )}
                             </div>
                           </div>
@@ -606,7 +606,7 @@ export default function Forms() {
                               Edit Template
                             </button>
                               <button
-                              className="px-4 py-2.5 rounded-full border border-[#E5E7EB] text-[#EF4444] hover:bg-[#FEF2F2] text-sm font-medium transition-all"
+                              className="px-4 py-2.5 rounded-full border border-border text-destructive hover:bg-destructive/10 text-sm font-medium transition-all"
                               onClick={async () => {
                                 if (!token) return
                                 if (!confirm('Delete this template? This cannot be undone.')) return
@@ -650,10 +650,10 @@ export default function Forms() {
           {/* Standardized Questions Tab */}
           {activeTab === "templates" && (
             <>
-              <div className="bg-white rounded-2xl shadow-sm border border-[#E5E7EB] overflow-hidden">
-                <div className="p-6 pb-4 border-b border-[#E5E7EB]">
-                  <h2 className="text-lg font-semibold text-[#1F2937]">Manage Standardized Templates</h2>
-                  <p className="text-sm text-[#6B7280] mt-0.5">
+              <div className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden">
+                <div className="p-6 pb-4 border-b border-border">
+                  <h2 className="text-lg font-semibold text-foreground">Manage Standardized Templates</h2>
+                  <p className="text-sm text-muted-foreground mt-0.5">
                     Edit templates that are used across multiple product forms. Changes here will update all forms using these templates.
                   </p>
                 </div>
@@ -661,11 +661,11 @@ export default function Forms() {
                   <div className="space-y-6">
                     {/* Category Selection */}
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">Select Category</label>
+                      <label className="text-sm font-medium text-foreground">Select Category</label>
                       <select
                         value={selectedCategory}
                         onChange={(e) => setSelectedCategory(e.target.value)}
-                        className="w-full md:w-1/2 rounded-md border border-border bg-background px-3 py-2 text-sm"
+                        className="w-full md:w-1/2 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
                       >
                         <option value="">Select a category...</option>
                         {CATEGORY_OPTIONS.filter(c => c.value).map((option) => (
@@ -679,15 +679,15 @@ export default function Forms() {
                     {selectedCategory && (
                       <div className="space-y-4">
                         {/* Personalization Questions */}
-                        <div className="bg-[#F9FAFB] rounded-2xl border border-[#E5E7EB] overflow-hidden">
-                          <div className="p-4 border-b border-[#E5E7EB]">
-                            <h3 className="text-base font-semibold text-[#1F2937]">Personalization Questions</h3>
-                            <p className="text-sm text-[#6B7280] mt-0.5">
+                        <div className="bg-muted/50 rounded-2xl border border-border overflow-hidden">
+                          <div className="p-4 border-b border-border">
+                            <h3 className="text-base font-semibold text-foreground">Personalization Questions</h3>
+                            <p className="text-sm text-muted-foreground mt-0.5">
                               Category: {CATEGORY_OPTIONS.find(c => c.value === selectedCategory)?.label}
                             </p>
                           </div>
                           <div className="p-4">
-                            <p className="text-sm text-[#6B7280] mb-4">
+                            <p className="text-sm text-muted-foreground mb-4">
                               These questions are shown in all {CATEGORY_OPTIONS.find(c => c.value === selectedCategory)?.label} product forms.
                             </p>
                             {(() => {
@@ -721,7 +721,7 @@ export default function Forms() {
                                             alert(e?.message || 'Failed to delete personalization template')
                                           }
                                         }}
-                                        className="w-full px-4 py-2.5 rounded-full border border-[#E5E7EB] text-[#EF4444] hover:bg-[#FEF2F2] transition-all text-sm font-medium"
+                                        className="w-full px-4 py-2.5 rounded-full border border-border text-destructive hover:bg-destructive/10 transition-all text-sm font-medium"
                                       >
                                         Delete
                                       </button>
@@ -750,9 +750,9 @@ export default function Forms() {
                     )}
 
                     {!selectedCategory && (
-                      <div className="text-center py-12 text-[#6B7280]">
-                        <div className="bg-[#F3F4F6] rounded-full p-6 mx-auto w-fit mb-4">
-                          <Search className="h-12 w-12 text-[#9CA3AF]" />
+                      <div className="text-center py-12 text-muted-foreground">
+                        <div className="bg-muted rounded-full p-6 mx-auto w-fit mb-4">
+                          <Search className="h-12 w-12 text-muted-foreground" />
                         </div>
                         <p>Select a category above to manage its standardized question templates.</p>
                       </div>
@@ -765,10 +765,10 @@ export default function Forms() {
 
           {activeTab === "account" && (
             <>
-              <div className="bg-white rounded-2xl shadow-sm border border-[#E5E7EB] overflow-hidden">
-                <div className="p-6 pb-4 border-b border-[#E5E7EB]">
-                  <h2 className="text-lg font-semibold text-[#1F2937]">Manage Account Questions</h2>
-                  <p className="text-sm text-[#6B7280] mt-0.5">
+              <div className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden">
+                <div className="p-6 pb-4 border-b border-border">
+                  <h2 className="text-lg font-semibold text-foreground">Manage Account Questions</h2>
+                  <p className="text-sm text-muted-foreground mt-0.5">
                     Configure the universal account questions shown in every product form across all categories.
                   </p>
                 </div>
@@ -801,7 +801,7 @@ export default function Forms() {
                             alert(e?.message || 'Failed to delete account questionnaire')
                           }
                         }}
-                        className="w-full px-4 py-2.5 rounded-full border border-[#E5E7EB] text-[#EF4444] hover:bg-[#FEF2F2] transition-all text-sm font-medium"
+                        className="w-full px-4 py-2.5 rounded-full border border-border text-destructive hover:bg-destructive/10 transition-all text-sm font-medium"
                       >
                         Delete
                       </button>
@@ -810,7 +810,7 @@ export default function Forms() {
                     <button
                       onClick={() => handleCreateTemplate("account")}
                       disabled={creating}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-full border border-[#E5E7EB] text-[#4B5563] hover:bg-[#F3F4F6] transition-all text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-full border border-border text-foreground hover:bg-muted transition-all text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {creating ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
@@ -1124,8 +1124,8 @@ function GlobalStructureTab({ baseUrl, token }: { baseUrl: string, token: string
         {/* Header with Add New Button */}
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-semibold text-[#1F2937]">Global Form Structures</h2>
-            <p className="text-sm text-[#6B7280] mt-1">Create and manage reusable form flows</p>
+            <h2 className="text-2xl font-semibold text-foreground">Global Form Structures</h2>
+            <p className="text-sm text-muted-foreground mt-1">Create and manage reusable form flows</p>
           </div>
           <button
             onClick={handleAddNew}
@@ -1139,26 +1139,26 @@ function GlobalStructureTab({ baseUrl, token }: { baseUrl: string, token: string
         {/* Structures List */}
         <div className="space-y-4">
           {structures.map((structure) => (
-            <div key={structure.id} className="bg-white border border-[#E5E7EB] rounded-2xl shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+            <div key={structure.id} className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden hover:shadow-md transition-shadow">
               <div className="p-6">
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-xl font-semibold text-[#1F2937]">{structure.name}</h3>
+                      <h3 className="text-xl font-semibold text-foreground">{structure.name}</h3>
                       {structure.isDefault && (
-                        <span className="px-2 py-1 bg-blue-50 border border-blue-200 text-blue-700 rounded-full text-xs font-medium">
+                        <span className="px-2 py-1 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-400 rounded-full text-xs font-medium">
                           Default
                         </span>
                       )}
                     </div>
                     {structure.description && (
-                      <p className="text-sm text-[#6B7280]">{structure.description}</p>
+                      <p className="text-sm text-muted-foreground">{structure.description}</p>
                     )}
                   </div>
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => handleEdit(structure)}
-                      className="px-4 py-2 rounded-full border border-[#E5E7EB] text-[#4B5563] hover:bg-[#F3F4F6] text-sm font-medium transition-all"
+                      className="px-4 py-2 rounded-full border border-border text-foreground hover:bg-muted text-sm font-medium transition-all"
                     >
                       <Edit className="h-4 w-4 inline mr-1.5" />
                       Edit
@@ -1166,7 +1166,7 @@ function GlobalStructureTab({ baseUrl, token }: { baseUrl: string, token: string
                     {!structure.isDefault && (
                       <button
                         onClick={() => handleDelete(structure.id)}
-                        className="px-4 py-2 rounded-full border border-red-200 text-red-600 hover:bg-red-50 text-sm font-medium transition-all"
+                        className="px-4 py-2 rounded-full border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 text-sm font-medium transition-all"
                       >
                         <Trash2 className="h-4 w-4 inline mr-1.5" />
                         Delete
@@ -1176,8 +1176,8 @@ function GlobalStructureTab({ baseUrl, token }: { baseUrl: string, token: string
                 </div>
 
                 {/* Form Flow Preview */}
-                <div className="bg-[#F9FAFB] rounded-xl p-4 border border-[#E5E7EB]">
-                  <p className="text-xs font-medium text-[#6B7280] mb-3 uppercase tracking-wide">Form Flow</p>
+                <div className="bg-muted/50 rounded-xl p-4 border border-border">
+                  <p className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wide">Form Flow</p>
                   <div className="flex items-center gap-3 overflow-x-auto">
                     {structure.sections
                       .filter(s => s.enabled)
@@ -1185,15 +1185,15 @@ function GlobalStructureTab({ baseUrl, token }: { baseUrl: string, token: string
                       .map((section, index, array) => (
                         <div key={section.id} className="flex items-center gap-3 flex-shrink-0">
                           <div className="flex flex-col items-center">
-                            <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center text-2xl border border-[#E5E7EB] shadow-sm">
+                            <div className="w-12 h-12 bg-card rounded-lg flex items-center justify-center text-2xl border border-border shadow-sm">
                               {section.icon}
                             </div>
-                            <p className="text-xs font-medium text-[#4B5563] mt-2 text-center max-w-[100px]">
+                            <p className="text-xs font-medium text-foreground mt-2 text-center max-w-[100px]">
                               {section.label}
                             </p>
                           </div>
                           {index < array.length - 1 && (
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-[#9CA3AF] flex-shrink-0">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-muted-foreground flex-shrink-0">
                               <path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                             </svg>
                           )}
@@ -1210,20 +1210,20 @@ function GlobalStructureTab({ baseUrl, token }: { baseUrl: string, token: string
       {/* Modal for Creating/Editing Structure */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto bg-white rounded-2xl shadow-2xl">
-            <div className="sticky top-0 bg-white border-b border-[#E5E7EB] p-6 z-10">
+          <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto bg-card rounded-2xl shadow-2xl">
+            <div className="sticky top-0 bg-card border-b border-border p-6 z-10">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-2xl font-semibold text-[#1F2937]">
+                  <h2 className="text-2xl font-semibold text-foreground">
                     {editingStructure ? 'Edit' : 'Create'} Form Structure
                   </h2>
-                  <p className="text-sm text-[#6B7280] mt-1">Define the order and flow of your form sections</p>
+                  <p className="text-sm text-muted-foreground mt-1">Define the order and flow of your form sections</p>
                 </div>
                 <button
                   onClick={() => setShowModal(false)}
-                  className="p-2 rounded-full hover:bg-[#F3F4F6] transition-colors"
+                  className="p-2 rounded-full hover:bg-muted transition-colors"
                 >
-                  <X className="h-5 w-5 text-[#6B7280]" />
+                  <X className="h-5 w-5 text-muted-foreground" />
                 </button>
               </div>
             </div>
@@ -1232,32 +1232,32 @@ function GlobalStructureTab({ baseUrl, token }: { baseUrl: string, token: string
               {/* Structure Name and Description */}
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-[#4B5563] mb-2">Structure Name *</label>
+                  <label className="block text-sm font-medium text-foreground mb-2">Structure Name *</label>
                   <input
                     type="text"
                     value={structureName}
                     onChange={(e) => setStructureName(e.target.value)}
                     placeholder="e.g., Weight Loss Flow, Standard Flow"
-                    className="w-full px-4 py-2.5 rounded-xl border border-[#E5E7EB] bg-white text-[#1F2937] focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:border-[#4FA59C] transition-all"
+                    className="w-full px-4 py-2.5 rounded-xl border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:border-[#4FA59C] transition-all"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-[#4B5563] mb-2">Description</label>
+                  <label className="block text-sm font-medium text-foreground mb-2">Description</label>
                   <textarea
                     value={structureDescription}
                     onChange={(e) => setStructureDescription(e.target.value)}
                     placeholder="Describe when to use this structure..."
-                    className="w-full px-4 py-2.5 rounded-xl border border-[#E5E7EB] bg-white text-[#1F2937] focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:border-[#4FA59C] transition-all resize-none"
+                    className="w-full px-4 py-2.5 rounded-xl border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:border-[#4FA59C] transition-all resize-none"
                     rows={2}
                   />
                 </div>
               </div>
 
               {/* Info Banner */}
-              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+              <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-xl p-4">
                 <div className="flex gap-2">
-                  <Info className="h-4 w-4 text-blue-600 flex-shrink-0 mt-0.5" />
-                  <p className="text-xs text-blue-700">
+                  <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-blue-700 dark:text-blue-400">
                     Drag sections to reorder them. Toggle switches to enable/disable. Account and Checkout sections cannot be disabled.
                   </p>
                 </div>
@@ -1265,7 +1265,7 @@ function GlobalStructureTab({ baseUrl, token }: { baseUrl: string, token: string
 
               {/* Form Sections */}
               <div>
-                <h3 className="text-lg font-semibold text-[#1F2937] mb-3">Form Sections</h3>
+                <h3 className="text-lg font-semibold text-foreground mb-3">Form Sections</h3>
 
         <div className="p-6 space-y-3">
           {sections.map((section, index) => (
@@ -1275,18 +1275,18 @@ function GlobalStructureTab({ baseUrl, token }: { baseUrl: string, token: string
               onDragStart={() => handleDragStart(index)}
               onDragOver={(e) => handleDragOver(e, index)}
               onDragEnd={handleDragEnd}
-                      className={`bg-white border-2 rounded-xl p-5 transition-all cursor-move ${draggedIndex === index ? 'border-[#4FA59C] shadow-lg scale-105' : 'border-[#E5E7EB] hover:border-[#D1D5DB]'
+                      className={`bg-card border-2 rounded-xl p-5 transition-all cursor-move ${draggedIndex === index ? 'border-[#4FA59C] shadow-lg scale-105' : 'border-border hover:border-muted-foreground/50'
               } ${!section.enabled ? 'opacity-60' : ''}`}
             >
               <div className="flex items-start gap-4">
                 {/* Drag Handle */}
                 <div className="flex-shrink-0 mt-1">
-                  <GripVertical className="h-5 w-5 text-[#9CA3AF]" />
+                  <GripVertical className="h-5 w-5 text-muted-foreground" />
                 </div>
 
                 {/* Icon */}
                 <div className="flex-shrink-0">
-                  <div className="w-12 h-12 bg-[#F3F4F6] rounded-xl flex items-center justify-center text-2xl">
+                  <div className="w-12 h-12 bg-muted rounded-xl flex items-center justify-center text-2xl">
                     {section.icon}
                   </div>
                 </div>
@@ -1294,22 +1294,22 @@ function GlobalStructureTab({ baseUrl, token }: { baseUrl: string, token: string
                 {/* Content */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-3 mb-1">
-                    <h3 className="font-semibold text-[#1F2937]">{section.label}</h3>
-                    <span className="px-2 py-0.5 bg-[#F3F4F6] text-[#6B7280] rounded-full text-xs font-medium">
+                    <h3 className="font-semibold text-foreground">{section.label}</h3>
+                    <span className="px-2 py-0.5 bg-muted text-muted-foreground rounded-full text-xs font-medium">
                       Step {index + 1}
                     </span>
                   </div>
-                  <p className="text-sm text-[#6B7280]">{section.description}</p>
+                  <p className="text-sm text-muted-foreground">{section.description}</p>
                   
                   {/* Section-specific info */}
                   {section.type === 'category_questions' && (
-                    <div className="mt-2 inline-flex items-center gap-1.5 px-2 py-1 bg-purple-50 border border-purple-200 rounded-lg">
-                      <span className="text-xs text-purple-700">✨ Supports Variants (Variant 1, Variant 2)</span>
+                    <div className="mt-2 inline-flex items-center gap-1.5 px-2 py-1 bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-800 rounded-lg">
+                      <span className="text-xs text-purple-700 dark:text-purple-400">✨ Supports Variants (Variant 1, Variant 2)</span>
                     </div>
                   )}
                   {(section.type === 'account_creation' || section.type === 'checkout') && (
-                    <div className="mt-2 inline-flex items-center gap-1.5 px-2 py-1 bg-green-50 border border-green-200 rounded-lg">
-                      <span className="text-xs text-green-700">🔒 Auto-injected by system</span>
+                    <div className="mt-2 inline-flex items-center gap-1.5 px-2 py-1 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg">
+                      <span className="text-xs text-green-700 dark:text-green-400">🔒 Auto-injected by system</span>
                     </div>
                   )}
                 </div>
@@ -1319,11 +1319,11 @@ function GlobalStructureTab({ baseUrl, token }: { baseUrl: string, token: string
                   <button
                     onClick={() => toggleSection(section.id)}
                     disabled={section.type === 'account_creation' || section.type === 'checkout'}
-                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${section.enabled ? 'bg-[#4FA59C]' : 'bg-gray-300'
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${section.enabled ? 'bg-[#4FA59C]' : 'bg-gray-300 dark:bg-gray-600'
                     }`}
                   >
                     <span
-                              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${section.enabled ? 'translate-x-6' : 'translate-x-1'
+                              className={`inline-block h-4 w-4 transform rounded-full bg-white dark:bg-gray-800 transition-transform ${section.enabled ? 'translate-x-6' : 'translate-x-1'
                       }`}
                     />
                   </button>
@@ -1335,10 +1335,10 @@ function GlobalStructureTab({ baseUrl, token }: { baseUrl: string, token: string
               </div>
 
               {/* Save/Cancel Buttons */}
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#E5E7EB]">
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
                 <button
                   onClick={() => setShowModal(false)}
-                  className="px-6 py-2.5 rounded-full border border-[#E5E7EB] text-[#4B5563] hover:bg-[#F3F4F6] font-medium transition-all"
+                  className="px-6 py-2.5 rounded-full border border-border text-foreground hover:bg-muted font-medium transition-all"
                 >
                   Cancel
                 </button>

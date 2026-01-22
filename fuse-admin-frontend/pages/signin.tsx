@@ -332,6 +332,16 @@ export default function SignIn() {
                   </div>
                 </div>
 
+                <div className="text-right -mt-2 mb-2">
+                  <button
+                    type="button"
+                    onClick={() => router.push('/forgot-password')}
+                    className="text-xs text-primary hover:underline font-medium"
+                  >
+                    Forgot your password?
+                  </button>
+                </div>
+
                 <Button
                   type="submit"
                   className="w-full"

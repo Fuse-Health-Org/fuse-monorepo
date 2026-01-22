@@ -197,7 +197,7 @@ export default function DoctorApplications() {
   }
 
   return (
-    <div className="flex h-screen bg-[#F9FAFB]">
+    <div className="flex h-screen bg-background">
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header />
@@ -205,27 +205,27 @@ export default function DoctorApplications() {
           {/* Page Header */}
           <div className="flex justify-between items-start">
             <div>
-              <h1 className="text-3xl font-semibold text-[#1F2937] mb-2">
+              <h1 className="text-3xl font-semibold text-foreground mb-2">
                 Doctor Applications
               </h1>
-              <p className="text-[#6B7280] text-base">
+              <p className="text-muted-foreground text-base">
                 Review and approve doctor applications to the Fuse ecosystem
               </p>
             </div>
           </div>
 
           {/* Stats Card */}
-          <div className="bg-white rounded-2xl shadow-sm border border-[#E5E7EB] p-6">
+          <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-xs font-semibold text-[#9CA3AF] uppercase tracking-wide mb-2">
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
                   Pending Applications
                 </h3>
-                <p className="text-3xl font-bold text-[#1F2937]">
+                <p className="text-3xl font-bold text-foreground">
                   {loading ? "..." : applications.length}
                 </p>
               </div>
-              <div className="bg-[#F3F4F6] rounded-xl p-3">
+              <div className="bg-muted rounded-xl p-3">
                 <UserCheck className="h-6 w-6 text-[#4FA59C]" />
               </div>
             </div>
@@ -237,12 +237,12 @@ export default function DoctorApplications() {
               <Loader2 className="h-8 w-8 text-[#4FA59C] animate-spin" />
             </div>
           ) : applications.length === 0 ? (
-            <div className="bg-white rounded-2xl shadow-sm border border-[#E5E7EB] p-12 text-center">
-              <UserCheck className="h-12 w-12 text-[#9CA3AF] mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-[#1F2937] mb-2">
+            <div className="bg-card rounded-2xl shadow-sm border border-border p-12 text-center">
+              <UserCheck className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-foreground mb-2">
                 No Pending Applications
               </h3>
-              <p className="text-[#6B7280]">
+              <p className="text-muted-foreground">
                 All doctor applications have been reviewed
               </p>
             </div>
@@ -251,7 +251,7 @@ export default function DoctorApplications() {
               {applications.map((doctor) => (
                 <div
                   key={doctor.id}
-                  className="bg-white rounded-2xl shadow-sm border border-[#E5E7EB] p-6 hover:shadow-md transition-all"
+                  className="bg-card rounded-2xl shadow-sm border border-border p-6 hover:shadow-md transition-all"
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
@@ -263,18 +263,18 @@ export default function DoctorApplications() {
                           </span>
                         </div>
                         <div>
-                          <h3 className="text-lg font-semibold text-[#1F2937]">
+                          <h3 className="text-lg font-semibold text-foreground">
                             Dr. {doctor.firstName} {doctor.lastName}
                           </h3>
-                          <p className="text-sm text-[#6B7280]">
+                          <p className="text-sm text-muted-foreground">
                             Applied {formatDate(doctor.createdAt)}
                           </p>
                         </div>
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div className="flex items-center gap-2 text-sm text-[#6B7280]">
-                          <Mail className="h-4 w-4 text-[#9CA3AF]" />
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Mail className="h-4 w-4 text-muted-foreground" />
                           <a
                             href={`mailto:${doctor.email}`}
                             className="hover:text-[#4FA59C] transition-colors"
@@ -284,32 +284,32 @@ export default function DoctorApplications() {
                         </div>
 
                         {doctor.phoneNumber && (
-                          <div className="flex items-center gap-2 text-sm text-[#6B7280]">
-                            <Phone className="h-4 w-4 text-[#9CA3AF]" />
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Phone className="h-4 w-4 text-muted-foreground" />
                             <span>{doctor.phoneNumber}</span>
                           </div>
                         )}
 
                         {doctor.npiNumber && (
-                          <div className="flex items-center gap-2 text-sm text-[#6B7280] flex-wrap">
-                            <FileText className="h-4 w-4 text-[#9CA3AF]" />
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
+                            <FileText className="h-4 w-4 text-muted-foreground" />
                             <span>NPI: {doctor.npiNumber}</span>
                             {verifyingNpis.has(doctor.npiNumber) ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-600">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-muted text-muted-foreground">
                                 <Loader2 className="h-3 w-3 animate-spin" />
                                 Verifying...
                               </span>
                             ) : npiVerifications[doctor.npiNumber] ? (
                               npiVerifications[doctor.npiNumber].isValid ? (
                                 <span 
-                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-700 font-medium"
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 font-medium"
                                   title={npiVerifications[doctor.npiNumber].providerInfo?.name || "Valid NPI"}
                                 >
                                   <CheckCircle className="h-3 w-3" />
                                   Valid for {npiVerifications[doctor.npiNumber].providerInfo?.name || "N/A"}
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-red-100 text-red-700 font-medium">
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 font-medium">
                                   <AlertTriangle className="h-3 w-3" />
                                   Invalid
                                 </span>
@@ -319,8 +319,8 @@ export default function DoctorApplications() {
                         )}
 
                         {(doctor.city || doctor.state) && (
-                          <div className="flex items-center gap-2 text-sm text-[#6B7280]">
-                            <MapPin className="h-4 w-4 text-[#9CA3AF]" />
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <MapPin className="h-4 w-4 text-muted-foreground" />
                             <span>
                               {doctor.city}
                               {doctor.city && doctor.state && ", "}
@@ -330,8 +330,8 @@ export default function DoctorApplications() {
                         )}
 
                         {doctor.website && (
-                          <div className="flex items-center gap-2 text-sm text-[#6B7280]">
-                            <Globe className="h-4 w-4 text-[#9CA3AF]" />
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Globe className="h-4 w-4 text-muted-foreground" />
                             <a
                               href={doctor.website}
                               target="_blank"
@@ -344,14 +344,14 @@ export default function DoctorApplications() {
                         )}
 
                         {doctor.businessType && (
-                          <div className="flex items-center gap-2 text-sm text-[#6B7280]">
-                            <Briefcase className="h-4 w-4 text-[#9CA3AF]" />
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Briefcase className="h-4 w-4 text-muted-foreground" />
                             <span>{doctor.businessType}</span>
                           </div>
                         )}
 
-                        <div className="flex items-center gap-2 text-sm text-[#6B7280]">
-                          <Calendar className="h-4 w-4 text-[#9CA3AF]" />
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Calendar className="h-4 w-4 text-muted-foreground" />
                           <span>
                             Account{" "}
                             {doctor.activated ? "activated" : "not activated"}
@@ -388,16 +388,16 @@ export default function DoctorApplications() {
       {/* Confirmation Modal */}
       {showConfirmModal && selectedDoctor && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
+          <div className="bg-card rounded-2xl shadow-xl max-w-md w-full p-6">
             <div className="flex items-start gap-4 mb-4">
-              <div className="bg-[#FEF3C7] rounded-xl p-3">
-                <AlertTriangle className="h-6 w-6 text-[#F59E0B]" />
+              <div className="bg-amber-50 dark:bg-amber-900/30 rounded-xl p-3">
+                <AlertTriangle className="h-6 w-6 text-amber-600 dark:text-amber-400" />
               </div>
               <div className="flex-1">
-                <h3 className="text-lg font-semibold text-[#1F2937] mb-2">
+                <h3 className="text-lg font-semibold text-foreground mb-2">
                   Approve Doctor Application?
                 </h3>
-                <p className="text-sm text-[#6B7280] mb-4">
+                <p className="text-sm text-muted-foreground mb-4">
                   You are about to approve{" "}
                   <strong>
                     Dr. {selectedDoctor.firstName} {selectedDoctor.lastName}
@@ -407,19 +407,19 @@ export default function DoctorApplications() {
               </div>
             </div>
 
-            <div className="bg-[#FEF2F2] border-l-4 border-[#EF4444] p-4 rounded-lg mb-6">
-              <p className="text-sm text-[#991B1B] leading-relaxed">
+            <div className="bg-red-50 dark:bg-red-900/30 border-l-4 border-red-500 dark:border-red-800 p-4 rounded-lg mb-6">
+              <p className="text-sm text-red-800 dark:text-red-300 leading-relaxed">
                 <strong>⚠️ Important:</strong> Approving someone as a doctor
                 will give them high-level permissions to perform medical actions
                 within the Fuse ecosystem, including:
               </p>
-              <ul className="list-disc list-inside text-sm text-[#991B1B] mt-2 space-y-1">
+              <ul className="list-disc list-inside text-sm text-red-800 dark:text-red-300 mt-2 space-y-1">
                 <li>Access to patient medical records</li>
                 <li>Ability to prescribe medications</li>
                 <li>Authorization to conduct consultations</li>
                 <li>Manage patient treatments and care plans</li>
               </ul>
-              <p className="text-sm text-[#991B1B] mt-3">
+              <p className="text-sm text-red-800 dark:text-red-300 mt-3">
                 Only approve if you have verified this person is a real, licensed
                 healthcare provider.
               </p>
@@ -432,7 +432,7 @@ export default function DoctorApplications() {
                   setSelectedDoctor(null)
                 }}
                 disabled={approvingId !== null}
-                className="flex-1 px-4 py-2.5 bg-[#F3F4F6] hover:bg-[#E5E7EB] text-[#374151] rounded-xl font-medium transition-all disabled:opacity-50"
+                className="flex-1 px-4 py-2.5 bg-muted hover:bg-muted/80 text-foreground rounded-xl font-medium transition-all disabled:opacity-50"
               >
                 Cancel
               </button>

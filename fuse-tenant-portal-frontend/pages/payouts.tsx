@@ -129,14 +129,14 @@ export default function Payouts() {
 
   const getStatusBadge = (status: string) => {
     const statusConfig: Record<string, { color: string; icon: any; text: string }> = {
-      paid: { color: "bg-green-50 text-green-700 border-green-200", icon: CheckCircle, text: "Paid" },
-      processing: { color: "bg-blue-50 text-blue-700 border-blue-200", icon: Clock, text: "Processing" },
-      shipped: { color: "bg-purple-50 text-purple-700 border-purple-200", icon: Package, text: "Shipped" },
-      delivered: { color: "bg-green-50 text-green-700 border-green-200", icon: CheckCircle, text: "Delivered" },
+      paid: { color: "bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800", icon: CheckCircle, text: "Paid" },
+      processing: { color: "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800", icon: Clock, text: "Processing" },
+      shipped: { color: "bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 border-purple-200 dark:border-purple-800", icon: Package, text: "Shipped" },
+      delivered: { color: "bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800", icon: CheckCircle, text: "Delivered" },
     }
 
     const config = statusConfig[status.toLowerCase()] || {
-      color: "bg-gray-50 text-gray-700 border-gray-200",
+      color: "bg-muted text-muted-foreground border-border",
       icon: Clock,
       text: status,
     }
@@ -179,7 +179,7 @@ export default function Payouts() {
   const displayData = filteredData()
 
   return (
-    <div className="flex h-screen bg-[#F9FAFB]">
+    <div className="flex h-screen bg-background">
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header />
@@ -187,99 +187,103 @@ export default function Payouts() {
           {/* Page Header */}
           <div className="flex justify-between items-start">
             <div>
-              <h1 className="text-3xl font-semibold text-[#1F2937] mb-2">Payouts Tracking</h1>
-              <p className="text-[#6B7280] text-base">Monitor and track all payouts to brands, doctors, pharmacies, and affiliates</p>
+              <h1 className="text-3xl font-semibold text-foreground mb-2">Payouts Tracking</h1>
+              <p className="text-muted-foreground text-base">Monitor and track all payouts to brands, doctors, pharmacies, and affiliates</p>
             </div>
           </div>
 
           {/* Summary Cards */}
           {data && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="bg-white rounded-2xl shadow-sm border border-[#E5E7EB] p-6">
+              <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-xs font-semibold text-[#9CA3AF] uppercase tracking-wide">Total Brand Payouts</h3>
-                  <div className="bg-[#F3F4F6] rounded-xl p-2">
+                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Total Brand Payouts</h3>
+                  <div className="bg-muted rounded-xl p-2">
                     <Building2 className="h-5 w-5 text-[#4FA59C]" />
                   </div>
                 </div>
-                <p className="text-3xl font-bold text-[#1F2937]">{formatCurrency(data.totals.totalBrandAmount)}</p>
-                <p className="text-sm text-[#6B7280] mt-1">{data.brands.length} brands</p>
+                <p className="text-3xl font-bold text-foreground">{formatCurrency(data.totals.totalBrandAmount)}</p>
+                <p className="text-sm text-muted-foreground mt-1">{data.brands.length} brands</p>
               </div>
 
-              <div className="bg-white rounded-2xl shadow-sm border border-[#E5E7EB] p-6">
+              <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-xs font-semibold text-[#9CA3AF] uppercase tracking-wide">Total Doctor Payouts</h3>
-                  <div className="bg-[#F3F4F6] rounded-xl p-2">
+                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Total Doctor Payouts</h3>
+                  <div className="bg-muted rounded-xl p-2">
                     <User className="h-5 w-5 text-[#4FA59C]" />
                   </div>
                 </div>
-                <p className="text-3xl font-bold text-[#1F2937]">{formatCurrency(data.totals.totalDoctorAmount)}</p>
-                <p className="text-sm text-[#6B7280] mt-1">{data.doctors.length} doctors</p>
+                <p className="text-3xl font-bold text-foreground">{formatCurrency(data.totals.totalDoctorAmount)}</p>
+                <p className="text-sm text-muted-foreground mt-1">{data.doctors.length} doctors</p>
               </div>
 
-              <div className="bg-white rounded-2xl shadow-sm border border-[#E5E7EB] p-6">
+              <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-xs font-semibold text-[#9CA3AF] uppercase tracking-wide">Total Pharmacy Payouts</h3>
-                  <div className="bg-[#F3F4F6] rounded-xl p-2">
+                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Total Pharmacy Payouts</h3>
+                  <div className="bg-muted rounded-xl p-2">
                     <Package className="h-5 w-5 text-[#4FA59C]" />
                   </div>
                 </div>
-                <p className="text-3xl font-bold text-[#1F2937]">{formatCurrency(data.totals.totalPharmacyAmount)}</p>
-                <p className="text-sm text-[#6B7280] mt-1">{data.pharmacies.length} pharmacies</p>
+                <p className="text-3xl font-bold text-foreground">{formatCurrency(data.totals.totalPharmacyAmount)}</p>
+                <p className="text-sm text-muted-foreground mt-1">{data.pharmacies.length} pharmacies</p>
               </div>
 
-              <div className="bg-white rounded-2xl shadow-sm border border-[#E5E7EB] p-6">
+              <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-xs font-semibold text-[#9CA3AF] uppercase tracking-wide">Platform Fees</h3>
-                  <div className="bg-[#F3F4F6] rounded-xl p-2">
+                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Platform Fees</h3>
+                  <div className="bg-muted rounded-xl p-2">
                     <TrendingUp className="h-5 w-5 text-[#4FA59C]" />
                   </div>
                 </div>
-                <p className="text-3xl font-bold text-[#1F2937]">{formatCurrency(data.totals.totalPlatformFee)}</p>
-                <p className="text-sm text-[#6B7280] mt-1">Total collected</p>
+                <p className="text-3xl font-bold text-foreground">{formatCurrency(data.totals.totalPlatformFee)}</p>
+                <p className="text-sm text-muted-foreground mt-1">Total collected</p>
               </div>
             </div>
           )}
 
           {/* Filters */}
-          <div className="bg-white rounded-2xl shadow-sm border border-[#E5E7EB] p-6">
+          <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-[#9CA3AF]" />
-                <input
-                  type="text"
-                  placeholder="Search..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-[#E5E7EB] rounded-xl focus:ring-2 focus:ring-[#4FA59C] focus:border-transparent"
-                />
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">Search</label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                  <input
+                    type="text"
+                    placeholder="Search..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 border border-input bg-background text-foreground rounded-xl focus:ring-2 focus:ring-[#4FA59C] focus:border-transparent"
+                  />
+                </div>
               </div>
               <div>
-                <label className="block text-xs font-medium text-[#6B7280] mb-1">Date From</label>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">Date From</label>
                 <input
                   type="date"
                   value={dateFrom}
                   onChange={(e) => setDateFrom(e.target.value)}
-                  className="w-full px-4 py-2 border border-[#E5E7EB] rounded-xl focus:ring-2 focus:ring-[#4FA59C] focus:border-transparent"
+                  className="w-full px-4 py-2 border border-input bg-background text-foreground rounded-xl focus:ring-2 focus:ring-[#4FA59C] focus:border-transparent"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-[#6B7280] mb-1">Date To</label>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">Date To</label>
                 <input
                   type="date"
                   value={dateTo}
                   onChange={(e) => setDateTo(e.target.value)}
-                  className="w-full px-4 py-2 border border-[#E5E7EB] rounded-xl focus:ring-2 focus:ring-[#4FA59C] focus:border-transparent"
+                  className="w-full px-4 py-2 border border-input bg-background text-foreground rounded-xl focus:ring-2 focus:ring-[#4FA59C] focus:border-transparent"
                 />
               </div>
-              <div className="flex items-end">
+              <div className="flex flex-col">
+                <label className="block text-xs font-medium text-muted-foreground mb-1 opacity-0">Clear</label>
                 <button
                   onClick={() => {
                     setDateFrom("")
                     setDateTo("")
                     setSearchQuery("")
                   }}
-                  className="w-full px-4 py-2 text-sm font-medium text-[#6B7280] bg-[#F3F4F6] rounded-xl hover:bg-[#E5E7EB] transition-all"
+                  className="w-full px-4 py-2 text-sm font-medium text-muted-foreground bg-muted rounded-xl hover:bg-muted/80 transition-all"
                 >
                   Clear Filters
                 </button>
@@ -288,15 +292,15 @@ export default function Payouts() {
           </div>
 
           {/* Tabs */}
-          <div className="bg-white rounded-2xl shadow-sm border border-[#E5E7EB]">
-            <div className="border-b border-[#E5E7EB]">
+          <div className="bg-card rounded-2xl shadow-sm border border-border">
+            <div className="border-b border-border">
               <div className="flex space-x-8 px-6">
                 <button
                   onClick={() => setSelectedTab("brands")}
                   className={`py-4 px-2 border-b-2 font-medium text-sm transition-colors ${
                     selectedTab === "brands"
                       ? "border-[#4FA59C] text-[#4FA59C]"
-                      : "border-transparent text-[#6B7280] hover:text-[#1F2937]"
+                      : "border-transparent text-muted-foreground hover:text-foreground"
                   }`}
                 >
                   Brands ({displayData.brands.length})
@@ -306,7 +310,7 @@ export default function Payouts() {
                   className={`py-4 px-2 border-b-2 font-medium text-sm transition-colors ${
                     selectedTab === "doctors"
                       ? "border-[#4FA59C] text-[#4FA59C]"
-                      : "border-transparent text-[#6B7280] hover:text-[#1F2937]"
+                      : "border-transparent text-muted-foreground hover:text-foreground"
                   }`}
                 >
                   Doctors ({displayData.doctors.length})
@@ -316,7 +320,7 @@ export default function Payouts() {
                   className={`py-4 px-2 border-b-2 font-medium text-sm transition-colors ${
                     selectedTab === "pharmacies"
                       ? "border-[#4FA59C] text-[#4FA59C]"
-                      : "border-transparent text-[#6B7280] hover:text-[#1F2937]"
+                      : "border-transparent text-muted-foreground hover:text-foreground"
                   }`}
                 >
                   Pharmacies ({displayData.pharmacies.length})
@@ -326,7 +330,7 @@ export default function Payouts() {
                   className={`py-4 px-2 border-b-2 font-medium text-sm transition-colors ${
                     selectedTab === "affiliates"
                       ? "border-[#4FA59C] text-[#4FA59C]"
-                      : "border-transparent text-[#6B7280] hover:text-[#1F2937]"
+                      : "border-transparent text-muted-foreground hover:text-foreground"
                   }`}
                 >
                   Affiliates ({displayData.affiliates.length})
@@ -339,46 +343,46 @@ export default function Payouts() {
               {loading ? (
                 <div className="text-center py-12">
                   <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#4FA59C]"></div>
-                  <p className="mt-4 text-[#6B7280]">Loading payouts...</p>
+                  <p className="mt-4 text-muted-foreground">Loading payouts...</p>
                 </div>
               ) : error ? (
                 <div className="text-center py-12">
                   <XCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-                  <p className="text-red-600">{error}</p>
+                  <p className="text-destructive">{error}</p>
                 </div>
               ) : (
                 <div className="space-y-4">
                   {selectedTab === "brands" &&
                     (displayData.brands.length === 0 ? (
-                      <p className="text-center py-12 text-[#6B7280]">No brand payouts found</p>
+                      <p className="text-center py-12 text-muted-foreground">No brand payouts found</p>
                     ) : (
                       displayData.brands.map((brand) => (
-                        <div key={brand.clinicId} className="border border-[#E5E7EB] rounded-xl p-6 hover:shadow-md transition-all">
+                        <div key={brand.clinicId} className="border border-border rounded-xl p-6 hover:shadow-md transition-all bg-card">
                           <div className="flex items-center justify-between mb-4">
                             <div>
-                              <h3 className="text-lg font-semibold text-[#1F2937]">{brand.clinicName}</h3>
-                              <p className="text-sm text-[#6B7280]">{brand.clinicSlug}</p>
+                              <h3 className="text-lg font-semibold text-foreground">{brand.clinicName}</h3>
+                              <p className="text-sm text-muted-foreground">{brand.clinicSlug}</p>
                             </div>
                             <div className="text-right">
-                              <p className="text-2xl font-bold text-[#1F2937]">{formatCurrency(brand.totalAmount)}</p>
-                              <p className="text-sm text-[#6B7280]">{brand.orderCount} orders</p>
+                              <p className="text-2xl font-bold text-foreground">{formatCurrency(brand.totalAmount)}</p>
+                              <p className="text-sm text-muted-foreground">{brand.orderCount} orders</p>
                             </div>
                           </div>
                           <div className="space-y-2">
                             {brand.orders.slice(0, 5).map((order) => (
-                              <div key={order.orderId} className="flex items-center justify-between p-3 bg-[#F9FAFB] rounded-lg">
+                              <div key={order.orderId} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                                 <div>
-                                  <p className="text-sm font-medium text-[#1F2937]">{order.orderNumber}</p>
-                                  <p className="text-xs text-[#6B7280]">{formatDate(order.date)}</p>
+                                  <p className="text-sm font-medium text-foreground">{order.orderNumber}</p>
+                                  <p className="text-xs text-muted-foreground">{formatDate(order.date)}</p>
                                 </div>
                                 <div className="flex items-center gap-3">
                                   {getStatusBadge(order.status)}
-                                  <p className="text-sm font-semibold text-[#1F2937]">{formatCurrency(order.amount)}</p>
+                                  <p className="text-sm font-semibold text-foreground">{formatCurrency(order.amount)}</p>
                                 </div>
                               </div>
                             ))}
                             {brand.orders.length > 5 && (
-                              <p className="text-xs text-[#6B7280] text-center pt-2">
+                              <p className="text-xs text-muted-foreground text-center pt-2">
                                 +{brand.orders.length - 5} more orders
                               </p>
                             )}
@@ -389,35 +393,35 @@ export default function Payouts() {
 
                   {selectedTab === "doctors" &&
                     (displayData.doctors.length === 0 ? (
-                      <p className="text-center py-12 text-[#6B7280]">No doctor payouts found</p>
+                      <p className="text-center py-12 text-muted-foreground">No doctor payouts found</p>
                     ) : (
                       displayData.doctors.map((doctor) => (
-                        <div key={doctor.doctorId} className="border border-[#E5E7EB] rounded-xl p-6 hover:shadow-md transition-all">
+                        <div key={doctor.doctorId} className="border border-border rounded-xl p-6 hover:shadow-md transition-all bg-card">
                           <div className="flex items-center justify-between mb-4">
                             <div>
-                              <h3 className="text-lg font-semibold text-[#1F2937]">{doctor.doctorName}</h3>
-                              <p className="text-sm text-[#6B7280]">{doctor.doctorEmail}</p>
+                              <h3 className="text-lg font-semibold text-foreground">{doctor.doctorName}</h3>
+                              <p className="text-sm text-muted-foreground">{doctor.doctorEmail}</p>
                             </div>
                             <div className="text-right">
-                              <p className="text-2xl font-bold text-[#1F2937]">{formatCurrency(doctor.totalAmount)}</p>
-                              <p className="text-sm text-[#6B7280]">{doctor.orderCount} orders</p>
+                              <p className="text-2xl font-bold text-foreground">{formatCurrency(doctor.totalAmount)}</p>
+                              <p className="text-sm text-muted-foreground">{doctor.orderCount} orders</p>
                             </div>
                           </div>
                           <div className="space-y-2">
                             {doctor.orders.slice(0, 5).map((order) => (
-                              <div key={order.orderId} className="flex items-center justify-between p-3 bg-[#F9FAFB] rounded-lg">
+                              <div key={order.orderId} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                                 <div>
-                                  <p className="text-sm font-medium text-[#1F2937]">{order.orderNumber}</p>
-                                  <p className="text-xs text-[#6B7280]">{formatDate(order.date)}</p>
+                                  <p className="text-sm font-medium text-foreground">{order.orderNumber}</p>
+                                  <p className="text-xs text-muted-foreground">{formatDate(order.date)}</p>
                                 </div>
                                 <div className="flex items-center gap-3">
                                   {getStatusBadge(order.status)}
-                                  <p className="text-sm font-semibold text-[#1F2937]">{formatCurrency(order.amount)}</p>
+                                  <p className="text-sm font-semibold text-foreground">{formatCurrency(order.amount)}</p>
                                 </div>
                               </div>
                             ))}
                             {doctor.orders.length > 5 && (
-                              <p className="text-xs text-[#6B7280] text-center pt-2">
+                              <p className="text-xs text-muted-foreground text-center pt-2">
                                 +{doctor.orders.length - 5} more orders
                               </p>
                             )}
@@ -428,34 +432,34 @@ export default function Payouts() {
 
                   {selectedTab === "pharmacies" &&
                     (displayData.pharmacies.length === 0 ? (
-                      <p className="text-center py-12 text-[#6B7280]">No pharmacy payouts found</p>
+                      <p className="text-center py-12 text-muted-foreground">No pharmacy payouts found</p>
                     ) : (
                       displayData.pharmacies.map((pharmacy) => (
-                        <div key={pharmacy.pharmacyId} className="border border-[#E5E7EB] rounded-xl p-6 hover:shadow-md transition-all">
+                        <div key={pharmacy.pharmacyId} className="border border-border rounded-xl p-6 hover:shadow-md transition-all bg-card">
                           <div className="flex items-center justify-between mb-4">
                             <div>
-                              <h3 className="text-lg font-semibold text-[#1F2937]">{pharmacy.pharmacyName}</h3>
+                              <h3 className="text-lg font-semibold text-foreground">{pharmacy.pharmacyName}</h3>
                             </div>
                             <div className="text-right">
-                              <p className="text-2xl font-bold text-[#1F2937]">{formatCurrency(pharmacy.totalAmount)}</p>
-                              <p className="text-sm text-[#6B7280]">{pharmacy.orderCount} orders</p>
+                              <p className="text-2xl font-bold text-foreground">{formatCurrency(pharmacy.totalAmount)}</p>
+                              <p className="text-sm text-muted-foreground">{pharmacy.orderCount} orders</p>
                             </div>
                           </div>
                           <div className="space-y-2">
                             {pharmacy.orders.slice(0, 5).map((order) => (
-                              <div key={order.orderId} className="flex items-center justify-between p-3 bg-[#F9FAFB] rounded-lg">
+                              <div key={order.orderId} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                                 <div>
-                                  <p className="text-sm font-medium text-[#1F2937]">{order.orderNumber}</p>
-                                  <p className="text-xs text-[#6B7280]">{formatDate(order.date)}</p>
+                                  <p className="text-sm font-medium text-foreground">{order.orderNumber}</p>
+                                  <p className="text-xs text-muted-foreground">{formatDate(order.date)}</p>
                                 </div>
                                 <div className="flex items-center gap-3">
                                   {getStatusBadge(order.status)}
-                                  <p className="text-sm font-semibold text-[#1F2937]">{formatCurrency(order.amount)}</p>
+                                  <p className="text-sm font-semibold text-foreground">{formatCurrency(order.amount)}</p>
                                 </div>
                               </div>
                             ))}
                             {pharmacy.orders.length > 5 && (
-                              <p className="text-xs text-[#6B7280] text-center pt-2">
+                              <p className="text-xs text-muted-foreground text-center pt-2">
                                 +{pharmacy.orders.length - 5} more orders
                               </p>
                             )}
@@ -466,38 +470,38 @@ export default function Payouts() {
 
                   {selectedTab === "affiliates" &&
                     (displayData.affiliates.length === 0 ? (
-                      <p className="text-center py-12 text-[#6B7280]">No affiliate payouts found</p>
+                      <p className="text-center py-12 text-muted-foreground">No affiliate payouts found</p>
                     ) : (
                       displayData.affiliates.map((affiliate) => (
                         <div
                           key={affiliate.affiliateId}
-                          className="border border-[#E5E7EB] rounded-xl p-6 hover:shadow-md transition-all"
+                          className="border border-border rounded-xl p-6 hover:shadow-md transition-all bg-card"
                         >
                           <div className="flex items-center justify-between mb-4">
                             <div>
-                              <h3 className="text-lg font-semibold text-[#1F2937]">{affiliate.affiliateName}</h3>
-                              <p className="text-sm text-[#6B7280]">{affiliate.affiliateEmail}</p>
+                              <h3 className="text-lg font-semibold text-foreground">{affiliate.affiliateName}</h3>
+                              <p className="text-sm text-muted-foreground">{affiliate.affiliateEmail}</p>
                             </div>
                             <div className="text-right">
-                              <p className="text-2xl font-bold text-[#1F2937]">{formatCurrency(affiliate.totalAmount)}</p>
-                              <p className="text-sm text-[#6B7280]">{affiliate.orderCount} orders</p>
+                              <p className="text-2xl font-bold text-foreground">{formatCurrency(affiliate.totalAmount)}</p>
+                              <p className="text-sm text-muted-foreground">{affiliate.orderCount} orders</p>
                             </div>
                           </div>
                           <div className="space-y-2">
                             {affiliate.orders.slice(0, 5).map((order) => (
-                              <div key={order.orderId} className="flex items-center justify-between p-3 bg-[#F9FAFB] rounded-lg">
+                              <div key={order.orderId} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                                 <div>
-                                  <p className="text-sm font-medium text-[#1F2937]">{order.orderNumber}</p>
-                                  <p className="text-xs text-[#6B7280]">{formatDate(order.date)}</p>
+                                  <p className="text-sm font-medium text-foreground">{order.orderNumber}</p>
+                                  <p className="text-xs text-muted-foreground">{formatDate(order.date)}</p>
                                 </div>
                                 <div className="flex items-center gap-3">
                                   {getStatusBadge(order.status)}
-                                  <p className="text-sm font-semibold text-[#1F2937]">{formatCurrency(order.amount)}</p>
+                                  <p className="text-sm font-semibold text-foreground">{formatCurrency(order.amount)}</p>
                                 </div>
                               </div>
                             ))}
                             {affiliate.orders.length > 5 && (
-                              <p className="text-xs text-[#6B7280] text-center pt-2">
+                              <p className="text-xs text-muted-foreground text-center pt-2">
                                 +{affiliate.orders.length - 5} more orders
                               </p>
                             )}

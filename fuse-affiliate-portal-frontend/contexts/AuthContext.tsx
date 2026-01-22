@@ -11,7 +11,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const PUBLIC_PATHS = ['/signin', '/signup', '/onboarding'];
+const PUBLIC_PATHS = ['/signin', '/signup', '/onboarding', '/forgot-password'];
 
 const isPublicRoute = (pathname: string) => {
   return PUBLIC_PATHS.includes(pathname);

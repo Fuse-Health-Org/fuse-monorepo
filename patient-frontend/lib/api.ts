@@ -157,6 +157,15 @@ export const authApi = {
       method: "PUT",
       body: JSON.stringify(profileData),
     }),
+
+  changePassword: async (currentPassword: string, newPassword: string) =>
+    apiCall("/users/profile", {
+      method: "PUT",
+      body: JSON.stringify({
+        currentPassword,
+        newPassword,
+      }),
+    }),
 };
 
 // Generic data fetching with automatic error handling

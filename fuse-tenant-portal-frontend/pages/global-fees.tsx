@@ -99,7 +99,7 @@ export default function GlobalFees() {
   };
 
   return (
-    <div className="flex h-screen bg-[#F9FAFB]">
+    <div className="flex h-screen bg-background">
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header />
@@ -113,8 +113,8 @@ export default function GlobalFees() {
                   <DollarSign className="h-5 w-5 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-2xl font-bold text-[#1F2937]">Global Fees Configuration</h1>
-                  <p className="text-sm text-[#6B7280]">Manage platform-wide transaction fees</p>
+                  <h1 className="text-2xl font-bold text-foreground">Global Fees Configuration</h1>
+                  <p className="text-sm text-muted-foreground">Manage platform-wide transaction fees</p>
                 </div>
               </div>
             </div>
@@ -123,8 +123,8 @@ export default function GlobalFees() {
             {message && (
               <div className={`mb-6 p-4 rounded-xl border ${
                 message.type === 'success' 
-                  ? 'bg-green-50 border-green-200 text-green-800' 
-                  : 'bg-red-50 border-red-200 text-red-800'
+                  ? 'bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800 text-green-800 dark:text-green-300' 
+                  : 'bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800 text-red-800 dark:text-red-300'
               }`}>
                 <div className="flex items-center space-x-2">
                   <AlertCircle className="h-5 w-5" />
@@ -136,20 +136,20 @@ export default function GlobalFees() {
             {/* Configuration Card */}
             {loading ? (
               <Card className="p-8">
-                <div className="text-center text-[#6B7280]">Loading configuration...</div>
+                <div className="text-center text-muted-foreground">Loading configuration...</div>
               </Card>
             ) : (
               <Card className="p-8">
                 <div className="space-y-8">
                   {/* Warning Banner */}
-                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                  <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
                     <div className="flex items-start space-x-3">
-                      <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5" />
+                      <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5" />
                       <div className="flex-1">
-                        <p className="text-sm font-medium text-amber-900 mb-1">
+                        <p className="text-sm font-medium text-amber-900 dark:text-amber-300 mb-1">
                           Important: Platform-Wide Configuration
                         </p>
-                        <p className="text-sm text-amber-700">
+                        <p className="text-sm text-amber-700 dark:text-amber-400">
                           Changes to these fees will affect all new transactions across the entire platform. 
                           Existing orders will not be affected.
                         </p>
@@ -159,10 +159,10 @@ export default function GlobalFees() {
 
                   {/* Fuse Platform Fee */}
                   <div>
-                    <label className="block text-sm font-semibold text-[#1F2937] mb-2">
+                    <label className="block text-sm font-semibold text-foreground mb-2">
                       Fuse Platform Fee (%)
                     </label>
-                    <p className="text-sm text-[#6B7280] mb-3">
+                    <p className="text-sm text-muted-foreground mb-3">
                       Percentage of each transaction retained by the Fuse platform
                     </p>
                     <div className="relative">
@@ -172,10 +172,10 @@ export default function GlobalFees() {
                         min="0"
                         value={fees.platformFeePercent}
                         onChange={(e) => handleInputChange('platformFeePercent', e.target.value)}
-                        className="w-full px-4 py-3 border border-[#D1D5DB] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:border-transparent text-[#1F2937] text-base"
+                        className="w-full px-4 py-3 border border-input rounded-xl focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:border-transparent text-foreground text-base bg-background"
                         placeholder="e.g., 1.0"
                       />
-                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[#6B7280] text-sm">
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
                         %
                       </span>
                     </div>
@@ -183,10 +183,10 @@ export default function GlobalFees() {
 
                   {/* Stripe Fee */}
                   <div>
-                    <label className="block text-sm font-semibold text-[#1F2937] mb-2">
+                    <label className="block text-sm font-semibold text-foreground mb-2">
                       Stripe Transaction Fee (%)
                     </label>
-                    <p className="text-sm text-[#6B7280] mb-3">
+                    <p className="text-sm text-muted-foreground mb-3">
                       Percentage charged by Stripe for payment processing
                     </p>
                     <div className="relative">
@@ -196,10 +196,10 @@ export default function GlobalFees() {
                         min="0"
                         value={fees.stripeFeePercent}
                         onChange={(e) => handleInputChange('stripeFeePercent', e.target.value)}
-                        className="w-full px-4 py-3 border border-[#D1D5DB] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:border-transparent text-[#1F2937] text-base"
+                        className="w-full px-4 py-3 border border-input rounded-xl focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:border-transparent text-foreground text-base bg-background"
                         placeholder="e.g., 3.9"
                       />
-                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[#6B7280] text-sm">
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
                         %
                       </span>
                     </div>
@@ -207,14 +207,14 @@ export default function GlobalFees() {
 
                   {/* Doctor Flat Fee */}
                   <div>
-                    <label className="block text-sm font-semibold text-[#1F2937] mb-2">
+                    <label className="block text-sm font-semibold text-foreground mb-2">
                       Doctor Flat Fee (USD)
                     </label>
-                    <p className="text-sm text-[#6B7280] mb-3">
+                    <p className="text-sm text-muted-foreground mb-3">
                       Fixed amount paid to doctors per transaction
                     </p>
                     <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#6B7280] text-sm">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
                         $
                       </span>
                       <input
@@ -223,42 +223,42 @@ export default function GlobalFees() {
                         min="0"
                         value={fees.doctorFlatFeeUsd}
                         onChange={(e) => handleInputChange('doctorFlatFeeUsd', e.target.value)}
-                        className="w-full pl-8 pr-4 py-3 border border-[#D1D5DB] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:border-transparent text-[#1F2937] text-base"
+                        className="w-full pl-8 pr-4 py-3 border border-input rounded-xl focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:border-transparent text-foreground text-base bg-background"
                         placeholder="e.g., 15.00"
                       />
-                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[#6B7280] text-sm">
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
                         USD
                       </span>
                     </div>
                   </div>
 
                   {/* Fee Breakdown Preview */}
-                  <div className="bg-[#F9FAFB] border border-[#E5E7EB] rounded-xl p-5">
-                    <h3 className="text-sm font-semibold text-[#1F2937] mb-4">
+                  <div className="bg-muted/50 border border-border rounded-xl p-5">
+                    <h3 className="text-sm font-semibold text-foreground mb-4">
                       Example Fee Breakdown (on $100 sale)
                     </h3>
                     <div className="space-y-2.5">
                       <div className="flex justify-between text-sm">
-                        <span className="text-[#6B7280]">Platform Fee ({fees.platformFeePercent}%)</span>
-                        <span className="font-medium text-[#1F2937]">
+                        <span className="text-muted-foreground">Platform Fee ({fees.platformFeePercent}%)</span>
+                        <span className="font-medium text-foreground">
                           ${((fees.platformFeePercent / 100) * 100).toFixed(2)}
                         </span>
                       </div>
                       <div className="flex justify-between text-sm">
-                        <span className="text-[#6B7280]">Stripe Fee ({fees.stripeFeePercent}%)</span>
-                        <span className="font-medium text-[#1F2937]">
+                        <span className="text-muted-foreground">Stripe Fee ({fees.stripeFeePercent}%)</span>
+                        <span className="font-medium text-foreground">
                           ${((fees.stripeFeePercent / 100) * 100).toFixed(2)}
                         </span>
                       </div>
                       <div className="flex justify-between text-sm">
-                        <span className="text-[#6B7280]">Doctor Fee (flat)</span>
-                        <span className="font-medium text-[#1F2937]">
+                        <span className="text-muted-foreground">Doctor Fee (flat)</span>
+                        <span className="font-medium text-foreground">
                           ${fees.doctorFlatFeeUsd.toFixed(2)}
                         </span>
                       </div>
-                      <div className="pt-2.5 border-t border-[#D1D5DB]">
+                      <div className="pt-2.5 border-t border-border">
                         <div className="flex justify-between text-sm font-semibold">
-                          <span className="text-[#1F2937]">Total Fees</span>
+                          <span className="text-foreground">Total Fees</span>
                           <span className="text-[#4FA59C]">
                             ${(
                               ((fees.platformFeePercent / 100) * 100) +
@@ -268,8 +268,8 @@ export default function GlobalFees() {
                           </span>
                         </div>
                         <div className="flex justify-between text-sm mt-2">
-                          <span className="text-[#6B7280]">Remaining for Brand</span>
-                          <span className="font-medium text-[#1F2937]">
+                          <span className="text-muted-foreground">Remaining for Brand</span>
+                          <span className="font-medium text-foreground">
                             ${(
                               100 -
                               ((fees.platformFeePercent / 100) * 100) -

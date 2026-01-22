@@ -873,15 +873,15 @@ export default function Products() {
   }
 
   return (
-    <div className="flex h-screen bg-[#F9FAFB]">
+    <div className="flex h-screen bg-background">
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header />
         <main className="flex-1 overflow-y-auto p-8 space-y-8">
           <div className="flex items-start justify-between">
             <div>
-              <h1 className="text-3xl font-semibold text-[#1F2937] mb-2">Product Management</h1>
-              <p className="text-[#6B7280] text-base">
+              <h1 className="text-3xl font-semibold text-foreground mb-2">Product Management</h1>
+              <p className="text-muted-foreground text-base">
                 Manage your product catalog with our Pharmacy & State Coverage system.
               </p>
             </div>
@@ -909,7 +909,7 @@ export default function Products() {
                   variant="outline"
                   onClick={handleDeactivateAll}
                   size="sm"
-                  className="rounded-full px-4 border-[#E5E7EB] text-[#6B7280] hover:bg-[#F3F4F6] transition-all text-sm"
+                  className="rounded-full px-4 border-border text-muted-foreground hover:bg-muted transition-all text-sm"
                 >
                   Deactivate All
                 </Button>
@@ -927,20 +927,20 @@ export default function Products() {
 
           {saveMessage && (
             <div className={`rounded-2xl p-4 ${saveMessage.startsWith('Error:')
-              ? 'bg-red-50 border border-red-200 text-red-700'
-              : 'bg-green-50 border border-green-200 text-green-700'
+              ? 'bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400'
+              : 'bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400'
               } shadow-sm`}>
               <p className="text-sm font-medium">{saveMessage}</p>
             </div>
           )}
 
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 bg-white rounded-2xl p-1.5 w-fit shadow-sm border border-[#E5E7EB]">
+            <div className="flex items-center gap-2 bg-card rounded-2xl p-1.5 w-fit shadow-sm border border-border">
               <button
                 onClick={() => setActiveTab('selected')}
                 className={`px-6 py-2 text-sm font-medium rounded-xl transition-all ${activeTab === 'selected'
                   ? 'bg-[#4FA59C] text-white shadow-sm'
-                  : 'text-[#6B7280] hover:bg-[#F3F4F6]'
+                  : 'text-muted-foreground hover:bg-muted'
                   }`}
               >
                 Selected Products
@@ -949,19 +949,19 @@ export default function Products() {
                 onClick={() => setActiveTab('all')}
                 className={`px-6 py-2 text-sm font-medium rounded-xl transition-all ${activeTab === 'all'
                   ? 'bg-[#4FA59C] text-white shadow-sm'
-                  : 'text-[#6B7280] hover:bg-[#F3F4F6]'
+                  : 'text-muted-foreground hover:bg-muted'
                   }`}
               >
                 All Products
               </button>
             </div>
 
-            <div className="flex items-center gap-2 bg-white rounded-2xl p-1.5 shadow-sm border border-[#E5E7EB]">
+            <div className="flex items-center gap-2 bg-card rounded-2xl p-1.5 shadow-sm border border-border">
               <button
                 onClick={() => setViewMode('card')}
                 className={`p-2 rounded-xl transition-all ${viewMode === 'card'
                   ? 'bg-[#4FA59C] text-white shadow-sm'
-                  : 'text-[#6B7280] hover:bg-[#F3F4F6]'
+                  : 'text-muted-foreground hover:bg-muted'
                   }`}
                 title="Card View"
               >
@@ -971,7 +971,7 @@ export default function Products() {
                 onClick={() => setViewMode('list')}
                 className={`p-2 rounded-xl transition-all ${viewMode === 'list'
                   ? 'bg-[#4FA59C] text-white shadow-sm'
-                  : 'text-[#6B7280] hover:bg-[#F3F4F6]'
+                  : 'text-muted-foreground hover:bg-muted'
                   }`}
                 title="List View"
               >
@@ -982,11 +982,11 @@ export default function Products() {
 
           <div className="space-y-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-[#4B5563]">Filter by Category</label>
+              <label className="text-sm font-medium text-foreground">Filter by Category</label>
               <select
                 value={selectedCategory || ""}
                 onChange={(e) => setSelectedCategory(e.target.value || null)}
-                className="rounded-xl border border-[#E5E7EB] bg-white px-4 py-2.5 text-sm text-[#1F2937] shadow-sm hover:border-[#4FA59C] transition-all focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50"
+                className="rounded-xl border border-input bg-background px-4 py-2.5 text-sm text-foreground shadow-sm hover:border-[#4FA59C] transition-all focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50"
               >
                 <option value="">All Categories</option>
                 {CATEGORY_OPTIONS.map((cat: { value: string; label: string }) => (
@@ -998,7 +998,7 @@ export default function Products() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-[#4B5563]">Filter by Pharmacy</label>
+              <label className="text-sm font-medium text-foreground">Filter by Pharmacy</label>
               <div className="flex flex-wrap gap-2">
                 {[
                   { id: 'absoluterx', name: 'AbsoluteRx' },
@@ -1021,7 +1021,7 @@ export default function Products() {
                       }}
                       className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${isSelected
                         ? 'bg-[#4FA59C] text-white shadow-md'
-                        : 'bg-white text-[#6B7280] border border-[#E5E7EB] hover:border-[#4FA59C] hover:text-[#4FA59C]'
+                        : 'bg-background text-muted-foreground border border-input hover:border-[#4FA59C] hover:text-[#4FA59C]'
                         }`}
                     >
                       {pharmacy.name}
@@ -1032,7 +1032,7 @@ export default function Products() {
                 {selectedPharmacies.size > 0 && (
                   <button
                     onClick={() => setSelectedPharmacies(new Set())}
-                    className="px-4 py-2 rounded-full text-sm font-medium text-[#EF4444] border border-[#EF4444] hover:bg-[#FEF2F2] transition-all"
+                    className="px-4 py-2 rounded-full text-sm font-medium text-destructive border border-destructive hover:bg-destructive/10 transition-all"
                   >
                     Clear All
                   </button>
@@ -1041,13 +1041,13 @@ export default function Products() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-[#4B5563]">Filter by Auto Imported</label>
+              <label className="text-sm font-medium text-foreground">Filter by Auto Imported</label>
               <div className="flex flex-wrap gap-2">
                 <button
                   onClick={() => setFilterAutoImported(filterAutoImported === true ? null : true)}
                   className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${filterAutoImported === true
                     ? 'bg-[#4FA59C] text-white shadow-md'
-                    : 'bg-white text-[#6B7280] border border-[#E5E7EB] hover:border-[#4FA59C] hover:text-[#4FA59C]'
+                    : 'bg-background text-muted-foreground border border-input hover:border-[#4FA59C] hover:text-[#4FA59C]'
                     }`}
                 >
                   Auto Imported
@@ -1056,7 +1056,7 @@ export default function Products() {
                 {filterAutoImported !== null && (
                   <button
                     onClick={() => setFilterAutoImported(null)}
-                    className="px-4 py-2 rounded-full text-sm font-medium text-[#EF4444] border border-[#EF4444] hover:bg-[#FEF2F2] transition-all"
+                    className="px-4 py-2 rounded-full text-sm font-medium text-destructive border border-destructive hover:bg-destructive/10 transition-all"
                   >
                     Clear
                   </button>
@@ -1065,13 +1065,13 @@ export default function Products() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-[#4B5563]">Filter by MDI Offering</label>
+              <label className="text-sm font-medium text-foreground">Filter by MDI Offering</label>
               <div className="flex flex-wrap gap-2">
                 <button
                   onClick={() => setFilterHasMdiOffering(filterHasMdiOffering === true ? null : true)}
                   className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${filterHasMdiOffering === true
                     ? 'bg-[#4FA59C] text-white shadow-md'
-                    : 'bg-white text-[#6B7280] border border-[#E5E7EB] hover:border-[#4FA59C] hover:text-[#4FA59C]'
+                    : 'bg-background text-muted-foreground border border-input hover:border-[#4FA59C] hover:text-[#4FA59C]'
                     }`}
                 >
                   Has MDI Offering
@@ -1080,7 +1080,7 @@ export default function Products() {
                 {filterHasMdiOffering !== null && (
                   <button
                     onClick={() => setFilterHasMdiOffering(null)}
-                    className="px-4 py-2 rounded-full text-sm font-medium text-[#EF4444] border border-[#EF4444] hover:bg-[#FEF2F2] transition-all"
+                    className="px-4 py-2 rounded-full text-sm font-medium text-destructive border border-destructive hover:bg-destructive/10 transition-all"
                   >
                     Clear
                   </button>
@@ -1095,19 +1095,19 @@ export default function Products() {
               <span className="text-base">Loading products...</span>
             </div>
           ) : products.length === 0 ? (
-            <div className="bg-white rounded-2xl shadow-sm border border-[#E5E7EB] p-16">
-              <div className="flex flex-col items-center justify-center text-[#6B7280]">
-                <div className="bg-[#F3F4F6] rounded-full p-6 mb-4">
-                  <Package className="h-12 w-12 text-[#9CA3AF]" />
+            <div className="bg-card rounded-2xl shadow-sm border border-border p-16">
+              <div className="flex flex-col items-center justify-center text-muted-foreground">
+                <div className="bg-muted rounded-full p-6 mb-4">
+                  <Package className="h-12 w-12 text-muted-foreground" />
                 </div>
-                <p className="text-lg text-[#4B5563]">No products found. Create your first product to get started.</p>
+                <p className="text-lg text-foreground">No products found. Create your first product to get started.</p>
               </div>
             </div>
           ) : viewMode === 'list' ? (
             <div className="space-y-4">
               {/* Bulk Selection Actions - Always visible */}
-              <div className="flex items-center gap-3 bg-white rounded-xl shadow-sm border border-[#E5E7EB] px-6 py-3">
-                <span className="text-sm text-[#6B7280] font-medium">
+              <div className="flex items-center gap-3 bg-card rounded-xl shadow-sm border border-border px-6 py-3">
+                <span className="text-sm text-muted-foreground font-medium">
                   {selectedProducts.size > 0 ? `${selectedProducts.size} product(s) selected` : 'No products selected'}
                 </span>
                 <div className="flex gap-2 ml-auto">
@@ -1130,22 +1130,22 @@ export default function Products() {
                 </div>
               </div>
 
-              <div className="bg-white rounded-2xl shadow-sm border border-[#E5E7EB] overflow-hidden">
+              <div className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden">
                 {/* Pagination controls at top */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-[#E5E7EB] bg-[#F9FAFB]">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-muted/50">
                   <div className="flex items-center gap-3">
-                    <span className="text-sm text-[#6B7280]">Show:</span>
+                    <span className="text-sm text-muted-foreground">Show:</span>
                     <select
                       value={itemsPerPage}
                       onChange={(e) => handleItemsPerPageChange(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
-                      className="rounded-lg border border-[#E5E7EB] bg-white px-3 py-1.5 text-sm text-[#1F2937] focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50"
+                      className="rounded-lg border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50"
                     >
                       <option value="300">300</option>
                       <option value="600">600</option>
                       <option value="1000">1000</option>
                       <option value="all">All</option>
                     </select>
-                    <span className="text-sm text-[#6B7280]">
+                    <span className="text-sm text-muted-foreground">
                       Showing {itemsPerPage === 'all' ? products.length : Math.min((currentPage - 1) * (itemsPerPage as number) + 1, products.length)} - {itemsPerPage === 'all' ? products.length : Math.min(currentPage * (itemsPerPage as number), products.length)} of {products.length}
                     </span>
                   </div>
@@ -1155,7 +1155,7 @@ export default function Products() {
                       <button
                         onClick={() => handlePageChange(currentPage - 1)}
                         disabled={currentPage === 1}
-                        className="p-2 rounded-lg border border-[#E5E7EB] text-[#6B7280] hover:bg-[#F3F4F6] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                        className="p-2 rounded-lg border border-border text-muted-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                       >
                         <ChevronLeft className="h-4 w-4" />
                       </button>
@@ -1179,7 +1179,7 @@ export default function Products() {
                               onClick={() => handlePageChange(pageNum)}
                               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${currentPage === pageNum
                                 ? 'bg-[#4FA59C] text-white'
-                                : 'text-[#6B7280] hover:bg-[#F3F4F6]'
+                                : 'text-muted-foreground hover:bg-muted'
                                 }`}
                             >
                               {pageNum}
@@ -1191,7 +1191,7 @@ export default function Products() {
                       <button
                         onClick={() => handlePageChange(currentPage + 1)}
                         disabled={currentPage === totalPages}
-                        className="p-2 rounded-lg border border-[#E5E7EB] text-[#6B7280] hover:bg-[#F3F4F6] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                        className="p-2 rounded-lg border border-border text-muted-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                       >
                         <ChevronRight className="h-4 w-4" />
                       </button>
@@ -1200,46 +1200,46 @@ export default function Products() {
                 </div>
 
                 <table className="w-full">
-                  <thead className="bg-[#F9FAFB] border-b border-[#E5E7EB]">
+                  <thead className="bg-muted/50 border-b border-border">
                     <tr>
                       <th className="px-4 py-3 text-left">
                         <input
                           type="checkbox"
                           checked={selectedProducts.size === products.length && products.length > 0}
                           onChange={toggleSelectAll}
-                          className="h-4 w-4 rounded border-[#D1D5DB] text-[#4FA59C] focus:ring-[#4FA59C]"
+                          className="h-4 w-4 rounded border-input text-[#4FA59C] focus:ring-[#4FA59C] bg-background"
                         />
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-[#6B7280] uppercase tracking-wide">Pharmacy</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-[#6B7280] uppercase tracking-wide">Product</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-[#6B7280] uppercase tracking-wide">Description</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-[#6B7280] uppercase tracking-wide">Size</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-[#6B7280] uppercase tracking-wide">Status</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-[#6B7280] uppercase tracking-wide">Actions</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Pharmacy</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Product</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Description</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Size</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Status</th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#E5E7EB]">
+                  <tbody className="divide-y divide-border">
                     {paginatedProducts().map((product) => (
-                      <tr key={product.id} className={`hover:bg-[#F9FAFB] transition-colors ${!product.isActive ? 'opacity-60' : ''}`}>
+                      <tr key={product.id} className={`hover:bg-muted/50 transition-colors ${!product.isActive ? 'opacity-60' : ''}`}>
                         <td className="px-4 py-4">
                           <input
                             type="checkbox"
                             checked={selectedProducts.has(product.id)}
                             onChange={() => toggleSelectProduct(product.id)}
-                            className="h-4 w-4 rounded border-[#D1D5DB] text-[#4FA59C] focus:ring-[#4FA59C]"
+                            className="h-4 w-4 rounded border-input text-[#4FA59C] focus:ring-[#4FA59C] bg-background"
                           />
                         </td>
                         <td className="px-4 py-4">
                           <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
                             product.pharmacyProvider === 'ironsail' 
-                              ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                              ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800'
                               : product.pharmacyProvider === 'absoluterx'
-                              ? 'bg-purple-50 text-purple-700 border border-purple-200'
+                              ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 border border-purple-200 dark:border-purple-800'
                               : product.pharmacyProvider === 'truepill'
-                              ? 'bg-green-50 text-green-700 border border-green-200'
+                              ? 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800'
                               : product.pharmacyProvider === 'pillpack'
-                              ? 'bg-orange-50 text-orange-700 border border-orange-200'
-                              : 'bg-gray-50 text-gray-600 border border-gray-200'
+                              ? 'bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 border border-orange-200 dark:border-orange-800'
+                              : 'bg-muted text-muted-foreground border border-border'
                           }`}>
                             {product.pharmacyProvider === 'ironsail' ? 'IronSail'
                               : product.pharmacyProvider === 'absoluterx' ? 'AbsoluteRx'
@@ -1253,31 +1253,31 @@ export default function Products() {
                             {product.imageUrl ? (
                               <img src={product.imageUrl} alt={product.name} className="h-10 w-10 rounded-lg object-cover" />
                             ) : (
-                              <div className="h-10 w-10 bg-[#F3F4F6] rounded-lg flex items-center justify-center">
-                                <ImageIcon className="h-5 w-5 text-[#9CA3AF]" />
+                              <div className="h-10 w-10 bg-muted rounded-lg flex items-center justify-center">
+                                <ImageIcon className="h-5 w-5 text-muted-foreground" />
                               </div>
                             )}
                             <div>
-                              <p className="text-sm font-semibold text-[#1F2937]">{product.name}</p>
+                              <p className="text-sm font-semibold text-foreground">{product.name}</p>
                               {product.brandId && (
-                                <span className="text-xs text-purple-600">Custom</span>
+                                <span className="text-xs text-purple-600 dark:text-purple-400">Custom</span>
                               )}
                             </div>
                           </div>
                         </td>
                         <td className="px-4 py-4">
-                          <p className="text-sm text-[#6B7280] line-clamp-2 max-w-md">{product.description}</p>
+                          <p className="text-sm text-muted-foreground line-clamp-2 max-w-md">{product.description}</p>
                         </td>
                         <td className="px-4 py-4">
-                          <p className="text-sm text-[#1F2937]">{product.medicationSize || '—'}</p>
+                          <p className="text-sm text-foreground">{product.medicationSize || '—'}</p>
                         </td>
                         <td className="px-4 py-4">
                           {product.isActive ? (
-                            <span className="inline-flex px-2.5 py-1 bg-green-50 text-green-700 text-xs font-medium rounded-full border border-green-200">
+                            <span className="inline-flex px-2.5 py-1 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-medium rounded-full border border-green-200 dark:border-green-800">
                               Active
                             </span>
                           ) : (
-                            <span className="inline-flex px-2.5 py-1 bg-[#FEF3C7] text-[#92400E] text-xs font-medium rounded-full border border-[#FDE68A]">
+                            <span className="inline-flex px-2.5 py-1 bg-yellow-50 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 text-xs font-medium rounded-full border border-yellow-200 dark:border-yellow-800">
                               Inactive
                             </span>
                           )}
@@ -1305,12 +1305,12 @@ export default function Products() {
 
                 {/* Pagination controls at bottom */}
                 {itemsPerPage !== 'all' && totalPages > 1 && (
-                  <div className="flex items-center justify-center px-6 py-4 border-t border-[#E5E7EB] bg-[#F9FAFB]">
+                  <div className="flex items-center justify-center px-6 py-4 border-t border-border bg-muted/50">
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => handlePageChange(currentPage - 1)}
                         disabled={currentPage === 1}
-                        className="p-2 rounded-lg border border-[#E5E7EB] text-[#6B7280] hover:bg-[#F3F4F6] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                        className="p-2 rounded-lg border border-border text-muted-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                       >
                         <ChevronLeft className="h-4 w-4" />
                       </button>
@@ -1334,7 +1334,7 @@ export default function Products() {
                               onClick={() => handlePageChange(pageNum)}
                               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${currentPage === pageNum
                                 ? 'bg-[#4FA59C] text-white'
-                                : 'text-[#6B7280] hover:bg-[#F3F4F6]'
+                                : 'text-muted-foreground hover:bg-muted'
                                 }`}
                             >
                               {pageNum}
@@ -1346,7 +1346,7 @@ export default function Products() {
                       <button
                         onClick={() => handlePageChange(currentPage + 1)}
                         disabled={currentPage === totalPages}
-                        className="p-2 rounded-lg border border-[#E5E7EB] text-[#6B7280] hover:bg-[#F3F4F6] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                        className="p-2 rounded-lg border border-border text-muted-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                       >
                         <ChevronRight className="h-4 w-4" />
                       </button>
@@ -1358,7 +1358,7 @@ export default function Products() {
           ) : (
             <>
               {/* Bulk Selection Actions - Always visible */}
-              <div className="flex items-center gap-3 bg-white rounded-xl shadow-sm border border-[#E5E7EB] px-6 py-3">
+              <div className="flex items-center gap-3 bg-card rounded-xl shadow-sm border border-border px-6 py-3">
                 <span className="text-sm text-[#6B7280] font-medium">
                   {selectedProducts.size > 0 ? `${selectedProducts.size} product(s) selected` : 'No products selected'}
                 </span>
@@ -1386,7 +1386,7 @@ export default function Products() {
                 {products.map((product) => (
                   <div
                     key={product.id}
-                    className={`relative bg-white rounded-2xl shadow-sm border border-[#E5E7EB] overflow-hidden transition-all hover:shadow-md hover:border-[#4FA59C] ${!product.isActive ? "opacity-60" : ""} ${selectedProducts.has(product.id) ? 'ring-2 ring-[#4FA59C]' : ''}`}
+                    className={`relative bg-card rounded-2xl shadow-sm border border-border overflow-hidden transition-all hover:shadow-md hover:border-[#4FA59C] ${!product.isActive ? "opacity-60" : ""} ${selectedProducts.has(product.id) ? 'ring-2 ring-[#4FA59C]' : ''}`}
                   >
                     {/* Checkbox overlay */}
                     <div className="absolute top-4 left-4 z-10">
@@ -1394,12 +1394,12 @@ export default function Products() {
                         type="checkbox"
                         checked={selectedProducts.has(product.id)}
                         onChange={() => toggleSelectProduct(product.id)}
-                        className="h-5 w-5 rounded border-[#D1D5DB] text-[#4FA59C] focus:ring-[#4FA59C] bg-white shadow-sm"
+                        className="h-5 w-5 rounded border-input text-[#4FA59C] focus:ring-[#4FA59C] bg-background shadow-sm"
                       />
                     </div>
                     {/* Product Image Header */}
                     {product.imageUrl && (
-                      <div className="w-full h-48 overflow-hidden bg-[#F9FAFB] border-b border-[#E5E7EB]">
+                      <div className="w-full h-48 overflow-hidden bg-muted/50 border-b border-border">
                         <img
                           src={product.imageUrl}
                           alt={product.name}
@@ -1408,26 +1408,26 @@ export default function Products() {
                       </div>
                     )}
                     {!product.imageUrl && (
-                      <div className="w-full h-48 bg-gradient-to-br from-[#F9FAFB] to-[#F3F4F6] border-b border-[#E5E7EB] flex items-center justify-center">
-                        <ImageIcon className="h-16 w-16 text-[#D1D5DB]" />
+                      <div className="w-full h-48 bg-gradient-to-br from-muted/50 to-muted border-b border-border flex items-center justify-center">
+                        <ImageIcon className="h-16 w-16 text-muted-foreground" />
                       </div>
                     )}
 
                     <div className="p-6 space-y-4">
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1 min-w-0">
-                          <h3 className="text-lg font-semibold text-[#1F2937] mb-1 truncate">{product.name}</h3>
-                          <p className="text-sm text-[#6B7280] line-clamp-2">{product.description}</p>
+                          <h3 className="text-lg font-semibold text-foreground mb-1 truncate">{product.name}</h3>
+                          <p className="text-sm text-muted-foreground line-clamp-2">{product.description}</p>
                           {product.brandId && (
                             <div className="mt-2">
-                              <span className="inline-flex items-center px-2.5 py-1 bg-purple-50 text-purple-700 text-xs font-medium rounded-full border border-purple-200">
+                              <span className="inline-flex items-center px-2.5 py-1 bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 text-xs font-medium rounded-full border border-purple-200 dark:border-purple-800">
                                 Custom product from {product.brandName || 'Brand'}
                               </span>
                             </div>
                           )}
                         </div>
                         {!product.isActive && (
-                          <span className="px-3 py-1 bg-[#FEF3C7] text-[#92400E] text-xs font-medium rounded-full border border-[#FDE68A] whitespace-nowrap">
+                          <span className="px-3 py-1 bg-yellow-50 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 text-xs font-medium rounded-full border border-yellow-200 dark:border-yellow-800 whitespace-nowrap">
                             Inactive
                           </span>
                         )}
@@ -1435,8 +1435,8 @@ export default function Products() {
 
                       <div className="space-y-3">
                         {/* Pharmacy Coverages - Show if bundle has multiple medications */}
-                        <div className="bg-[#F0F9FF] rounded-xl p-2.5 border border-[#BAE6FD]">
-                          <p className="text-[10px] font-semibold text-[#0369A1] mb-1.5 uppercase tracking-wide">
+                        <div className="bg-blue-50 dark:bg-blue-900/30 rounded-xl p-2.5 border border-blue-200 dark:border-blue-800">
+                          <p className="text-[10px] font-semibold text-blue-700 dark:text-blue-400 mb-1.5 uppercase tracking-wide">
                             {product.pharmacyCoverages && product.pharmacyCoverages.length > 1
                               ? `Bundle (${product.pharmacyCoverages.length} medications)`
                               : 'Single Medication'}
@@ -1446,11 +1446,11 @@ export default function Products() {
                             {product.pharmacyCoverages && product.pharmacyCoverages.length > 0 ? (
                               product.pharmacyCoverages.map((coverage, idx) => (
                                 <div key={coverage.id} className="text-xs">
-                                  <p className="font-semibold text-[#0C4A6E] leading-tight">
+                                  <p className="font-semibold text-blue-900 dark:text-blue-300 leading-tight">
                                     • {coverage.customName || coverage.pharmacyProduct?.pharmacyProductName || 'Product'}
                                   </p>
                                   {coverage.customSig && (
-                                    <p className="text-[10px] text-[#64748B] leading-tight ml-2 truncate" title={coverage.customSig}>
+                                    <p className="text-[10px] text-blue-700 dark:text-blue-400 leading-tight ml-2 truncate" title={coverage.customSig}>
                                       {coverage.customSig}
                                     </p>
                                   )}
@@ -1459,11 +1459,11 @@ export default function Products() {
                             ) : (
                               <>
                                 <div className="text-xs">
-                                  <p className="font-semibold text-[#0C4A6E] leading-tight">
+                                  <p className="font-semibold text-blue-900 dark:text-blue-300 leading-tight">
                                     • {product.name}
                                   </p>
                                   {product.placeholderSig && (
-                                    <p className="text-[10px] text-[#64748B] leading-tight ml-2 truncate" title={product.placeholderSig}>
+                                    <p className="text-[10px] text-blue-700 dark:text-blue-400 leading-tight ml-2 truncate" title={product.placeholderSig}>
                                       {product.placeholderSig}
                                     </p>
                                   )}
@@ -1475,12 +1475,12 @@ export default function Products() {
                         {product.pharmacyCoverages && product.pharmacyCoverages.length <= 1 && <div className="h-[32px]"></div>}
 
                         <div className="space-y-1.5 relative z-10">
-                          <label className="text-xs font-medium text-[#9CA3AF] uppercase tracking-wide">Medical Questions</label>
+                          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Medical Questions</label>
                           <select
                             value=""
                             onChange={(e) => handleAttachFormToProduct(product.id, e.target.value)}
                             disabled={attachingFormToProduct === product.id}
-                            className="w-full rounded-xl border border-[#E5E7EB] bg-white px-3 py-2 text-sm text-[#1F2937] hover:border-[#4FA59C] transition-all focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground hover:border-[#4FA59C] transition-all focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 disabled:opacity-50 disabled:cursor-not-allowed"
                             style={{ zIndex: 1000 }}
                           >
                             <option value="" disabled>
@@ -1495,9 +1495,9 @@ export default function Products() {
                         </div>
 
                         <div className="grid grid-cols-2 gap-3">
-                          <div className="bg-[#F9FAFB] rounded-xl p-3 border border-[#E5E7EB]">
-                            <p className="text-xs font-medium text-[#9CA3AF] mb-1">Medication Size</p>
-                            <p className="text-sm font-semibold text-[#1F2937]">{product.medicationSize || '—'}</p>
+                          <div className="bg-muted/50 rounded-xl p-3 border border-border">
+                            <p className="text-xs font-medium text-muted-foreground mb-1">Medication Size</p>
+                            <p className="text-sm font-semibold text-foreground">{product.medicationSize || '—'}</p>
                           </div>
                         </div>
                       </div>
@@ -1522,7 +1522,7 @@ export default function Products() {
                             ) : (
                               <button
                                 onClick={() => handleToggleActive(product)}
-                                className="rounded-full px-4 py-2.5 border border-[#E5E7EB] text-[#EF4444] text-sm font-medium hover:bg-[#FEF2F2] transition-all"
+                                className="rounded-full px-4 py-2.5 border border-destructive text-destructive text-sm font-medium hover:bg-destructive/10 transition-all"
                               >
                                 Deactivate
                               </button>
@@ -1566,13 +1566,13 @@ export default function Products() {
 
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="w-full max-w-3xl max-h-[90vh] overflow-y-auto bg-white rounded-2xl shadow-2xl border border-[#E5E7EB]">
+          <div className="w-full max-w-3xl max-h-[90vh] overflow-y-auto bg-card rounded-2xl shadow-2xl border border-border">
             <div className="p-8 space-y-6">
-              <div className="flex items-center justify-between pb-4 border-b border-[#E5E7EB]">
-                <h2 className="text-2xl font-semibold text-[#1F2937]">{editingProduct ? "Edit Product" : "Create Product"}</h2>
+              <div className="flex items-center justify-between pb-4 border-b border-border">
+                <h2 className="text-2xl font-semibold text-foreground">{editingProduct ? "Edit Product" : "Create Product"}</h2>
                 <button
                   onClick={() => setShowModal(false)}
-                  className="rounded-full px-4 py-2 border border-[#E5E7EB] text-[#6B7280] hover:bg-[#F3F4F6] transition-all text-sm font-medium"
+                  className="rounded-full px-4 py-2 border border-border text-muted-foreground hover:bg-muted transition-all text-sm font-medium"
                 >
                   Close
                 </button>
@@ -1585,17 +1585,17 @@ export default function Products() {
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     placeholder="e.g., Semaglutide 2.5mg"
-                    className="w-full rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] px-4 py-2.5 text-sm text-[#1F2937] focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all"
+                    className="w-full rounded-xl border border-input bg-background px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-[#4B5563]">Categories</label>
-                  <div className="space-y-2 rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] p-4">
+                  <label className="text-sm font-medium text-foreground">Categories</label>
+                  <div className="space-y-2 rounded-xl border border-border bg-muted/50 p-4">
                     {CATEGORY_OPTIONS.filter((cat) => cat.value).map((cat) => {
                       const checked = formData.categories.includes(cat.value)
                       return (
-                        <label key={cat.value} className="flex items-center gap-3 text-sm text-[#1F2937]">
+                        <label key={cat.value} className="flex items-center gap-3 text-sm text-foreground">
                           <input
                             type="checkbox"
                             checked={checked}
@@ -1618,59 +1618,59 @@ export default function Products() {
                       )
                     })}
                     {formData.categories.length === 0 && (
-                      <p className="text-xs text-[#9CA3AF]">Select one or more categories if applicable.</p>
+                      <p className="text-xs text-muted-foreground">Select one or more categories if applicable.</p>
                     )}
                   </div>
                 </div>
 
                 <div className="space-y-2 md:col-span-2">
-                  <label className="text-sm font-medium text-[#4B5563]">Description *</label>
+                  <label className="text-sm font-medium text-foreground">Description *</label>
                   <textarea
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     placeholder="Detailed product description..."
-                    className="w-full rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] px-4 py-2.5 text-sm text-[#1F2937] min-h-[100px] focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all resize-none"
+                    className="w-full rounded-xl border border-input bg-background px-4 py-2.5 text-sm text-foreground min-h-[100px] focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all resize-none"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-[#4B5563]">Placeholder Sig *</label>
+                  <label className="text-sm font-medium text-foreground">Placeholder Sig *</label>
                   <input
                     value={formData.placeholderSig}
                     onChange={(e) => setFormData({ ...formData, placeholderSig: e.target.value })}
                     placeholder="e.g., 2.5mg/0.5ml"
-                    className="w-full rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] px-4 py-2.5 text-sm text-[#1F2937] focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all"
+                    className="w-full rounded-xl border border-input bg-background px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-[#4B5563]">Medication Size</label>
+                  <label className="text-sm font-medium text-foreground">Medication Size</label>
                   <input
                     value={formData.medicationSize}
                     onChange={(e) => setFormData({ ...formData, medicationSize: e.target.value })}
                     placeholder="e.g., 10ml vial, 30 tablets"
-                    className="w-full rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] px-4 py-2.5 text-sm text-[#1F2937] focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all"
+                    className="w-full rounded-xl border border-input bg-background px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-[#4B5563]">Active Ingredients *</label>
+                  <label className="text-sm font-medium text-foreground">Active Ingredients *</label>
                   <input
                     value={formData.activeIngredients.join(", ")}
                     onChange={(e) =>
                       setFormData({ ...formData, activeIngredients: e.target.value.split(",").map((s) => s.trim()) })
                     }
                     placeholder="Comma separated: Ingredient1, Ingredient2"
-                    className="w-full rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] px-4 py-2.5 text-sm text-[#1F2937] focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all"
+                    className="w-full rounded-xl border border-input bg-background px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-[#4B5563]">Pharmacy Vendor</label>
+                  <label className="text-sm font-medium text-foreground">Pharmacy Vendor</label>
                   <select
                     value={formData.pharmacyProvider}
                     onChange={(e) => setFormData({ ...formData, pharmacyProvider: e.target.value })}
-                    className="w-full rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] px-4 py-2.5 text-sm text-[#1F2937] focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all"
+                    className="w-full rounded-xl border border-input bg-background px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all"
                   >
                     <option value="">Select vendor...</option>
                     {pharmacyProviders.map((vendor) => (
@@ -1682,46 +1682,46 @@ export default function Products() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-[#4B5563]">Pharmacy Product ID</label>
+                  <label className="text-sm font-medium text-foreground">Pharmacy Product ID</label>
                   <input
                     value={formData.pharmacyProductId}
                     onChange={(e) => setFormData({ ...formData, pharmacyProductId: e.target.value })}
                     placeholder="SKU or ID from pharmacy system"
-                    className="w-full rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] px-4 py-2.5 text-sm text-[#1F2937] focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all"
+                    className="w-full rounded-xl border border-input bg-background px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-[#4B5563]">Pharmacy Wholesale Price *</label>
+                  <label className="text-sm font-medium text-foreground">Pharmacy Wholesale Price *</label>
                   <input
                     type="number"
                     step="0.01"
                     value={formData.price}
                     onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
                     placeholder="0.00"
-                    className="w-full rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] px-4 py-2.5 text-sm text-[#1F2937] focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all"
+                    className="w-full rounded-xl border border-input bg-background px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all"
                   />
-                  <p className="text-xs text-[#9CA3AF]">The wholesale price from the pharmacy</p>
+                  <p className="text-xs text-muted-foreground">The wholesale price from the pharmacy</p>
                 </div>
 
-                <div className="flex items-center space-x-3 md:col-span-2 bg-[#F9FAFB] rounded-xl p-4 border border-[#E5E7EB]">
+                <div className="flex items-center space-x-3 md:col-span-2 bg-muted/50 rounded-xl p-4 border border-border">
                   <input
                     type="checkbox"
                     id="isActive"
                     checked={formData.isActive}
                     onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-                    className="w-5 h-5 rounded border-[#E5E7EB] text-[#4FA59C] focus:ring-[#4FA59C] focus:ring-2 focus:ring-opacity-50"
+                    className="w-5 h-5 rounded border-input text-[#4FA59C] focus:ring-[#4FA59C] focus:ring-2 focus:ring-opacity-50 bg-background"
                   />
-                  <label htmlFor="isActive" className="text-sm font-medium text-[#1F2937] cursor-pointer">
+                  <label htmlFor="isActive" className="text-sm font-medium text-foreground cursor-pointer">
                     Product is active
                   </label>
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3 pt-4 border-t border-[#E5E7EB]">
+              <div className="flex justify-end gap-3 pt-4 border-t border-border">
                 <button
                   onClick={() => setShowModal(false)}
-                  className="rounded-full px-6 py-2.5 border border-[#E5E7EB] text-[#6B7280] hover:bg-[#F3F4F6] transition-all text-sm font-medium"
+                  className="rounded-full px-6 py-2.5 border border-border text-muted-foreground hover:bg-muted transition-all text-sm font-medium"
                 >
                   Cancel
                 </button>
