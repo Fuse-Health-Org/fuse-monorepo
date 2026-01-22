@@ -788,7 +788,7 @@ export default function Templates() {
                                     placeholder="Search templates..."
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
-                                    className="w-full pl-10 pr-4 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
+                                    className="w-full pl-10 pr-4 py-2 border border-input bg-background text-foreground rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                                 />
                             </div>
                         </CardContent>
@@ -997,7 +997,7 @@ export default function Templates() {
                                                 type="text"
                                                 value={editedName}
                                                 onChange={(e) => setEditedName(e.target.value)}
-                                                className="text-2xl font-semibold bg-transparent border-b-2 border-primary focus:outline-none flex-1 min-w-0"
+                                                className="text-2xl font-semibold bg-transparent border-b-2 border-primary text-foreground focus:outline-none flex-1 min-w-0"
                                                 placeholder="Template name"
                                             />
                                         ) : (
@@ -1015,7 +1015,7 @@ export default function Templates() {
                                             type="text"
                                             value={editedDescription}
                                             onChange={(e) => setEditedDescription(e.target.value)}
-                                            className="text-muted-foreground bg-transparent border-b border-border focus:outline-none w-full"
+                                            className="text-muted-foreground bg-transparent border-b border-input text-foreground focus:outline-none w-full"
                                             placeholder="Template description (optional)"
                                         />
                                     ) : (
@@ -1063,7 +1063,7 @@ export default function Templates() {
                                             type="text"
                                             value={editedSubject}
                                             onChange={(e) => setEditedSubject(e.target.value)}
-                                            className="w-full px-4 py-3 pt-4 text-lg font-medium border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-background"
+                                            className="w-full px-4 py-3 pt-4 text-lg font-medium border border-input bg-background text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                                             placeholder="Enter email subject..."
                                         />
                                     </div>
@@ -1113,7 +1113,7 @@ export default function Templates() {
                                                                         <textarea
                                                                             value={block.content}
                                                                             onChange={(e) => handleBlockContentChange(block.id, e.target.value)}
-                                                                            className="w-full min-h-[100px] p-2 border border-border rounded-md resize-y focus:outline-none focus:ring-2 focus:ring-primary"
+                                                                            className="w-full min-h-[100px] p-2 border border-input bg-background text-foreground rounded-md resize-y focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                                                                             placeholder="Enter your text here..."
                                                                         />
                                                                     ) : (
@@ -1586,7 +1586,7 @@ export default function Templates() {
                                     type="text"
                                     value={deleteConfirmName}
                                     onChange={(e) => setDeleteConfirmName(e.target.value)}
-                                    className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                                    className="w-full px-3 py-2 border border-input bg-background text-foreground rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                                     placeholder="Enter template name"
                                     autoComplete="off"
                                     disabled={deleting}

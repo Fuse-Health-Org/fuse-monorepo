@@ -77,22 +77,22 @@ interface TicketMessage {
 const statusConfig = {
   new: {
     label: "New",
-    color: "bg-blue-50 text-blue-700 border-blue-200",
+    color: "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800",
     icon: AlertCircle
   },
   in_progress: {
     label: "In Progress",
-    color: "bg-yellow-50 text-yellow-700 border-yellow-200",
+    color: "bg-yellow-50 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800",
     icon: Clock
   },
   resolved: {
     label: "Resolved",
-    color: "bg-green-50 text-green-700 border-green-200",
+    color: "bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800",
     icon: CheckCircle2
   },
   closed: {
     label: "Closed",
-    color: "bg-gray-50 text-gray-700 border-gray-200",
+    color: "bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700",
     icon: XCircle
   }
 }
@@ -571,15 +571,15 @@ export default function Support() {
   }
 
   return (
-    <div className="flex h-screen bg-[#F9FAFB]">
+    <div className="flex h-screen bg-background">
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header />
         <main className="flex-1 flex overflow-hidden p-4">
           {/* Main Content Card */}
-          <div className="flex-1 flex rounded-2xl shadow-sm border border-[#E5E7EB] bg-white overflow-hidden">
+          <div className="flex-1 flex rounded-2xl shadow-sm border border-border bg-card overflow-hidden">
             {/* Left Sidebar: Filters */}
-            <div className="w-64 bg-[#1F2937] flex flex-col">
+            <div className="w-64 bg-[#1F2937] dark:bg-gray-900 flex flex-col">
               <div className="p-4 border-b border-[#374151]">
                 <div className="flex items-center gap-2 mb-4">
                   <MessageSquare className="h-5 w-5 text-white" />
@@ -714,18 +714,18 @@ export default function Support() {
               </div>
             </div>
             {/* Middle Column: Tickets List */}
-            <div className="w-96 border-r border-[#E5E7EB] bg-white flex flex-col">
+            <div className="w-96 border-r border-border bg-card flex flex-col">
             {/* Header */}
-            <div className="p-6 border-b border-[#E5E7EB]">
+            <div className="p-6 border-b border-border">
               <div className="flex items-center justify-between mb-2">
-                <h1 className="text-xl font-semibold text-[#1F2937]">
+                <h1 className="text-xl font-semibold text-foreground">
                   {filterStatus === "all" ? "All Tickets" : 
                    filterStatus === "new" ? "New Tickets" :
                    filterStatus === "in_progress" ? "In Progress" :
                    filterStatus === "resolved" ? "Resolved" :
                    filterStatus === "closed" ? "Closed" : "Tickets"}
                 </h1>
-                <span className="text-sm text-[#6B7280]">({sortedTickets.length})</span>
+                <span className="text-sm text-muted-foreground">({sortedTickets.length})</span>
               </div>
             </div>
 
@@ -734,16 +734,16 @@ export default function Support() {
               {loading ? (
                 <div className="p-8 text-center">
                   <Loader2 className="h-8 w-8 text-[#4FA59C] animate-spin mx-auto mb-2" />
-                  <p className="text-sm text-[#4B5563]">Loading tickets...</p>
+                  <p className="text-sm text-muted-foreground">Loading tickets...</p>
                 </div>
               ) : sortedTickets.length === 0 ? (
                 <div className="p-8 text-center">
-                  <MessageSquare className="h-10 w-10 text-[#9CA3AF] mx-auto mb-2" />
-                  <p className="text-sm text-[#4B5563] mb-1">No tickets found</p>
-                  <p className="text-xs text-[#6B7280]">Try adjusting your filters</p>
+                  <MessageSquare className="h-10 w-10 text-muted-foreground mx-auto mb-2" />
+                  <p className="text-sm text-foreground mb-1">No tickets found</p>
+                  <p className="text-xs text-muted-foreground">Try adjusting your filters</p>
                 </div>
               ) : (
-                <div className="divide-y divide-[#E5E7EB]">
+                <div className="divide-y divide-border">
                   {sortedTickets.map((ticket) => {
                     const StatusIcon = statusConfig[ticket.status].icon
                     const isSelected = selectedTicket?.id === ticket.id
@@ -752,8 +752,8 @@ export default function Support() {
                         key={ticket.id}
                         className={`p-4 cursor-pointer transition-all ${
                           isSelected
-                            ? "bg-[#4FA59C]/10 border-l-4 border-[#4FA59C]"
-                            : "hover:bg-[#F9FAFB]"
+                            ? "bg-[#4FA59C]/10 dark:bg-[#4FA59C]/20 border-l-4 border-[#4FA59C]"
+                            : "hover:bg-muted/50"
                         }`}
                         onClick={() => fetchTicketDetails(ticket.id)}
                       >
@@ -761,7 +761,7 @@ export default function Support() {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
                               <h3 className={`text-sm font-semibold truncate ${
-                                isSelected ? "text-[#4FA59C]" : "text-[#1F2937]"
+                                isSelected ? "text-[#4FA59C]" : "text-foreground"
                               }`}>
                                 {ticket.title}
                               </h3>
@@ -770,10 +770,10 @@ export default function Support() {
                                 {statusConfig[ticket.status].label}
                               </span>
                             </div>
-                            <p className="text-xs text-[#6B7280] line-clamp-2 mb-2">
+                            <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
                               {ticket.description}
                             </p>
-                            <div className="flex items-center gap-3 text-xs text-[#9CA3AF]">
+                            <div className="flex items-center gap-3 text-xs text-muted-foreground">
                               <span>{ticket.author.firstName} {ticket.author.lastName}</span>
                               <span>•</span>
                               <span>{formatDate(ticket.updatedAt)}</span>
@@ -798,23 +798,23 @@ export default function Support() {
           </div>
 
             {/* Right Column: Ticket Details */}
-            <div className="flex-1 flex flex-col bg-white">
+            <div className="flex-1 flex flex-col bg-card">
               {selectedTicket ? (
                 loadingMessages ? (
                   <div className="flex-1 flex items-center justify-center">
                     <div className="text-center">
                       <Loader2 className="h-12 w-12 text-[#4FA59C] animate-spin mx-auto mb-4" />
-                      <p className="text-lg text-[#4B5563]">Loading ticket details...</p>
+                      <p className="text-lg text-foreground">Loading ticket details...</p>
                     </div>
                   </div>
                 ) : (
                   <>
                     {/* Header */}
-                    <div className="p-6 border-b border-[#E5E7EB] bg-white">
+                    <div className="p-6 border-b border-border bg-card">
                       <div className="flex items-center justify-between h-9">
                         {/* Left side: Patient name */}
                         <div className="flex items-center">
-                          <p className="text-lg font-semibold text-[#1F2937]">
+                          <p className="text-lg font-semibold text-foreground">
                             {selectedTicket.author.firstName} {selectedTicket.author.lastName}
                           </p>
                         </div>
@@ -826,7 +826,7 @@ export default function Support() {
                             <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border ${statusConfig[selectedTicket.status].color}`}>
                               {statusConfig[selectedTicket.status].label}
                             </span>
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-[#F3F4F6] text-[#6B7280]">
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">
                               {categoryConfig[selectedTicket.category].icon} {categoryConfig[selectedTicket.category].label}
                             </span>
                           </div>
@@ -835,7 +835,7 @@ export default function Support() {
                           <div className="relative" ref={assignDropdownRef}>
                             <button
                               onClick={() => setAssignDropdownOpen(!assignDropdownOpen)}
-                              className="flex items-center gap-2 px-3 py-2 rounded-lg border border-[#E5E7EB] bg-white hover:bg-[#F9FAFB] transition-all text-sm text-[#6B7280]"
+                              className="flex items-center gap-2 px-3 py-2 rounded-lg border border-input bg-background hover:bg-muted transition-all text-sm text-foreground"
                             >
                               <User className="h-4 w-4" />
                               <span>
@@ -848,20 +848,20 @@ export default function Support() {
                             </button>
                             
                             {assignDropdownOpen && (
-                              <div className="absolute right-0 top-full mt-1 w-64 bg-white border border-[#E5E7EB] rounded-lg shadow-lg z-50 max-h-80 overflow-y-auto">
+                              <div className="absolute right-0 top-full mt-1 w-64 bg-card border border-border rounded-lg shadow-lg z-50 max-h-80 overflow-y-auto">
                                 <div className="p-2">
-                                  <div className="px-3 py-2 text-xs font-semibold text-[#9CA3AF] uppercase">
+                                  <div className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
                                     Assign to
                                   </div>
                                   {loadingUsers ? (
                                     <div className="px-3 py-4 text-center">
-                                      <Loader2 className="h-4 w-4 animate-spin mx-auto text-[#9CA3AF]" />
+                                      <Loader2 className="h-4 w-4 animate-spin mx-auto text-muted-foreground" />
                                     </div>
                                   ) : (
                                     <>
                                       <div 
-                                        className={`px-3 py-2 hover:bg-[#F9FAFB] cursor-pointer rounded flex items-center gap-2 ${
-                                          !selectedTicket.assignedTo ? "bg-[#F9FAFB]" : ""
+                                        className={`px-3 py-2 hover:bg-muted cursor-pointer rounded flex items-center gap-2 ${
+                                          !selectedTicket.assignedTo ? "bg-muted" : ""
                                         }`}
                                         onClick={() => assignTicket(null)}
                                       >
@@ -871,13 +871,13 @@ export default function Support() {
                                         {selectedTicket.assignedTo && (
                                           <div className="h-4 w-4" />
                                         )}
-                                        <span className="text-sm text-[#6B7280]">Unassigned</span>
+                                        <span className="text-sm text-muted-foreground">Unassigned</span>
                                       </div>
                                       {assignableUsers.map((user) => (
                                         <div
                                           key={user.id}
-                                          className={`px-3 py-2 hover:bg-[#F9FAFB] cursor-pointer rounded flex items-center gap-2 ${
-                                            selectedTicket.assignedTo?.id === user.id ? "bg-[#F9FAFB]" : ""
+                                          className={`px-3 py-2 hover:bg-muted cursor-pointer rounded flex items-center gap-2 ${
+                                            selectedTicket.assignedTo?.id === user.id ? "bg-muted" : ""
                                           }`}
                                           onClick={() => assignTicket(user.id)}
                                         >
@@ -887,15 +887,15 @@ export default function Support() {
                                             <div className="h-4 w-4" />
                                           )}
                                           <div className="flex-1">
-                                            <div className="text-sm text-[#1F2937]">
+                                            <div className="text-sm text-foreground">
                                               {user.firstName} {user.lastName}
                                             </div>
-                                            <div className="text-xs text-[#9CA3AF]">{user.email}</div>
+                                            <div className="text-xs text-muted-foreground">{user.email}</div>
                                           </div>
                                         </div>
                                       ))}
                                       {assignableUsers.length === 0 && (
-                                        <div className="px-3 py-2 text-xs text-[#9CA3AF] italic">
+                                        <div className="px-3 py-2 text-xs text-muted-foreground italic">
                                           No users available
                                         </div>
                                       )}
@@ -911,15 +911,15 @@ export default function Support() {
                             <button 
                               onClick={updateTicketStatus}
                               disabled={updatingStatus}
-                              className="p-2 rounded-lg border border-[#E5E7EB] bg-white hover:bg-[#F9FAFB] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                              className="p-2 rounded-lg border border-input bg-background hover:bg-muted transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                               title={`Mark as ${getNextStatus(selectedTicket.status)?.label}`}
                             >
                               {getNextStatusIcon(selectedTicket.status) && (
                                 <span className={`${
-                                  selectedTicket.status === "new" ? "text-yellow-600" :
-                                  selectedTicket.status === "in_progress" ? "text-green-600" :
-                                  selectedTicket.status === "resolved" ? "text-gray-600" :
-                                  "text-[#9CA3AF]"
+                                  selectedTicket.status === "new" ? "text-yellow-600 dark:text-yellow-400" :
+                                  selectedTicket.status === "in_progress" ? "text-green-600 dark:text-green-400" :
+                                  selectedTicket.status === "resolved" ? "text-gray-600 dark:text-gray-400" :
+                                  "text-muted-foreground"
                                 }`}>
                                   {updatingStatus ? (
                                     <Loader2 className="h-5 w-5 animate-spin" />
@@ -937,15 +937,15 @@ export default function Support() {
                   {/* Content Area */}
                   <div className="flex-1 flex overflow-hidden">
                     {/* Left: Comments/Chat */}
-                    <div className="w-1/2 border-r border-[#E5E7EB] flex flex-col bg-[#F9FAFB]">
+                    <div className="w-1/2 border-r border-border flex flex-col bg-muted/50">
                       {/* Comments Header */}
-                      <div className="p-6 border-b border-[#E5E7EB] bg-white">
+                      <div className="p-6 border-b border-border bg-card">
                         <div className="flex items-center gap-2">
                           <MessageCircle className="h-5 w-5 text-[#4FA59C]" />
-                          <h2 className="text-lg font-semibold text-[#1F2937]">
+                          <h2 className="text-lg font-semibold text-foreground">
                             Comments
                           </h2>
-                          <span className="text-sm text-[#9CA3AF]">
+                          <span className="text-sm text-muted-foreground">
                             ({selectedTicket.messageCount})
                           </span>
                         </div>
@@ -983,8 +983,8 @@ export default function Support() {
                               <div
                                 className={`max-w-[85%] rounded-xl p-4 shadow-sm ${
                                   isGreenMessage
-                                    ? "bg-teal-50 text-teal-900 border border-teal-200"
-                                    : "bg-blue-50 text-blue-900 border border-blue-200"
+                                    ? "bg-teal-50 dark:bg-teal-900/30 text-teal-900 dark:text-teal-300 border border-teal-200 dark:border-teal-800"
+                                    : "bg-blue-50 dark:bg-blue-900/30 text-blue-900 dark:text-blue-300 border border-blue-200 dark:border-blue-800"
                                 }`}
                               >
                                 <div className="flex items-center gap-2 mb-2">
@@ -993,8 +993,8 @@ export default function Support() {
                                   </span>
                                   <span className={`text-xs ${
                                     isGreenMessage
-                                      ? "text-teal-600"
-                                      : "text-blue-600"
+                                      ? "text-teal-600 dark:text-teal-400"
+                                      : "text-blue-600 dark:text-blue-400"
                                   }`}>
                                     {formatDate(msg.createdAt)}
                                   </span>
@@ -1009,9 +1009,9 @@ export default function Support() {
                         ) : (
                           <div className="flex items-center justify-center h-full">
                             <div className="text-center">
-                              <MessageCircle className="h-12 w-12 text-[#9CA3AF] mx-auto mb-2" />
-                              <p className="text-sm text-[#6B7280]">No comments yet</p>
-                              <p className="text-xs text-[#9CA3AF] mt-1">Be the first to reply</p>
+                              <MessageCircle className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
+                              <p className="text-sm text-foreground">No comments yet</p>
+                              <p className="text-xs text-muted-foreground mt-1">Be the first to reply</p>
                             </div>
                           </div>
                         )}
@@ -1019,7 +1019,7 @@ export default function Support() {
                       </div>
 
                       {/* Message Input */}
-                      <div className="bg-white border-t border-[#E5E7EB] p-4">
+                      <div className="bg-card border-t border-border p-4">
                         <div className="flex gap-3">
                           <input
                             type="text"
@@ -1032,7 +1032,7 @@ export default function Support() {
                                 sendMessage()
                               }
                             }}
-                            className="flex-1 px-4 py-2.5 rounded-lg border border-[#E5E7EB] bg-white text-sm text-[#1F2937] focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all"
+                            className="flex-1 px-4 py-2.5 rounded-lg border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-opacity-50 focus:border-[#4FA59C] transition-all"
                             disabled={sending}
                           />
                           <button
@@ -1051,9 +1051,9 @@ export default function Support() {
                     </div>
 
                     {/* Right: Ticket Details */}
-                    <div className="w-1/2 overflow-y-auto bg-white">
+                    <div className="w-1/2 overflow-y-auto bg-card">
                       {/* User Profile Section */}
-                      <div className="p-6 border-b border-[#E5E7EB] bg-white">
+                      <div className="p-6 border-b border-border bg-card">
                         <div className="flex gap-4">
                           {/* Avatar */}
                           <div className="flex-shrink-0">
@@ -1065,10 +1065,10 @@ export default function Support() {
                           {/* Name and Details */}
                           <div className="flex-1 min-w-0">
                             <div className="mb-3">
-                              <h2 className="text-lg font-semibold text-[#1F2937]">
+                              <h2 className="text-lg font-semibold text-foreground">
                                 {selectedTicket.author.firstName} {selectedTicket.author.lastName}
                               </h2>
-                              <p className="text-sm text-[#6B7280] mt-0.5">
+                              <p className="text-sm text-muted-foreground mt-0.5">
                                 {selectedTicket.author.email}
                               </p>
                             </div>
@@ -1077,8 +1077,8 @@ export default function Support() {
                             <div className="space-y-2">
                               {/* Location */}
                               {(selectedTicket.author.city || selectedTicket.author.state) && (
-                                <div className="flex items-center gap-2 text-sm text-[#6B7280]">
-                                  <MapPin className="h-4 w-4 text-[#9CA3AF] flex-shrink-0" />
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                  <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                                   <span className="truncate">
                                     {selectedTicket.author.city && selectedTicket.author.state
                                       ? `${selectedTicket.author.city}, ${selectedTicket.author.state}`
@@ -1089,23 +1089,23 @@ export default function Support() {
                               
                               {/* Company/Clinic */}
                               {selectedTicket.author.clinic && (
-                                <div className="flex items-center gap-2 text-sm text-[#6B7280]">
-                                  <Building2 className="h-4 w-4 text-[#9CA3AF] flex-shrink-0" />
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                  <Building2 className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                                   <span className="truncate">{selectedTicket.author.clinic.name}</span>
                                 </div>
                               )}
                               
                               {/* Role */}
                               {selectedTicket.author.role && (
-                                <div className="flex items-center gap-2 text-sm text-[#6B7280]">
-                                  <User className="h-4 w-4 text-[#9CA3AF] flex-shrink-0" />
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                  <User className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                                   <span className="capitalize">{selectedTicket.author.role}</span>
                                 </div>
                               )}
                               
                               {/* Source */}
-                              <div className="flex items-center gap-2 text-sm text-[#6B7280]">
-                                <Globe className="h-4 w-4 text-[#9CA3AF] flex-shrink-0" />
+                              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <Globe className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                                 <span>Support Ticket</span>
                               </div>
                             </div>
@@ -1117,16 +1117,16 @@ export default function Support() {
                       <div className="p-6 space-y-6">
                         {/* Title */}
                         <div>
-                          <h1 className="text-2xl font-bold text-[#1F2937] mb-4">
+                          <h1 className="text-2xl font-bold text-foreground mb-4">
                             {selectedTicket.title}
                           </h1>
                         </div>
                       
                       {/* Description */}
                       <div>
-                        <h3 className="text-sm font-semibold text-[#1F2937] mb-2">Description</h3>
-                        <div className="bg-white rounded-xl p-4 border border-[#E5E7EB] shadow-sm">
-                          <p className="text-sm text-[#6B7280] leading-relaxed">
+                        <h3 className="text-sm font-semibold text-foreground mb-2">Description</h3>
+                        <div className="bg-card rounded-xl p-4 border border-border shadow-sm">
+                          <p className="text-sm text-muted-foreground leading-relaxed">
                             {selectedTicket.description}
                           </p>
                         </div>
@@ -1135,12 +1135,12 @@ export default function Support() {
                       {/* Tags if any */}
                       {selectedTicket.tags && selectedTicket.tags.length > 0 && (
                         <div>
-                          <h3 className="text-sm font-semibold text-[#1F2937] mb-3">Tags</h3>
+                          <h3 className="text-sm font-semibold text-foreground mb-3">Tags</h3>
                           <div className="flex flex-wrap gap-2">
                             {selectedTicket.tags.map((tag, index) => (
                               <span 
                                 key={index}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-[#E5E7EB] text-[#6B7280]"
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-muted text-muted-foreground"
                               >
                                 <Tag className="h-3 w-3" />
                                 {tag}
@@ -1152,22 +1152,22 @@ export default function Support() {
                       </div>
 
                       {/* Separator - Full Width */}
-                      <div className="border-t border-[#E5E7EB]"></div>
+                      <div className="border-t border-border"></div>
 
                       {/* Data Section */}
                       <div className="p-6 pt-6">
-                        <h3 className="text-sm font-semibold text-[#1F2937] mb-3">Data</h3>
-                        <div className="bg-white rounded-xl p-4 border border-[#E5E7EB] shadow-sm space-y-3">
+                        <h3 className="text-sm font-semibold text-foreground mb-3">Data</h3>
+                        <div className="bg-card rounded-xl p-4 border border-border shadow-sm space-y-3">
                           {/* Email */}
                           <div className="flex items-center gap-3 py-2">
-                            <Mail className="h-4 w-4 text-[#9CA3AF] flex-shrink-0" />
+                            <Mail className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                             <div className="flex-1 min-w-0">
-                              <p className="text-xs text-[#9CA3AF]">Email</p>
-                              <p className="text-sm font-medium text-[#1F2937] truncate">{selectedTicket.author.email}</p>
+                              <p className="text-xs text-muted-foreground">Email</p>
+                              <p className="text-sm font-medium text-foreground truncate">{selectedTicket.author.email}</p>
                             </div>
                             <button
                               onClick={() => copyToClipboard(selectedTicket.author.email, "Email")}
-                              className="flex-shrink-0 p-1.5 rounded-lg hover:bg-[#F3F4F6] transition-colors text-[#6B7280] hover:text-[#1F2937]"
+                              className="flex-shrink-0 p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
                               title="Copy email"
                             >
                               <Copy className="h-4 w-4" />
@@ -1176,14 +1176,14 @@ export default function Support() {
 
                           {/* ID */}
                           <div className="flex items-center gap-3 py-2">
-                            <Hash className="h-4 w-4 text-[#9CA3AF] flex-shrink-0" />
+                            <Hash className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                             <div className="flex-1 min-w-0">
-                              <p className="text-xs text-[#9CA3AF]">ID</p>
-                              <p className="text-sm font-medium text-[#1F2937] font-mono truncate">{selectedTicket.id}</p>
+                              <p className="text-xs text-muted-foreground">ID</p>
+                              <p className="text-sm font-medium text-foreground font-mono truncate">{selectedTicket.id}</p>
                             </div>
                             <button
                               onClick={() => copyToClipboard(selectedTicket.id, "ID")}
-                              className="flex-shrink-0 p-1.5 rounded-lg hover:bg-[#F3F4F6] transition-colors text-[#6B7280] hover:text-[#1F2937]"
+                              className="flex-shrink-0 p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
                               title="Copy ID"
                             >
                               <Copy className="h-4 w-4" />
@@ -1192,14 +1192,14 @@ export default function Support() {
 
                           {/* Last updated */}
                           <div className="flex items-center gap-3 py-2">
-                            <Clock className="h-4 w-4 text-[#9CA3AF]" />
+                            <Clock className="h-4 w-4 text-muted-foreground" />
                             <div className="flex-1">
-                              <p className="text-xs text-[#9CA3AF]">Last updated</p>
-                              <p className="text-sm font-medium text-[#1F2937]">
+                              <p className="text-xs text-muted-foreground">Last updated</p>
+                              <p className="text-sm font-medium text-foreground">
                                 {formatDate(selectedTicket.updatedAt)}
                               </p>
                               {selectedTicket.lastUpdatedBy && (
-                                <p className="text-xs text-[#6B7280] mt-0.5">
+                                <p className="text-xs text-muted-foreground mt-0.5">
                                   by {selectedTicket.lastUpdatedBy.firstName} {selectedTicket.lastUpdatedBy.lastName}
                                 </p>
                               )}
@@ -1214,9 +1214,9 @@ export default function Support() {
               ) : (
                 <div className="flex-1 flex items-center justify-center">
                   <div className="text-center">
-                    <MessageSquare className="h-16 w-16 text-[#9CA3AF] mx-auto mb-4" />
-                    <p className="text-lg font-medium text-[#4B5563] mb-1">Select a ticket to view details</p>
-                    <p className="text-sm text-[#6B7280]">Choose a ticket from the list on the left</p>
+                    <MessageSquare className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-lg font-medium text-foreground mb-1">Select a ticket to view details</p>
+                    <p className="text-sm text-muted-foreground">Choose a ticket from the list on the left</p>
                   </div>
                 </div>
               )}

@@ -1,6 +1,7 @@
 import React from "react";
 import { useRouter } from "next/router";
 import { useAuth } from "../contexts/AuthContext";
+import { useTheme } from "../contexts/ThemeContext";
 import { Icon } from "@iconify/react";
 
 const navigation = [
@@ -14,6 +15,7 @@ const navigation = [
 
 export function Sidebar() {
     const { user, signOut } = useAuth();
+    const { theme, toggleTheme } = useTheme();
     const router = useRouter();
 
     const handleLogout = async () => {
@@ -88,14 +90,27 @@ export function Sidebar() {
                             </p>
                         </div>
                     </div>
-                    <button
-                        onClick={handleLogout}
-                        className="p-1 text-foreground-400 hover:text-foreground hover:bg-content2 rounded flex-shrink-0"
-                        title="Logout"
-                        aria-label="Logout"
-                    >
-                        <Icon icon="lucide:log-out" className="h-4 w-4" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                        <button
+                            onClick={toggleTheme}
+                            className="p-1 text-foreground-400 hover:text-foreground hover:bg-content2 rounded flex-shrink-0"
+                            title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+                            aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+                        >
+                            <Icon 
+                                icon={theme === 'light' ? 'lucide:moon' : 'lucide:sun'} 
+                                className="h-4 w-4" 
+                            />
+                        </button>
+                        <button
+                            onClick={handleLogout}
+                            className="p-1 text-foreground-400 hover:text-foreground hover:bg-content2 rounded flex-shrink-0"
+                            title="Logout"
+                            aria-label="Logout"
+                        >
+                            <Icon icon="lucide:log-out" className="h-4 w-4" />
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

@@ -280,8 +280,8 @@ export default function SettingsPage() {
 
         {/* Clinic Name */}
         <Card>
-          <CardHeader className="pb-2">
-            <h3 className="text-base font-semibold">Clinic Name</h3>
+          <CardHeader className="pb-2 flex-col items-start">
+            <h3 className="text-base font-semibold mb-1">Clinic Name</h3>
             <p className="text-xs text-muted-foreground">Your clinic's display name</p>
           </CardHeader>
           <CardBody className="pt-0">
@@ -296,8 +296,8 @@ export default function SettingsPage() {
 
         {/* Affiliate Slug */}
         <Card>
-          <CardHeader className="pb-2">
-            <h3 className="text-base font-semibold">Affiliate Slug</h3>
+          <CardHeader className="pb-2 flex-col items-start">
+            <h3 className="text-base font-semibold mb-1">Affiliate Slug</h3>
             <p className="text-xs text-muted-foreground">
               Your unique identifier - updates domain configuration below automatically
             </p>
@@ -334,8 +334,8 @@ export default function SettingsPage() {
                 <Icon icon="lucide:info" className="h-4 w-4 text-primary-600 mt-0.5 flex-shrink-0" />
                 <div className="text-xs text-primary-800">
                   <p className="font-medium mb-1">Preview URLs (save to confirm):</p>
-                  <p>• Subdomain: <code className="font-mono bg-white px-1 py-0.5 rounded">{settings.clinicSlug || 'affiliate'}.{settings.parentClinicSlug || 'brand'}.{baseDomain}</code></p>
-                  <p>• Custom: <code className="font-mono bg-white px-1 py-0.5 rounded">{settings.clinicSlug || 'affiliate'}.{settings.parentClinicSlug || 'brand'}.com</code></p>
+                  <p>• Subdomain: <code className="font-mono bg-white dark:bg-content2 px-1 py-0.5 rounded">{settings.clinicSlug || 'affiliate'}.{settings.parentClinicSlug || 'brand'}.{baseDomain}</code></p>
+                  <p>• Custom: <code className="font-mono bg-white dark:bg-content2 px-1 py-0.5 rounded">{settings.clinicSlug || 'affiliate'}.{settings.parentClinicSlug || 'brand'}.com</code></p>
                 </div>
               </div>
             </div>
@@ -344,9 +344,9 @@ export default function SettingsPage() {
 
         {/* Domain Configuration */}
         <Card>
-          <CardHeader className="pb-4">
-            <h3 className="text-xl font-semibold">Domain Configuration</h3>
-            <p className="text-sm text-muted-foreground mt-1">
+          <CardHeader className="pb-4 flex-col items-start">
+            <h3 className="text-xl font-semibold mb-1">Domain Configuration</h3>
+            <p className="text-sm text-muted-foreground">
               Choose how visitors will access your affiliate portal
             </p>
           </CardHeader>

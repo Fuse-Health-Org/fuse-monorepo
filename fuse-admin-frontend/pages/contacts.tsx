@@ -899,7 +899,7 @@ export default function ContactsPage() {
                 <select
                   value={selectedTagFilter}
                   onChange={(e) => setSelectedTagFilter(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="px-3 py-2 border border-input bg-background text-foreground rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                 >
                   <option value="">All Tags</option>
                   {allTags.map((tag) => (
@@ -1132,7 +1132,7 @@ export default function ContactsPage() {
 
               {/* Sequence Selection */}
               <div>
-                <label className="block text-sm font-medium mb-2">
+                <label className="block text-sm font-medium text-foreground mb-2">
                   Select a sequence <span className="text-red-500">*</span>
                 </label>
                 {sequences.length === 0 ? (
@@ -1147,7 +1147,7 @@ export default function ContactsPage() {
                   <select
                     value={selectedSequenceId}
                     onChange={(e) => setSelectedSequenceId(e.target.value)}
-                    className="w-full px-3 py-2 border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full px-3 py-2 border border-input bg-background text-foreground rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                     disabled={sendingSequence}
                   >
                     <option value="">-- Select a sequence --</option>
@@ -1497,15 +1497,30 @@ export default function ContactsPage() {
 
               {/* File Upload */}
               <div>
-                <label className="block text-sm font-medium mb-2">
+                <label className="block text-sm font-medium text-foreground mb-2">
                   Select CSV File <span className="text-red-500">*</span>
                 </label>
-                <Input
-                  type="file"
-                  accept=".csv"
-                  onChange={handleCSVFileSelect}
-                  disabled={uploadingCSV}
-                />
+                <div className="flex items-center gap-2">
+                  <input
+                    type="file"
+                    accept=".csv"
+                    onChange={handleCSVFileSelect}
+                    disabled={uploadingCSV}
+                    id="csv-file-input"
+                    className="hidden"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => document.getElementById('csv-file-input')?.click()}
+                    disabled={uploadingCSV}
+                  >
+                    Select file
+                  </Button>
+                  <span className="text-sm text-muted-foreground flex-1">
+                    {csvFile ? csvFile.name : 'No file selected'}
+                  </span>
+                </div>
               </div>
 
               {/* Preview */}
@@ -1598,13 +1613,13 @@ export default function ContactsPage() {
             <div className="p-6 space-y-4">
               {/* Tag Selection */}
               <div>
-                <label className="block text-sm font-medium mb-2">
+                <label className="block text-sm font-medium text-foreground mb-2">
                   Select a tag <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={selectedTagForSend}
                   onChange={(e) => setSelectedTagForSend(e.target.value)}
-                  className="w-full px-3 py-2 border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full px-3 py-2 border border-input bg-background text-foreground rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                   disabled={sendingByTag}
                 >
                   <option value="">-- Select a tag --</option>
@@ -1618,7 +1633,7 @@ export default function ContactsPage() {
 
               {/* Sequence Selection */}
               <div>
-                <label className="block text-sm font-medium mb-2">
+                <label className="block text-sm font-medium text-foreground mb-2">
                   Select a sequence <span className="text-red-500">*</span>
                 </label>
                 {sequences.length === 0 ? (
@@ -1633,7 +1648,7 @@ export default function ContactsPage() {
                   <select
                     value={selectedSequenceId}
                     onChange={(e) => setSelectedSequenceId(e.target.value)}
-                    className="w-full px-3 py-2 border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full px-3 py-2 border border-input bg-background text-foreground rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                     disabled={sendingByTag}
                   >
                     <option value="">-- Select a sequence --</option>

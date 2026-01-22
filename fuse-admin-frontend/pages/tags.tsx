@@ -15,7 +15,8 @@ import {
   Trash2,
   X,
   Loader2,
-  Users
+  Users,
+  AlertTriangle
 } from 'lucide-react'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
@@ -56,8 +57,11 @@ export default function Tags() {
   const [loading, setLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [tagToDelete, setTagToDelete] = useState<Tag | null>(null)
   const [selectedTag, setSelectedTag] = useState<Tag | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   // Form state
   const [formData, setFormData] = useState({
@@ -164,13 +168,17 @@ export default function Tags() {
     }
   }
 
-  const handleDeleteTag = async (tagId: string) => {
-    if (!confirm('Are you sure you want to delete this tag? This will remove it from all contacts.')) {
-      return
-    }
+  const handleDeleteTag = (tag: Tag) => {
+    setTagToDelete(tag)
+    setShowDeleteModal(true)
+  }
+
+  const confirmDeleteTag = async () => {
+    if (!tagToDelete) return
 
     try {
-      const response = await fetch(`${API_URL}/tags/${tagId}`, {
+      setDeleting(true)
+      const response = await fetch(`${API_URL}/tags/${tagToDelete.id}`, {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${token}`
@@ -183,10 +191,14 @@ export default function Tags() {
       }
 
       showSuccess('Tag deleted successfully')
+      setShowDeleteModal(false)
+      setTagToDelete(null)
       fetchTags()
     } catch (error: any) {
       console.error('Error deleting tag:', error)
       showError(error.message || 'Failed to delete tag')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -219,7 +231,7 @@ export default function Tags() {
     return (
       <Layout>
         <div className="flex items-center justify-center h-screen">
-          <p className="text-gray-500">Please log in to manage tags.</p>
+          <p className="text-muted-foreground">Please log in to manage tags.</p>
         </div>
       </Layout>
     )
@@ -231,16 +243,16 @@ export default function Tags() {
         <title>Tag Management - Fuse Health</title>
       </Head>
 
-      <div className="min-h-screen bg-gray-50 p-6">
+      <div className="min-h-screen bg-background p-6">
         <div className="max-w-6xl mx-auto">
           {/* Header */}
           <div className="mb-6 flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
+              <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
                 <TagIcon className="h-8 w-8 text-blue-600" />
                 Tag Management
               </h1>
-              <p className="text-gray-600 mt-1">Organize and segment your contacts</p>
+              <p className="text-muted-foreground mt-1">Organize and segment your contacts</p>
             </div>
             <Button onClick={openCreateModal} className="flex items-center gap-2">
               <Plus className="h-4 w-4" />
@@ -256,9 +268,9 @@ export default function Tags() {
           ) : tags.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center">
-                <TagIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">No tags yet</h3>
-                <p className="text-gray-600 mb-4">Create your first tag to start organizing contacts</p>
+                <TagIcon className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-foreground mb-2">No tags yet</h3>
+                <p className="text-muted-foreground mb-4">Create your first tag to start organizing contacts</p>
                 <Button onClick={openCreateModal}>
                   <Plus className="h-4 w-4 mr-2" />
                   Create Tag
@@ -276,7 +288,7 @@ export default function Tags() {
                           className="w-4 h-4 rounded-full"
                           style={{ backgroundColor: tag.color || '#3B82F6' }}
                         />
-                        <h3 className="font-semibold text-gray-900">{tag.name}</h3>
+                        <h3 className="font-semibold text-foreground">{tag.name}</h3>
                       </div>
                       <div className="flex gap-1">
                         <Button
@@ -290,7 +302,7 @@ export default function Tags() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleDeleteTag(tag.id)}
+                          onClick={() => handleDeleteTag(tag)}
                           className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -299,7 +311,7 @@ export default function Tags() {
                     </div>
 
                     {tag.description && (
-                      <p className="text-sm text-gray-600 mb-3">{tag.description}</p>
+                      <p className="text-sm text-muted-foreground mb-3">{tag.description}</p>
                     )}
 
                     <div className="flex items-center justify-between">
@@ -308,7 +320,7 @@ export default function Tags() {
                           {CATEGORY_OPTIONS.find(c => c.value === tag.category)?.label || tag.category}
                         </Badge>
                       )}
-                      <div className="flex items-center gap-1 text-sm text-gray-600">
+                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
                         <Users className="h-4 w-4" />
                         <span>{tag.userCount || 0}</span>
                       </div>
@@ -324,19 +336,19 @@ export default function Tags() {
       {/* Create Tag Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-            <div className="flex items-center justify-between p-4 border-b">
-              <h2 className="text-xl font-semibold">Create New Tag</h2>
+          <div className="bg-background border border-border rounded-lg shadow-xl max-w-md w-full">
+            <div className="flex items-center justify-between p-4 border-b border-border">
+              <h2 className="text-xl font-semibold text-foreground">Create New Tag</h2>
               <button
                 onClick={() => setShowCreateModal(false)}
-                className="text-gray-500 hover:text-gray-700"
+                className="text-muted-foreground hover:text-foreground"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
             <div className="p-4 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Tag Name *
                 </label>
                 <Input
@@ -348,7 +360,7 @@ export default function Tags() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Description
                 </label>
                 <Input
@@ -360,13 +372,13 @@ export default function Tags() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Category
                 </label>
                 <select
                   value={formData.category}
                   onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-input bg-background text-foreground rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                 >
                   {CATEGORY_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
@@ -377,7 +389,7 @@ export default function Tags() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-foreground mb-2">
                   Color
                 </label>
                 <div className="flex gap-2 flex-wrap">
@@ -387,8 +399,8 @@ export default function Tags() {
                       onClick={() => setFormData({ ...formData, color })}
                       className={`w-8 h-8 rounded-full border-2 transition-all ${
                         formData.color === color
-                          ? 'border-gray-900 scale-110'
-                          : 'border-gray-300 hover:scale-105'
+                          ? 'border-foreground scale-110'
+                          : 'border-border hover:scale-105'
                       }`}
                       style={{ backgroundColor: color }}
                     />
@@ -396,7 +408,7 @@ export default function Tags() {
                 </div>
               </div>
             </div>
-            <div className="flex gap-2 p-4 border-t">
+            <div className="flex gap-2 p-4 border-t border-border">
               <Button
                 variant="outline"
                 onClick={() => setShowCreateModal(false)}
@@ -426,19 +438,19 @@ export default function Tags() {
       {/* Edit Tag Modal */}
       {showEditModal && selectedTag && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-            <div className="flex items-center justify-between p-4 border-b">
-              <h2 className="text-xl font-semibold">Edit Tag</h2>
+          <div className="bg-background border border-border rounded-lg shadow-xl max-w-md w-full">
+            <div className="flex items-center justify-between p-4 border-b border-border">
+              <h2 className="text-xl font-semibold text-foreground">Edit Tag</h2>
               <button
                 onClick={() => setShowEditModal(false)}
-                className="text-gray-500 hover:text-gray-700"
+                className="text-muted-foreground hover:text-foreground"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
             <div className="p-4 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Tag Name *
                 </label>
                 <Input
@@ -450,7 +462,7 @@ export default function Tags() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Description
                 </label>
                 <Input
@@ -462,13 +474,13 @@ export default function Tags() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Category
                 </label>
                 <select
                   value={formData.category}
                   onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-input bg-background text-foreground rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                 >
                   {CATEGORY_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
@@ -479,7 +491,7 @@ export default function Tags() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-foreground mb-2">
                   Color
                 </label>
                 <div className="flex gap-2 flex-wrap">
@@ -489,8 +501,8 @@ export default function Tags() {
                       onClick={() => setFormData({ ...formData, color })}
                       className={`w-8 h-8 rounded-full border-2 transition-all ${
                         formData.color === color
-                          ? 'border-gray-900 scale-110'
-                          : 'border-gray-300 hover:scale-105'
+                          ? 'border-foreground scale-110'
+                          : 'border-border hover:scale-105'
                       }`}
                       style={{ backgroundColor: color }}
                     />
@@ -498,7 +510,7 @@ export default function Tags() {
                 </div>
               </div>
             </div>
-            <div className="flex gap-2 p-4 border-t">
+            <div className="flex gap-2 p-4 border-t border-border">
               <Button
                 variant="outline"
                 onClick={() => setShowEditModal(false)}
@@ -518,6 +530,73 @@ export default function Tags() {
                   </>
                 ) : (
                   'Update Tag'
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && tagToDelete && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-background border border-border rounded-lg shadow-xl max-w-md w-full">
+            <div className="flex items-center justify-between p-4 border-b border-border">
+              <h2 className="text-xl font-semibold text-foreground">Delete Tag</h2>
+              <button
+                onClick={() => {
+                  setShowDeleteModal(false)
+                  setTagToDelete(null)
+                }}
+                className="text-muted-foreground hover:text-foreground"
+                disabled={deleting}
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-full">
+                  <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-foreground font-medium mb-2">
+                    Are you sure you want to delete "{tagToDelete.name}"?
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    This action cannot be undone. The tag will be removed from all contacts.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-2 p-4 border-t border-border">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowDeleteModal(false)
+                  setTagToDelete(null)
+                }}
+                disabled={deleting}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={confirmDeleteTag}
+                disabled={deleting}
+                variant="destructive"
+                className="flex-1"
+              >
+                {deleting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete Tag
+                  </>
                 )}
               </Button>
             </div>

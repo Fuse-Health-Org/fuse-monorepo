@@ -250,7 +250,7 @@ export default function TierManagement() {
   };
 
   return (
-    <div className="flex h-screen bg-[#F9FAFB]">
+    <div className="flex h-screen bg-background">
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header />
@@ -264,8 +264,8 @@ export default function TierManagement() {
                   <Settings className="h-5 w-5 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-2xl font-bold text-[#1F2937]">Tier Configuration</h1>
-                  <p className="text-sm text-[#6B7280]">Manage feature access for each subscription tier</p>
+                  <h1 className="text-2xl font-bold text-foreground">Tier Configuration</h1>
+                  <p className="text-sm text-muted-foreground">Manage feature access for each subscription tier</p>
                 </div>
               </div>
             </div>
@@ -273,11 +273,11 @@ export default function TierManagement() {
             {/* Tiers List */}
             {loading ? (
               <Card className="p-8">
-                <div className="text-center text-[#6B7280]">Loading tiers...</div>
+                <div className="text-center text-muted-foreground">Loading tiers...</div>
               </Card>
             ) : tiers.length === 0 ? (
               <Card className="p-8">
-                <div className="text-center text-[#6B7280]">No active subscription tiers found</div>
+                <div className="text-center text-muted-foreground">No active subscription tiers found</div>
               </Card>
             ) : (
               <div className="space-y-4">
@@ -287,45 +287,45 @@ export default function TierManagement() {
                       {/* Plan Info */}
                       <div className="flex-1">
                         <div className="flex items-center space-x-3 mb-2">
-                          <h3 className="text-lg font-semibold text-[#1F2937]">
+                          <h3 className="text-lg font-semibold text-foreground">
                             {tier.plan.name}
                           </h3>
-                          <span className="px-3 py-1 text-xs font-medium text-[#4FA59C] bg-[#E5F5F3] rounded-full">
+                          <span className="px-3 py-1 text-xs font-medium text-[#4FA59C] bg-teal-50 dark:bg-teal-900/30 rounded-full">
                             {tier.plan.planType}
                           </span>
                         </div>
-                        <p className="text-sm text-[#6B7280] mb-3">
+                        <p className="text-sm text-muted-foreground mb-3">
                           {tier.plan.description}
                         </p>
                         <div className="flex items-center space-x-6 text-sm">
                           <div>
-                            <span className="text-[#9CA3AF]">Price:</span>{' '}
-                            <span className="font-semibold text-[#1F2937]">
+                            <span className="text-muted-foreground">Price:</span>{' '}
+                            <span className="font-semibold text-foreground">
                               ${tier.plan.monthlyPrice}/month
                             </span>
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className="text-[#9CA3AF]">Max Products:</span>{' '}
+                            <span className="text-muted-foreground">Max Products:</span>{' '}
                             {editingMaxProducts === tier.plan.id ? (
                               <div className="flex items-center gap-2">
                                 <input
                                   type="number"
                                   value={maxProductsDraft}
                                   onChange={(e) => setMaxProductsDraft(parseInt(e.target.value) || 0)}
-                                  className="w-20 px-2 py-1 text-sm border border-[#E5E7EB] rounded focus:outline-none focus:ring-2 focus:ring-[#4FA59C]"
+                                  className="w-20 px-2 py-1 text-sm border border-input rounded focus:outline-none focus:ring-2 focus:ring-[#4FA59C] bg-background text-foreground"
                                   placeholder="-1 for unlimited"
                                 />
                                 <button
                                   onClick={() => handleSaveMaxProducts(tier.plan.id)}
                                   disabled={saving === tier.plan.id}
-                                  className="p-1 text-[#4FA59C] hover:bg-[#E5F5F3] rounded transition-colors disabled:opacity-50"
+                                  className="p-1 text-[#4FA59C] hover:bg-teal-50 dark:hover:bg-teal-900/30 rounded transition-colors disabled:opacity-50"
                                   title="Save"
                                 >
                                   <Save className="h-4 w-4" />
                                 </button>
                                 <button
                                   onClick={handleCancelEditingMaxProducts}
-                                  className="p-1 text-[#9CA3AF] hover:bg-gray-100 rounded transition-colors"
+                                  className="p-1 text-muted-foreground hover:bg-muted rounded transition-colors"
                                   title="Cancel"
                                 >
                                   <X className="h-4 w-4" />
@@ -333,32 +333,32 @@ export default function TierManagement() {
                               </div>
                             ) : (
                               <>
-                                <span className="font-semibold text-[#1F2937]">
+                                <span className="font-semibold text-foreground">
                                   {tier.plan.maxProducts === -1 ? 'Unlimited' : tier.plan.maxProducts}
                                 </span>
                                 <button
                                   onClick={() => handleStartEditingMaxProducts(tier.plan.id, tier.plan.maxProducts)}
-                                  className="p-1 text-[#9CA3AF] hover:text-[#4FA59C] hover:bg-[#E5F5F3] rounded transition-colors"
+                                  className="p-1 text-muted-foreground hover:text-[#4FA59C] hover:bg-teal-50 dark:hover:bg-teal-900/30 rounded transition-colors"
                                   title="Edit max products"
                                 >
                                   <Edit2 className="h-3 w-3" />
                                 </button>
                               </>
                             )}
-                            <span className="text-xs text-[#9CA3AF]">(-1 = unlimited)</span>
+                            <span className="text-xs text-muted-foreground">(-1 = unlimited)</span>
                           </div>
                         </div>
                       </div>
 
                       {/* Features */}
                       <div className="ml-8 flex flex-col items-end space-y-3">
-                        <div className="text-xs font-semibold text-[#9CA3AF] uppercase tracking-wider mb-1">
+                        <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
                           Features
                         </div>
 
                         {/* Can Add Custom Products Toggle */}
                         <div className="flex items-center space-x-3">
-                          <span className="text-sm text-[#6B7280]">
+                          <span className="text-sm text-muted-foreground">
                             Can Add Custom Products
                           </span>
                           <button
@@ -372,14 +372,14 @@ export default function TierManagement() {
                                 relative inline-flex h-7 w-12 items-center rounded-full transition-colors
                                 ${tier.config?.canAddCustomProducts
                                 ? 'bg-[#4FA59C]'
-                                : 'bg-[#D1D5DB]'
+                                : 'bg-gray-300 dark:bg-gray-600'
                               }
                                 ${saving === tier.plan.id ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
                               `}
                           >
                             <span
                               className={`
-                                  inline-block h-5 w-5 transform rounded-full bg-white transition-transform shadow-sm
+                                  inline-block h-5 w-5 transform rounded-full bg-white dark:bg-gray-800 transition-transform shadow-sm
                                   flex items-center justify-center
                                   ${tier.config?.canAddCustomProducts ? 'translate-x-6' : 'translate-x-1'}
                                 `}
@@ -387,7 +387,7 @@ export default function TierManagement() {
                               {tier.config?.canAddCustomProducts ? (
                                 <Check className="h-3 w-3 text-[#4FA59C]" />
                               ) : (
-                                <X className="h-3 w-3 text-[#9CA3AF]" />
+                                <X className="h-3 w-3 text-muted-foreground" />
                               )}
                             </span>
                           </button>
@@ -395,7 +395,7 @@ export default function TierManagement() {
 
                         {/* Has Access To Analytics Toggle */}
                         <div className="flex items-center space-x-3">
-                          <span className="text-sm text-[#6B7280]">
+                          <span className="text-sm text-muted-foreground">
                             Has Access To Analytics
                           </span>
                           <button
@@ -409,14 +409,14 @@ export default function TierManagement() {
                                 relative inline-flex h-7 w-12 items-center rounded-full transition-colors
                                 ${tier.config?.hasAccessToAnalytics
                                 ? 'bg-[#4FA59C]'
-                                : 'bg-[#D1D5DB]'
+                                : 'bg-gray-300 dark:bg-gray-600'
                               }
                                 ${saving === tier.plan.id ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
                               `}
                           >
                             <span
                               className={`
-                                  inline-block h-5 w-5 transform rounded-full bg-white transition-transform shadow-sm
+                                  inline-block h-5 w-5 transform rounded-full bg-white dark:bg-gray-800 transition-transform shadow-sm
                                   flex items-center justify-center
                                   ${tier.config?.hasAccessToAnalytics ? 'translate-x-6' : 'translate-x-1'}
                                 `}
@@ -424,7 +424,7 @@ export default function TierManagement() {
                               {tier.config?.hasAccessToAnalytics ? (
                                 <Check className="h-3 w-3 text-[#4FA59C]" />
                               ) : (
-                                <X className="h-3 w-3 text-[#9CA3AF]" />
+                                <X className="h-3 w-3 text-muted-foreground" />
                               )}
                             </span>
                           </button>
@@ -432,7 +432,7 @@ export default function TierManagement() {
 
                         {/* Has Custom Portal Toggle */}
                         <div className="flex items-center space-x-3">
-                          <span className="text-sm text-[#6B7280]">
+                          <span className="text-sm text-muted-foreground">
                             Has Custom Portal
                           </span>
                           <button
@@ -446,14 +446,14 @@ export default function TierManagement() {
                                 relative inline-flex h-7 w-12 items-center rounded-full transition-colors
                                 ${tier.config?.hasCustomPortal
                                 ? 'bg-[#4FA59C]'
-                                : 'bg-[#D1D5DB]'
+                                : 'bg-gray-300 dark:bg-gray-600'
                               }
                                 ${saving === tier.plan.id ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
                               `}
                           >
                             <span
                               className={`
-                                  inline-block h-5 w-5 transform rounded-full bg-white transition-transform shadow-sm
+                                  inline-block h-5 w-5 transform rounded-full bg-white dark:bg-gray-800 transition-transform shadow-sm
                                   flex items-center justify-center
                                   ${tier.config?.hasCustomPortal ? 'translate-x-6' : 'translate-x-1'}
                                 `}
@@ -461,7 +461,7 @@ export default function TierManagement() {
                               {tier.config?.hasCustomPortal ? (
                                 <Check className="h-3 w-3 text-[#4FA59C]" />
                               ) : (
-                                <X className="h-3 w-3 text-[#9CA3AF]" />
+                                <X className="h-3 w-3 text-muted-foreground" />
                               )}
                             </span>
                           </button>
@@ -469,7 +469,7 @@ export default function TierManagement() {
 
                         {/* Has Programs Toggle */}
                         <div className="flex items-center space-x-3">
-                          <span className="text-sm text-[#6B7280]">
+                          <span className="text-sm text-muted-foreground">
                             Has Programs
                           </span>
                           <button
@@ -483,14 +483,14 @@ export default function TierManagement() {
                                 relative inline-flex h-7 w-12 items-center rounded-full transition-colors
                                 ${tier.config?.hasPrograms
                                 ? 'bg-[#4FA59C]'
-                                : 'bg-[#D1D5DB]'
+                                : 'bg-gray-300 dark:bg-gray-600'
                               }
                                 ${saving === tier.plan.id ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
                               `}
                           >
                             <span
                               className={`
-                                  inline-block h-5 w-5 transform rounded-full bg-white transition-transform shadow-sm
+                                  inline-block h-5 w-5 transform rounded-full bg-white dark:bg-gray-800 transition-transform shadow-sm
                                   flex items-center justify-center
                                   ${tier.config?.hasPrograms ? 'translate-x-6' : 'translate-x-1'}
                                 `}
@@ -498,7 +498,7 @@ export default function TierManagement() {
                               {tier.config?.hasPrograms ? (
                                 <Check className="h-3 w-3 text-[#4FA59C]" />
                               ) : (
-                                <X className="h-3 w-3 text-[#9CA3AF]" />
+                                <X className="h-3 w-3 text-muted-foreground" />
                               )}
                             </span>
                           </button>
@@ -506,7 +506,7 @@ export default function TierManagement() {
 
                         {/* Can Customize Form Structure Toggle */}
                         <div className="flex items-center space-x-3">
-                          <span className="text-sm text-[#6B7280]">
+                          <span className="text-sm text-muted-foreground">
                             Can Customize Form Structure
                           </span>
                           <button
@@ -520,14 +520,14 @@ export default function TierManagement() {
                                 relative inline-flex h-7 w-12 items-center rounded-full transition-colors
                                 ${tier.config?.canCustomizeFormStructure
                                 ? 'bg-[#4FA59C]'
-                                : 'bg-[#D1D5DB]'
+                                : 'bg-gray-300 dark:bg-gray-600'
                               }
                                 ${saving === tier.plan.id ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
                               `}
                           >
                             <span
                               className={`
-                                  inline-block h-5 w-5 transform rounded-full bg-white transition-transform shadow-sm
+                                  inline-block h-5 w-5 transform rounded-full bg-white dark:bg-gray-800 transition-transform shadow-sm
                                   flex items-center justify-center
                                   ${tier.config?.canCustomizeFormStructure ? 'translate-x-6' : 'translate-x-1'}
                                 `}
@@ -535,7 +535,7 @@ export default function TierManagement() {
                               {tier.config?.canCustomizeFormStructure ? (
                                 <Check className="h-3 w-3 text-[#4FA59C]" />
                               ) : (
-                                <X className="h-3 w-3 text-[#9CA3AF]" />
+                                <X className="h-3 w-3 text-muted-foreground" />
                               )}
                             </span>
                           </button>
@@ -544,16 +544,16 @@ export default function TierManagement() {
                     </div>
 
                     {/* Custom Plan Card Text Section */}
-                    <div className="mt-6 pt-6 border-t border-[#E5E7EB]">
+                    <div className="mt-6 pt-6 border-t border-border">
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex-1">
-                          <h4 className="text-sm font-semibold text-[#1F2937]">Custom Plan Card Text</h4>
-                          <p className="text-xs text-[#9CA3AF]">Custom bullet points shown on the plans page (overrides auto-generated text)</p>
+                          <h4 className="text-sm font-semibold text-foreground">Custom Plan Card Text</h4>
+                          <p className="text-xs text-muted-foreground">Custom bullet points shown on the plans page (overrides auto-generated text)</p>
                         </div>
                         <div className="flex items-center gap-4">
                           {/* Toggle for using custom text */}
                           <div className="flex items-center gap-2">
-                            <span className="text-xs text-[#6B7280]">Use Custom Text</span>
+                            <span className="text-xs text-muted-foreground">Use Custom Text</span>
                             <button
                               onClick={() => handleToggleFeature(
                                 tier.plan.id,
@@ -565,14 +565,14 @@ export default function TierManagement() {
                                 relative inline-flex h-6 w-10 items-center rounded-full transition-colors
                                 ${tier.config?.isCustomTierCardTextActive
                                   ? 'bg-[#4FA59C]'
-                                  : 'bg-[#D1D5DB]'
+                                  : 'bg-gray-300 dark:bg-gray-600'
                                 }
                                 ${saving === tier.plan.id ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
                               `}
                             >
                               <span
                                 className={`
-                                  inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow-sm
+                                  inline-block h-4 w-4 transform rounded-full bg-white dark:bg-gray-800 transition-transform shadow-sm
                                   ${tier.config?.isCustomTierCardTextActive ? 'translate-x-5' : 'translate-x-1'}
                                 `}
                               />
@@ -581,7 +581,7 @@ export default function TierManagement() {
                           {editingCustomText !== tier.plan.id && (
                             <button
                               onClick={() => handleStartEditingCustomText(tier.plan.id, tier.config?.customTierCardText || null)}
-                              className="px-3 py-1.5 text-xs font-medium text-[#4FA59C] bg-[#E5F5F3] rounded-lg hover:bg-[#d0ebe8] transition-colors"
+                              className="px-3 py-1.5 text-xs font-medium text-[#4FA59C] bg-teal-50 dark:bg-teal-900/30 rounded-lg hover:bg-teal-100 dark:hover:bg-teal-900/50 transition-colors"
                             >
                               {tier.config?.customTierCardText?.length ? 'Edit Text' : 'Add Custom Text'}
                             </button>
@@ -598,11 +598,11 @@ export default function TierManagement() {
                                 value={line}
                                 onChange={(e) => handleUpdateCustomTextLine(index, e.target.value)}
                                 placeholder="Enter bullet point text..."
-                                className="flex-1 px-3 py-2 text-sm border border-[#E5E7EB] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:border-transparent"
+                                className="flex-1 px-3 py-2 text-sm border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:border-transparent bg-background text-foreground"
                               />
                               <button
                                 onClick={() => handleRemoveCustomTextLine(index)}
-                                className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                className="p-2 text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
                               >
                                 <Trash2 className="h-4 w-4" />
                               </button>
@@ -610,7 +610,7 @@ export default function TierManagement() {
                           ))}
                           <button
                             onClick={handleAddCustomTextLine}
-                            className="flex items-center gap-1 px-3 py-2 text-sm text-[#6B7280] hover:text-[#1F2937] hover:bg-[#F3F4F6] rounded-lg transition-colors"
+                            className="flex items-center gap-1 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
                           >
                             <Plus className="h-4 w-4" />
                             Add Line
@@ -626,7 +626,7 @@ export default function TierManagement() {
                             </button>
                             <button
                               onClick={handleCancelEditingCustomText}
-                              className="px-4 py-2 text-sm font-medium text-[#6B7280] hover:text-[#1F2937] hover:bg-[#F3F4F6] rounded-lg transition-colors"
+                              className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
                             >
                               Cancel
                             </button>
@@ -635,13 +635,13 @@ export default function TierManagement() {
                       ) : tier.config?.customTierCardText?.length ? (
                         <div>
                           {!tier.config?.isCustomTierCardTextActive && (
-                            <p className="text-xs text-amber-600 mb-2 italic">
+                            <p className="text-xs text-amber-600 dark:text-amber-400 mb-2 italic">
                               ⚠️ Custom text is saved but not active. Toggle "Use Custom Text" to display it on the plans page.
                             </p>
                           )}
                           <ul className="space-y-1">
                             {tier.config.customTierCardText.map((line, index) => (
-                              <li key={index} className="flex items-center gap-2 text-sm text-[#6B7280]">
+                              <li key={index} className="flex items-center gap-2 text-sm text-muted-foreground">
                                 <Check className="h-3 w-3 text-[#4FA59C] flex-shrink-0" />
                                 {line}
                               </li>
@@ -649,7 +649,7 @@ export default function TierManagement() {
                           </ul>
                         </div>
                       ) : (
-                        <p className="text-sm text-[#9CA3AF] italic">No custom text configured. Features will be auto-generated from toggles above.</p>
+                        <p className="text-sm text-muted-foreground italic">No custom text configured. Features will be auto-generated from toggles above.</p>
                       )}
                     </div>
                   </Card>

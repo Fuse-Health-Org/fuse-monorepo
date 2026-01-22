@@ -172,13 +172,13 @@ export function MDIOfferingManager({ productId, productName }: MDIOfferingManage
       <CardContent className="space-y-4">
         {/* Status Messages */}
         {error && (
-          <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+          <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-400 text-sm">
             <AlertCircle className="h-4 w-4" />
             {error}
           </div>
         )}
         {success && (
-          <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
+          <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg text-green-700 dark:text-green-400 text-sm">
             <Check className="h-4 w-4" />
             {success}
           </div>
@@ -186,15 +186,15 @@ export function MDIOfferingManager({ productId, productName }: MDIOfferingManage
 
         {/* Current Status */}
         {hasOffering && linkedOffering ? (
-          <div className="flex items-center justify-between p-4 bg-green-50 border border-green-200 rounded-lg">
+          <div className="flex items-center justify-between p-4 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
-                <Check className="h-5 w-5 text-green-600" />
+              <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/50 flex items-center justify-center">
+                <Check className="h-5 w-5 text-green-600 dark:text-green-400" />
               </div>
               <div>
-                <div className="font-medium text-green-900">Linked to MDI Offering</div>
-                <div className="text-sm text-green-700">{linkedOffering.name}</div>
-                <div className="text-xs text-green-600 font-mono mt-1">{linkedOffering.id}</div>
+                <div className="font-medium text-green-900 dark:text-green-300">Linked to MDI Offering</div>
+                <div className="text-sm text-green-700 dark:text-green-400">{linkedOffering.name}</div>
+                <div className="text-xs text-green-600 dark:text-green-500 font-mono mt-1">{linkedOffering.id}</div>
               </div>
             </div>
             <Button
@@ -202,7 +202,7 @@ export function MDIOfferingManager({ productId, productName }: MDIOfferingManage
               size="sm"
               onClick={handleUnlinkOffering}
               disabled={linking}
-              className="text-red-600 border-red-200 hover:bg-red-50"
+              className="text-red-600 dark:text-red-400 border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-900/30"
             >
               {linking ? <Loader2 className="h-4 w-4 animate-spin" /> : <Unlink className="h-4 w-4 mr-2" />}
               Unlink
@@ -210,13 +210,13 @@ export function MDIOfferingManager({ productId, productName }: MDIOfferingManage
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="flex items-center gap-3 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-              <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
-                <AlertCircle className="h-5 w-5 text-amber-600" />
+            <div className="flex items-center gap-3 p-4 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg">
+              <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center">
+                <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
               </div>
               <div>
-                <div className="font-medium text-amber-900">No MDI Offering Linked</div>
-                <div className="text-sm text-amber-700">
+                <div className="font-medium text-amber-900 dark:text-amber-300">No MDI Offering Linked</div>
+                <div className="text-sm text-amber-700 dark:text-amber-400">
                   Link an existing offering or create a new one
                 </div>
               </div>
@@ -257,18 +257,18 @@ export function MDIOfferingManager({ productId, productName }: MDIOfferingManage
             </div>
 
             {/* Info about creating offerings */}
-            <div className="pt-4 border-t">
-              <div className="flex items-start gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <ExternalLink className="h-5 w-5 text-blue-600 mt-0.5" />
+            <div className="pt-4 border-t border-border">
+              <div className="flex items-start gap-3 p-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <ExternalLink className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5" />
                 <div>
-                  <div className="font-medium text-sm text-blue-900">Need a new offering?</div>
-                  <div className="text-xs text-blue-700 mt-1">
+                  <div className="font-medium text-sm text-blue-900 dark:text-blue-300">Need a new offering?</div>
+                  <div className="text-xs text-blue-700 dark:text-blue-400 mt-1">
                     Offerings must be created in the{" "}
                     <a 
                       href="https://app.mdintegrations.com" 
                       target="_blank" 
                       rel="noopener noreferrer"
-                      className="underline font-medium hover:text-blue-900"
+                      className="underline font-medium hover:text-blue-900 dark:hover:text-blue-300"
                     >
                       MD Integrations portal
                     </a>

@@ -1390,7 +1390,7 @@ export default function Flows() {
                                                         placeholder="Search sequences..."
                                                         value={searchTerm}
                                                         onChange={(e) => setSearchTerm(e.target.value)}
-                                                        className="w-full pl-10 pr-4 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
+                                                        className="w-full pl-10 pr-4 py-2 border border-input bg-background text-foreground rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                                                     />
                                                 </div>
                                             </div>
@@ -1569,7 +1569,7 @@ export default function Flows() {
                                         value={newFlowName}
                                         onChange={(e) => setNewFlowName(e.target.value)}
                                         placeholder="e.g. Post-Checkout Onboarding"
-                                        className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                                        className="w-full px-3 py-2 border border-input bg-background text-foreground rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                                         disabled={creatingFlow}
                                     />
                                 </div>
@@ -1579,7 +1579,7 @@ export default function Flows() {
                                     <select
                                         value={newFlowTrigger}
                                         onChange={(e) => setNewFlowTrigger(e.target.value)}
-                                        className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-background"
+                                        className="w-full px-3 py-2 border border-input bg-background text-foreground rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                                         disabled={creatingFlow}
                                     >
                                         <option value="">Select a trigger...</option>

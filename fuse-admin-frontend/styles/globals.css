@@ -126,3 +126,39 @@
 [class*="__react-joyride"] * {
   --joyride-color-primary: #166534 !important;
 }
+
+/* Sidebar scrollbar styles */
+.bg-sidebar nav.overflow-y-auto::-webkit-scrollbar {
+  width: 8px;
+}
+
+.bg-sidebar nav.overflow-y-auto::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.bg-sidebar nav.overflow-y-auto::-webkit-scrollbar-thumb {
+  background: hsl(var(--sidebar-border));
+  border-radius: 4px;
+}
+
+.bg-sidebar nav.overflow-y-auto::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.4);
+}
+
+.dark .bg-sidebar nav.overflow-y-auto::-webkit-scrollbar-thumb {
+  background: hsl(var(--sidebar-border));
+}
+
+.dark .bg-sidebar nav.overflow-y-auto::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.6);
+}
+
+/* Firefox scrollbar */
+.bg-sidebar nav.overflow-y-auto {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--sidebar-border)) transparent;
+}
+
+.dark .bg-sidebar nav.overflow-y-auto {
+  scrollbar-color: hsl(var(--sidebar-border)) transparent;
+}
