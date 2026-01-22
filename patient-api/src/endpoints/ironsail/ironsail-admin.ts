@@ -1,5 +1,9 @@
 import { Express } from "express";
 import { getIronSailToken, IRONSAIL_API_BASE } from "./ironsail-auth";
+import ShippingOrder from "../../models/ShippingOrder";
+import Order from "../../models/Order";
+import User from "../../models/User";
+import { Op } from "sequelize";
 
 // ============= IRONSAIL ADMIN API =============
 // Provides admin access to browse IronSail pharmacies and medication catalogs
@@ -8,6 +12,72 @@ export function registerIronSailAdminEndpoints(
   app: Express,
   authenticateJWT: any
 ) {
+  // List IronSail orders from our database
+  app.get("/ironsail/orders", authenticateJWT, async (req, res) => {
+    try {
+      const { page = "1", per_page = "25", status } = req.query;
+      const pageNum = parseInt(page as string);
+      const perPage = Math.min(parseInt(per_page as string), 100);
+      const offset = (pageNum - 1) * perPage;
+
+      // Build where clause
+      const where: any = {
+        pharmacyOrderId: {
+          [Op.like]: 'IRONSAIL-%'
+        }
+      };
+
+      if (status && typeof status === 'string') {
+        where.status = status;
+      }
+
+      // Get total count
+      const total = await ShippingOrder.count({ where });
+
+      // Fetch orders with related data
+      const shippingOrders = await ShippingOrder.findAll({
+        where,
+        include: [
+          {
+            model: Order,
+            as: "order",
+            attributes: ["id", "orderNumber", "status", "createdAt"],
+            include: [
+              {
+                model: User,
+                as: "user",
+                attributes: ["id", "firstName", "lastName", "email"]
+              }
+            ]
+          }
+        ],
+        order: [["createdAt", "DESC"]],
+        limit: perPage,
+        offset
+      });
+
+      console.log(`[IronSail] Listed ${shippingOrders.length} IronSail orders (page ${pageNum})`);
+
+      return res.json({
+        success: true,
+        data: shippingOrders,
+        pagination: {
+          page: pageNum,
+          per_page: perPage,
+          total,
+          total_pages: Math.ceil(total / perPage)
+        }
+      });
+    } catch (error: any) {
+      console.error("[IronSail] Error listing orders:", error?.message);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to list IronSail orders",
+        error: error?.message
+      });
+    }
+  });
+
   // List available IronSail pharmacies
   app.get("/ironsail/pharmacies", authenticateJWT, async (req, res) => {
     try {
