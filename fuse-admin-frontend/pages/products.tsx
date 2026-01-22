@@ -1146,7 +1146,7 @@ export default function Products() {
                                     return (
                                         <div
                                             key={product.id}
-                                            className={`flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors ${quickEditMode ? 'cursor-default' : 'cursor-pointer'} ${index !== 0 ? 'border-t border-gray-100' : ''}`}
+                                            className={`flex items-center justify-between px-6 py-4 hover:bg-accent transition-colors ${quickEditMode ? 'cursor-default' : 'cursor-pointer'} ${index !== 0 ? 'border-t border-border' : ''}`}
                                             onClick={() => !quickEditMode && router.push(product.brandId ? `/custom-products/${product.id}` : `/products/${product.id}`)}
                                         >
                                             <div className="flex items-center gap-4 flex-1 min-w-0">
@@ -1156,13 +1156,13 @@ export default function Products() {
                                                         e.stopPropagation();
                                                         toggleFavorite(product.id);
                                                     }}
-                                                    className="flex-shrink-0 p-1 rounded-full hover:bg-amber-50 transition-colors"
+                                                    className="flex-shrink-0 p-1 rounded-full hover:bg-accent transition-colors"
                                                     title={favoriteProductIds.has(product.id) ? 'Remove from favorites' : 'Add to favorites'}
                                                 >
                                                     <Star
                                                         className={`h-4 w-4 transition-colors ${favoriteProductIds.has(product.id)
                                                             ? 'fill-amber-400 text-amber-400'
-                                                            : 'text-gray-300 hover:text-amber-400'
+                                                            : 'text-muted-foreground hover:text-amber-400'
                                                             }`}
                                                     />
                                                 </button>
@@ -1196,9 +1196,9 @@ export default function Products() {
                                                 {/* Name & Info */}
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-2 mb-0.5">
-                                                        <h3 className="text-sm font-medium text-gray-900 truncate">{product.name}</h3>
+                                                        <h3 className="text-sm font-medium text-foreground truncate">{product.name}</h3>
                                                         {product.brandId && (
-                                                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-50 text-purple-700 border border-purple-200">
+                                                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-50 dark:bg-purple-950/20 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
                                                                 Custom Product
                                                             </span>
                                                         )}
@@ -1207,8 +1207,8 @@ export default function Products() {
                                                         <div className="text-xs text-muted-foreground space-y-0.5">
                                                             {product.pharmacyCoverages.map((coverage, idx) => (
                                                                 <div key={coverage.id} className="truncate">
-                                                                    <span className="font-medium text-gray-700">{coverage.customName || coverage.pharmacyProduct?.pharmacyProductName || 'Product'}</span>
-                                                                    {coverage.customSig && <span className="text-gray-500"> - {coverage.customSig}</span>}
+                                                                    <span className="font-medium text-foreground">{coverage.customName || coverage.pharmacyProduct?.pharmacyProductName || 'Product'}</span>
+                                                                    {coverage.customSig && <span className="text-muted-foreground"> - {coverage.customSig}</span>}
                                                                 </div>
                                                             ))}
                                                         </div>
