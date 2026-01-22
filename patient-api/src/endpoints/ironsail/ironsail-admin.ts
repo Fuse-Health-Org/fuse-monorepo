@@ -130,14 +130,14 @@ export function registerIronSailAdminEndpoints(
   app.get("/ironsail/test-search", async (req, res) => {
     try {
       const { pharmacy = "kaduceus", search = "semaglutide" } = req.query;
-      
+
       const token = await getIronSailToken();
-      
+
       const headers: Record<string, string> = {
         "Accept": "application/json",
         "Content-Type": "application/json"
       };
-      
+
       if (token) {
         headers["Authorization"] = `Bearer ${token}`;
       }
@@ -145,28 +145,28 @@ export function registerIronSailAdminEndpoints(
       // Test 1: Without search parameter
       const urlNoSearch = `${IRONSAIL_API_BASE}/pharmacies/${pharmacy}/medications?page=1`;
       console.log(`\n[IronSail Test] URL without search: ${urlNoSearch}`);
-      
+
       const responseNoSearch = await fetch(urlNoSearch, { method: "GET", headers });
       const dataNoSearch = await responseNoSearch.json() as { data?: any[]; pagination?: any };
-      
+
       // Test 2: With search parameter
       const urlWithSearch = `${IRONSAIL_API_BASE}/pharmacies/${pharmacy}/medications?page=1&search=${encodeURIComponent(search as string)}`;
       console.log(`[IronSail Test] URL with search: ${urlWithSearch}`);
-      
+
       const responseWithSearch = await fetch(urlWithSearch, { method: "GET", headers });
       const dataWithSearch = await responseWithSearch.json() as { data?: any[]; pagination?: any };
-      
+
       // Test 3: Try 'name' parameter instead
       const urlWithName = `${IRONSAIL_API_BASE}/pharmacies/${pharmacy}/medications?page=1&name=${encodeURIComponent(search as string)}`;
       console.log(`[IronSail Test] URL with name param: ${urlWithName}`);
-      
+
       const responseWithName = await fetch(urlWithName, { method: "GET", headers });
       const dataWithName = await responseWithName.json() as { data?: any[]; pagination?: any };
 
       // Test 4: Try 'q' parameter
       const urlWithQ = `${IRONSAIL_API_BASE}/pharmacies/${pharmacy}/medications?page=1&q=${encodeURIComponent(search as string)}`;
       console.log(`[IronSail Test] URL with q param: ${urlWithQ}`);
-      
+
       const responseWithQ = await fetch(urlWithQ, { method: "GET", headers });
       const dataWithQ = await responseWithQ.json() as { data?: any[]; pagination?: any };
 
@@ -247,7 +247,7 @@ export function registerIronSailAdminEndpoints(
         // First, get page 1 to know total pages
         const firstPageUrl = `${IRONSAIL_API_BASE}/pharmacies/${pharmacyId}/medications?page=1`;
         const firstResponse = await fetch(firstPageUrl, { method: "GET", headers });
-        
+
         if (!firstResponse.ok) {
           const errorText = await firstResponse.text();
           console.error("[IronSail] Failed to fetch medications:", errorText);
@@ -290,9 +290,9 @@ export function registerIronSailAdminEndpoints(
           const name = (med.name || '').toLowerCase();
           const formulation = (med.formulation || '').toLowerCase();
           const type = (med.type || '').toLowerCase();
-          return name.includes(searchTerm) || 
-                 formulation.includes(searchTerm) || 
-                 type.includes(searchTerm);
+          return name.includes(searchTerm) ||
+            formulation.includes(searchTerm) ||
+            type.includes(searchTerm);
         });
 
         console.log(`[IronSail] Found ${filteredMedications.length} medications matching "${searchTerm}"`);
