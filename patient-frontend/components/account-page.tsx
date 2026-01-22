@@ -42,6 +42,16 @@ export const AccountPage: React.FC = () => {
   const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = React.useState("");
   
+  // Password change states
+  const [passwordData, setPasswordData] = React.useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
+  const [isChangingPassword, setIsChangingPassword] = React.useState(false);
+  const [passwordError, setPasswordError] = React.useState("");
+  const [passwordSuccess, setPasswordSuccess] = React.useState("");
+  
   const [personalInfo, setPersonalInfo] = React.useState({
     firstName: user?.firstName || "",
     lastName: user?.lastName || "",
@@ -168,6 +178,65 @@ export const AccountPage: React.FC = () => {
       ...prev,
       [key]: !prev[key]
     }));
+  };
+  
+  const handlePasswordInputChange = (field: keyof typeof passwordData, value: string) => {
+    setPasswordData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+    setPasswordError("");
+    setPasswordSuccess("");
+  };
+  
+  const handleChangePassword = async () => {
+    setIsChangingPassword(true);
+    setPasswordError("");
+    setPasswordSuccess("");
+    
+    // Validation
+    if (!passwordData.currentPassword) {
+      setPasswordError("Current password is required");
+      setIsChangingPassword(false);
+      return;
+    }
+    
+    if (passwordData.newPassword.length < 8) {
+      setPasswordError("New password must be at least 8 characters long");
+      setIsChangingPassword(false);
+      return;
+    }
+    
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      setPasswordError("Passwords don't match");
+      setIsChangingPassword(false);
+      return;
+    }
+    
+    try {
+      const result = await authApi.changePassword(
+        passwordData.currentPassword,
+        passwordData.newPassword
+      );
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to change password');
+      }
+      
+      setPasswordSuccess("Password changed successfully!");
+      setPasswordData({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      });
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => setPasswordSuccess(""), 3000);
+    } catch (err) {
+      setPasswordError(err instanceof Error ? err.message : 'Failed to change password. Please try again.');
+    } finally {
+      setIsChangingPassword(false);
+    }
   };
   
   return (
@@ -424,6 +493,28 @@ export const AccountPage: React.FC = () => {
           <CardBody className="p-6">
             <h2 className="text-xl font-semibold mb-6">Security Settings</h2>
             
+            {passwordError && (
+              <Card className="border border-danger-200 bg-danger-50 mb-4">
+                <CardBody className="p-4">
+                  <div className="flex items-center gap-3">
+                    <Icon icon="lucide:alert-circle" className="text-danger text-xl flex-shrink-0" />
+                    <p className="text-danger-600">{passwordError}</p>
+                  </div>
+                </CardBody>
+              </Card>
+            )}
+            
+            {passwordSuccess && (
+              <Card className="border border-success-200 bg-success-50 mb-4">
+                <CardBody className="p-4">
+                  <div className="flex items-center gap-3">
+                    <Icon icon="lucide:check-circle" className="text-success text-xl flex-shrink-0" />
+                    <p className="text-success-600">{passwordSuccess}</p>
+                  </div>
+                </CardBody>
+              </Card>
+            )}
+            
             <div className="space-y-6">
               <div>
                 <h3 className="text-lg font-medium mb-4">Password</h3>
@@ -433,6 +524,9 @@ export const AccountPage: React.FC = () => {
                     <Input 
                       type="password"
                       placeholder="Enter your current password"
+                      value={passwordData.currentPassword}
+                      onValueChange={(value) => handlePasswordInputChange("currentPassword", value)}
+                      isDisabled={isChangingPassword}
                     />
                   </div>
                   
@@ -441,6 +535,10 @@ export const AccountPage: React.FC = () => {
                     <Input 
                       type="password"
                       placeholder="Enter your new password"
+                      value={passwordData.newPassword}
+                      onValueChange={(value) => handlePasswordInputChange("newPassword", value)}
+                      isDisabled={isChangingPassword}
+                      description="Must be at least 8 characters long"
                     />
                   </div>
                   
@@ -449,11 +547,19 @@ export const AccountPage: React.FC = () => {
                     <Input 
                       type="password"
                       placeholder="Confirm your new password"
+                      value={passwordData.confirmPassword}
+                      onValueChange={(value) => handlePasswordInputChange("confirmPassword", value)}
+                      isDisabled={isChangingPassword}
                     />
                   </div>
                   
-                  <Button color="primary">
-                    Update Password
+                  <Button 
+                    color="primary"
+                    onPress={handleChangePassword}
+                    isLoading={isChangingPassword}
+                    isDisabled={isChangingPassword || !passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword}
+                  >
+                    {isChangingPassword ? "Updating..." : "Update Password"}
                   </Button>
                 </div>
               </div>

@@ -69,6 +69,9 @@ import { StripeService } from "@fuse/stripe";
 import {
   signInSchema,
   signUpSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
+  resetPasswordWithCodeSchema,
   updateProfileSchema,
   clinicUpdateSchema,
   productCreateSchema,
@@ -2088,6 +2091,13 @@ const verificationCodes = new Map<
   { code: string; expiresAt: number; firstName?: string }
 >();
 
+// In-memory store for password reset codes
+// Format: { email: { code: string, expiresAt: number, firstName?: string, verified: boolean } }
+const passwordResetCodes = new Map<
+  string,
+  { code: string; expiresAt: number; firstName?: string; verified: boolean }
+>();
+
 // Clean up expired codes every 5 minutes
 setInterval(
   () => {
@@ -2095,6 +2105,11 @@ setInterval(
     for (const [email, data] of verificationCodes.entries()) {
       if (data.expiresAt < now) {
         verificationCodes.delete(email);
+      }
+    }
+    for (const [email, data] of passwordResetCodes.entries()) {
+      if (data.expiresAt < now) {
+        passwordResetCodes.delete(email);
       }
     }
   },
@@ -2278,6 +2293,267 @@ app.post("/auth/verify-code", async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Verification failed. Please try again.",
+    });
+  }
+});
+
+// Forgot password - send reset code
+app.post("/auth/forgot-password", async (req, res) => {
+  try {
+    const validation = forgotPasswordSchema.safeParse(req.body);
+
+    if (!validation.success) {
+      return res.status(400).json({
+        success: false,
+        message: "Validation failed",
+        errors: validation.error.format(),
+      });
+    }
+
+    const { email } = validation.data;
+
+    // Find user by email
+    const user = await User.findByEmail(email);
+    
+    // For security, don't reveal if user exists or not
+    // Always return success message, but only send email if user exists
+    if (user) {
+      // Check if user is activated
+      if (!user.activated) {
+        return res.status(200).json({
+          success: true,
+          message: "If an account exists with this email, a reset code has been sent.",
+        });
+      }
+
+      // Generate 6-digit code
+      const code = Math.floor(100000 + Math.random() * 900000).toString();
+      
+      // Store code with 10-minute expiration
+      const expiresAt = Date.now() + 10 * 60 * 1000;
+      
+      passwordResetCodes.set(email.toLowerCase(), {
+        code,
+        expiresAt,
+        firstName: user.firstName,
+        verified: false,
+      });
+
+      // Send email with code
+      const emailSent = await MailsSender.sendPasswordResetCode(
+        email,
+        code,
+        user.firstName
+      );
+
+      if (!emailSent) {
+        return res.status(500).json({
+          success: false,
+          message: "Failed to send reset code. Please try again.",
+        });
+      }
+
+      // HIPAA Audit: Log password reset request
+      await AuditService.log({
+        userId: user.id,
+        userEmail: user.email,
+        action: AuditAction.PASSWORD_RESET,
+        resourceType: AuditResourceType.USER,
+        resourceId: user.id,
+        ipAddress: AuditService.getClientIp(req),
+        userAgent: req.headers["user-agent"],
+        details: { email: user.email },
+      });
+
+      if (process.env.NODE_ENV === "development") {
+        console.log("✅ Password reset code sent");
+      }
+    }
+
+    // Always return success for security (don't reveal if user exists)
+    res.status(200).json({
+      success: true,
+      message: "If an account exists with this email, a reset code has been sent.",
+    });
+  } catch (error) {
+    if (process.env.NODE_ENV === "development") {
+      console.error("❌ Forgot password error:", error);
+    } else {
+      console.error("❌ Forgot password error");
+    }
+    res.status(500).json({
+      success: false,
+      message: "Failed to process password reset request. Please try again.",
+    });
+  }
+});
+
+// Verify reset code
+app.post("/auth/verify-reset-code", async (req, res) => {
+  try {
+    const { email, code } = req.body;
+
+    if (!email || !code) {
+      return res.status(400).json({
+        success: false,
+        message: "Email and code are required",
+      });
+    }
+
+    // Get stored code
+    const storedData = passwordResetCodes.get(email.toLowerCase());
+
+    if (!storedData) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid or expired reset code",
+      });
+    }
+
+    // Check if code is expired
+    if (storedData.expiresAt < Date.now()) {
+      passwordResetCodes.delete(email.toLowerCase());
+      return res.status(401).json({
+        success: false,
+        message: "Reset code has expired. Please request a new one.",
+      });
+    }
+
+    // Verify code
+    if (storedData.code !== code.trim()) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid reset code",
+      });
+    }
+
+    // Mark code as verified
+    storedData.verified = true;
+    passwordResetCodes.set(email.toLowerCase(), storedData);
+
+    if (process.env.NODE_ENV === "development") {
+      console.log("✅ Password reset code verified");
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Code verified successfully",
+    });
+  } catch (error) {
+    if (process.env.NODE_ENV === "development") {
+      console.error("❌ Verify reset code error:", error);
+    } else {
+      console.error("❌ Verify reset code error");
+    }
+    res.status(500).json({
+      success: false,
+      message: "Verification failed. Please try again.",
+    });
+  }
+});
+
+// Reset password with verified code
+app.post("/auth/reset-password", async (req, res) => {
+  try {
+    const validation = resetPasswordWithCodeSchema.safeParse(req.body);
+
+    if (!validation.success) {
+      return res.status(400).json({
+        success: false,
+        message: "Validation failed",
+        errors: validation.error.format(),
+      });
+    }
+
+    const { email, code, password } = validation.data;
+
+    // Get stored code
+    const storedData = passwordResetCodes.get(email.toLowerCase());
+
+    if (!storedData) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid or expired reset code",
+      });
+    }
+
+    // Check if code is expired
+    if (storedData.expiresAt < Date.now()) {
+      passwordResetCodes.delete(email.toLowerCase());
+      return res.status(401).json({
+        success: false,
+        message: "Reset code has expired. Please request a new one.",
+      });
+    }
+
+    // Verify code matches
+    if (storedData.code !== code.trim()) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid reset code",
+      });
+    }
+
+    // Check if code was verified
+    if (!storedData.verified) {
+      return res.status(401).json({
+        success: false,
+        message: "Code must be verified first",
+      });
+    }
+
+    // Find user
+    const user = await User.findByEmail(email);
+    if (!user) {
+      // For security, don't reveal if user exists
+      passwordResetCodes.delete(email.toLowerCase());
+      return res.status(401).json({
+        success: false,
+        message: "Invalid or expired reset code",
+      });
+    }
+
+    // Hash new password
+    const passwordHash = await User.hashPassword(password);
+
+    // Update user password
+    await user.update({
+      passwordHash,
+      temporaryPasswordHash: null, // Clear temporary password if exists
+    });
+
+    // Delete used code
+    passwordResetCodes.delete(email.toLowerCase());
+
+    // HIPAA Audit: Log password reset completion
+    await AuditService.log({
+      userId: user.id,
+      userEmail: user.email,
+      action: AuditAction.PASSWORD_RESET,
+      resourceType: AuditResourceType.USER,
+      resourceId: user.id,
+      ipAddress: AuditService.getClientIp(req),
+      userAgent: req.headers["user-agent"],
+      details: { email: user.email, passwordReset: true },
+    });
+
+    if (process.env.NODE_ENV === "development") {
+      console.log("✅ Password reset successfully");
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Password reset successfully",
+    });
+  } catch (error) {
+    if (process.env.NODE_ENV === "development") {
+      console.error("❌ Reset password error:", error);
+    } else {
+      console.error("❌ Reset password error");
+    }
+    res.status(500).json({
+      success: false,
+      message: "Failed to reset password. Please try again.",
     });
   }
 });

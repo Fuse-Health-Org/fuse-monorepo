@@ -12,7 +12,7 @@ import { Toaster } from 'sonner'
 import "../styles/globals.css"
 
 // Pages that don't require authentication
-const publicPages = ['/signin', '/signup', '/verify-email']
+const publicPages = ['/signin', '/signup', '/verify-email', '/forgot-password']
 
 export default function App({ Component, pageProps }: AppProps & { showToast?: (type: 'success' | 'error', message: string) => void }) {
     const router = useRouter()

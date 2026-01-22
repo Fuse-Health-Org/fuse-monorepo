@@ -33,6 +33,17 @@ export default function SettingsPage() {
     parentClinicCustomDomain: "",
   });
 
+  // Password change states
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
   // Toast notifications
   const [toasts, setToasts] = useState<Array<{ id: string; type: 'success' | 'error' | 'info'; message: string }>>([]);
 
@@ -172,6 +183,56 @@ export default function SettingsPage() {
       showToast('error', 'Failed to save settings');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    setIsChangingPassword(true);
+
+    // Validation
+    if (!passwordData.currentPassword) {
+      showToast('error', 'Current password is required');
+      setIsChangingPassword(false);
+      return;
+    }
+
+    if (passwordData.newPassword.length < 8) {
+      showToast('error', 'New password must be at least 8 characters long');
+      setIsChangingPassword(false);
+      return;
+    }
+
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      showToast('error', "Passwords don't match");
+      setIsChangingPassword(false);
+      return;
+    }
+
+    try {
+      const response = await apiCall("/users/profile", {
+        method: "PUT",
+        body: JSON.stringify({
+          currentPassword: passwordData.currentPassword.trim(),
+          newPassword: passwordData.newPassword.trim(),
+        }),
+      });
+
+      if (response.success) {
+        showToast('success', 'Password changed successfully!');
+        setPasswordData({
+          currentPassword: "",
+          newPassword: "",
+          confirmPassword: "",
+        });
+      } else {
+        const errorMessage = (response as any).message || response.error || 'Failed to change password';
+        showToast('error', errorMessage);
+      }
+    } catch (error) {
+      console.error("Error changing password:", error);
+      showToast('error', 'Failed to change password');
+    } finally {
+      setIsChangingPassword(false);
     }
   };
 
@@ -462,6 +523,94 @@ export default function SettingsPage() {
                 </div>
               </div>
             )}
+          </CardBody>
+        </Card>
+
+        {/* Password Change Section */}
+        <Card>
+          <CardHeader className="pb-2">
+            <h3 className="text-base font-semibold">Change Password</h3>
+            <p className="text-xs text-muted-foreground">Update your password to keep your account secure</p>
+          </CardHeader>
+          <CardBody className="pt-0">
+            <div className="space-y-4">
+              <Input
+                type={showCurrentPassword ? "text" : "password"}
+                label="Current Password"
+                placeholder="Enter your current password"
+                value={passwordData.currentPassword}
+                onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
+                variant="bordered"
+                endContent={
+                  <button
+                    type="button"
+                    onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                    className="focus:outline-none"
+                  >
+                    <Icon
+                      icon={showCurrentPassword ? "lucide:eye-off" : "lucide:eye"}
+                      className="text-default-400"
+                    />
+                  </button>
+                }
+                isDisabled={isChangingPassword}
+              />
+              
+              <Input
+                type={showNewPassword ? "text" : "password"}
+                label="New Password"
+                placeholder="Enter your new password"
+                value={passwordData.newPassword}
+                onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                variant="bordered"
+                description="Must be at least 8 characters long"
+                endContent={
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    className="focus:outline-none"
+                  >
+                    <Icon
+                      icon={showNewPassword ? "lucide:eye-off" : "lucide:eye"}
+                      className="text-default-400"
+                    />
+                  </button>
+                }
+                isDisabled={isChangingPassword}
+              />
+              
+              <Input
+                type={showConfirmPassword ? "text" : "password"}
+                label="Confirm New Password"
+                placeholder="Confirm your new password"
+                value={passwordData.confirmPassword}
+                onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                variant="bordered"
+                endContent={
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="focus:outline-none"
+                  >
+                    <Icon
+                      icon={showConfirmPassword ? "lucide:eye-off" : "lucide:eye"}
+                      className="text-default-400"
+                    />
+                  </button>
+                }
+                isDisabled={isChangingPassword}
+              />
+              
+              <Button
+                color="primary"
+                onPress={handleChangePassword}
+                isLoading={isChangingPassword}
+                isDisabled={isChangingPassword || !passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword}
+                startContent={<Icon icon="lucide:lock" className="h-5 w-5" />}
+              >
+                {isChangingPassword ? "Changing..." : "Change Password"}
+              </Button>
+            </div>
           </CardBody>
         </Card>
 

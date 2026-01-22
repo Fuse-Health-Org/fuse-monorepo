@@ -558,6 +558,94 @@ export class MailsSender {
   }
 
   /**
+   * Send password reset code to user's email
+   */
+  static async sendPasswordResetCode(
+    email: string,
+    code: string,
+    firstName?: string
+  ): Promise<boolean> {
+    const greeting = firstName ? `Hello ${firstName}` : "Hello";
+
+    const msg: any = {
+      to: email,
+      from: this.FROM_EMAIL,
+      subject: "Your Fuse Password Reset Code",
+      text: `${greeting},\n\nYour password reset code is: ${code}\n\nThis code will expire in 10 minutes.\n\nIf you didn't request a password reset, please ignore this email and your password will remain unchanged.\n\nBest regards,\nThe Fuse Team`,
+      // Disable click tracking
+      trackingSettings: {
+        clickTracking: {
+          enable: false,
+        },
+        openTracking: {
+          enable: false,
+        },
+      },
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); padding: 30px; text-align: center;">
+            <h1 style="color: white; margin: 0; font-size: 28px;">Password Reset</h1>
+          </div>
+          
+          <div style="padding: 40px 30px; background-color: #f8f9fa;">
+            <h2 style="color: #333; margin-top: 0;">${greeting},</h2>
+            
+            <p style="color: #666; font-size: 16px; line-height: 1.6;">
+              You requested to reset your password. Use this verification code to continue:
+            </p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <div style="background-color: #f3f4f6; 
+                          padding: 20px; 
+                          border-radius: 12px; 
+                          display: inline-block;
+                          border: 2px solid #e5e7eb;">
+                <span style="font-size: 36px; 
+                            font-weight: bold; 
+                            letter-spacing: 8px; 
+                            color: #ef4444;
+                            font-family: 'Courier New', monospace;">
+                  ${code}
+                </span>
+              </div>
+            </div>
+            
+            <p style="color: #666; font-size: 14px; text-align: center;">
+              <strong>This code will expire in 10 minutes.</strong>
+            </p>
+            
+            <div style="background-color: #fef3c7; padding: 15px; border-radius: 8px; margin-top: 30px; border-left: 4px solid #f59e0b;">
+              <p style="color: #92400e; font-size: 14px; margin: 0;">
+                <strong>🔒 Security Notice:</strong> If you didn't request a password reset, please ignore this email and your password will remain unchanged.
+              </p>
+            </div>
+          </div>
+          
+          <div style="background-color: #333; padding: 20px; text-align: center;">
+            <p style="color: #ccc; margin: 0; font-size: 14px;">
+              Best regards,<br>
+              The Fuse Team
+            </p>
+          </div>
+        </div>
+      `,
+    };
+
+    try {
+      await sgMail.send(msg);
+      console.log("✅ Password reset code sent");
+      return true;
+    } catch (error) {
+      if (process.env.NODE_ENV === "development") {
+        console.error("❌ Failed to send password reset code:", error);
+      } else {
+        console.error("❌ Failed to send password reset code");
+      }
+      return false;
+    }
+  }
+
+  /**
    * Send email to doctor when they sign up, notifying them their application is under review
    */
   static async sendDoctorApplicationPendingEmail(

@@ -12,6 +12,7 @@ import {
     FileQuestion,
     Package,
     CreditCard,
+    Settings,
 } from "lucide-react"
 
 const navigation = [
@@ -21,6 +22,7 @@ const navigation = [
     { name: "Medical Question Templates", icon: FileQuestion, current: false, href: "/forms" },
     { name: "Multi-Choice Forms", icon: Package, current: false, href: "/multi-choice-forms" },
     { name: "Payouts", icon: CreditCard, current: false, href: "/payouts" },
+    { name: "Settings", icon: Settings, current: false, href: "/settings" },
 ]
 
 export function Sidebar() {

@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { Button, Input, Card, CardBody } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { useRouter } from "next/router";
+import Link from "next/link";
 import { authApi } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
 import Head from "next/head";
@@ -442,6 +443,11 @@ export default function SignIn() {
                       </button>
                     }
                   />
+                  <div className="text-right mt-2">
+                    <Link href="/forgot-password" className="text-xs text-primary hover:underline font-medium">
+                      Forgot your password?
+                    </Link>
+                  </div>
                 </div>
 
                 <Button

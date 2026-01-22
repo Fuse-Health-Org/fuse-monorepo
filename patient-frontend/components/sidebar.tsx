@@ -6,6 +6,7 @@ import { useChat } from "../hooks/useChat";
 import { apiCall } from "../lib/api";
 import { motion } from "framer-motion";
 import { getAvatarEmoji } from "../lib/avatarUtils";
+import { useAuth } from "../contexts/AuthContext";
 
 interface User {
   id: string;
@@ -32,6 +33,7 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, user, hasTickets = false }) => {
   const router = useRouter();
+  const { signOut } = useAuth();
   const [clinic, setClinic] = React.useState<Clinic | null>(null);
   const [loadingClinic, setLoadingClinic] = React.useState(false);
   const [loadingLogo, setLoadingLogo] = React.useState(false);
@@ -276,8 +278,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, user,
               <span className="text-xl">{getAvatarEmoji(user)}</span>
             }
           />
-          <div className="flex-1">
-            <p className="font-medium text-sm">
+          <div className="flex-1 min-w-0">
+            <p className="font-medium text-sm truncate">
               {user?.firstName && user?.lastName
                 ? `${user.firstName} ${user.lastName}`
                 : user?.email || "User"
@@ -287,6 +289,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, user,
               {user?.role || "User"}
             </p>
           </div>
+          <Button
+            isIconOnly
+            variant="light"
+            color="default"
+            onPress={signOut}
+            className="text-foreground-600 hover:text-foreground flex-shrink-0"
+            aria-label="Sign Out"
+            size="sm"
+          >
+            <Icon icon="lucide:log-out" className="text-lg" />
+          </Button>
         </div>
       </div>
 
