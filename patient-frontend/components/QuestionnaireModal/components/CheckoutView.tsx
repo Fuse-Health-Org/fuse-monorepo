@@ -573,37 +573,39 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                             </div>
                         )}
 
-                        {/* Deferred Payment Form - Renders immediately without clientSecret */}
+                        {/* Deferred Payment Form - Renders ONCE and never re-renders */}
+                        {/* Uses 'payment' mode with placeholder amount, updates via elements.update() */}
                         {paymentStatus !== 'succeeded' && paymentStatus !== 'failed' && (() => {
                             const paymentAmount = isProgramCheckout ? programTotal : dueIfApproved;
-                            const hasValidAmount = paymentAmount > 0;
+                            const hasProductSelected = isProgramCheckout ? hasSelectedProgramProducts : !!selectedPlan;
                             
-                            // Show placeholder when no valid amount yet
-                            if (!hasValidAmount) {
-                                return (
-                                    <div className="text-center py-8 bg-gray-50 rounded-lg border border-gray-200">
-                                        <Icon icon="lucide:credit-card" className="text-3xl text-gray-400 mx-auto mb-2" />
-                                        <p className="text-lg font-medium text-gray-700 mb-1">
-                                            {isProgramCheckout ? 'Select a Product' : 'Select a Plan'}
-                                        </p>
-                                        <p className="text-sm text-gray-500">
-                                            {isProgramCheckout 
-                                                ? 'Choose a product above to see payment options'
-                                                : 'Choose a plan above to see payment options'}
-                                        </p>
-                                    </div>
-                                );
-                            }
+                            // Determine disabled state and reason
+                            const isDisabled = !hasProductSelected || !canContinue;
+                            const getDisabledReason = () => {
+                                if (!hasProductSelected) {
+                                    return isProgramCheckout 
+                                        ? 'Please select a product above'
+                                        : 'Please select a plan above';
+                                }
+                                if (!canContinue) {
+                                    return 'Please fill out shipping address';
+                                }
+                                return undefined;
+                            };
+                            
+                            // Use placeholder amount (50 cents) for initial render
+                            // Actual amount is updated via elements.update() in StripeDeferredPaymentForm
+                            const PLACEHOLDER_AMOUNT_CENTS = 50; // Stripe minimum
                             
                             return (
                                 <Elements 
                                     stripe={stripePromise} 
                                     options={{
-                                        mode: 'payment', // PaymentIntent mode (server creates PI, not Subscription)
-                                        amount: Math.round(paymentAmount * 100), // Convert to cents
+                                        mode: 'payment',
+                                        amount: PLACEHOLDER_AMOUNT_CENTS,
                                         currency: 'usd',
-                                        setupFutureUsage: 'off_session', // Save card for future recurring payments
-                                        captureMethod: 'manual', // Pre-authorization: charge only if approved by doctor
+                                        setupFutureUsage: 'off_session',
+                                        captureMethod: 'manual',
                                         appearance: {
                                             theme: 'stripe',
                                             variables: {
@@ -625,8 +627,8 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                                         onSuccess={onPaymentSuccess}
                                         onError={onPaymentError}
                                         onConfirm={onPaymentConfirm}
-                                        disabled={!canContinue}
-                                        disabledReason={!canContinue ? 'Please fill out shipping address' : undefined}
+                                        disabled={isDisabled}
+                                        disabledReason={getDisabledReason()}
                                     />
                                 </Elements>
                             );

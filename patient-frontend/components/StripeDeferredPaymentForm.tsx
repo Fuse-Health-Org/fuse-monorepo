@@ -29,6 +29,8 @@ interface StripeDeferredPaymentFormProps {
  * Stripe Payment Form with deferred intent creation.
  * 
  * This form renders the PaymentElement immediately without waiting for a clientSecret.
+ * Uses mode: 'payment' with dynamic amount updates via elements.update().
+ * 
  * When the user submits:
  * 1. Validates the payment details with elements.submit()
  * 2. Calls onCreatePaymentIntent to create the subscription and get clientSecret
@@ -46,6 +48,16 @@ export const StripeDeferredPaymentForm: React.FC<StripeDeferredPaymentFormProps>
   const stripe = useStripe();
   const elements = useElements();
   const [isProcessing, setIsProcessing] = React.useState(false);
+  const previousAmountRef = React.useRef<number>(0);
+
+  // Update Elements amount when it changes (without re-mounting)
+  React.useEffect(() => {
+    if (elements && amount > 0 && amount !== previousAmountRef.current) {
+      console.log('💰 [DEFERRED] Updating Elements amount:', amount * 100, 'cents');
+      elements.update({ amount: Math.round(amount * 100) });
+      previousAmountRef.current = amount;
+    }
+  }, [elements, amount]);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -124,9 +136,22 @@ export const StripeDeferredPaymentForm: React.FC<StripeDeferredPaymentFormProps>
     }
   };
 
+  const hasValidAmount = amount > 0;
+  const isButtonDisabled = !stripe || !elements || isProcessing || disabled || !hasValidAmount;
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="bg-white p-6 rounded-lg border">
+        {/* Info message when no product selected */}
+        {!hasValidAmount && (
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-700 flex items-center gap-2">
+              <Icon icon="lucide:info" className="text-blue-500" />
+              Select a product above to see the total and complete checkout
+            </p>
+          </div>
+        )}
+        
         <PaymentElement 
           options={{
             layout: 'tabs',
@@ -137,20 +162,25 @@ export const StripeDeferredPaymentForm: React.FC<StripeDeferredPaymentFormProps>
       
       <div className="flex justify-between items-center">
         <div className="text-lg font-semibold">
-          Total: ${amount.toFixed(2)}
+          {hasValidAmount ? `Total: $${amount.toFixed(2)}` : 'Total: --'}
         </div>
         
         <Button
           type="submit"
           color="primary"
           size="lg"
-          isDisabled={!stripe || !elements || isProcessing || disabled}
+          isDisabled={isButtonDisabled}
           isLoading={isProcessing}
           startContent={
             isProcessing ? null : <Icon icon="lucide:credit-card" />
           }
         >
-          {isProcessing ? 'Processing...' : `Pay $${amount.toFixed(2)}`}
+          {isProcessing 
+            ? 'Processing...' 
+            : hasValidAmount 
+              ? `Pay $${amount.toFixed(2)}`
+              : 'Select a product'
+          }
         </Button>
       </div>
 
