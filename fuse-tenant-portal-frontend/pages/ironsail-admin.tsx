@@ -109,7 +109,7 @@ export default function IronSailAdmin() {
   // Connection status
   const [connectionStatus, setConnectionStatus] = useState<"connected" | "disconnected" | "checking">("checking")
   const [connectionConfig, setConnectionConfig] = useState<ConnectionConfig | null>(null)
-  
+
   // Orders state
   const [orders, setOrders] = useState<IronSailOrder[]>([])
   const [loadingOrders, setLoadingOrders] = useState(false)
@@ -296,11 +296,11 @@ export default function IronSailAdmin() {
     // Try to infer category and prescription category from medication name
     const medNameLower = med.name?.toLowerCase() || ""
     const formLower = med.formulation?.toLowerCase() || ""
-    
+
     let suggestedCategory = ""
     let suggestedPrescriptionCategory = ""
     let suggestedRisksBenefits = ""
-    
+
     if (medNameLower.includes("semaglutide") || medNameLower.includes("tirzepatide") || medNameLower.includes("retatrutide")) {
       suggestedCategory = "Weight Loss"
       suggestedPrescriptionCategory = "GLP-1 Agonists"
@@ -420,8 +420,8 @@ export default function IronSailAdmin() {
             <button
               onClick={() => setActiveTab("overview")}
               className={`px-4 py-2 font-medium transition-colors ${activeTab === "overview"
-                  ? "text-teal-600 border-b-2 border-teal-600"
-                  : "text-gray-600 hover:text-gray-900"
+                ? "text-teal-600 border-b-2 border-teal-600"
+                : "text-gray-600 hover:text-gray-900"
                 }`}
             >
               <div className="flex items-center gap-2">
@@ -432,8 +432,8 @@ export default function IronSailAdmin() {
             <button
               onClick={() => setActiveTab("pharmacies")}
               className={`px-4 py-2 font-medium transition-colors ${activeTab === "pharmacies"
-                  ? "text-teal-600 border-b-2 border-teal-600"
-                  : "text-gray-600 hover:text-gray-900"
+                ? "text-teal-600 border-b-2 border-teal-600"
+                : "text-gray-600 hover:text-gray-900"
                 }`}
             >
               <div className="flex items-center gap-2">
@@ -444,8 +444,8 @@ export default function IronSailAdmin() {
             <button
               onClick={() => setActiveTab("products")}
               className={`px-4 py-2 font-medium transition-colors ${activeTab === "products"
-                  ? "text-teal-600 border-b-2 border-teal-600"
-                  : "text-gray-600 hover:text-gray-900"
+                ? "text-teal-600 border-b-2 border-teal-600"
+                : "text-gray-600 hover:text-gray-900"
                 }`}
             >
               <div className="flex items-center gap-2">
@@ -456,8 +456,8 @@ export default function IronSailAdmin() {
             <button
               onClick={() => setActiveTab("orders")}
               className={`px-4 py-2 font-medium transition-colors ${activeTab === "orders"
-                  ? "text-teal-600 border-b-2 border-teal-600"
-                  : "text-gray-600 hover:text-gray-900"
+                ? "text-teal-600 border-b-2 border-teal-600"
+                : "text-gray-600 hover:text-gray-900"
                 }`}
             >
               <div className="flex items-center gap-2">
@@ -468,8 +468,8 @@ export default function IronSailAdmin() {
             <button
               onClick={() => setActiveTab("config")}
               className={`px-4 py-2 font-medium transition-colors ${activeTab === "config"
-                  ? "text-teal-600 border-b-2 border-teal-600"
-                  : "text-gray-600 hover:text-gray-900"
+                ? "text-teal-600 border-b-2 border-teal-600"
+                : "text-gray-600 hover:text-gray-900"
                 }`}
             >
               <div className="flex items-center gap-2">
@@ -993,7 +993,7 @@ export default function IronSailAdmin() {
                         IronSail Orders
                       </CardTitle>
                       <CardDescription>
-                        {ordersPagination.total > 0 
+                        {ordersPagination.total > 0
                           ? `Showing ${orders.length} of ${ordersPagination.total} orders`
                           : "Orders sent to IronSail pharmacies"
                         }
@@ -1041,15 +1041,15 @@ export default function IronSailAdmin() {
                                   <Badge
                                     variant={
                                       order.status === "delivered" ? "default" :
-                                      order.status === "shipped" ? "secondary" :
-                                      order.status === "cancelled" ? "destructive" :
-                                      "outline"
+                                        order.status === "shipped" ? "secondary" :
+                                          order.status === "cancelled" ? "destructive" :
+                                            "outline"
                                     }
                                     className={
                                       order.status === "delivered" ? "bg-green-100 text-green-800" :
-                                      order.status === "shipped" ? "bg-blue-100 text-blue-800" :
-                                      order.status === "processing" ? "bg-yellow-100 text-yellow-800" :
-                                      ""
+                                        order.status === "shipped" ? "bg-blue-100 text-blue-800" :
+                                          order.status === "processing" ? "bg-yellow-100 text-yellow-800" :
+                                            ""
                                     }
                                   >
                                     {order.status}
@@ -1075,9 +1075,9 @@ export default function IronSailAdmin() {
                                       <Package className="h-4 w-4" />
                                       <span>Tracking: {order.trackingNumber}</span>
                                       {order.trackingUrl && (
-                                        <a 
-                                          href={order.trackingUrl} 
-                                          target="_blank" 
+                                        <a
+                                          href={order.trackingUrl}
+                                          target="_blank"
                                           rel="noopener noreferrer"
                                           className="text-teal-600 hover:underline flex items-center gap-1"
                                         >
@@ -1150,8 +1150,8 @@ export default function IronSailAdmin() {
                     <div className="text-sm text-teal-900">
                       <p className="font-medium mb-1">About Order Tracking</p>
                       <p className="text-teal-700">
-                        These orders are stored in your database when sent to IronSail pharmacies. 
-                        Status updates are received via webhooks from the IronSail API. Orders are 
+                        These orders are stored in your database when sent to IronSail pharmacies.
+                        Status updates are received via webhooks from the IronSail API. Orders are
                         automatically created when MD Integrations sends a prescription_submitted event.
                       </p>
                     </div>
