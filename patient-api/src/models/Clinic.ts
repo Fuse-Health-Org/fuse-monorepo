@@ -5,6 +5,7 @@ import Treatment from './Treatment';
 import TenantProduct from './TenantProduct';
 import Sale from './Sale';
 import CustomWebsite from './CustomWebsite';
+import User from './User';
 
 
 export enum PaymentStatus {
@@ -162,6 +163,28 @@ export default class Clinic extends Entity {
 
     @HasMany(() => Clinic, 'affiliateOwnerClinicId')
     declare affiliateClinics: Clinic[];
+
+    // Main doctor - the doctor who invited this brand (for brands invited by doctors)
+    @ForeignKey(() => User)
+    @Column({
+        type: DataType.UUID,
+        allowNull: true,
+    })
+    declare mainDoctorId?: string;
+
+    @BelongsTo(() => User, 'mainDoctorId')
+    declare mainDoctor?: User;
+
+    // Referrer brand - the brand that referred this brand (for brands invited by other brands via admin portal)
+    @ForeignKey(() => Clinic)
+    @Column({
+        type: DataType.UUID,
+        allowNull: true,
+    })
+    declare referredByBrandId?: string;
+
+    @BelongsTo(() => Clinic, 'referredByBrandId')
+    declare referredByBrand?: Clinic;
 
     @HasOne(() => Subscription)
     declare subscription?: Subscription;

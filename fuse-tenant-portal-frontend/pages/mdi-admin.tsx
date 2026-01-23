@@ -16,7 +16,9 @@ import {
   CheckCircle2,
   XCircle,
   Search,
-  AlertCircle
+  AlertCircle,
+  Link2,
+  Copy
 } from "lucide-react"
 import { useAuth } from "@/contexts/AuthContext"
 import { toast } from "sonner"
@@ -41,7 +43,7 @@ export default function MDIAdmin() {
   const { token } = useAuth()
   const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
 
-  const [activeTab, setActiveTab] = useState<"offerings" | "pharmacies" | "utils">("offerings")
+  const [activeTab, setActiveTab] = useState<"offerings" | "pharmacies" | "utils" | "invitation">("offerings")
   
   // Offerings state
   const [offerings, setOfferings] = useState<Offering[]>([])
@@ -249,6 +251,19 @@ export default function MDIAdmin() {
               <div className="flex items-center gap-2">
                 <ShieldAlert className="h-4 w-4" />
                 Utilities
+              </div>
+            </button>
+            <button
+              onClick={() => setActiveTab("invitation")}
+              className={`px-4 py-2 font-medium transition-colors ${
+                activeTab === "invitation"
+                  ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Link2 className="h-4 w-4" />
+                MD Invitation Link
               </div>
             </button>
           </div>
@@ -646,6 +661,80 @@ export default function MDIAdmin() {
                         DELETE /md/admin/patient/:patientId/driver-license
                       </code>
                       <p className="text-amber-800 dark:text-amber-300 mt-1">Clear driver license for testing</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* MD Invitation Link Tab */}
+          {activeTab === "invitation" && (
+            <div className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Link2 className="h-5 w-5" />
+                    MD Invitation Link
+                  </CardTitle>
+                  <CardDescription>
+                    Share this link with brands to invite them to join MD Integrations. Brands that sign up using this link will be automatically configured for MD Integrations.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">
+                        Invitation URL
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          value={`${process.env.NEXT_PUBLIC_ADMIN_FRONTEND_URL || "http://localhost:3002"}/signup?invitation=mdi`}
+                          readOnly
+                          className="font-mono text-sm"
+                        />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const url = `${process.env.NEXT_PUBLIC_ADMIN_FRONTEND_URL || "http://localhost:3002"}/signup?invitation=mdi`
+                            navigator.clipboard.writeText(url)
+                            toast.success("Link copied to clipboard!")
+                          }}
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const url = `${process.env.NEXT_PUBLIC_ADMIN_FRONTEND_URL || "http://localhost:3002"}/signup?invitation=mdi`
+                            window.open(url, "_blank")
+                          }}
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Brands that register using this link will automatically be configured with MD Integrations format.
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Info Card */}
+              <Card className="bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800">
+                <CardContent className="pt-6">
+                  <div className="flex gap-3">
+                    <AlertCircle className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5" />
+                    <div className="text-sm text-blue-900 dark:text-blue-300">
+                      <p className="font-medium mb-1">About MD Invitation Link</p>
+                      <p className="text-blue-700 dark:text-blue-400">
+                        This is a fixed invitation link for MD Integrations. When brands sign up using this link, 
+                        they will be automatically configured to use MD Integrations as their doctor portal format. 
+                        Share this link with brands you want to invite to the platform.
+                      </p>
                     </div>
                   </div>
                 </CardContent>

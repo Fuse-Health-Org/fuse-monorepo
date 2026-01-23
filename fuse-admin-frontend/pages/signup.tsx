@@ -48,6 +48,8 @@ export default function SignUp() {
   const [error, setError] = useState<string | null>(null)
   const { user } = useAuth()
   const router = useRouter()
+  const [invitationInfo, setInvitationInfo] = useState<any>(null)
+  const [loadingInvitation, setLoadingInvitation] = useState(false)
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -55,6 +57,46 @@ export default function SignUp() {
       router.push('/')
     }
   }, [user, router])
+
+  // Load invitation information if invitation parameter exists
+  useEffect(() => {
+    const loadInvitation = async () => {
+      const invitationSlug = router.query.invitation as string
+      if (!invitationSlug) return
+
+      // Fixed MDI link - no need to fetch from API
+      if (invitationSlug === "mdi") {
+        setInvitationInfo({
+          invitationType: "mdi",
+          patientPortalDashboardFormat: "md-integrations",
+        })
+        setLoadingInvitation(false)
+        return
+      }
+
+      // Doctor invitation - fetch from API
+      setLoadingInvitation(true)
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+        const response = await fetch(`${apiUrl}/brand-invitations/${invitationSlug}`)
+        const data = await response.json()
+
+        if (response.ok && data.success) {
+          setInvitationInfo(data.data.invitation)
+        } else {
+          setError(data.message || 'Invalid invitation link')
+        }
+      } catch (error) {
+        setError('Failed to load invitation information')
+      } finally {
+        setLoadingInvitation(false)
+      }
+    }
+
+    if (router.isReady) {
+      loadInvitation()
+    }
+  }, [router.isReady, router.query.invitation])
 
   // Password strength validation
   const validatePasswordStrength = (password: string): number => {
@@ -139,7 +181,8 @@ export default function SignUp() {
           phoneNumber: formData.phoneNumber,
           clinicName: formData.companyName,
           businessType: formData.businessType,
-          website: formData.website
+          website: formData.website,
+          ...(router.query.invitation && { invitationSlug: router.query.invitation as string })
         }),
       })
 
@@ -205,6 +248,40 @@ export default function SignUp() {
             <h1 className="text-2xl font-bold text-foreground">Fuse</h1>
             <p className="text-muted-foreground">Create your brand partner account</p>
           </div>
+
+          {/* Invitation Info Banner */}
+          {loadingInvitation && (
+            <Card className="bg-card border-border">
+              <CardContent className="pt-6">
+                <p className="text-center text-muted-foreground">Loading invitation information...</p>
+              </CardContent>
+            </Card>
+          )}
+
+          {invitationInfo && !loadingInvitation && (
+            <Card className="bg-primary/10 border-primary/20">
+              <CardContent className="pt-6">
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-primary rounded-full"></div>
+                    <h3 className="font-semibold text-foreground">
+                      {invitationInfo.invitationType === 'doctor' 
+                        ? `Invited by ${invitationInfo.doctor?.firstName || ''} ${invitationInfo.doctor?.lastName || ''}`
+                        : 'Invited by MD Integrations'}
+                    </h3>
+                  </div>
+                  {invitationInfo.clinic && (
+                    <p className="text-sm text-muted-foreground">
+                      You'll be connected to <strong>{invitationInfo.clinic.name}</strong>
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Your brand will be automatically configured to use {invitationInfo.patientPortalDashboardFormat === 'md-integrations' ? 'MD Integrations' : 'Fuse'} as the doctor portal.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Sign Up Form */}
           <Card className="bg-card border-border">

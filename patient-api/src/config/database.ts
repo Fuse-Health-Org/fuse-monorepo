@@ -60,6 +60,7 @@ import CustomWebsite from '../models/CustomWebsite';
 import Like from '../models/Like';
 import BrandFavoritedProduct from '../models/BrandFavoritedProduct';
 import Program from '../models/Program';
+import BrandInvitation from '../models/BrandInvitation';
 import { MigrationService } from '../services/migration.service';
 
 // Load environment variables from .env.local
@@ -146,7 +147,7 @@ export const sequelize = new Sequelize(databaseUrl, {
     TenantProductForm, FormProducts, GlobalFormStructure, Sale, DoctorPatientChats, Pharmacy, PharmacyCoverage, PharmacyProduct,
     TenantCustomFeatures, TierConfiguration, TenantAnalyticsEvents, FormAnalyticsDaily,
     MessageTemplate, Sequence, SequenceRun, Tag, UserTag, GlobalFees, WebsiteBuilderConfigs, UserRoles,
-    SupportTicket, TicketMessage, AuditLog, MfaToken, CustomWebsite, Like, BrandFavoritedProduct, Program, AffiliateProductImage
+    SupportTicket, TicketMessage, AuditLog, MfaToken, CustomWebsite, Like, BrandFavoritedProduct, Program, AffiliateProductImage, BrandInvitation
   ],
 });
 

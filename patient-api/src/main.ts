@@ -61,6 +61,7 @@ import User from "./models/User";
 import UserRoles from "./models/UserRoles";
 import MfaToken from "./models/MfaToken";
 import Clinic, { PatientPortalDashboardFormat } from "./models/Clinic";
+import BrandInvitation, { InvitationType } from "./models/BrandInvitation";
 import Physician from "./models/Physician";
 import { Op } from "sequelize";
 import QuestionnaireStepService from "./services/questionnaireStep.service";
@@ -773,7 +774,53 @@ app.post("/auth/signup", async (req, res) => {
       businessType,
       npiNumber,
       patientPortalDashboardFormat,
+      invitationSlug,
     } = validation.data;
+
+    // Handle brand invitation if provided
+    let brandInvitation: BrandInvitation | null = null;
+    let isFixedMDILink = false;
+    
+    if (invitationSlug && role === "brand") {
+      // Fixed MDI link - no need to check database
+      if (invitationSlug === "mdi") {
+        isFixedMDILink = true;
+      } else {
+        // Doctor invitation - check database
+        brandInvitation = await BrandInvitation.findOne({
+          where: { invitationSlug },
+          include: [
+            {
+              model: Clinic,
+              as: "doctorClinic",
+              required: false,
+            },
+          ],
+        });
+
+        if (brandInvitation) {
+          // Validate invitation is active and not expired
+          if (!brandInvitation.isActive) {
+            return res.status(410).json({
+              success: false,
+              message: "This invitation link is no longer active",
+            });
+          }
+
+          if (brandInvitation.expiresAt && new Date() > brandInvitation.expiresAt) {
+            return res.status(410).json({
+              success: false,
+              message: "This invitation link has expired",
+            });
+          }
+        } else {
+          return res.status(404).json({
+            success: false,
+            message: "Invalid invitation link",
+          });
+        }
+      }
+    }
 
     // Validate clinic name for providers/brands (both require clinics)
     if ((role === "provider" || role === "brand") && !clinicName?.trim()) {
@@ -813,12 +860,22 @@ app.post("/auth/signup", async (req, res) => {
       // Generate unique slug
       const slug = await generateUniqueSlug(clinicName.trim());
 
-      // For brand signup, default to MD_INTEGRATIONS format
-      // (can be changed later in Tenant Management portal if needed)
-      const dashboardFormat: PatientPortalDashboardFormat =
-        patientPortalDashboardFormat === 'fuse'
-          ? PatientPortalDashboardFormat.FUSE
-          : PatientPortalDashboardFormat.MD_INTEGRATIONS;
+      // Determine dashboard format based on invitation or default
+      let dashboardFormat: PatientPortalDashboardFormat;
+      if (isFixedMDILink) {
+        // Fixed MDI link - always use MD_INTEGRATIONS
+        dashboardFormat = PatientPortalDashboardFormat.MD_INTEGRATIONS;
+      } else if (brandInvitation) {
+        // Use format from invitation (doctor invitation)
+        dashboardFormat = brandInvitation.patientPortalDashboardFormat;
+      } else {
+        // For brand signup, default to MD_INTEGRATIONS format
+        // (can be changed later in Tenant Management portal if needed)
+        dashboardFormat =
+          patientPortalDashboardFormat === 'fuse'
+            ? PatientPortalDashboardFormat.FUSE
+            : PatientPortalDashboardFormat.MD_INTEGRATIONS;
+      }
 
       clinic = await Clinic.create({
         name: clinicName.trim(),
@@ -826,6 +883,13 @@ app.post("/auth/signup", async (req, res) => {
         logo: "", // Default empty logo, can be updated later
         businessType: businessType || null,
         patientPortalDashboardFormat: dashboardFormat,
+        // If this is a brand invitation from a doctor, associate with doctor's clinic and set main doctor
+        affiliateOwnerClinicId: brandInvitation?.invitationType === InvitationType.DOCTOR
+          ? brandInvitation.doctorClinicId
+          : undefined,
+        mainDoctorId: brandInvitation?.invitationType === InvitationType.DOCTOR
+          ? brandInvitation.doctorId
+          : undefined,
       });
 
       // Note: Global form structures are created at database initialization (ensureDefaultFormStructures)
@@ -948,6 +1012,15 @@ app.post("/auth/signup", async (req, res) => {
       await user.save();
       if (process.env.NODE_ENV === "development") {
         console.log("🔗 User associated with clinic ID:", finalClinicId);
+      }
+    }
+
+    // Update invitation usage count if invitation was used (only for doctor invitations, not fixed MDI link)
+    if (brandInvitation && role === "brand" && !isFixedMDILink) {
+      brandInvitation.usageCount += 1;
+      await brandInvitation.save();
+      if (process.env.NODE_ENV === "development") {
+        console.log("✅ Brand invitation usage count updated:", brandInvitation.usageCount);
       }
     }
 
@@ -16521,6 +16594,11 @@ async function startServer() {
     "./endpoints/affiliate"
   );
   registerAffiliateEndpoints(app, authenticateJWT, getCurrentUser);
+
+  const { registerBrandInvitationEndpoints } = await import(
+    "./endpoints/brand-invitations"
+  );
+  registerBrandInvitationEndpoints(app, authenticateJWT, getCurrentUser);
 
   // ============= AUDIT LOGS ENDPOINTS =============
   const { registerAuditLogsEndpoints } = await import("./endpoints/audit-logs");

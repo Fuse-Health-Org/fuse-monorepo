@@ -28,6 +28,7 @@ export const signUpSchema = z.object({
   businessType: z.string().optional(),
   npiNumber: z.string().optional(),
   patientPortalDashboardFormat: z.enum(['fuse', 'md-integrations']).optional(),
+  invitationSlug: z.string().optional(),
 });
 
 export const forgotPasswordSchema = z.object({
