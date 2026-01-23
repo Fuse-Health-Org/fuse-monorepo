@@ -171,7 +171,7 @@ export default function BrandInvitationsPage() {
         <main className="flex-1 overflow-y-auto p-6 space-y-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold">Brand Invitations</h1>
+              <h1 className="text-3xl font-bold">Fuse Invitations</h1>
               <p className="text-muted-foreground mt-1">
                 Create and manage invitation links for brands to join your practice
               </p>
@@ -198,7 +198,7 @@ export default function BrandInvitationsPage() {
           {showCreateForm && (
             <Card>
               <CardHeader>
-                <CardTitle>Create Brand Invitation Link</CardTitle>
+                <CardTitle>Create Fuse Invitation Link</CardTitle>
                 <CardDescription>
                   Create a special link that brands can use to sign up and automatically connect to your practice
                 </CardDescription>
@@ -214,7 +214,7 @@ export default function BrandInvitationsPage() {
                     onChange={(e) => setNewInvitationSlug(e.target.value)}
                   />
                   <p className="text-xs text-muted-foreground mt-1">
-                    Leave empty to auto-generate from your clinic name
+                    Leave empty to use "fuse" as the default slug
                   </p>
                 </div>
                 <div>

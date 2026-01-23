@@ -883,10 +883,7 @@ app.post("/auth/signup", async (req, res) => {
         logo: "", // Default empty logo, can be updated later
         businessType: businessType || null,
         patientPortalDashboardFormat: dashboardFormat,
-        // If this is a brand invitation from a doctor, associate with doctor's clinic and set main doctor
-        affiliateOwnerClinicId: brandInvitation?.invitationType === InvitationType.DOCTOR
-          ? brandInvitation.doctorClinicId
-          : undefined,
+        // If this is a brand invitation from a doctor, set main doctor (but not the clinic relationship)
         mainDoctorId: brandInvitation?.invitationType === InvitationType.DOCTOR
           ? brandInvitation.doctorId
           : undefined,
