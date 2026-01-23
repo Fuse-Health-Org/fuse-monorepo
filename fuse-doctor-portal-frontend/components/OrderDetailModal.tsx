@@ -382,9 +382,9 @@ export function OrderDetailModal({ order, isOpen, onClose, onApprove, onCancel, 
                                     );
                                     const orderTotal = Number(order.totalAmount || 0);
                                     const nonMedicalFee = Math.max(0, orderTotal - productsTotal);
-                                    
+
                                     if (nonMedicalFee <= 0) return null;
-                                    
+
                                     return (
                                         <div className="mt-1 text-xs text-gray-500">
                                             <span>Products: ${productsTotal.toFixed(2)}</span>
@@ -566,9 +566,9 @@ export function OrderDetailModal({ order, isOpen, onClose, onApprove, onCancel, 
                                     );
 
                                     // Check if there are any non-medical services from the parent program
-                                    const hasParentProgramServices = order.program.hasPatientPortal || 
+                                    const hasParentProgramServices = order.program.hasPatientPortal ||
                                         order.program.hasBmiCalculator ||
-                                        order.program.hasProteinIntakeCalculator || 
+                                        order.program.hasProteinIntakeCalculator ||
                                         order.program.hasCalorieDeficitCalculator ||
                                         order.program.hasEasyShopping;
 
@@ -598,7 +598,7 @@ export function OrderDetailModal({ order, isOpen, onClose, onApprove, onCancel, 
                                                     const pp = item.perProductProgram;
                                                     if (!pp) return null;
                                                     const productName = item.product?.name || 'Product';
-                                                    
+
                                                     return (
                                                         <div key={item.id}>
                                                             {renderServiceLine(pp.hasPatientPortal, 'Patient Portal', pp.patientPortalPrice, productName)}
@@ -620,7 +620,7 @@ export function OrderDetailModal({ order, isOpen, onClose, onApprove, onCancel, 
                                                         {renderServiceLine(order.program.hasEasyShopping, 'Easy Shopping', order.program.easyShoppingPrice)}
                                                     </>
                                                 )}
-                                                
+
                                                 {/* Total Non-Medical Services Fee */}
                                                 {calculatedNonMedicalFee > 0 && (
                                                     <div className="flex justify-between pt-2 mt-2 border-t border-purple-100 font-medium">
