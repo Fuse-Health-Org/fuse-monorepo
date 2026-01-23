@@ -175,17 +175,6 @@ export default class Clinic extends Entity {
     @BelongsTo(() => User, 'mainDoctorId')
     declare mainDoctor?: User;
 
-    // Referrer brand - the brand that referred this brand (for brands invited by other brands via admin portal)
-    @ForeignKey(() => Clinic)
-    @Column({
-        type: DataType.UUID,
-        allowNull: true,
-    })
-    declare referredByBrandId?: string;
-
-    @BelongsTo(() => Clinic, 'referredByBrandId')
-    declare referredByBrand?: Clinic;
-
     @HasOne(() => Subscription)
     declare subscription?: Subscription;
 

@@ -22,7 +22,7 @@ const navigation = [
     { name: "Patients", icon: Users, current: false, href: "/patients" },
     { name: "Medical Question Templates", icon: FileQuestion, current: false, href: "/forms" },
     { name: "Multi-Choice Forms", icon: Package, current: false, href: "/multi-choice-forms" },
-    { name: "Brand Invitations", icon: Link2, current: false, href: "/brand-invitations" },
+    { name: "Fuse Invitations", icon: Link2, current: false, href: "/brand-invitations" },
     { name: "Payouts", icon: CreditCard, current: false, href: "/payouts" },
     { name: "Settings", icon: Settings, current: false, href: "/settings" },
 ]

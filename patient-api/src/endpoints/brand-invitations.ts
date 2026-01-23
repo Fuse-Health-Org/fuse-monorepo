@@ -83,12 +83,8 @@ export function registerBrandInvitationEndpoints(
       let finalSlug = invitationSlug;
       if (!finalSlug) {
         if (invitationType === InvitationType.DOCTOR) {
-          const clinic = await Clinic.findByPk(user.clinicId!);
-          if (clinic) {
-            finalSlug = clinic.slug.toLowerCase().replace(/[^a-z0-9-]/g, "-");
-          } else {
-            finalSlug = `doctor-${user.id.substring(0, 8)}`;
-          }
+          // Use "fuse" as the default slug for doctor invitations
+          finalSlug = "fuse";
         } else {
           finalSlug = "mdi";
         }
