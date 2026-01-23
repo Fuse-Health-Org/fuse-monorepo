@@ -780,7 +780,7 @@ app.post("/auth/signup", async (req, res) => {
     // Handle brand invitation if provided
     let brandInvitation: BrandInvitation | null = null;
     let isFixedMDILink = false;
-    
+
     if (invitationSlug && role === "brand") {
       // Fixed MDI link - no need to check database
       if (invitationSlug === "mdi") {
@@ -2387,7 +2387,7 @@ app.post("/auth/forgot-password", async (req, res) => {
 
     // Find user by email
     const user = await User.findByEmail(email);
-    
+
     // For security, don't reveal if user exists or not
     // Always return success message, but only send email if user exists
     if (user) {
@@ -2401,10 +2401,10 @@ app.post("/auth/forgot-password", async (req, res) => {
 
       // Generate 6-digit code
       const code = Math.floor(100000 + Math.random() * 900000).toString();
-      
+
       // Store code with 10-minute expiration
       const expiresAt = Date.now() + 10 * 60 * 1000;
-      
+
       passwordResetCodes.set(email.toLowerCase(), {
         code,
         expiresAt,

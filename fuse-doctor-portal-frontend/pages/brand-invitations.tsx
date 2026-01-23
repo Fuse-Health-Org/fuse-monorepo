@@ -49,7 +49,7 @@ export default function BrandInvitationsPage() {
   const [success, setSuccess] = useState<string | null>(null);
 
   // Check if user is doctor
-  const isDoctor = user?.role === "doctor" || user?.userRoles?.doctor;
+  const isDoctor = user?.role === "doctor" || (user as any)?.userRoles?.doctor;
 
   useEffect(() => {
     if (!isDoctor) {
