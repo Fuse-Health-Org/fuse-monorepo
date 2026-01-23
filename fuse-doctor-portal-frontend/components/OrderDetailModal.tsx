@@ -373,7 +373,26 @@ export function OrderDetailModal({ order, isOpen, onClose, onApprove, onCancel, 
                             </div>
                             <div>
                                 <p className="text-sm text-gray-600">Order Total</p>
-                                <p className="font-medium">${order.totalAmount}</p>
+                                <p className="font-medium text-lg">${Number(order.totalAmount || 0).toFixed(2)}</p>
+                                {/* Show breakdown for program orders */}
+                                {order.program && order.orderItems && order.orderItems.length > 0 && (() => {
+                                    const productsTotal = order.orderItems.reduce(
+                                        (sum: number, item: any) => sum + Number(item.unitPrice || 0) * (item.quantity || 1),
+                                        0
+                                    );
+                                    const orderTotal = Number(order.totalAmount || 0);
+                                    const nonMedicalFee = Math.max(0, orderTotal - productsTotal);
+                                    
+                                    if (nonMedicalFee <= 0) return null;
+                                    
+                                    return (
+                                        <div className="mt-1 text-xs text-gray-500">
+                                            <span>Products: ${productsTotal.toFixed(2)}</span>
+                                            <span className="mx-1">+</span>
+                                            <span>Services: ${nonMedicalFee.toFixed(2)}</span>
+                                        </div>
+                                    );
+                                })()}
                             </div>
                             {order.shippingAddress && (
                                 <div className="col-span-2">
@@ -526,45 +545,93 @@ export function OrderDetailModal({ order, isOpen, onClose, onApprove, onCancel, 
                                 )}
 
                                 {/* Non-Medical Services */}
-                                {(order.program.hasPatientPortal || order.program.hasBmiCalculator ||
-                                    order.program.hasProteinIntakeCalculator || order.program.hasCalorieDeficitCalculator ||
-                                    order.program.hasEasyShopping) && (
-                                        <div>
-                                            <h4 className="font-medium text-gray-900 mb-2">Non-Medical Services Included</h4>
+                                {(() => {
+                                    // Calculate non-medical services fee from order total minus product costs
+                                    const productsTotal = order.orderItems?.reduce(
+                                        (sum: number, item: any) => sum + Number(item.unitPrice || 0) * (item.quantity || 1),
+                                        0
+                                    ) || 0;
+                                    const orderTotal = Number(order.totalAmount || 0);
+                                    const calculatedNonMedicalFee = Math.max(0, orderTotal - productsTotal);
+
+                                    // Check if we have per-product programs with non-medical services
+                                    const hasPerProductServices = order.orderItems?.some(
+                                        (item: any) => item.perProductProgram && (
+                                            item.perProductProgram.hasPatientPortal ||
+                                            item.perProductProgram.hasBmiCalculator ||
+                                            item.perProductProgram.hasProteinIntakeCalculator ||
+                                            item.perProductProgram.hasCalorieDeficitCalculator ||
+                                            item.perProductProgram.hasEasyShopping
+                                        )
+                                    );
+
+                                    // Check if there are any non-medical services from the parent program
+                                    const hasParentProgramServices = order.program.hasPatientPortal || 
+                                        order.program.hasBmiCalculator ||
+                                        order.program.hasProteinIntakeCalculator || 
+                                        order.program.hasCalorieDeficitCalculator ||
+                                        order.program.hasEasyShopping;
+
+                                    // Show section if we have calculated fee > 0 or any services
+                                    if (calculatedNonMedicalFee <= 0 && !hasParentProgramServices && !hasPerProductServices) return null;
+
+                                    // Helper function to render service line
+                                    const renderServiceLine = (enabled: boolean | undefined, label: string, price: number | undefined, productName?: string) => {
+                                        if (!enabled) return null;
+                                        return (
+                                            <div className="flex justify-between" key={`${label}-${productName || 'parent'}`}>
+                                                <span className="text-gray-700">
+                                                    ✓ {label}
+                                                    {productName && <span className="text-xs text-gray-500 ml-1">({productName})</span>}
+                                                </span>
+                                                <span className="font-medium">${Number(price || 0).toFixed(2)}</span>
+                                            </div>
+                                        );
+                                    };
+
+                                    return (
+                                        <div className="mt-4 pt-4 border-t border-purple-200">
+                                            <h4 className="font-medium text-gray-900 mb-2">Non-Medical Services</h4>
                                             <div className="space-y-1 text-sm">
-                                                {order.program.hasPatientPortal && (
-                                                    <div className="flex justify-between">
-                                                        <span className="text-gray-700">✓ Patient Portal</span>
-                                                        <span className="font-medium">${Number(order.program.patientPortalPrice || 0).toFixed(2)}</span>
-                                                    </div>
+                                                {/* Per-product non-medical services (from child programs) */}
+                                                {hasPerProductServices && order.orderItems?.map((item: any) => {
+                                                    const pp = item.perProductProgram;
+                                                    if (!pp) return null;
+                                                    const productName = item.product?.name || 'Product';
+                                                    
+                                                    return (
+                                                        <div key={item.id}>
+                                                            {renderServiceLine(pp.hasPatientPortal, 'Patient Portal', pp.patientPortalPrice, productName)}
+                                                            {renderServiceLine(pp.hasBmiCalculator, 'BMI Calculator', pp.bmiCalculatorPrice, productName)}
+                                                            {renderServiceLine(pp.hasProteinIntakeCalculator, 'Protein Intake Calculator', pp.proteinIntakeCalculatorPrice, productName)}
+                                                            {renderServiceLine(pp.hasCalorieDeficitCalculator, 'Calorie Deficit Calculator', pp.calorieDeficitCalculatorPrice, productName)}
+                                                            {renderServiceLine(pp.hasEasyShopping, 'Easy Shopping', pp.easyShoppingPrice, productName)}
+                                                        </div>
+                                                    );
+                                                })}
+
+                                                {/* Parent program non-medical services (unified pricing mode) */}
+                                                {!hasPerProductServices && hasParentProgramServices && (
+                                                    <>
+                                                        {renderServiceLine(order.program.hasPatientPortal, 'Patient Portal', order.program.patientPortalPrice)}
+                                                        {renderServiceLine(order.program.hasBmiCalculator, 'BMI Calculator', order.program.bmiCalculatorPrice)}
+                                                        {renderServiceLine(order.program.hasProteinIntakeCalculator, 'Protein Intake Calculator', order.program.proteinIntakeCalculatorPrice)}
+                                                        {renderServiceLine(order.program.hasCalorieDeficitCalculator, 'Calorie Deficit Calculator', order.program.calorieDeficitCalculatorPrice)}
+                                                        {renderServiceLine(order.program.hasEasyShopping, 'Easy Shopping', order.program.easyShoppingPrice)}
+                                                    </>
                                                 )}
-                                                {order.program.hasBmiCalculator && (
-                                                    <div className="flex justify-between">
-                                                        <span className="text-gray-700">✓ BMI Calculator</span>
-                                                        <span className="font-medium">${Number(order.program.bmiCalculatorPrice || 0).toFixed(2)}</span>
-                                                    </div>
-                                                )}
-                                                {order.program.hasProteinIntakeCalculator && (
-                                                    <div className="flex justify-between">
-                                                        <span className="text-gray-700">✓ Protein Intake Calculator</span>
-                                                        <span className="font-medium">${Number(order.program.proteinIntakeCalculatorPrice || 0).toFixed(2)}</span>
-                                                    </div>
-                                                )}
-                                                {order.program.hasCalorieDeficitCalculator && (
-                                                    <div className="flex justify-between">
-                                                        <span className="text-gray-700">✓ Calorie Deficit Calculator</span>
-                                                        <span className="font-medium">${Number(order.program.calorieDeficitCalculatorPrice || 0).toFixed(2)}</span>
-                                                    </div>
-                                                )}
-                                                {order.program.hasEasyShopping && (
-                                                    <div className="flex justify-between">
-                                                        <span className="text-gray-700">✓ Easy Shopping</span>
-                                                        <span className="font-medium">${Number(order.program.easyShoppingPrice || 0).toFixed(2)}</span>
+                                                
+                                                {/* Total Non-Medical Services Fee */}
+                                                {calculatedNonMedicalFee > 0 && (
+                                                    <div className="flex justify-between pt-2 mt-2 border-t border-purple-100 font-medium">
+                                                        <span className="text-gray-900">Total Non-Medical Services</span>
+                                                        <span className="text-purple-700">${calculatedNonMedicalFee.toFixed(2)}</span>
                                                     </div>
                                                 )}
                                             </div>
                                         </div>
-                                    )}
+                                    );
+                                })()}
                             </div>
                         </section>
                     )}

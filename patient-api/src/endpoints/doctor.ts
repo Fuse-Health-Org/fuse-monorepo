@@ -328,6 +328,52 @@ export function registerDoctorEndpoints(
         // Age and gender can be added when User model is updated
         const filteredOrders = orders;
 
+        // Fetch per-product programs for program orders (child programs with individual non-medical services)
+        const programOrderIds = filteredOrders
+          .filter(o => o.programId)
+          .map(o => o.programId);
+        
+        // Get all child programs for the parent programs
+        const childPrograms = programOrderIds.length > 0 
+          ? await Program.findAll({
+              where: {
+                parentProgramId: { [Op.in]: programOrderIds },
+                isActive: true,
+              },
+              attributes: [
+                'id', 'name', 'parentProgramId', 'individualProductId',
+                'hasPatientPortal', 'patientPortalPrice',
+                'hasBmiCalculator', 'bmiCalculatorPrice',
+                'hasProteinIntakeCalculator', 'proteinIntakeCalculatorPrice',
+                'hasCalorieDeficitCalculator', 'calorieDeficitCalculatorPrice',
+                'hasEasyShopping', 'easyShoppingPrice',
+              ],
+            })
+          : [];
+
+        // Build a map: parentProgramId -> { productId -> childProgram }
+        const childProgramsMap: Record<string, Record<string, any>> = {};
+        for (const child of childPrograms) {
+          if (!child.parentProgramId || !child.individualProductId) continue;
+          if (!childProgramsMap[child.parentProgramId]) {
+            childProgramsMap[child.parentProgramId] = {};
+          }
+          childProgramsMap[child.parentProgramId][child.individualProductId] = {
+            id: child.id,
+            name: child.name,
+            hasPatientPortal: child.hasPatientPortal,
+            patientPortalPrice: child.patientPortalPrice,
+            hasBmiCalculator: child.hasBmiCalculator,
+            bmiCalculatorPrice: child.bmiCalculatorPrice,
+            hasProteinIntakeCalculator: child.hasProteinIntakeCalculator,
+            proteinIntakeCalculatorPrice: child.proteinIntakeCalculatorPrice,
+            hasCalorieDeficitCalculator: child.hasCalorieDeficitCalculator,
+            calorieDeficitCalculatorPrice: child.calorieDeficitCalculatorPrice,
+            hasEasyShopping: child.hasEasyShopping,
+            easyShoppingPrice: child.easyShoppingPrice,
+          };
+        }
+
         // HIPAA Audit: Log bulk PHI access (doctor viewing pending orders with patient info)
         await AuditService.logFromRequest(req, {
           action: AuditAction.VIEW,
@@ -341,7 +387,13 @@ export function registerDoctorEndpoints(
 
         res.json({
           success: true,
-          data: filteredOrders.map((order) => ({
+          data: filteredOrders.map((order) => {
+            // Get child programs for this order's program
+            const orderChildPrograms = order.programId 
+              ? childProgramsMap[order.programId] || {}
+              : {};
+            
+            return {
             id: order.id,
             orderNumber: order.orderNumber,
             status: order.status,
@@ -413,28 +465,38 @@ export function registerDoctorEndpoints(
                 }
               : null,
             // Order items for multi-product orders (programs)
-            orderItems: order.orderItems?.map((item: any) => ({
-              id: item.id,
-              productId: item.productId,
-              quantity: item.quantity,
-              unitPrice: item.unitPrice,
-              totalPrice: item.totalPrice,
-              placeholderSig: item.placeholderSig,
-              product: item.product
-                ? {
-                    id: item.product.id,
-                    name: item.product.name,
-                    imageUrl: item.product.imageUrl,
-                    placeholderSig: item.product.placeholderSig,
-                  }
-                : null,
-            })) || [],
+            orderItems: order.orderItems?.map((item: any) => {
+              // Get per-product program (child program) for this item
+              const perProductProgram = item.productId 
+                ? orderChildPrograms[item.productId] 
+                : null;
+              
+              return {
+                id: item.id,
+                productId: item.productId,
+                quantity: item.quantity,
+                unitPrice: item.unitPrice,
+                totalPrice: item.totalPrice,
+                placeholderSig: item.placeholderSig,
+                product: item.product
+                  ? {
+                      id: item.product.id,
+                      name: item.product.name,
+                      imageUrl: item.product.imageUrl,
+                      placeholderSig: item.product.placeholderSig,
+                    }
+                  : null,
+                // Per-product program with individual non-medical services
+                perProductProgram: perProductProgram || null,
+              };
+            }) || [],
             shippingAddress: order.shippingAddress,
             questionnaireAnswers: order.questionnaireAnswers,
             mdCaseId: order.mdCaseId,
             mdPrescriptions: order.mdPrescriptions,
             mdOfferings: order.mdOfferings,
-          })),
+          };
+          }),
           pagination: {
             limit: parseInt(limit),
             offset: parseInt(offset),
