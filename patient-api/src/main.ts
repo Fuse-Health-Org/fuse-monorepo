@@ -3024,13 +3024,89 @@ app.get("/clinic/by-slug/:slug", async (req, res) => {
 });
 
 // Public: allow custom domain (placed before /clinic/:id to avoid param route capture)
+// This endpoint is called by Caddy's on_demand_tls "ask" feature to validate domains before issuing certs
 app.get("/clinic/allow-custom-domain", async (req, res) => {
   try {
-    // Unconditionally allow on-demand TLS issuance for testing/tools (curl/Postman/Caddy ask)
-    // If you need to re-enable validation later, restore the DB lookup here.
-    return res.status(200).send("ok");
-  } catch {
-    return res.status(200).send("ok");
+    const domainParam = (req.query as any).domain as string | undefined;
+    if (!domainParam) {
+      return res.status(400).send("domain required");
+    }
+
+    // Normalize to hostname
+    let baseDomain = domainParam;
+    try {
+      const url = new URL(
+        domainParam.startsWith("http") ? domainParam : `https://${domainParam}`
+      );
+      baseDomain = url.hostname;
+    } catch {
+      baseDomain = domainParam.split("/")[0].split("?")[0];
+    }
+
+    // 1. Check for custom vanity domain (e.g., myclinic.com)
+    const customDomainClinic = await Clinic.findOne({
+      where: { customDomain: baseDomain, isCustomDomain: true },
+      attributes: ["id"],
+    });
+
+    if (customDomainClinic) {
+      console.log(`✅ [allow-custom-domain] Allowing custom domain: ${baseDomain}`);
+      return res.status(200).send("ok");
+    }
+
+    // 2. Check for valid subdomain patterns on our platform domains
+    const platformDomains = ['.fusehealth.com', '.fuse.health', '.fusehealthstaging.xyz'];
+    
+    for (const platformDomain of platformDomains) {
+      if (baseDomain.endsWith(platformDomain)) {
+        const withoutPlatform = baseDomain.slice(0, -platformDomain.length);
+        const parts = withoutPlatform.split('.');
+        
+        // Only allow exactly 2-part subdomains: <affiliate>.<brand> or admin.<brand>
+        if (parts.length === 2) {
+          const [firstPart, brandSlug] = parts;
+          
+          // Find the brand clinic
+          const brandClinic = await Clinic.findOne({
+            where: { slug: brandSlug, affiliateOwnerClinicId: null }, // Must be a brand, not an affiliate
+            attributes: ["id"],
+          });
+          
+          if (brandClinic) {
+            // Allow admin.<brand> for affiliate portal
+            if (firstPart === 'admin') {
+              console.log(`✅ [allow-custom-domain] Allowing admin portal: ${baseDomain}`);
+              return res.status(200).send("ok");
+            }
+            
+            // Check if affiliate exists under this brand
+            const affiliateClinic = await Clinic.findOne({
+              where: { 
+                slug: firstPart,
+                affiliateOwnerClinicId: brandClinic.id
+              },
+              attributes: ["id"],
+            });
+            
+            if (affiliateClinic) {
+              console.log(`✅ [allow-custom-domain] Allowing affiliate subdomain: ${baseDomain}`);
+              return res.status(200).send("ok");
+            }
+          }
+        }
+        
+        // For this platform domain, we checked and it didn't match - don't allow
+        console.log(`❌ [allow-custom-domain] Rejecting invalid subdomain: ${baseDomain}`);
+        return res.status(404).send("not allowed");
+      }
+    }
+
+    // Not a platform domain and not a custom domain - reject
+    console.log(`❌ [allow-custom-domain] Rejecting unknown domain: ${baseDomain}`);
+    return res.status(404).send("not allowed");
+  } catch (error) {
+    console.error("❌ Error in /clinic/allow-custom-domain:", error);
+    return res.status(500).send("error");
   }
 });
 
@@ -15535,45 +15611,6 @@ app.post("/organization/verify-domain", authenticateJWT, async (req, res) => {
       console.error("❌ Error verifying domain");
     }
     res.status(500).json({ success: false, message: "Internal server error" });
-  }
-});
-
-// Allow custom domain (for Caddy on-demand TLS "ask")
-app.get("/clinic/allow-custom-domain", async (req, res) => {
-  try {
-    const domainParam = (req.query as any).domain as string | undefined;
-    if (!domainParam) {
-      return res.status(400).send("domain required");
-    }
-
-    // Normalize to hostname
-    let baseDomain = domainParam;
-    try {
-      const url = new URL(
-        domainParam.startsWith("http") ? domainParam : `https://${domainParam}`
-      );
-      baseDomain = url.hostname;
-    } catch {
-      baseDomain = domainParam.split("/")[0].split("?")[0];
-    }
-
-    const clinic = await Clinic.findOne({
-      where: { customDomain: baseDomain, isCustomDomain: true },
-      attributes: ["id"],
-    });
-
-    if (!clinic) {
-      return res.status(404).send("not allowed");
-    }
-
-    return res.status(200).send("ok");
-  } catch (error) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("❌ Error in /clinic/allow-custom-domain:", error);
-    } else {
-      console.error("❌ Error in /clinic/allow-custom-domain");
-    }
-    return res.status(500).send("error");
   }
 });
 
