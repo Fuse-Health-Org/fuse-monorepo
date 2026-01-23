@@ -164,16 +164,16 @@ export default class Clinic extends Entity {
     @HasMany(() => Clinic, 'affiliateOwnerClinicId')
     declare affiliateClinics: Clinic[];
 
-    // Main doctor - the doctor who invited this brand (for brands invited by doctors)
+    // Referrer doctor - the doctor who invited this brand (for brands invited by doctors)
     @ForeignKey(() => User)
     @Column({
         type: DataType.UUID,
         allowNull: true,
     })
-    declare mainDoctorId?: string;
+    declare referrerDoctorId?: string;
 
-    @BelongsTo(() => User, 'mainDoctorId')
-    declare mainDoctor?: User;
+    @BelongsTo(() => User, 'referrerDoctorId')
+    declare referrerDoctor?: User;
 
     @HasOne(() => Subscription)
     declare subscription?: Subscription;

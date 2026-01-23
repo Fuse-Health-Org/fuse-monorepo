@@ -883,8 +883,8 @@ app.post("/auth/signup", async (req, res) => {
         logo: "", // Default empty logo, can be updated later
         businessType: businessType || null,
         patientPortalDashboardFormat: dashboardFormat,
-        // If this is a brand invitation from a doctor, set main doctor (but not the clinic relationship)
-        mainDoctorId: brandInvitation?.invitationType === InvitationType.DOCTOR
+        // If this is a brand invitation from a doctor, set referrer doctor (but not the clinic relationship)
+        referrerDoctorId: brandInvitation?.invitationType === InvitationType.DOCTOR
           ? brandInvitation.doctorId
           : undefined,
       });

@@ -49,7 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const initAuth = async () => {
       const publicRoute = isPublicRoute(router.pathname);
-      
+
       if (!publicRoute) {
         await refreshUser();
       }
