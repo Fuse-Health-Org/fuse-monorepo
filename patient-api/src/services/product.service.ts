@@ -72,13 +72,17 @@ class ProductService {
     } = options;
     const offset = (page - 1) * limit;
 
-    // Get user to check if they're a brand user
+    // Get user to check their roles
     const user = await getUser(userId);
 
     const where: any = {};
 
-    // If user is a brand, only show their own custom products and standard products (null brandId)
-    if (user?.hasRoleSync("brand")) {
+    // Brand filtering: Only apply for brand users who are NOT also doctors/admins
+    // Doctors and admins should see all products for form assignment purposes
+    const isOnlyBrand = user?.hasRoleSync("brand") && 
+      !user?.hasAnyRoleSync(["doctor", "admin", "superAdmin"]);
+    
+    if (isOnlyBrand) {
       where[Op.or] = [
         { brandId: userId }, // Their own custom products
         { brandId: null }, // Standard platform products

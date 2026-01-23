@@ -34,7 +34,8 @@ export function useProducts(baseUrl: string) {
         setError(null)
 
         try {
-            const productsRes = await fetch(`${baseUrl}/products-management?limit=500&isActive=true`, {
+            // Fetch all products (including inactive) for form assignment purposes
+            const productsRes = await fetch(`${baseUrl}/products-management?limit=500`, {
                 headers: { Authorization: `Bearer ${token}` },
             })
 

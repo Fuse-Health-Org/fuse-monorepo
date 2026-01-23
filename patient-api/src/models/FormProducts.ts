@@ -6,7 +6,7 @@ import Questionnaire from './Questionnaire'
 @Table({
   freezeTableName: true,
   tableName: 'FormProducts',
-  paranoid: true,
+  paranoid: false,
 })
 export default class FormProducts extends Entity {
   @ForeignKey(() => Questionnaire)

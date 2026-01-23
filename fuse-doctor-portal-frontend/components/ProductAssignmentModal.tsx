@@ -7,6 +7,7 @@ interface Product {
     description?: string | null
     category?: string | null
     imageUrl?: string | null
+    isActive?: boolean
 }
 
 type ProductOfferType = 'single_choice' | 'multiple_choice'
@@ -77,6 +78,12 @@ export function ProductAssignmentModal({
 
     const filteredProducts = products
         .filter((product) => {
+            // Only show inactive products if they are already selected
+            const isInactive = product.isActive === false
+            const isSelected = selectedProductIds.has(product.id)
+            if (isInactive && !isSelected) return false
+            
+            // Apply search filter
             if (!searchQuery) return true
             return (
                 product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -245,9 +252,16 @@ export function ProductAssignmentModal({
 
                                         {/* Product Info */}
                                         <div className="flex-1 min-w-0">
-                                            <h3 className="font-semibold text-card-foreground text-sm line-clamp-1">
-                                                {product.name}
-                                            </h3>
+                                            <div className="flex items-center gap-2">
+                                                <h3 className="font-semibold text-card-foreground text-sm line-clamp-1">
+                                                    {product.name}
+                                                </h3>
+                                                {product.isActive === false && (
+                                                    <span className="flex-shrink-0 px-1.5 py-0.5 text-[10px] font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded">
+                                                        Deactivated
+                                                    </span>
+                                                )}
+                                            </div>
                                             {product.category && (
                                                 <p className="text-xs text-muted-foreground mt-0.5">
                                                     {product.category}
