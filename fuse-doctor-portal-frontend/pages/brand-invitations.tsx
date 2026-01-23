@@ -209,7 +209,7 @@ export default function BrandInvitationsPage() {
                     Custom Slug (optional)
                   </label>
                   <Input
-                    placeholder="Auto-generated from clinic name"
+                    placeholder='Defaults to "fuse"'
                     value={newInvitationSlug}
                     onChange={(e) => setNewInvitationSlug(e.target.value)}
                   />
