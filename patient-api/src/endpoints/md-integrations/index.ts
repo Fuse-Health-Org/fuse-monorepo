@@ -10,14 +10,14 @@ export function registerMDIntegrationsEndpoints(
 ) {
     // Import services
     const MDFilesService = require("../../services/mdIntegration/MDFiles.service").default;
-    const AuditService = require("../../services/audit/audit.service").default;
-    const { AuditAction, AuditResourceType } = require("../../types/audit.types");
+    const AuditService = require("../../services/audit.service").default;
+    const { AuditAction, AuditResourceType } = require("../../services/audit.service");
     const User = require("../../models/User").default;
     const Order = require("../../models/Order").default;
     const Clinic = require("../../models/Clinic").default;
     const TenantProduct = require("../../models/TenantProduct").default;
     const Product = require("../../models/Product").default;
-    const UserService = require("../../services/user/user.service").default;
+    const UserService = require("../../services/user.service").default;
 
     // ============= FILE OPERATIONS =============
 
