@@ -71,10 +71,11 @@ class IronSailOrderService {
         this.spreadsheetId = process.env.IRONSAIL_FUSE_PRODUCTS_SPREADSHEET_ID || '14Lwc-mbVaqd_oGvg-0C7oyPa3JmaRQ7cLXcN1kl4LT8';
     }
 
-    async createOrder(order: Order, coverage?: PharmacyProduct) {
+    async createOrder(order: Order, coverage?: PharmacyProduct, options?: { skipShippingOrderCreation?: boolean }) {
         try {
             const coverageName = coverage?.pharmacyCoverage?.customName || 'Product';
-            console.log(`🚢 [IronSail] Processing order ${order.orderNumber} for coverage: ${coverageName}`);
+            const isRetry = options?.skipShippingOrderCreation;
+            console.log(`🚢 [IronSail] Processing order ${order.orderNumber} for coverage: ${coverageName}${isRetry ? ' (RETRY)' : ''}`);
 
             // Extract order data
             const orderData = this.extractOrderData(order, coverage);
@@ -104,21 +105,25 @@ class IronSailOrderService {
                 throw new Error(`Spreadsheet write failed: ${spreadsheetError instanceof Error ? spreadsheetError.message : 'Unknown error'}`);
             }
 
-            // 4. Create ShippingOrder record (include coverage ID if available for uniqueness)
-            console.log(`📋 [IronSail] Creating ShippingOrder record for ${coverageName}`);
+            // 4. Create ShippingOrder record (skip if this is a retry - we already have one)
             const coverageId = coverage?.pharmacyCoverageId || coverage?.id;
             const pharmacyOrderId = coverageId
                 ? `IRONSAIL-${order.orderNumber}-${coverageId.substring(0, 8)}`
                 : `IRONSAIL-${order.orderNumber}`;
 
-            await ShippingOrder.create({
-                orderId: order.id,
-                shippingAddressId: order.shippingAddressId,
-                status: OrderShippingStatus.PROCESSING,
-                pharmacyOrderId: pharmacyOrderId,
-                pharmacy: PharmacyProvider.IRONSAIL
-            });
-            console.log(`✅ [IronSail] ShippingOrder record created with ID: ${pharmacyOrderId}`);
+            if (!options?.skipShippingOrderCreation) {
+                console.log(`📋 [IronSail] Creating ShippingOrder record for ${coverageName}`);
+                await ShippingOrder.create({
+                    orderId: order.id,
+                    shippingAddressId: order.shippingAddressId,
+                    status: OrderShippingStatus.PROCESSING,
+                    pharmacyOrderId: pharmacyOrderId,
+                    pharmacy: PharmacyProvider.IRONSAIL
+                });
+                console.log(`✅ [IronSail] ShippingOrder record created with ID: ${pharmacyOrderId}`);
+            } else {
+                console.log(`⏭️ [IronSail] Skipping ShippingOrder creation (retry mode)`);
+            }
 
             console.log(`✅ [IronSail] Order ${order.orderNumber} processed successfully`);
 
@@ -127,7 +132,7 @@ class IronSailOrderService {
                 message: "IronSail order processed successfully",
                 data: {
                     orderNumber: order.orderNumber,
-                    pharmacyOrderId: `IRONSAIL-${order.orderNumber}`
+                    pharmacyOrderId: pharmacyOrderId
                 }
             };
 

@@ -230,6 +230,14 @@ class IronSailApiOrderService {
             const mdOfferings = (fullOrder as any).mdOfferings as MDIOffering[] | undefined;
             const mdPrescriptions = (fullOrder as any).mdPrescriptions as any[] | undefined;
 
+            console.error('\n[IronSail API] ===== CHECKING MDI DATA =====');
+            console.error('[IronSail API] Order:', fullOrder.orderNumber);
+            console.error('[IronSail API] mdOfferings:', mdOfferings ? `present (${mdOfferings.length} items)` : 'MISSING/NULL');
+            console.error('[IronSail API] mdPrescriptions:', mdPrescriptions ? `present (${mdPrescriptions.length} items)` : 'MISSING/NULL');
+            if (mdOfferings) {
+                console.error('[IronSail API] mdOfferings data:', JSON.stringify(mdOfferings, null, 2));
+            }
+
             if (!mdOfferings || mdOfferings.length === 0) {
                 throw new Error('No MDI offerings found in order. Cannot create IronSail order without prescription data.');
             }

@@ -3,6 +3,7 @@ import { getIronSailToken, IRONSAIL_API_BASE } from "./ironsail-auth";
 import ShippingOrder from "../../models/ShippingOrder";
 import Order from "../../models/Order";
 import User from "../../models/User";
+import Clinic from "../../models/Clinic";
 import { Op } from "sequelize";
 
 // ============= IRONSAIL ADMIN API =============
@@ -45,12 +46,17 @@ export function registerIronSailAdminEndpoints(
           {
             model: Order,
             as: "order",
-            attributes: ["id", "orderNumber", "status", "createdAt"],
+            attributes: ["id", "orderNumber", "status", "createdAt", "clinicId"],
             include: [
               {
                 model: User,
                 as: "user",
                 attributes: ["id", "firstName", "lastName", "email"]
+              },
+              {
+                model: Clinic,
+                as: "clinic",
+                attributes: ["id", "name", "patientPortalDashboardFormat"]
               }
             ]
           }
@@ -693,6 +699,84 @@ Case ID: 8536c3d3-66e0-4bf2-8497-a31f359fad20`,
       });
     } catch (error) {
       console.error('[IronSail Admin] Status update error:', error);
+      return res.status(500).json({
+        success: false,
+        message: error instanceof Error ? error.message : 'Internal server error'
+      });
+    }
+  });
+
+  // =============================================================================
+  // DELETE ENDPOINT (DANGEROUS)
+  // =============================================================================
+
+  /**
+   * DELETE /ironsail/orders/:id
+   * Delete a shipping order record
+   * 
+   * WARNING: This is a destructive operation that can result in:
+   * - Loss of patient medical history
+   * - Loss of payment and billing records
+   * - Prescription tracking and compliance issues
+   * 
+   * This should only be used to clean up duplicate or test records.
+   */
+  app.delete("/ironsail/orders/:id", authenticateJWT, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const user = (req as any).user;
+
+      const shippingOrder = await ShippingOrder.findByPk(id, {
+        include: [
+          {
+            model: Order,
+            as: "order",
+            attributes: ["id", "orderNumber"],
+            include: [
+              {
+                model: User,
+                as: "user",
+                attributes: ["id", "firstName", "lastName", "email"]
+              }
+            ]
+          }
+        ]
+      });
+
+      if (!shippingOrder) {
+        return res.status(404).json({
+          success: false,
+          message: 'Shipping order not found'
+        });
+      }
+
+      // Log the deletion for audit purposes
+      console.warn(`[IronSail Admin] ⚠️ DANGER: Deleting shipping order`, {
+        deletedBy: user?.email || user?.id || 'unknown',
+        shippingOrderId: shippingOrder.id,
+        pharmacyOrderId: shippingOrder.pharmacyOrderId,
+        orderId: shippingOrder.orderId,
+        orderNumber: (shippingOrder as any).order?.orderNumber,
+        patientEmail: (shippingOrder as any).order?.user?.email,
+        status: shippingOrder.status,
+        createdAt: shippingOrder.createdAt,
+        timestamp: new Date().toISOString()
+      });
+
+      await shippingOrder.destroy();
+
+      console.warn(`[IronSail Admin] ✅ Shipping order deleted: ${shippingOrder.pharmacyOrderId}`);
+
+      return res.json({
+        success: true,
+        message: 'Shipping order deleted successfully',
+        data: {
+          id: shippingOrder.id,
+          pharmacyOrderId: shippingOrder.pharmacyOrderId
+        }
+      });
+    } catch (error) {
+      console.error('[IronSail Admin] Delete error:', error);
       return res.status(500).json({
         success: false,
         message: error instanceof Error ? error.message : 'Internal server error'

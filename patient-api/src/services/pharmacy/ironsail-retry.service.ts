@@ -1,7 +1,12 @@
 import Order from '../../models/Order';
+import OrderItem from '../../models/OrderItem';
 import ShippingOrder, { OrderShippingStatus } from '../../models/ShippingOrder';
 import { PharmacyProvider } from '../../models/Product';
-import IronSailApiOrderService from './ironsail-api-order.service';
+import User from '../../models/User';
+import PharmacyProduct from '../../models/PharmacyProduct';
+import Pharmacy from '../../models/Pharmacy';
+import PharmacyCoverage from '../../models/PharmacyCoverage';
+import IronSailOrderService from './ironsail-order';
 
 // Exponential backoff intervals in milliseconds
 // 30s -> 60s -> 2m -> 4m -> 8m -> 16m
@@ -115,6 +120,81 @@ class IronSailRetryService {
     }
 
     /**
+     * Find IronSail coverages for an order (same logic as MDWebhook)
+     */
+    private async findIronSailCoverages(order: Order): Promise<PharmacyProduct[]> {
+        // Get order items to find productIds
+        const orderItems = await OrderItem.findAll({
+            where: { orderId: order.id },
+            attributes: ['productId']
+        });
+        
+        if (orderItems.length === 0) {
+            console.log('[IronSail Retry] No order items found');
+            return [];
+        }
+        
+        // Get patient state - try user first, then shipping address
+        const patient = await User.findByPk(order.userId);
+        let patientState = patient?.state?.toUpperCase().substring(0, 2);
+        
+        // Fallback to shipping address state if user state is not set
+        if (!patientState && order.shippingAddress?.state) {
+            patientState = order.shippingAddress.state.toUpperCase().substring(0, 2);
+            console.log('[IronSail Retry] Using shipping address state:', patientState);
+        }
+        
+        // If order doesn't have shippingAddress loaded, try to fetch it
+        if (!patientState && order.shippingAddressId) {
+            const ShippingAddress = require('../../models/ShippingAddress').default;
+            const shippingAddr = await ShippingAddress.findByPk(order.shippingAddressId);
+            if (shippingAddr?.state) {
+                patientState = shippingAddr.state.toUpperCase().substring(0, 2);
+                console.log('[IronSail Retry] Using fetched shipping address state:', patientState);
+            }
+        }
+        
+        if (!patientState) {
+            console.log('[IronSail Retry] Cannot determine patient state from user or shipping address');
+            return [];
+        }
+        
+        // Find IronSail coverages for the order's products
+        const productIds = orderItems.map(item => item.productId).filter(Boolean);
+        const coverages = await PharmacyProduct.findAll({
+            where: {
+                productId: productIds,
+                state: patientState,
+            },
+            include: [
+                {
+                    model: Pharmacy,
+                    as: 'pharmacy',
+                    required: true,
+                },
+                {
+                    model: PharmacyCoverage,
+                    as: 'pharmacyCoverage',
+                },
+            ],
+        });
+        
+        const ironSailCoverages = coverages.filter(
+            (c) => c.pharmacy?.slug === 'ironsail' && c.pharmacy?.isActive
+        );
+        
+        console.log('[IronSail Retry] Coverage check:', {
+            orderNumber: order.orderNumber,
+            patientState,
+            productIds,
+            totalCoverages: coverages.length,
+            ironSailCoverages: ironSailCoverages.length
+        });
+        
+        return ironSailCoverages;
+    }
+
+    /**
      * Execute a retry attempt for a shipping order
      */
     async executeRetry(shippingOrderId: string, orderId: string): Promise<RetryResult> {
@@ -130,7 +210,15 @@ class IronSailRetryService {
             return { success: false, shouldRetry: false, error: 'Order is no longer in retry state' };
         }
 
-        const order = await Order.findByPk(orderId);
+        // Reload order with all necessary associations
+        const order = await Order.findByPk(orderId, {
+            include: [
+                { model: User, as: 'user' },
+                { association: 'shippingAddress' },
+                { association: 'orderItems', include: [{ association: 'product' }] },
+                { association: 'tenantProduct', include: [{ association: 'product' }] },
+            ]
+        });
         if (!order) {
             console.error(`[IronSail Retry] Order ${orderId} not found`);
             await shippingOrder.update({
@@ -142,14 +230,39 @@ class IronSailRetryService {
 
         console.log(`[IronSail Retry] Executing retry #${shippingOrder.retryCount + 1} for order ${order.orderNumber}`);
 
-        // Attempt to create the IronSail order
-        const result = await IronSailApiOrderService.createOrder(order);
+        // Find IronSail coverages for this order
+        const ironSailCoverages = await this.findIronSailCoverages(order);
+        
+        if (ironSailCoverages.length === 0) {
+            console.error(`[IronSail Retry] No IronSail coverage found for order ${order.orderNumber}`);
+            await shippingOrder.update({
+                status: OrderShippingStatus.FAILED,
+                retryError: 'No IronSail pharmacy coverage configured for this order\'s products',
+            });
+            return { success: false, shouldRetry: false, error: 'No IronSail pharmacy coverage found' };
+        }
+
+        // Use the first coverage (or could match by pharmacyOrderId suffix if needed)
+        const coverage = ironSailCoverages[0];
+        const coverageName = coverage.pharmacyCoverage?.customName || 'Product';
+        
+        console.log(`[IronSail Retry] Using coverage: ${coverageName}`);
+
+        // Attempt to create the IronSail order using coverage-based service
+        // Skip ShippingOrder creation since we already have one (we're retrying it)
+        const ironSailService = new IronSailOrderService();
+        const result = await ironSailService.createOrder(order, coverage, { skipShippingOrderCreation: true });
 
         if (result.success) {
             // Success! Update the shipping order
+            const coverageId = coverage.pharmacyCoverageId || coverage.id;
+            const pharmacyOrderId = coverageId
+                ? `IRONSAIL-${order.orderNumber}-${coverageId.substring(0, 8)}`
+                : `IRONSAIL-${order.orderNumber}`;
+                
             await shippingOrder.update({
                 status: OrderShippingStatus.PROCESSING,
-                pharmacyOrderId: result.data?.pharmacyOrderId || `IRONSAIL-${result.data?.ironSailOrderUuid}`,
+                pharmacyOrderId: pharmacyOrderId,
                 retryError: null,
                 nextRetryAt: null,
             });
@@ -195,13 +308,31 @@ class IronSailRetryService {
 
     /**
      * Submit order to IronSail with automatic retry on failure
-     * This is the main entry point to replace direct IronSailApiOrderService.createOrder calls
+     * This is the main entry point - uses coverage-based IronSailOrderService
      */
     async submitOrderWithRetry(order: Order): Promise<{ success: boolean; data?: any; error?: string }> {
         console.log(`[IronSail Retry] Submitting order ${order.orderNumber} to IronSail`);
 
-        // First attempt
-        const result = await IronSailApiOrderService.createOrder(order);
+        // Find IronSail coverages for this order
+        const ironSailCoverages = await this.findIronSailCoverages(order);
+        
+        if (ironSailCoverages.length === 0) {
+            console.log(`[IronSail Retry] No IronSail coverage found for order ${order.orderNumber}`);
+            return {
+                success: false,
+                error: 'No IronSail pharmacy coverage configured for this order\'s products',
+            };
+        }
+
+        // Use the first coverage
+        const coverage = ironSailCoverages[0];
+        const coverageName = coverage.pharmacyCoverage?.customName || 'Product';
+        
+        console.log(`[IronSail Retry] Using coverage: ${coverageName}`);
+
+        // First attempt using coverage-based service
+        const ironSailService = new IronSailOrderService();
+        const result = await ironSailService.createOrder(order, coverage);
 
         if (result.success) {
             console.log(`[IronSail Retry] ✅ Order ${order.orderNumber} submitted successfully on first attempt`);
