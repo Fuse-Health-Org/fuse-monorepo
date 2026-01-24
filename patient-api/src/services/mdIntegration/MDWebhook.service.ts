@@ -667,12 +667,12 @@ class MDWebhookService {
               pharmacy_name: o?.product?.pharmacy_name,
               product_name: o?.product?.name || o?.name
             }));
-          
+
           console.error('[MD-WH] ℹ️ Dosespot already routing prescription - skipping IronSail', {
             orderNumber: order.orderNumber,
             dosespotPharmacies
           });
-          
+
           // Dosespot is handling this - just mark as processing and don't send to IronSail
           await order.updateStatus(OrderStatus.PROCESSING);
           break;
