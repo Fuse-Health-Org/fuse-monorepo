@@ -2,7 +2,7 @@ import { Table, Column, DataType, ForeignKey, BelongsTo } from 'sequelize-typesc
 import Entity from './Entity';
 import Order from './Order';
 import ShippingAddress from './ShippingAddress';
-
+import { PharmacyProvider } from './Product';
 
 export enum OrderShippingStatus {
   PENDING = 'pending',
@@ -56,6 +56,12 @@ export default class ShippingOrder extends Entity {
     allowNull: true,
   })
   declare pharmacyOrderId?: string;
+
+  @Column({
+    type: DataType.ENUM(...Object.values(PharmacyProvider)),
+    allowNull: true,
+  })
+  declare pharmacy?: PharmacyProvider;
 
   @Column({
     type: DataType.STRING,

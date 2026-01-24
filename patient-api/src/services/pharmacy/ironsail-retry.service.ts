@@ -1,5 +1,6 @@
 import Order from '../../models/Order';
 import ShippingOrder, { OrderShippingStatus } from '../../models/ShippingOrder';
+import { PharmacyProvider } from '../../models/Product';
 import IronSailApiOrderService from './ironsail-api-order.service';
 
 // Exponential backoff intervals in milliseconds
@@ -72,6 +73,7 @@ class IronSailRetryService {
             shippingAddressId: order.shippingAddressId,
             status: isRetryable ? OrderShippingStatus.RETRY_PENDING : OrderShippingStatus.FAILED,
             pharmacyOrderId: `PENDING-${order.orderNumber}`,
+            pharmacy: PharmacyProvider.IRONSAIL,
             retryCount: 0,
             lastRetryAt: new Date(),
             nextRetryAt: nextRetryAt,
@@ -223,6 +225,7 @@ class IronSailRetryService {
             shippingAddressId: order.shippingAddressId,
             status: OrderShippingStatus.FAILED,
             pharmacyOrderId: `FAILED-${order.orderNumber}`,
+            pharmacy: PharmacyProvider.IRONSAIL,
             retryCount: 0,
             lastRetryAt: new Date(),
             retryError: result.error?.substring(0, 65535),

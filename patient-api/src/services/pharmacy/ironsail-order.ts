@@ -4,6 +4,7 @@ import { google } from 'googleapis';
 import PDFDocument from 'pdfkit';
 import sgMail from '@sendgrid/mail';
 import ShippingOrder, { OrderShippingStatus } from '../../models/ShippingOrder';
+import { PharmacyProvider } from '../../models/Product';
 
 interface IronSailOrderData {
     orderNumber: string;
@@ -114,7 +115,8 @@ class IronSailOrderService {
                 orderId: order.id,
                 shippingAddressId: order.shippingAddressId,
                 status: OrderShippingStatus.PROCESSING,
-                pharmacyOrderId: pharmacyOrderId
+                pharmacyOrderId: pharmacyOrderId,
+                pharmacy: PharmacyProvider.IRONSAIL
             });
             console.log(`✅ [IronSail] ShippingOrder record created with ID: ${pharmacyOrderId}`);
 

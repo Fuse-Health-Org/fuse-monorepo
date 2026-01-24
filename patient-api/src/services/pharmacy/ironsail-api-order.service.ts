@@ -3,6 +3,7 @@ import User from '../../models/User';
 import ShippingAddress from '../../models/ShippingAddress';
 import { getIronSailToken, IRONSAIL_API_BASE, IRONSAIL_TENANT } from '../../endpoints/ironsail/ironsail-auth';
 import ShippingOrder, { OrderShippingStatus } from '../../models/ShippingOrder';
+import { PharmacyProvider } from '../../models/Product';
 
 // MDI Offering/Product structure from webhook
 interface MDIOfferingProduct {
@@ -356,7 +357,8 @@ class IronSailApiOrderService {
                 orderId: order.id,
                 shippingAddressId: order.shippingAddressId,
                 status: OrderShippingStatus.PROCESSING,
-                pharmacyOrderId: pharmacyOrderId
+                pharmacyOrderId: pharmacyOrderId,
+                pharmacy: PharmacyProvider.IRONSAIL
             });
 
             console.log(`[IronSail API] ShippingOrder record created: ${pharmacyOrderId}`);

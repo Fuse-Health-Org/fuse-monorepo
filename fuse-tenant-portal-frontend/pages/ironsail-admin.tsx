@@ -72,6 +72,7 @@ interface IronSailOrder {
   orderId: string
   pharmacyOrderId: string
   status: string
+  pharmacy?: string
   createdAt: string
   shippedAt?: string
   deliveredAt?: string
@@ -1155,6 +1156,21 @@ export default function IronSailAdmin() {
                                     {order.status === "failed" && <AlertTriangle className="h-3 w-3 mr-1" />}
                                     {order.status}
                                   </Badge>
+                                  {order.pharmacy && (
+                                    <Badge
+                                      variant="outline"
+                                      className={
+                                        order.pharmacy === "ironsail" ? "bg-teal-50 text-teal-700 border-teal-200" :
+                                        order.pharmacy === "absoluterx" ? "bg-purple-50 text-purple-700 border-purple-200" :
+                                        "bg-gray-50 text-gray-700 border-gray-200"
+                                      }
+                                    >
+                                      <Building2 className="h-3 w-3 mr-1" />
+                                      {order.pharmacy === "ironsail" ? "IronSail" :
+                                       order.pharmacy === "absoluterx" ? "AbsoluteRX" :
+                                       order.pharmacy}
+                                    </Badge>
+                                  )}
                                   {order.retryCount !== undefined && order.retryCount > 0 && (
                                     <span className="text-xs text-gray-500">
                                       (Retry #{order.retryCount})
