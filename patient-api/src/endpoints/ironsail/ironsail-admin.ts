@@ -422,5 +422,221 @@ export function registerIronSailAdminEndpoints(
     }
   });
 
+  // =============================================================================
+  // TEST ENDPOINT: IronSail PDF Preview
+  // =============================================================================
+  app.post("/test/ironsail-pdf", async (req, res) => {
+    try {
+      const IronSailOrderService = (await import('../../services/pharmacy/ironsail-order')).default;
+      const sgMail = (await import('@sendgrid/mail')).default;
+      const PDFDocument = (await import('pdfkit')).default;
+
+      // Sample data matching the problematic case
+      const testData = {
+        orderNumber: 'ORD-20260116-231232-781543',
+        patientFirstName: 'Lb',
+        patientLastName: 'Acc',
+        patientEmail: 'lbacc816@gmail.com',
+        patientPhone: '3513513135',
+        patientGender: 'Male',
+        patientDOB: '1992-03-05',
+        patientAddress: '66 Hansen Way, Apartment 4',
+        patientCity: 'Palo Alto',
+        patientState: 'CA',
+        patientZipCode: '94304',
+        patientCountry: 'USA',
+        productName: 'Semaglutide/Methylcobalamin 2.5mg/0.5mg/ml 4ml (10mg)',
+        productSKU: '3629',
+        rxId: '3629',
+        medicationForm: 'Injectable',
+        sig: `Thank you for choosing our Semaglutide/Methylcobalamin weight loss program.
+Your prescription has been submitted to the pharmacy. You should receive shipping confirmation within 2-3 business days.
+
+INSTRUCTIONS:
+- Store medication in refrigerator
+- Inject subcutaneously as directed by your healthcare provider
+- Take as directed by your healthcare provider
+
+If you have any questions about your treatment, please message your provider through the patient portal.`,
+        dispense: '4.00 Milliliter',
+        daysSupply: '30',
+        refills: '0',
+        shippingInfo: 'fedex_priority_overnight',
+        memo: 'MDI Prescription - pending',
+        orderDate: '1/16/2026',
+        ndc: undefined,
+        pharmacyNotes: `Company: FUSE HEALTH LLC
+Patient ID: lbacc816@gmail.com
+Case ID: 8536c3d3-66e0-4bf2-8497-a31f359fad20`,
+        mdiClinicianName: undefined,
+        isMdiPrescription: true,
+      };
+
+      // Generate PDF using current layout
+      const pdfBuffer = await new Promise<Buffer>((resolve, reject) => {
+        const doc = new PDFDocument({
+          margin: 50,
+          size: [795, 1008]
+        });
+        const chunks: Buffer[] = [];
+
+        doc.on('data', (chunk: Buffer) => chunks.push(chunk));
+        doc.on('end', () => resolve(Buffer.concat(chunks)));
+        doc.on('error', reject);
+
+        const col1 = 50;
+        const col2 = 290;
+        const col3 = 530;
+
+        // Company Header
+        doc.fontSize(18).font('Helvetica-Bold').text('FUSE HEALTH INC', { align: 'center' });
+        doc.moveDown(0.5);
+        doc.fontSize(10).font('Helvetica').text('254 Chapman Road, Ste 208 #24703, Newark, DE 19702 USA', { align: 'center' });
+        doc.text('+19095321861', { align: 'center' });
+        doc.moveDown(1.5);
+
+        // Title
+        doc.fontSize(16).text('Electronic Prescription Order (MDI)', { align: 'center', underline: true });
+        doc.moveDown(1.5);
+
+        // === FIRST 3-COLUMN GRID ===
+        let startY = doc.y;
+        doc.fontSize(10).text('Prescriber: SHUBH DHRUV', col1, startY);
+        doc.text('Order Number: ' + testData.orderNumber, col1, doc.y);
+        doc.text('Memo: ' + testData.memo, col1, doc.y);
+
+        doc.text('License: PA63768 (California)', col2, startY);
+        doc.text('NPI: 1477329381', col2, doc.y);
+        doc.text('Shipping: ' + testData.shippingInfo, col2, doc.y);
+
+        doc.text('Date: ' + testData.orderDate, col3, startY);
+        doc.fillColor('blue').text('MDI Prescription', col3, doc.y);
+        doc.fillColor('black');
+
+        doc.moveDown(3);
+
+        // === PATIENT INFORMATION ===
+        doc.fontSize(14).text('Patient Information', 0, doc.y, { align: 'center', underline: true });
+        doc.moveDown(1);
+
+        startY = doc.y;
+        doc.fontSize(10);
+        doc.text('First Name: ' + testData.patientFirstName, col1, startY);
+        doc.text('Phone: ' + testData.patientPhone, col1, doc.y);
+        doc.text('Address: ' + testData.patientAddress, col1, doc.y);
+        doc.text('State: ' + testData.patientState, col1, doc.y);
+
+        doc.text('Last Name: ' + testData.patientLastName, col2, startY);
+        doc.text('Email: ' + testData.patientEmail, col2, doc.y);
+        doc.text('City: ' + testData.patientCity, col2, doc.y);
+        doc.text('Zip Code: ' + testData.patientZipCode, col2, doc.y);
+
+        doc.text('Gender: ' + testData.patientGender, col3, startY);
+        doc.text('DOB: ' + testData.patientDOB, col3, doc.y);
+        doc.text('Country: ' + testData.patientCountry, col3, doc.y);
+
+        doc.moveDown(3);
+        doc.y += 30;
+
+        // === MEDICATION ===
+        doc.fontSize(14).text('Medication', 0, doc.y, { align: 'center', underline: true });
+        doc.moveDown(1);
+
+        // Simple table layout - label on left, value on right, each row separate
+        const labelX = col1;
+        const valueX = col1 + 120;
+        const rowHeight = 18;
+
+        let currentY = doc.y;
+        doc.fontSize(10);
+
+        // Row 1: Name
+        doc.font('Helvetica-Bold').text('Name:', labelX, currentY);
+        doc.font('Helvetica').text(testData.productName + ' (' + testData.productSKU + ')', valueX, currentY);
+        currentY += rowHeight;
+
+        // Row 2: RX ID
+        doc.font('Helvetica-Bold').text('RX ID:', labelX, currentY);
+        doc.font('Helvetica').text(testData.rxId, valueX, currentY);
+        currentY += rowHeight;
+
+        // Row 3: Form
+        doc.font('Helvetica-Bold').text('Form:', labelX, currentY);
+        doc.font('Helvetica').text(testData.medicationForm, valueX, currentY);
+        currentY += rowHeight;
+
+        // Row 4: Dispense
+        doc.font('Helvetica-Bold').text('Dispense:', labelX, currentY);
+        doc.font('Helvetica').text(testData.dispense, valueX, currentY);
+        currentY += rowHeight;
+
+        // Row 5: Days Supply
+        doc.font('Helvetica-Bold').text('Days Supply:', labelX, currentY);
+        doc.font('Helvetica').text(testData.daysSupply, valueX, currentY);
+        currentY += rowHeight;
+
+        // Row 6: Refills
+        doc.font('Helvetica-Bold').text('Refills:', labelX, currentY);
+        doc.font('Helvetica').text(testData.refills, valueX, currentY);
+        currentY += rowHeight;
+
+        doc.y = currentY;
+
+        // SIG in its own box
+        doc.moveDown(1);
+        doc.fontSize(12).font('Helvetica-Bold').text('Sig (Directions):', col1);
+        doc.moveDown(0.5);
+        doc.fontSize(10).font('Helvetica');
+
+        const sigStartY = doc.y;
+        doc.rect(col1, sigStartY, 695, 100).stroke();
+        doc.text(testData.sig, col1 + 10, sigStartY + 10, { width: 675 });
+        doc.y = sigStartY + 110;
+
+        // Pharmacy Notes
+        doc.moveDown(1);
+        doc.fontSize(12).font('Helvetica-Bold').text('Pharmacy Notes:', col1);
+        doc.moveDown(0.5);
+        doc.fontSize(10).font('Helvetica').text(testData.pharmacyNotes, col1, doc.y, { width: 695 });
+
+        doc.end();
+      });
+
+      // Get email from request body or default
+      const recipientEmail = req.body?.email || 'grrbm2@gmail.com';
+
+      // Send email
+      const msg = {
+        to: recipientEmail,
+        from: 'noreply@fusehealth.com',
+        subject: `[TEST] IronSail PDF Preview - ${new Date().toISOString()}`,
+        html: `<h2>Test PDF for IronSail Layout</h2><p>See attached PDF to review the current layout.</p>`,
+        attachments: [
+          {
+            content: pdfBuffer.toString('base64'),
+            filename: `Test_Prescription_${Date.now()}.pdf`,
+            type: 'application/pdf',
+            disposition: 'attachment',
+          },
+        ],
+      };
+
+      await sgMail.send(msg as any);
+
+      res.json({
+        success: true,
+        message: `Test PDF sent to ${recipientEmail}`,
+        pdfSize: pdfBuffer.length,
+      });
+    } catch (error) {
+      console.error('Test PDF error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to generate/send test PDF',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
   console.log("✅ IronSail Admin endpoints registered");
 }
