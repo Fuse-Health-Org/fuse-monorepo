@@ -15483,6 +15483,12 @@ async function startServer() {
   ticketAutoCloseService.start();
   console.log('🎫 Support ticket auto-close service initialized');
 
+  // Initialize IronSail Retry Worker (retries stuck pharmacy orders every 2 hours)
+  const IronSailRetryWorker = (await import('./services/pharmacy/IronSailRetryWorker')).default;
+  const ironSailRetryWorker = new IronSailRetryWorker();
+  ironSailRetryWorker.start();
+  console.log('🚢 IronSail retry worker initialized');
+
   // Start auto-approval service
   const AutoApprovalService = (await import("./services/autoApproval.service"))
     .default;

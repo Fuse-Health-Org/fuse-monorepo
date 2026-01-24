@@ -7,7 +7,7 @@ import MDClinicianService from './MDClinician.service';
 import Physician from '../../models/Physician';
 import PharmacyPhysicianService from '../pharmacy/physician';
 import User from '../../models/User';
-import IronSailApiOrderService from '../pharmacy/ironsail-api-order.service';
+import IronSailRetryService from '../pharmacy/ironsail-retry.service';
 
 
 interface Product {
@@ -626,15 +626,16 @@ class MDWebhookService {
           }
         }
 
-        // NOW submit order to IronSail API
+        // NOW submit order to IronSail API with automatic retry on failure
         // This is the correct trigger - prescription is finalized and ready
         try {
           // Use console.error to force output (always visible, not filtered by HIPAA)
           console.error('\n[MD-WH] ===== SUBMITTING TO IRONSAIL =====');
           console.error('[MD-WH] Order Number:', order.orderNumber);
-          console.error('[MD-WH] 🚢 Submitting order to IronSail API', { orderNumber: order.orderNumber });
+          console.error('[MD-WH] 🚢 Submitting order to IronSail API (with retry)', { orderNumber: order.orderNumber });
           
-          const ironSailResult = await IronSailApiOrderService.createOrder(order);
+          // Use the retry service which handles exponential backoff automatically
+          const ironSailResult = await IronSailRetryService.submitOrderWithRetry(order);
           
           if (ironSailResult.success) {
             console.error('[MD-WH] ✅ Order submitted to IronSail successfully', {
@@ -646,16 +647,17 @@ class MDWebhookService {
             // Mark order as processing
             await order.updateStatus(OrderStatus.PROCESSING);
           } else {
-            console.error('[MD-WH] ❌ Failed to submit order to IronSail', {
+            console.error('[MD-WH] ⏳ IronSail submission failed, retry scheduled', {
               orderNumber: order.orderNumber,
               error: ironSailResult.error
             });
-            // Don't throw - the prescription is saved, we can retry pharmacy order later
-            // But log the error for monitoring
+            // Don't throw - the retry service has already scheduled retries
+            // Order remains in PROCESSING state while retries are attempted
+            await order.updateStatus(OrderStatus.PROCESSING);
           }
         } catch (ironSailError) {
           console.error('[MD-WH] ❌ Error submitting order to IronSail after prescription_submitted', ironSailError);
-          // Don't throw - the prescription is saved, we can retry pharmacy order later
+          // Don't throw - the prescription is saved, manual retry can be attempted
         }
         break;
       }
