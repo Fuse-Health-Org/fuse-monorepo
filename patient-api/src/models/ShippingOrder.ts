@@ -15,6 +15,8 @@ export enum OrderShippingStatus {
   REJECTED = 'rejected',
   PROBLEM = 'problem',
   COMPLETED = 'completed',
+  RETRY_PENDING = 'retry_pending',  // Failed to submit, waiting for retry
+  FAILED = 'failed',                 // All retries exhausted
 }
 
 @Table({
@@ -78,5 +80,31 @@ export default class ShippingOrder extends Entity {
     allowNull: true,
   })
   declare deliveredAt?: Date;
+
+  // Retry tracking fields for IronSail order submission
+  @Column({
+    type: DataType.INTEGER,
+    allowNull: false,
+    defaultValue: 0,
+  })
+  declare retryCount: number;
+
+  @Column({
+    type: DataType.DATE,
+    allowNull: true,
+  })
+  declare lastRetryAt?: Date;
+
+  @Column({
+    type: DataType.DATE,
+    allowNull: true,
+  })
+  declare nextRetryAt?: Date;
+
+  @Column({
+    type: DataType.TEXT,
+    allowNull: true,
+  })
+  declare retryError?: string;
 
 }

@@ -1,4 +1,3 @@
-import cron, { ScheduledTask } from 'node-cron';
 import { Op } from 'sequelize';
 import Prescription from '../../models/Prescription';
 import User from '../../models/User';
@@ -6,69 +5,23 @@ import SequenceRun from '../../models/SequenceRun';
 import SequenceTriggerService from './SequenceTriggerService';
 
 /**
- * Worker that checks for expired prescriptions daily
+ * Service that checks for expired prescriptions
  * and triggers sequences for prescription_expired event
+ * 
+ * Cron schedule is managed by cronJobs/index.ts
  */
 export default class PrescriptionExpirationWorker {
   private triggerService: SequenceTriggerService;
-  private isRunning = false;
-  private cronJob: ScheduledTask | null = null;
 
   constructor() {
     this.triggerService = new SequenceTriggerService();
   }
 
   /**
-   * Start the cron job to check for expired prescriptions
-   * Runs every day at 9:00 AM
-   */
-  start() {
-    if (this.cronJob) {
-      console.log('⚠️ PrescriptionExpirationWorker already started');
-      return;
-    }
-
-    // Schedule: Every day at 9:00 AM
-    // Format: second minute hour day month weekday
-    this.cronJob = cron.schedule('0 9 * * *', async () => {
-      await this.checkExpiredPrescriptions();
-    });
-
-    console.log('✅ PrescriptionExpirationWorker started (runs daily at 9:00 AM)');
-    
-    // Run immediately on startup (for testing/development)
-    if (process.env.NODE_ENV === 'development') {
-      console.log('🔍 Running initial prescription check (development mode)...');
-      // Run after 10 seconds to allow app to fully initialize
-      setTimeout(() => {
-        this.checkExpiredPrescriptions().catch(err => {
-          console.error('❌ Initial prescription check failed:', err);
-        });
-      }, 10000);
-    }
-  }
-
-  /**
-   * Stop the cron job
-   */
-  stop() {
-    if (this.cronJob) {
-      this.cronJob.stop();
-      this.cronJob = null;
-      console.log('🛑 PrescriptionExpirationWorker stopped');
-    }
-  }
-
-  /**
    * Check for expired prescriptions and trigger sequences
+   * Called by cron job registry
    */
   async checkExpiredPrescriptions(): Promise<void> {
-    if (this.isRunning) {
-      console.log('⚠️ Prescription check already running, skipping...');
-      return;
-    }
-
-    this.isRunning = true;
 
     try {
       console.log('🔍 Checking for expired prescriptions...');
@@ -172,7 +125,7 @@ export default class PrescriptionExpirationWorker {
           if (sequencesTriggered > 0) {
             triggeredCount += sequencesTriggered;
             processedPrescriptionIds.add(prescription.id);
-            
+
             console.log(
               `✅ Triggered ${sequencesTriggered} sequence(s) for prescription "${prescription.name}"`
             );
@@ -191,8 +144,7 @@ export default class PrescriptionExpirationWorker {
       );
     } catch (error) {
       console.error('❌ Error checking expired prescriptions:', error);
-    } finally {
-      this.isRunning = false;
+      throw error; // Re-throw so cron registry can log it
     }
   }
 

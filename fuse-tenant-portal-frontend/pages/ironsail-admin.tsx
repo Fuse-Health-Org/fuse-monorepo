@@ -23,7 +23,10 @@ import {
   Settings,
   ShoppingCart,
   Calendar,
-  User
+  User,
+  RotateCcw,
+  Clock,
+  AlertTriangle
 } from "lucide-react"
 import { useAuth } from "@/contexts/AuthContext"
 import { toast } from "sonner"
@@ -73,6 +76,11 @@ interface IronSailOrder {
   deliveredAt?: string
   trackingNumber?: string
   trackingUrl?: string
+  // Retry tracking fields
+  retryCount?: number
+  lastRetryAt?: string
+  nextRetryAt?: string
+  retryError?: string
   order?: {
     orderNumber: string
     status: string
@@ -255,6 +263,29 @@ export default function IronSailAdmin() {
   const handleOrdersPageChange = (newPage: number) => {
     if (newPage >= 1 && newPage <= ordersPagination.total_pages) {
       fetchOrders(newPage)
+    }
+  }
+
+  const [retryingOrderId, setRetryingOrderId] = useState<string | null>(null)
+
+  const handleRetryOrder = async (shippingOrderId: string) => {
+    setRetryingOrderId(shippingOrderId)
+    try {
+      const res = await fetch(`${baseUrl}/ironsail/orders/${shippingOrderId}/retry`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success('Retry initiated successfully')
+        fetchOrders(ordersPagination.page)
+      } else {
+        toast.error(data.message || 'Failed to retry order')
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to retry order')
+    } finally {
+      setRetryingOrderId(null)
     }
   }
 
@@ -1032,7 +1063,11 @@ export default function IronSailAdmin() {
                         {orders.map((order) => (
                           <div
                             key={order.id}
-                            className="p-4 border rounded-lg hover:border-teal-300 transition-colors"
+                            className={`p-4 border rounded-lg transition-colors ${
+                              order.status === "retry_pending" ? "border-orange-300 bg-orange-50" :
+                              order.status === "failed" ? "border-red-300 bg-red-50" :
+                              "hover:border-teal-300"
+                            }`}
                           >
                             <div className="flex items-start justify-between">
                               <div className="flex-1">
@@ -1042,18 +1077,28 @@ export default function IronSailAdmin() {
                                     variant={
                                       order.status === "delivered" ? "default" :
                                         order.status === "shipped" ? "secondary" :
-                                          order.status === "cancelled" ? "destructive" :
-                                            "outline"
+                                          order.status === "cancelled" || order.status === "failed" ? "destructive" :
+                                            order.status === "retry_pending" ? "secondary" :
+                                              "outline"
                                     }
                                     className={
                                       order.status === "delivered" ? "bg-green-100 text-green-800" :
                                         order.status === "shipped" ? "bg-blue-100 text-blue-800" :
                                           order.status === "processing" ? "bg-yellow-100 text-yellow-800" :
-                                            ""
+                                            order.status === "retry_pending" ? "bg-orange-100 text-orange-800" :
+                                              order.status === "failed" ? "bg-red-100 text-red-800" :
+                                                ""
                                     }
                                   >
+                                    {order.status === "retry_pending" && <Clock className="h-3 w-3 mr-1" />}
+                                    {order.status === "failed" && <AlertTriangle className="h-3 w-3 mr-1" />}
                                     {order.status}
                                   </Badge>
+                                  {order.retryCount !== undefined && order.retryCount > 0 && (
+                                    <span className="text-xs text-gray-500">
+                                      (Retry #{order.retryCount})
+                                    </span>
+                                  )}
                                 </div>
                                 <div className="space-y-1 text-sm text-gray-600">
                                   <div className="flex items-center gap-2">
@@ -1070,6 +1115,28 @@ export default function IronSailAdmin() {
                                       Created: {new Date(order.createdAt).toLocaleDateString()} at {new Date(order.createdAt).toLocaleTimeString()}
                                     </span>
                                   </div>
+                                  {/* Retry status info */}
+                                  {(order.status === "retry_pending" || order.status === "failed") && (
+                                    <div className="mt-2 p-2 rounded bg-white border border-orange-200">
+                                      {order.lastRetryAt && (
+                                        <div className="flex items-center gap-2 text-xs text-gray-600">
+                                          <RotateCcw className="h-3 w-3" />
+                                          <span>Last retry: {new Date(order.lastRetryAt).toLocaleString()}</span>
+                                        </div>
+                                      )}
+                                      {order.nextRetryAt && order.status === "retry_pending" && (
+                                        <div className="flex items-center gap-2 text-xs text-orange-600 mt-1">
+                                          <Clock className="h-3 w-3" />
+                                          <span>Next retry: {new Date(order.nextRetryAt).toLocaleString()}</span>
+                                        </div>
+                                      )}
+                                      {order.retryError && (
+                                        <div className="mt-1 text-xs text-red-600 truncate" title={order.retryError}>
+                                          Error: {order.retryError.substring(0, 100)}{order.retryError.length > 100 ? '...' : ''}
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
                                   {order.trackingNumber && (
                                     <div className="flex items-center gap-2">
                                       <Package className="h-4 w-4" />
@@ -1099,10 +1166,27 @@ export default function IronSailAdmin() {
                                   )}
                                 </div>
                               </div>
-                              <div className="text-right">
+                              <div className="text-right flex flex-col items-end gap-2">
                                 <code className="px-2 py-1 bg-gray-100 rounded text-xs font-mono">
                                   {order.order?.orderNumber}
                                 </code>
+                                {/* Manual retry button for failed/retry_pending orders */}
+                                {(order.status === "retry_pending" || order.status === "failed") && (
+                                  <Button
+                                    onClick={() => handleRetryOrder(order.id)}
+                                    disabled={retryingOrderId === order.id}
+                                    variant="outline"
+                                    size="sm"
+                                    className="text-orange-600 border-orange-200 hover:bg-orange-50"
+                                  >
+                                    {retryingOrderId === order.id ? (
+                                      <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                                    ) : (
+                                      <RotateCcw className="h-4 w-4 mr-1" />
+                                    )}
+                                    Retry Now
+                                  </Button>
+                                )}
                               </div>
                             </div>
                           </div>

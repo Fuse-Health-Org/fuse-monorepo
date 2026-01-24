@@ -1,67 +1,19 @@
-import cron, { ScheduledTask } from 'node-cron';
 import { Op } from 'sequelize';
 import SupportTicket, { TicketStatus } from '../models/SupportTicket';
 import TicketMessage, { MessageSender } from '../models/TicketMessage';
 
 /**
- * Worker that checks for resolved tickets that haven't been responded to by the patient
+ * Service that checks for resolved tickets that haven't been responded to by the patient
  * for 3 days and automatically closes them
+ * 
+ * Cron schedule is managed by cronJobs/index.ts
  */
 export default class SupportTicketAutoCloseService {
-  private isRunning = false;
-  private cronJob: ScheduledTask | null = null;
-
-  /**
-   * Start the cron job to check for tickets to auto-close
-   * Runs every day at 2:00 AM
-   */
-  start() {
-    if (this.cronJob) {
-      console.log('⚠️ SupportTicketAutoCloseService already started');
-      return;
-    }
-
-    // Schedule: Every day at 2:00 AM
-    // Format: second minute hour day month weekday
-    this.cronJob = cron.schedule('0 2 * * *', async () => {
-      await this.checkAndCloseResolvedTickets();
-    });
-
-    console.log('✅ SupportTicketAutoCloseService started (runs daily at 2:00 AM)');
-    
-    // Run immediately on startup (for testing/development)
-    if (process.env.NODE_ENV === 'development') {
-      console.log('🔍 Running initial ticket auto-close check (development mode)...');
-      // Run after 10 seconds to allow app to fully initialize
-      setTimeout(() => {
-        this.checkAndCloseResolvedTickets().catch(err => {
-          console.error('❌ Initial ticket auto-close check failed:', err);
-        });
-      }, 10000);
-    }
-  }
-
-  /**
-   * Stop the cron job
-   */
-  stop() {
-    if (this.cronJob) {
-      this.cronJob.stop();
-      this.cronJob = null;
-      console.log('🛑 SupportTicketAutoCloseService stopped');
-    }
-  }
-
   /**
    * Check for resolved tickets that should be auto-closed
+   * Called by cron job registry
    */
   async checkAndCloseResolvedTickets(): Promise<void> {
-    if (this.isRunning) {
-      console.log('⚠️ Ticket auto-close check already running, skipping...');
-      return;
-    }
-
-    this.isRunning = true;
 
     try {
       console.log('🔍 Checking for resolved tickets to auto-close...');
@@ -129,8 +81,7 @@ export default class SupportTicketAutoCloseService {
       );
     } catch (error) {
       console.error('❌ Error checking resolved tickets:', error);
-    } finally {
-      this.isRunning = false;
+      throw error; // Re-throw so cron registry can log it
     }
   }
 

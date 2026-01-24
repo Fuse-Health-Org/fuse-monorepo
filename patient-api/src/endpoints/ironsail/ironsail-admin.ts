@@ -20,10 +20,14 @@ export function registerIronSailAdminEndpoints(
       const perPage = Math.min(parseInt(per_page as string), 100);
       const offset = (pageNum - 1) * perPage;
 
-      // Build where clause
+      // Build where clause - include IRONSAIL, PENDING, and FAILED orders
       const where: any = {
         pharmacyOrderId: {
-          [Op.like]: 'IRONSAIL-%'
+          [Op.or]: [
+            { [Op.like]: 'IRONSAIL-%' },
+            { [Op.like]: 'PENDING-%' },
+            { [Op.like]: 'FAILED-%' }
+          ]
         }
       };
 
@@ -634,6 +638,52 @@ Case ID: 8536c3d3-66e0-4bf2-8497-a31f359fad20`,
         success: false,
         message: 'Failed to generate/send test PDF',
         error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  // =============================================================================
+  // MANUAL RETRY ENDPOINT
+  // =============================================================================
+
+  /**
+   * POST /ironsail/orders/:id/retry
+   * Manually retry a failed or stuck IronSail order
+   */
+  app.post("/ironsail/orders/:id/retry", authenticateJWT, async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      // Import retry service
+      const IronSailRetryService = (await import('../../services/pharmacy/ironsail-retry.service')).default;
+
+      console.log(`[IronSail Admin] Manual retry requested for shipping order: ${id}`);
+
+      const result = await IronSailRetryService.manualRetry(id);
+
+      if (result.success) {
+        res.json({
+          success: true,
+          message: 'Order retry succeeded',
+        });
+      } else if (result.shouldRetry) {
+        res.json({
+          success: true,
+          message: 'Order retry in progress, will continue automatically',
+          nextRetryAt: result.nextRetryAt?.toISOString(),
+          retryCount: result.retryCount,
+        });
+      } else {
+        res.status(400).json({
+          success: false,
+          message: result.error || 'Retry failed',
+        });
+      }
+    } catch (error) {
+      console.error('[IronSail Admin] Manual retry error:', error);
+      res.status(500).json({
+        success: false,
+        message: error instanceof Error ? error.message : 'Internal server error',
       });
     }
   });

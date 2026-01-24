@@ -15469,19 +15469,9 @@ async function startServer() {
   WebSocketService.initialize(httpServer);
   console.log("🔌 WebSocket server initialized");
 
-  // Initialize Prescription Expiration Worker
-  const PrescriptionExpirationWorker = (
-    await import("./services/sequence/PrescriptionExpirationWorker")
-  ).default;
-  const prescriptionWorker = new PrescriptionExpirationWorker();
-  prescriptionWorker.start();
-  console.log("💊 Prescription expiration worker initialized");
-
-  // Initialize Support Ticket Auto-Close Service
-  const SupportTicketAutoCloseService = (await import('./services/supportTicketAutoClose.service')).default;
-  const ticketAutoCloseService = new SupportTicketAutoCloseService();
-  ticketAutoCloseService.start();
-  console.log('🎫 Support ticket auto-close service initialized');
+  // Initialize all cron jobs from centralized registry
+  const cronJobRegistry = (await import('./cronJobs')).default;
+  await cronJobRegistry.registerAll();
 
   // Start auto-approval service
   const AutoApprovalService = (await import("./services/autoApproval.service"))
