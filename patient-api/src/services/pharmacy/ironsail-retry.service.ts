@@ -239,16 +239,23 @@ class IronSailRetryService {
      * Returns orders older than minAgeMinutes that haven't been retried recently
      */
     async getStuckRetryOrders(minAgeMinutes: number = 30, limit: number = 50): Promise<ShippingOrder[]> {
-        const minAge = new Date(Date.now() - minAgeMinutes * 60 * 1000);
+        const Op = require('sequelize').Op;
+        const whereClause: any = {
+            status: OrderShippingStatus.RETRY_PENDING,
+        };
+
+        // Only apply age filter if minAgeMinutes > 0
+        if (minAgeMinutes > 0) {
+            const minAge = new Date(Date.now() - minAgeMinutes * 60 * 1000);
+            whereClause[Op.or] = [
+                { lastRetryAt: { [Op.lt]: minAge } },
+                { lastRetryAt: null }
+            ];
+        }
 
         const stuckOrders = await ShippingOrder.findAll({
-            where: {
-                status: OrderShippingStatus.RETRY_PENDING,
-                lastRetryAt: {
-                    [require('sequelize').Op.lt]: minAge,
-                },
-            },
-            order: [['lastRetryAt', 'ASC']], // Oldest first
+            where: whereClause,
+            order: [['lastRetryAt', 'ASC NULLS FIRST']], // Oldest first, nulls at the top
             limit,
         });
 
