@@ -125,7 +125,7 @@ export default class PrescriptionExpirationWorker {
           if (sequencesTriggered > 0) {
             triggeredCount += sequencesTriggered;
             processedPrescriptionIds.add(prescription.id);
-            
+
             console.log(
               `✅ Triggered ${sequencesTriggered} sequence(s) for prescription "${prescription.name}"`
             );

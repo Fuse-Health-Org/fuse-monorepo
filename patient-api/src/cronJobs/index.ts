@@ -3,19 +3,19 @@ import cron, { ScheduledTask } from 'node-cron';
 /**
  * Centralized Cron Job Registry
  * 
- * All cron job schedules are declared here for easy management.
- * The actual business logic lives in their respective service files.
+ * This file handles registration and lifecycle of all cron jobs.
+ * Individual job definitions are in separate files (*.cron.ts).
  * 
  * Cron Format: second minute hour day month weekday
  * 
  * Examples:
- *   '0 9 * * *'     - Every day at 9:00 AM
- *   '0 2 * * *'     - Every day at 2:00 AM
- *   '0 *\/2 * * *'  - Every 2 hours
- *   '0 0 * * 0'     - Every Sunday at midnight
+ *   '0 9 * * *'      - Every day at 9:00 AM
+ *   '0 2 * * *'      - Every day at 2:00 AM
+ *   '0 0 *​/2 * * *'  - Every 2 hours (at minute 0)
+ *   '0 0 * * 0'      - Every Sunday at midnight
  */
 
-interface CronJobDefinition {
+export interface CronJobDefinition {
     name: string;
     schedule: string;
     description: string;
@@ -34,52 +34,16 @@ class CronJobRegistry {
      * Called once at application startup
      */
     async registerAll(): Promise<void> {
-        // Import services lazily to avoid circular dependencies
-        const PrescriptionExpirationWorker = (await import('../services/sequence/PrescriptionExpirationWorker')).default;
-        const SupportTicketAutoCloseService = (await import('../services/supportTicketAutoClose.service')).default;
-        const IronSailRetryWorker = (await import('../services/pharmacy/IronSailRetryWorker')).default;
+        // Import all cron job definitions from separate files
+        const prescriptionExpirationJob = (await import('./prescription-expiration.cron')).default;
+        const ticketAutoCloseJob = (await import('./ticket-auto-close.cron')).default;
+        const ironSailRetryJob = (await import('./ironsail-retry.cron')).default;
 
-        // Instantiate workers (they contain the business logic)
-        const prescriptionWorker = new PrescriptionExpirationWorker();
-        const ticketAutoCloseService = new SupportTicketAutoCloseService();
-        const ironSailRetryWorker = new IronSailRetryWorker();
-
-        // =============================================================================
-        // CRON JOB DEFINITIONS
-        // Add new cron jobs here with their schedules and handlers
-        // =============================================================================
-
+        // Add all job definitions to the registry
         this.definitions = [
-            {
-                name: 'prescription-expiration',
-                schedule: '0 9 * * *',  // Every day at 9:00 AM
-                description: 'Check for expired prescriptions and trigger sequences',
-                handler: async () => {
-                    await (prescriptionWorker as any).checkExpiredPrescriptions();
-                },
-                runOnStartup: true,
-                startupDelay: 10000,
-            },
-            {
-                name: 'ticket-auto-close',
-                schedule: '0 2 * * *',  // Every day at 2:00 AM
-                description: 'Auto-close resolved support tickets after 3 days of inactivity',
-                handler: async () => {
-                    await (ticketAutoCloseService as any).checkAndCloseResolvedTickets();
-                },
-                runOnStartup: true,
-                startupDelay: 10000,
-            },
-            {
-                name: 'ironsail-retry',
-                schedule: '0 */2 * * *',  // Every 2 hours
-                description: 'Retry stuck IronSail pharmacy orders (older than 30 minutes)',
-                handler: async () => {
-                    await (ironSailRetryWorker as any).processStuckOrders();
-                },
-                runOnStartup: true,
-                startupDelay: 15000,
-            },
+            prescriptionExpirationJob,
+            ticketAutoCloseJob,
+            ironSailRetryJob,
         ];
 
         // Register and start all jobs
@@ -144,7 +108,7 @@ class CronJobRegistry {
                     console.log(`✅ [CRON] ${name} completed (startup)`);
                 } catch (error) {
                     console.error(`❌ [CRON] ${name} failed (startup):`, error);
-                }finally {
+                } finally {
                     this.runningJobs.delete(name);
                 }
             }, delay);
@@ -194,4 +158,4 @@ const cronJobRegistry = new CronJobRegistry();
 export default cronJobRegistry;
 
 // Also export the class for testing
-export { CronJobRegistry, CronJobDefinition };
+export { CronJobRegistry };
