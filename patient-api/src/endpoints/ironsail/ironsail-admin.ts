@@ -643,6 +643,64 @@ Case ID: 8536c3d3-66e0-4bf2-8497-a31f359fad20`,
   });
 
   // =============================================================================
+  // MANUAL STATUS UPDATE ENDPOINT
+  // =============================================================================
+
+  /**
+   * PATCH /ironsail/orders/:id/status
+   * Manually update the status of an IronSail shipping order
+   */
+  app.patch("/ironsail/orders/:id/status", authenticateJWT, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { status } = req.body;
+
+      // Validate status
+      const validStatuses = [
+        'pending', 'processing', 'filled', 'approved', 'shipped',
+        'delivered', 'cancelled', 'rejected', 'problem', 'completed',
+        'retry_pending', 'failed'
+      ];
+
+      if (!status || !validStatuses.includes(status)) {
+        return res.status(400).json({
+          success: false,
+          message: `Invalid status. Must be one of: ${validStatuses.join(', ')}`
+        });
+      }
+
+      const shippingOrder = await ShippingOrder.findByPk(id);
+      if (!shippingOrder) {
+        return res.status(404).json({
+          success: false,
+          message: 'Shipping order not found'
+        });
+      }
+
+      const oldStatus = shippingOrder.status;
+      await shippingOrder.update({ status });
+
+      console.log(`[IronSail Admin] Status updated for ${shippingOrder.pharmacyOrderId}: ${oldStatus} → ${status}`);
+
+      return res.json({
+        success: true,
+        message: 'Status updated successfully',
+        data: {
+          id: shippingOrder.id,
+          oldStatus,
+          newStatus: status
+        }
+      });
+    } catch (error) {
+      console.error('[IronSail Admin] Status update error:', error);
+      return res.status(500).json({
+        success: false,
+        message: error instanceof Error ? error.message : 'Internal server error'
+      });
+    }
+  });
+
+  // =============================================================================
   // MANUAL RETRY ENDPOINT
   // =============================================================================
 

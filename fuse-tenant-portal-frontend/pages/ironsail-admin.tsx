@@ -26,7 +26,8 @@ import {
   User,
   RotateCcw,
   Clock,
-  AlertTriangle
+  AlertTriangle,
+  Save
 } from "lucide-react"
 import { useAuth } from "@/contexts/AuthContext"
 import { toast } from "sonner"
@@ -267,6 +268,66 @@ export default function IronSailAdmin() {
   }
 
   const [retryingOrderId, setRetryingOrderId] = useState<string | null>(null)
+  const [pendingStatusChanges, setPendingStatusChanges] = useState<Record<string, string>>({})
+  const [savingStatusId, setSavingStatusId] = useState<string | null>(null)
+
+  // Available order statuses
+  const ORDER_STATUSES = [
+    { value: 'pending', label: 'Pending' },
+    { value: 'processing', label: 'Processing' },
+    { value: 'filled', label: 'Filled' },
+    { value: 'approved', label: 'Approved' },
+    { value: 'shipped', label: 'Shipped' },
+    { value: 'delivered', label: 'Delivered' },
+    { value: 'cancelled', label: 'Cancelled' },
+    { value: 'rejected', label: 'Rejected' },
+    { value: 'problem', label: 'Problem' },
+    { value: 'completed', label: 'Completed' },
+    { value: 'retry_pending', label: 'Retry Pending' },
+    { value: 'failed', label: 'Failed' },
+  ]
+
+  const handleStatusChange = (orderId: string, newStatus: string) => {
+    setPendingStatusChanges(prev => ({
+      ...prev,
+      [orderId]: newStatus
+    }))
+  }
+
+  const handleSaveStatus = async (orderId: string) => {
+    const newStatus = pendingStatusChanges[orderId]
+    if (!newStatus) return
+
+    setSavingStatusId(orderId)
+    try {
+      const res = await fetch(`${baseUrl}/ironsail/orders/${orderId}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ status: newStatus })
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success('Status updated successfully')
+        // Clear pending change
+        setPendingStatusChanges(prev => {
+          const updated = { ...prev }
+          delete updated[orderId]
+          return updated
+        })
+        // Refresh orders
+        fetchOrders(ordersPagination.page)
+      } else {
+        toast.error(data.message || 'Failed to update status')
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update status')
+    } finally {
+      setSavingStatusId(null)
+    }
+  }
 
   const handleRetryOrder = async (shippingOrderId: string) => {
     setRetryingOrderId(shippingOrderId)
@@ -1170,6 +1231,36 @@ export default function IronSailAdmin() {
                                 <code className="px-2 py-1 bg-gray-100 rounded text-xs font-mono">
                                   {order.order?.orderNumber}
                                 </code>
+                                {/* Status change dropdown */}
+                                <div className="flex items-center gap-1">
+                                  <select
+                                    value={pendingStatusChanges[order.id] ?? order.status}
+                                    onChange={(e) => handleStatusChange(order.id, e.target.value)}
+                                    className="text-xs border rounded px-2 py-1 bg-white"
+                                  >
+                                    {ORDER_STATUSES.map((s) => (
+                                      <option key={s.value} value={s.value}>
+                                        {s.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  {pendingStatusChanges[order.id] && pendingStatusChanges[order.id] !== order.status && (
+                                    <Button
+                                      onClick={() => handleSaveStatus(order.id)}
+                                      disabled={savingStatusId === order.id}
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-7 w-7 p-0 text-green-600 border-green-200 hover:bg-green-50"
+                                      title="Save status change"
+                                    >
+                                      {savingStatusId === order.id ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                      ) : (
+                                        <Save className="h-4 w-4" />
+                                      )}
+                                    </Button>
+                                  )}
+                                </div>
                                 {/* Manual retry button for failed/retry_pending orders */}
                                 {(order.status === "retry_pending" || order.status === "failed") && (
                                   <Button
