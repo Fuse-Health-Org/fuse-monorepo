@@ -26,7 +26,10 @@ import {
   User,
   RotateCcw,
   Clock,
-  AlertTriangle
+  AlertTriangle,
+  Save,
+  Trash2,
+  AlertOctagon
 } from "lucide-react"
 import { useAuth } from "@/contexts/AuthContext"
 import { toast } from "sonner"
@@ -71,6 +74,7 @@ interface IronSailOrder {
   orderId: string
   pharmacyOrderId: string
   status: string
+  pharmacy?: string
   createdAt: string
   shippedAt?: string
   deliveredAt?: string
@@ -88,6 +92,11 @@ interface IronSailOrder {
       firstName: string
       lastName: string
       email: string
+    }
+    clinic?: {
+      id: string
+      name: string
+      patientPortalDashboardFormat: 'fuse' | 'md-integrations'
     }
   }
 }
@@ -267,6 +276,72 @@ export default function IronSailAdmin() {
   }
 
   const [retryingOrderId, setRetryingOrderId] = useState<string | null>(null)
+  const [pendingStatusChanges, setPendingStatusChanges] = useState<Record<string, string>>({})
+  const [savingStatusId, setSavingStatusId] = useState<string | null>(null)
+  
+  // Delete order state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [orderToDelete, setOrderToDelete] = useState<IronSailOrder | null>(null)
+  const [deleteConfirmText, setDeleteConfirmText] = useState("")
+  const [deletingOrderId, setDeletingOrderId] = useState<string | null>(null)
+
+  // Available order statuses
+  const ORDER_STATUSES = [
+    { value: 'pending', label: 'Pending' },
+    { value: 'processing', label: 'Processing' },
+    { value: 'filled', label: 'Filled' },
+    { value: 'approved', label: 'Approved' },
+    { value: 'shipped', label: 'Shipped' },
+    { value: 'delivered', label: 'Delivered' },
+    { value: 'cancelled', label: 'Cancelled' },
+    { value: 'rejected', label: 'Rejected' },
+    { value: 'problem', label: 'Problem' },
+    { value: 'completed', label: 'Completed' },
+    { value: 'retry_pending', label: 'Retry Pending' },
+    { value: 'failed', label: 'Failed' },
+  ]
+
+  const handleStatusChange = (orderId: string, newStatus: string) => {
+    setPendingStatusChanges(prev => ({
+      ...prev,
+      [orderId]: newStatus
+    }))
+  }
+
+  const handleSaveStatus = async (orderId: string) => {
+    const newStatus = pendingStatusChanges[orderId]
+    if (!newStatus) return
+
+    setSavingStatusId(orderId)
+    try {
+      const res = await fetch(`${baseUrl}/ironsail/orders/${orderId}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ status: newStatus })
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success('Status updated successfully')
+        // Clear pending change
+        setPendingStatusChanges(prev => {
+          const updated = { ...prev }
+          delete updated[orderId]
+          return updated
+        })
+        // Refresh orders
+        fetchOrders(ordersPagination.page)
+      } else {
+        toast.error(data.message || 'Failed to update status')
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update status')
+    } finally {
+      setSavingStatusId(null)
+    }
+  }
 
   const handleRetryOrder = async (shippingOrderId: string) => {
     setRetryingOrderId(shippingOrderId)
@@ -286,6 +361,42 @@ export default function IronSailAdmin() {
       toast.error(err.message || 'Failed to retry order')
     } finally {
       setRetryingOrderId(null)
+    }
+  }
+
+  const openDeleteDialog = (order: IronSailOrder) => {
+    setOrderToDelete(order)
+    setDeleteConfirmText("")
+    setDeleteDialogOpen(true)
+  }
+
+  const closeDeleteDialog = () => {
+    setDeleteDialogOpen(false)
+    setOrderToDelete(null)
+    setDeleteConfirmText("")
+  }
+
+  const handleDeleteOrder = async () => {
+    if (!orderToDelete || deleteConfirmText !== "DELETE") return
+    
+    setDeletingOrderId(orderToDelete.id)
+    try {
+      const res = await fetch(`${baseUrl}/ironsail/orders/${orderToDelete.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success('Order record deleted successfully')
+        closeDeleteDialog()
+        fetchOrders(ordersPagination.page)
+      } else {
+        toast.error(data.message || 'Failed to delete order')
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete order')
+    } finally {
+      setDeletingOrderId(null)
     }
   }
 
@@ -1094,6 +1205,33 @@ export default function IronSailAdmin() {
                                     {order.status === "failed" && <AlertTriangle className="h-3 w-3 mr-1" />}
                                     {order.status}
                                   </Badge>
+                                  {order.pharmacy && (
+                                    <Badge
+                                      variant="outline"
+                                      className={
+                                        order.pharmacy === "ironsail" ? "bg-teal-50 text-teal-700 border-teal-200" :
+                                        order.pharmacy === "absoluterx" ? "bg-purple-50 text-purple-700 border-purple-200" :
+                                        "bg-gray-50 text-gray-700 border-gray-200"
+                                      }
+                                    >
+                                      <Building2 className="h-3 w-3 mr-1" />
+                                      {order.pharmacy === "ironsail" ? "IronSail" :
+                                       order.pharmacy === "absoluterx" ? "AbsoluteRX" :
+                                       order.pharmacy}
+                                    </Badge>
+                                  )}
+                                  {order.order?.clinic?.patientPortalDashboardFormat && (
+                                    <Badge
+                                      variant="outline"
+                                      className={
+                                        order.order.clinic.patientPortalDashboardFormat === "md-integrations" 
+                                          ? "bg-indigo-50 text-indigo-700 border-indigo-200" 
+                                          : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                      }
+                                    >
+                                      {order.order.clinic.patientPortalDashboardFormat === "md-integrations" ? "MDI" : "Fuse"}
+                                    </Badge>
+                                  )}
                                   {order.retryCount !== undefined && order.retryCount > 0 && (
                                     <span className="text-xs text-gray-500">
                                       (Retry #{order.retryCount})
@@ -1170,6 +1308,36 @@ export default function IronSailAdmin() {
                                 <code className="px-2 py-1 bg-gray-100 rounded text-xs font-mono">
                                   {order.order?.orderNumber}
                                 </code>
+                                {/* Status change dropdown */}
+                                <div className="flex items-center gap-1">
+                                  <select
+                                    value={pendingStatusChanges[order.id] ?? order.status}
+                                    onChange={(e) => handleStatusChange(order.id, e.target.value)}
+                                    className="text-xs border rounded px-2 py-1 bg-white"
+                                  >
+                                    {ORDER_STATUSES.map((s) => (
+                                      <option key={s.value} value={s.value}>
+                                        {s.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  {pendingStatusChanges[order.id] && pendingStatusChanges[order.id] !== order.status && (
+                                    <Button
+                                      onClick={() => handleSaveStatus(order.id)}
+                                      disabled={savingStatusId === order.id}
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-7 w-7 p-0 text-green-600 border-green-200 hover:bg-green-50"
+                                      title="Save status change"
+                                    >
+                                      {savingStatusId === order.id ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                      ) : (
+                                        <Save className="h-4 w-4" />
+                                      )}
+                                    </Button>
+                                  )}
+                                </div>
                                 {/* Manual retry button for failed/retry_pending orders */}
                                 {(order.status === "retry_pending" || order.status === "failed") && (
                                   <Button
@@ -1187,6 +1355,16 @@ export default function IronSailAdmin() {
                                     Retry Now
                                   </Button>
                                 )}
+                                {/* Delete button */}
+                                <Button
+                                  onClick={() => openDeleteDialog(order)}
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-red-600 border-red-200 hover:bg-red-50"
+                                  title="Delete this shipping order record"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
                               </div>
                             </div>
                           </div>
@@ -1440,6 +1618,91 @@ IRONSAIL_CLIENT_SECRET=<your_client_secret>`}
                   </div>
                 </CardContent>
               </Card>
+            </div>
+          )}
+
+          {/* Delete Confirmation Dialog */}
+          {deleteDialogOpen && orderToDelete && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 overflow-hidden">
+                <div className="bg-red-600 px-6 py-4">
+                  <div className="flex items-center gap-3 text-white">
+                    <AlertOctagon className="h-8 w-8" />
+                    <div>
+                      <h2 className="text-xl font-bold">DANGER: Delete Order Record</h2>
+                      <p className="text-red-100 text-sm">This action cannot be undone</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="p-6 space-y-4">
+                  <div className="bg-red-50 border-2 border-red-200 rounded-lg p-4">
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle className="h-6 w-6 text-red-600 flex-shrink-0 mt-0.5" />
+                      <div className="text-sm text-red-900">
+                        <p className="font-bold mb-2">WARNING: This is extremely dangerous!</p>
+                        <ul className="list-disc list-inside space-y-1">
+                          <li>You may <strong>lose critical patient medical history</strong></li>
+                          <li>You may <strong>lose payment and billing records</strong></li>
+                          <li>This could affect <strong>prescription tracking and compliance</strong></li>
+                          <li>This action is <strong>permanent and irreversible</strong></li>
+                          <li>Consider changing the status instead of deleting</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <p className="text-sm text-gray-600 mb-2">Order to delete:</p>
+                    <p className="font-mono text-sm font-bold">{orderToDelete.pharmacyOrderId}</p>
+                    <p className="text-sm text-gray-500">
+                      Patient: {orderToDelete.order?.user?.firstName} {orderToDelete.order?.user?.lastName}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      Original Order: {orderToDelete.order?.orderNumber}
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Type <span className="font-bold text-red-600">DELETE</span> to confirm:
+                    </label>
+                    <Input
+                      value={deleteConfirmText}
+                      onChange={(e) => setDeleteConfirmText(e.target.value)}
+                      placeholder="Type DELETE to confirm"
+                      className="border-red-200 focus:border-red-500 focus:ring-red-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 px-6 py-4 flex justify-end gap-3">
+                  <Button
+                    onClick={closeDeleteDialog}
+                    variant="outline"
+                    disabled={deletingOrderId === orderToDelete.id}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleDeleteOrder}
+                    disabled={deleteConfirmText !== "DELETE" || deletingOrderId === orderToDelete.id}
+                    className="bg-red-600 hover:bg-red-700 text-white"
+                  >
+                    {deletingOrderId === orderToDelete.id ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        Deleting...
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete Permanently
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
             </div>
           )}
         </main>

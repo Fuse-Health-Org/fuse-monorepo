@@ -3,6 +3,7 @@ import User from '../../models/User';
 import ShippingAddress from '../../models/ShippingAddress';
 import { getIronSailToken, IRONSAIL_API_BASE, IRONSAIL_TENANT } from '../../endpoints/ironsail/ironsail-auth';
 import ShippingOrder, { OrderShippingStatus } from '../../models/ShippingOrder';
+import { PharmacyProvider } from '../../models/Product';
 
 // MDI Offering/Product structure from webhook
 interface MDIOfferingProduct {
@@ -229,6 +230,14 @@ class IronSailApiOrderService {
             const mdOfferings = (fullOrder as any).mdOfferings as MDIOffering[] | undefined;
             const mdPrescriptions = (fullOrder as any).mdPrescriptions as any[] | undefined;
 
+            console.error('\n[IronSail API] ===== CHECKING MDI DATA =====');
+            console.error('[IronSail API] Order:', fullOrder.orderNumber);
+            console.error('[IronSail API] mdOfferings:', mdOfferings ? `present (${mdOfferings.length} items)` : 'MISSING/NULL');
+            console.error('[IronSail API] mdPrescriptions:', mdPrescriptions ? `present (${mdPrescriptions.length} items)` : 'MISSING/NULL');
+            if (mdOfferings) {
+                console.error('[IronSail API] mdOfferings data:', JSON.stringify(mdOfferings, null, 2));
+            }
+
             if (!mdOfferings || mdOfferings.length === 0) {
                 throw new Error('No MDI offerings found in order. Cannot create IronSail order without prescription data.');
             }
@@ -356,7 +365,8 @@ class IronSailApiOrderService {
                 orderId: order.id,
                 shippingAddressId: order.shippingAddressId,
                 status: OrderShippingStatus.PROCESSING,
-                pharmacyOrderId: pharmacyOrderId
+                pharmacyOrderId: pharmacyOrderId,
+                pharmacy: PharmacyProvider.IRONSAIL
             });
 
             console.log(`[IronSail API] ShippingOrder record created: ${pharmacyOrderId}`);

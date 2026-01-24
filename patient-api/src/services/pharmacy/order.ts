@@ -3,6 +3,7 @@ import { config, PharmacyApiConfig, PharmacyApiResponse } from './config';
 import Order from '../../models/Order';
 import PatientService from './patient';
 import ShippingOrder, { OrderShippingStatus } from '../../models/ShippingOrder';
+import { PharmacyProvider } from '../../models/Product';
 
 interface PharmacyProduct {
   sku: number;
@@ -287,7 +288,8 @@ class OrderService {
       orderId: order.id,
       shippingAddressId: order.shippingAddressId,
       status: OrderShippingStatus.PROCESSING,
-      pharmacyOrderId: pharmacyOrderId
+      pharmacyOrderId: pharmacyOrderId,
+      pharmacy: PharmacyProvider.ABSOLUTERX
     });
     console.log(`✅ ShippingOrder created successfully!`);
   }

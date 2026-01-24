@@ -8,6 +8,11 @@ import Physician from '../../models/Physician';
 import PharmacyPhysicianService from '../pharmacy/physician';
 import User from '../../models/User';
 import IronSailRetryService from '../pharmacy/ironsail-retry.service';
+import IronSailOrderService from '../pharmacy/ironsail-order';
+import PharmacyProduct from '../../models/PharmacyProduct';
+import Pharmacy from '../../models/Pharmacy';
+import PharmacyCoverage from '../../models/PharmacyCoverage';
+import OrderItem from '../../models/OrderItem';
 
 
 interface Product {
@@ -308,7 +313,7 @@ class MDWebhookService {
 
       // Try to find the order from metadata or get the most recent order with mdCaseId
       let order: Order | null = null;
-      
+
       // Try to extract orderId from metadata
       const meta = eventData?.metadata as string | undefined;
       if (meta) {
@@ -317,11 +322,11 @@ class MDWebhookService {
           order = await Order.findByPk(match[1]);
         }
       }
-      
+
       // Fallback: find most recent order with mdCaseId for this user
       if (!order) {
         order = await Order.findOne({
-          where: { 
+          where: {
             userId: user.id,
           },
           order: [['createdAt', 'DESC']]
@@ -340,9 +345,9 @@ class MDWebhookService {
             }
           }
         });
-        console.log('[MD-WH] ✅ saved intro video pending action', { 
+        console.log('[MD-WH] ✅ saved intro video pending action', {
           orderNumber: (order as any).orderNumber,
-          accessLink: eventData.access_link 
+          accessLink: eventData.access_link
         });
       } else {
         console.log('[MD-WH] ⚠️ no order found for intro video request', { userId: user.id });
@@ -380,7 +385,7 @@ class MDWebhookService {
 
       // Try to find the order from metadata or get the most recent order with mdCaseId
       let order: Order | null = null;
-      
+
       // Try to extract orderId from metadata
       const meta = eventData?.metadata as string | undefined;
       if (meta) {
@@ -389,11 +394,11 @@ class MDWebhookService {
           order = await Order.findByPk(match[1]);
         }
       }
-      
+
       // Fallback: find most recent order with mdCaseId for this user
       if (!order) {
         order = await Order.findOne({
-          where: { 
+          where: {
             userId: user.id,
           },
           order: [['createdAt', 'DESC']]
@@ -412,9 +417,9 @@ class MDWebhookService {
             }
           }
         });
-        console.log('[MD-WH] ✅ saved drivers license pending action', { 
+        console.log('[MD-WH] ✅ saved drivers license pending action', {
           orderNumber: (order as any).orderNumber,
-          accessLink: eventData.access_link 
+          accessLink: eventData.access_link
         });
       } else {
         console.log('[MD-WH] ⚠️ no order found for drivers license request', { userId: user.id });
@@ -465,7 +470,7 @@ class MDWebhookService {
     console.error('[MD-WH] Event Type:', eventData.event_type);
     console.error('[MD-WH] Case ID:', eventData.case_id || 'N/A');
     console.error(`[MD-WH] 🔔 Processing webhook: ${eventData.event_type} (case_id: ${eventData.case_id || 'N/A'})`);
-    
+
     switch (eventData.event_type) {
       case 'offering_submitted':
         await this.handleOfferingSubmitted(eventData as OfferingSubmittedEvent);
@@ -540,7 +545,7 @@ class MDWebhookService {
         // Mark as processing - pharmacy order will be triggered by prescription_submitted
         await order.updateStatus(OrderStatus.PROCESSING);
         console.log('[MD-WH] 🔄 order marked processing after case_approved (waiting for prescription_submitted)', { orderNumber: order.orderNumber });
-        
+
         // NOTE: We do NOT call approveOrder() here anymore.
         // Pharmacy orders are triggered by prescription_submitted webhook when the Rx is finalized.
         break;
@@ -556,18 +561,32 @@ class MDWebhookService {
           console.log('[MD-WH] ⚠️ no order for prescription_submitted', { case_id: eventData.case_id });
           break;
         }
-        
+
         console.log('[MD-WH] 💊 processing prescription for order', { orderNumber: order.orderNumber });
 
         // Persist prescriptions/offerings from payload - THIS IS THE ACTUAL Rx DATA
         try {
           const payloadPrescriptions = (eventData as any)?.prescriptions;
           const payloadOfferings = (eventData as any)?.offerings ?? (eventData as any)?.services;
+
+          console.error('\n[MD-WH] ===== SAVING MDI DATA =====');
+          console.error('[MD-WH] payloadPrescriptions:', payloadPrescriptions ? 'present' : 'MISSING');
+          console.error('[MD-WH] payloadOfferings:', payloadOfferings ? 'present' : 'MISSING');
+          console.error('[MD-WH] Raw prescriptions:', JSON.stringify(payloadPrescriptions, null, 2));
+          console.error('[MD-WH] Raw offerings:', JSON.stringify(payloadOfferings, null, 2));
+
           if (payloadPrescriptions || payloadOfferings) {
             await order.update({
               mdPrescriptions: payloadPrescriptions ?? order.getDataValue('mdPrescriptions'),
               mdOfferings: payloadOfferings ?? order.getDataValue('mdOfferings')
             });
+
+            // Verify the data was saved by reloading
+            await order.reload();
+            console.error('[MD-WH] ✅ AFTER SAVE - mdPrescriptions:', order.getDataValue('mdPrescriptions') ? 'saved' : 'NULL');
+            console.error('[MD-WH] ✅ AFTER SAVE - mdOfferings:', order.getDataValue('mdOfferings') ? 'saved' : 'NULL');
+            console.error('[MD-WH] ✅ AFTER SAVE - mdOfferings data:', JSON.stringify(order.getDataValue('mdOfferings'), null, 2));
+
             console.log('[MD-WH] 📝 saved rx/offerings from webhook payload', {
               orderNumber: order.orderNumber,
               prescriptions_count: Array.isArray(payloadPrescriptions) ? payloadPrescriptions.length : 0,
@@ -601,7 +620,7 @@ class MDWebhookService {
                 });
               });
             }
-            
+
             // Also log offerings if present
             if (Array.isArray(payloadOfferings)) {
               payloadOfferings.forEach((o: any, idx: number) => {
@@ -626,38 +645,148 @@ class MDWebhookService {
           }
         }
 
-        // NOW submit order to IronSail API with automatic retry on failure
-        // This is the correct trigger - prescription is finalized and ready
+        // =============================================================================
+        // CHECK IF DOSESPOT ALREADY HANDLED THE PRESCRIPTION
+        // If MDI offerings have a pharmacy_id set, it means Dosespot is routing the
+        // prescription to a pharmacy - we should NOT also send to IronSail
+        // =============================================================================
+        const payloadOfferingsForCheck = (eventData as any)?.offerings ?? (eventData as any)?.services;
+        const dosespotHandled = Array.isArray(payloadOfferingsForCheck) && payloadOfferingsForCheck.some((offering: any) => {
+          const pharmacyId = offering?.product?.pharmacy_id;
+          const pharmacyName = offering?.product?.pharmacy_name;
+          // Dosespot pharmacy IDs are numeric (e.g., 261963), IronSail uses UUIDs
+          const isDosespotPharmacy = pharmacyId && (typeof pharmacyId === 'number' || /^\d+$/.test(String(pharmacyId)));
+          return isDosespotPharmacy;
+        });
+
+        if (dosespotHandled) {
+          const dosespotPharmacies = payloadOfferingsForCheck
+            .filter((o: any) => o?.product?.pharmacy_id)
+            .map((o: any) => ({
+              pharmacy_id: o?.product?.pharmacy_id,
+              pharmacy_name: o?.product?.pharmacy_name,
+              product_name: o?.product?.name || o?.name
+            }));
+
+          console.error('[MD-WH] ℹ️ Dosespot already routing prescription - skipping IronSail', {
+            orderNumber: order.orderNumber,
+            dosespotPharmacies
+          });
+
+          // Dosespot is handling this - just mark as processing and don't send to IronSail
+          await order.updateStatus(OrderStatus.PROCESSING);
+          break;
+        }
+
+        // Check if this order has IronSail pharmacy coverage configured
+        // Only submit to IronSail if we have coverage; otherwise MDI/Dosespot handles it
         try {
-          // Use console.error to force output (always visible, not filtered by HIPAA)
-          console.error('\n[MD-WH] ===== SUBMITTING TO IRONSAIL =====');
+          console.error('\n[MD-WH] ===== CHECKING IRONSAIL COVERAGE =====');
           console.error('[MD-WH] Order Number:', order.orderNumber);
-          console.error('[MD-WH] 🚢 Submitting order to IronSail API (with retry)', { orderNumber: order.orderNumber });
-          
-          // Use the retry service which handles exponential backoff automatically
-          const ironSailResult = await IronSailRetryService.submitOrderWithRetry(order);
-          
-          if (ironSailResult.success) {
-            console.error('[MD-WH] ✅ Order submitted to IronSail successfully', {
+          console.error('[MD-WH] Note: Dosespot not detected, checking for IronSail coverage...');
+
+          // Get order items to find productIds
+          const orderItems = await OrderItem.findAll({
+            where: { orderId: order.id },
+            attributes: ['productId']
+          });
+
+          // Get patient state from shipping address or user
+          const patient = await User.findByPk(order.userId);
+          const patientState = patient?.state?.toUpperCase().substring(0, 2);
+
+          if (!patientState || orderItems.length === 0) {
+            console.error('[MD-WH] ⚠️ Cannot determine patient state or products for IronSail coverage check', {
               orderNumber: order.orderNumber,
-              ironSailOrderUuid: ironSailResult.data?.ironSailOrderUuid,
-              pharmacyOrderId: ironSailResult.data?.pharmacyOrderId
+              hasState: !!patientState,
+              orderItemsCount: orderItems.length
             });
-            
-            // Mark order as processing
             await order.updateStatus(OrderStatus.PROCESSING);
+            break;
+          }
+
+          // Find IronSail coverages for any of the order's products
+          const productIds = orderItems.map(item => item.productId).filter(Boolean);
+          const coverages = await PharmacyProduct.findAll({
+            where: {
+              productId: productIds,
+              state: patientState,
+            },
+            include: [
+              {
+                model: Pharmacy,
+                as: 'pharmacy',
+                required: true,
+              },
+              {
+                model: PharmacyCoverage,
+                as: 'pharmacyCoverage',
+              },
+            ],
+          });
+
+          const ironSailCoverages = coverages.filter(
+            (c) => c.pharmacy?.slug === 'ironsail' && c.pharmacy?.isActive
+          );
+
+          console.error('[MD-WH] Coverage check result:', {
+            orderNumber: order.orderNumber,
+            patientState,
+            productIds,
+            totalCoverages: coverages.length,
+            ironSailCoverages: ironSailCoverages.length
+          });
+
+          if (ironSailCoverages.length === 0) {
+            console.error('[MD-WH] ℹ️ No IronSail coverage found - prescription handled by MDI/Dosespot', {
+              orderNumber: order.orderNumber
+            });
+            // No IronSail coverage - MDI/Dosespot handles the prescription directly
+            await order.updateStatus(OrderStatus.PROCESSING);
+            break;
+          }
+
+          // We have IronSail coverage - submit for each coverage
+          console.error('[MD-WH] ===== SUBMITTING TO IRONSAIL =====');
+          console.error('[MD-WH] 🚢 Found IronSail coverage, submitting order', {
+            orderNumber: order.orderNumber,
+            coverageCount: ironSailCoverages.length
+          });
+
+          const ironSailService = new IronSailOrderService();
+          let allSucceeded = true;
+
+          for (const coverage of ironSailCoverages) {
+            const coverageName = coverage.pharmacyCoverage?.customName || 'Product';
+            console.error(`[MD-WH] Processing coverage: ${coverageName}`);
+
+            const result = await ironSailService.createOrder(order, coverage);
+
+            if (result.success) {
+              console.error(`[MD-WH] ✅ IronSail order created for coverage: ${coverageName}`);
+            } else {
+              console.error(`[MD-WH] ❌ IronSail order failed for coverage: ${coverageName}`, result.error);
+              allSucceeded = false;
+            }
+          }
+
+          // Mark order as processing regardless of success
+          // Failed submissions can be retried manually from admin
+          await order.updateStatus(OrderStatus.PROCESSING);
+
+          if (allSucceeded) {
+            console.error('[MD-WH] ✅ All IronSail submissions completed successfully', {
+              orderNumber: order.orderNumber
+            });
           } else {
-            console.error('[MD-WH] ⏳ IronSail submission failed, retry scheduled', {
-              orderNumber: order.orderNumber,
-              error: ironSailResult.error
+            console.error('[MD-WH] ⚠️ Some IronSail submissions failed, check ShippingOrder records', {
+              orderNumber: order.orderNumber
             });
-            // Don't throw - the retry service has already scheduled retries
-            // Order remains in PROCESSING state while retries are attempted
-            await order.updateStatus(OrderStatus.PROCESSING);
           }
         } catch (ironSailError) {
-          console.error('[MD-WH] ❌ Error submitting order to IronSail after prescription_submitted', ironSailError);
+          console.error('[MD-WH] ❌ Error during IronSail coverage check/submission', ironSailError);
           // Don't throw - the prescription is saved, manual retry can be attempted
+          await order.updateStatus(OrderStatus.PROCESSING);
         }
         break;
       }

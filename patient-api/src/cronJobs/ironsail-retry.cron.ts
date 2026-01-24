@@ -3,8 +3,8 @@ import { CronJobDefinition } from './index';
 /**
  * IronSail Retry Cron Job
  * 
- * Retries stuck IronSail pharmacy orders that have been in retry state
- * for more than 30 minutes. Processes up to 50 orders per run, oldest first.
+ * Retries all IronSail pharmacy orders in retry_pending status.
+ * Processes up to 50 orders per run, oldest first.
  */
 
 let workerInstance: any = null;
@@ -22,7 +22,7 @@ async function getWorker() {
 const ironSailRetryJob: CronJobDefinition = {
     name: 'ironsail-retry',
     schedule: '0 */2 * * *',  // Every 2 hours
-    description: 'Retry stuck IronSail pharmacy orders (older than 30 minutes)',
+    description: 'Retry all IronSail pharmacy orders in retry_pending status',
     handler: async () => {
         const worker = await getWorker();
         await worker.processStuckOrders();
