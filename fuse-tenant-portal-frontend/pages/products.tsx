@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { useRouter } from "next/router"
 import { Sidebar } from "@/components/sidebar"
 import { Header } from "@/components/header"
@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { Loader2, Plus, Package, FileText, X, Image as ImageIcon, Grid, List, Trash2, ChevronLeft, ChevronRight, PowerOff } from "lucide-react"
+import { Loader2, Plus, Package, FileText, X, Image as ImageIcon, Grid, List, Trash2, ChevronLeft, ChevronRight, PowerOff, Upload, CheckCircle2 } from "lucide-react"
 import { useAuth } from "@/contexts/AuthContext"
 import { CATEGORY_OPTIONS } from "@fuse/enums"
 import { toast } from "sonner"
@@ -79,6 +79,8 @@ export default function Products() {
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set())
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState<number | 'all'>(300)
+  const [uploadingImageFor, setUploadingImageFor] = useState<string | null>(null)
+  const fileInputRefs = useRef<Map<string, HTMLInputElement>>(new Map())
 
   // Form state
   const [formData, setFormData] = useState({
@@ -808,6 +810,72 @@ export default function Products() {
     }
   }
 
+  // Quick inline image upload handler
+  const handleQuickImageUpload = async (productId: string, file: File) => {
+    if (!token) {
+      toast.error('Not authenticated')
+      return
+    }
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select a valid image file')
+      return
+    }
+
+    // Validate file size (5MB max)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image size must be less than 5MB')
+      return
+    }
+
+    setUploadingImageFor(productId)
+    try {
+      const formData = new FormData()
+      formData.append('image', file)
+
+      const response = await fetch(`${baseUrl}/products/${productId}/upload-image`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        if (data.code === 'FEATURE_NOT_AVAILABLE') {
+          toast.error('Upgrade Required', {
+            description: data.message || 'Your plan does not support custom product images'
+          })
+        } else {
+          toast.error(data.message || 'Failed to upload image')
+        }
+        return
+      }
+
+      const newImageUrl = data.data.imageUrl
+      
+      // Update the product in the local state
+      setProducts(prev => prev.map(p => 
+        p.id === productId ? { ...p, imageUrl: newImageUrl } : p
+      ))
+      
+      toast.success('Image uploaded successfully')
+    } catch (error: any) {
+      console.error('Error uploading image:', error)
+      toast.error(error.message || 'Failed to upload image')
+    } finally {
+      setUploadingImageFor(null)
+      // Reset file input
+      const input = fileInputRefs.current.get(productId)
+      if (input) {
+        input.value = ''
+      }
+    }
+  }
+
   const handleAttachFormToProduct = async (productId: string, formId: string) => {
     if (!token || !formId) return
 
@@ -1199,7 +1267,7 @@ export default function Products() {
                   )}
                 </div>
 
-                <table className="w-full min-w-[900px]">
+                <table className="w-full min-w-[1000px]">
                   <thead className="bg-muted/50 border-b border-border">
                     <tr>
                       <th className="px-4 py-3 text-left">
@@ -1211,6 +1279,7 @@ export default function Products() {
                         />
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Pharmacy</th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wide">Image</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Product</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Description</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Size</th>
@@ -1249,14 +1318,41 @@ export default function Products() {
                           </span>
                         </td>
                         <td className="px-4 py-4">
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center justify-center">
                             {product.imageUrl ? (
-                              <img src={product.imageUrl} alt={product.name} className="h-10 w-10 rounded-lg object-cover" />
+                              <span title="Image uploaded"><CheckCircle2 className="h-5 w-5 text-green-500" /></span>
                             ) : (
-                              <div className="h-10 w-10 bg-muted rounded-lg flex items-center justify-center">
-                                <ImageIcon className="h-5 w-5 text-muted-foreground" />
-                              </div>
+                              <>
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  className="hidden"
+                                  ref={(el) => {
+                                    if (el) fileInputRefs.current.set(product.id, el)
+                                  }}
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0]
+                                    if (file) handleQuickImageUpload(product.id, file)
+                                  }}
+                                />
+                                <button
+                                  onClick={() => fileInputRefs.current.get(product.id)?.click()}
+                                  disabled={uploadingImageFor === product.id}
+                                  className="p-1.5 rounded-lg hover:bg-muted transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                  title="Upload image"
+                                >
+                                  {uploadingImageFor === product.id ? (
+                                    <Loader2 className="h-5 w-5 text-[#4FA59C] animate-spin" />
+                                  ) : (
+                                    <Upload className="h-5 w-5 text-muted-foreground hover:text-[#4FA59C]" />
+                                  )}
+                                </button>
+                              </>
                             )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-4">
+                          <div className="flex items-center gap-3">
                             <div>
                               <p className="text-sm font-semibold text-foreground">{product.name}</p>
                               {product.brandId && (
@@ -1406,18 +1502,46 @@ export default function Products() {
                       />
                     </div>
                     {/* Product Image Header */}
-                    {product.imageUrl && (
-                      <div className="w-full h-48 overflow-hidden bg-muted/50 border-b border-border">
+                    {product.imageUrl ? (
+                      <div className="relative w-full h-48 overflow-hidden bg-muted/50 border-b border-border group">
                         <img
                           src={product.imageUrl}
                           alt={product.name}
                           className="w-full h-full object-cover"
                         />
+                        <div className="absolute top-3 right-3">
+                          <span title="Image uploaded"><CheckCircle2 className="h-6 w-6 text-green-500 bg-white rounded-full" /></span>
+                        </div>
                       </div>
-                    )}
-                    {!product.imageUrl && (
-                      <div className="w-full h-48 bg-gradient-to-br from-muted/50 to-muted border-b border-border flex items-center justify-center">
-                        <ImageIcon className="h-16 w-16 text-muted-foreground" />
+                    ) : (
+                      <div className="relative w-full h-48 bg-gradient-to-br from-muted/50 to-muted border-b border-border flex flex-col items-center justify-center gap-2">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          ref={(el) => {
+                            if (el) fileInputRefs.current.set(`card-${product.id}`, el)
+                          }}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            if (file) handleQuickImageUpload(product.id, file)
+                          }}
+                        />
+                        <button
+                          onClick={() => fileInputRefs.current.get(`card-${product.id}`)?.click()}
+                          disabled={uploadingImageFor === product.id}
+                          className="flex flex-col items-center gap-2 p-4 rounded-xl hover:bg-muted/80 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="Upload image"
+                        >
+                          {uploadingImageFor === product.id ? (
+                            <Loader2 className="h-12 w-12 text-[#4FA59C] animate-spin" />
+                          ) : (
+                            <>
+                              <Upload className="h-12 w-12 text-muted-foreground" />
+                              <span className="text-xs text-muted-foreground">Click to upload</span>
+                            </>
+                          )}
+                        </button>
                       </div>
                     )}
 
