@@ -42,20 +42,20 @@ const CONFIG = {
   crossedOutMultiplier: 1.3, // 30% higher for display
 };
 
-// Fixed badge configuration
+// Fixed badge configuration - neutral colors
 const BADGE_MAP: { [key: string]: { label: string; color: string } } = {
-  'weightloss': { label: 'Weight Loss', color: '#ef4444' },
-  'weight-loss': { label: 'Weight Loss', color: '#ef4444' },
-  'hairgrowth': { label: 'Hair Growth', color: '#8b5cf6' },
-  'hair-growth': { label: 'Hair Growth', color: '#8b5cf6' },
-  'performance': { label: 'Muscle Growth', color: '#3b82f6' },
-  'recovery': { label: 'Recovery', color: '#10b981' },
-  'flexibility': { label: 'Flexibility', color: '#a855f7' },
-  'sexual-health': { label: 'Sexual Health', color: '#ec4899' },
-  'skincare': { label: 'Better Skin', color: '#f59e0b' },
-  'wellness': { label: 'Wellness', color: '#06b6d4' },
-  'energy': { label: 'More Energy', color: '#eab308' },
-  'sleep': { label: 'Better Sleep', color: '#6366f1' },
+  'weightloss': { label: 'Weight Loss', color: '#525252' },
+  'weight-loss': { label: 'Weight Loss', color: '#525252' },
+  'hairgrowth': { label: 'Hair Growth', color: '#6b7280' },
+  'hair-growth': { label: 'Hair Growth', color: '#6b7280' },
+  'performance': { label: 'Muscle Growth', color: '#4b5563' },
+  'recovery': { label: 'Recovery', color: '#525252' },
+  'flexibility': { label: 'Flexibility', color: '#6b7280' },
+  'sexual-health': { label: 'Sexual Health', color: '#4b5563' },
+  'skincare': { label: 'Better Skin', color: '#525252' },
+  'wellness': { label: 'Wellness', color: '#6b7280' },
+  'energy': { label: 'More Energy', color: '#4b5563' },
+  'sleep': { label: 'Better Sleep', color: '#525252' },
 };
 
 export const UniformProductCard: React.FC<UniformProductCardProps> = ({
@@ -182,7 +182,7 @@ export const UniformProductCard: React.FC<UniformProductCardProps> = ({
         fontSize: '1.25rem',
         marginBottom: '0.5rem',
         fontWeight: 400,
-        color: isHovered ? '#38bdf8' : 'inherit',
+        color: isHovered ? '#525252' : 'inherit',
         transition: 'color 0.3s ease',
       }}>
         {product.name}
@@ -261,7 +261,7 @@ function getBadges(product: Product): Array<{ label: string; color: string }> {
 
   // Default badge if none found
   if (badges.length === 0) {
-    badges.push({ label: 'Wellness', color: '#06b6d4' });
+    badges.push({ label: 'Wellness', color: '#6b7280' });
   }
 
   return badges;

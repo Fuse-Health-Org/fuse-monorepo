@@ -533,12 +533,12 @@ export default function LandingPage() {
         onHover={() => setHoveredCardIndex(cardId)}
         onLeave={() => setHoveredCardIndex(null)}
         onLikeClick={handleLikeClick}
-        primaryColor={primaryColor}
-        renderGetStartedButton={(formId, slug, color) => (
+        primaryColor="#374151"
+        renderGetStartedButton={(formId, slug) => (
           <GetStartedButton
             formId={formId}
             slug={slug}
-            primaryColor={color}
+            primaryColor="#374151"
           />
         )}
       />
@@ -553,8 +553,8 @@ export default function LandingPage() {
     const isHovered = hoveredCardIndex === cardId;
     const hasTemplate = !!program.medicalTemplateId;
 
-    // Program colors - purple-ish tones to differentiate from products
-    const programColors = ["#6366f1", "#8b5cf6", "#7c3aed", "#6d28d9"];
+    // Program colors - neutral tones
+    const programColors = ["#525252", "#4b5563", "#6b7280", "#374151"];
     const cardColor = programColors[index % 4];
 
     // Use the frontend display product image if available
@@ -580,7 +580,7 @@ export default function LandingPage() {
           position: "absolute",
           top: "0.5rem",
           left: "0.5rem",
-          background: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
+          background: "#525252",
           color: "white",
           fontSize: "0.625rem",
           padding: "0.25rem 0.5rem",
@@ -686,7 +686,7 @@ export default function LandingPage() {
           fontSize: "1.25rem",
           marginBottom: "0.5rem",
           fontWeight: 400,
-          color: isHovered ? "#6366f1" : "inherit",
+          color: isHovered ? "#525252" : "inherit",
           transition: "color 0.3s ease",
         }}>
           {program.name}
@@ -702,7 +702,7 @@ export default function LandingPage() {
         <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "1rem" }}>
           <span
             style={{
-              backgroundColor: "#6366f1",
+              backgroundColor: "#6b7280",
               color: "white",
               padding: "0.25rem 0.75rem",
               borderRadius: "1rem",
@@ -727,7 +727,7 @@ export default function LandingPage() {
               fontSize: "0.875rem",
               fontWeight: 600,
               textDecoration: "none",
-              backgroundColor: primaryColor,
+              backgroundColor: "#374151",
               color: "white",
               cursor: "pointer",
               border: "none",
