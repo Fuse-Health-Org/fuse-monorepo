@@ -82,8 +82,9 @@ export default function ProgramEditor() {
     const { id } = router.query
     const isCreateMode = id === 'create'
 
-    const { token, user } = useAuth()
-    const [loading, setLoading] = useState(!isCreateMode)
+    const { token, user, isLoading: authLoading } = useAuth()
+    // Only start in loading state if we know we're in edit mode (router ready and not create)
+    const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
     const [error, setError] = useState<string | null>(null)
 
@@ -143,10 +144,27 @@ export default function ProgramEditor() {
 
     // Load existing program if editing
     useEffect(() => {
-        if (!isCreateMode && token && id) {
+        // Wait for router to be ready before trying to fetch
+        if (!router.isReady) return
+        
+        // For create mode, no need to fetch - just disable loading
+        if (isCreateMode) {
+            setLoading(false)
+            return
+        }
+        
+        // For edit mode, need both token and id to fetch
+        if (token && id) {
             fetchProgram()
         }
-    }, [token, id, isCreateMode])
+        // If no token yet but auth is not loading, something is wrong - set loading false
+        // to prevent infinite loading state
+        else if (!authLoading && !token) {
+            console.log('⚠️ No token available after auth loaded - cannot fetch program')
+            setLoading(false)
+            setError('Authentication required')
+        }
+    }, [token, id, isCreateMode, router.isReady, authLoading])
 
     // Load medical templates
     useEffect(() => {
@@ -571,7 +589,8 @@ export default function ProgramEditor() {
             return bProductCount - aProductCount
         })
 
-    if (loading) {
+    // Show loading state while waiting for router or data
+    if (!router.isReady || loading) {
         return (
             <Layout>
                 <div className="min-h-screen bg-background flex items-center justify-center">
