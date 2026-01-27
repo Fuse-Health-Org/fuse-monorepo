@@ -1130,7 +1130,7 @@ export default function Products() {
                 </div>
               </div>
 
-              <div className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden">
+              <div className="bg-card rounded-2xl shadow-sm border border-border overflow-x-auto">
                 {/* Pagination controls at top */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-muted/50">
                   <div className="flex items-center gap-3">
@@ -1199,7 +1199,7 @@ export default function Products() {
                   )}
                 </div>
 
-                <table className="w-full">
+                <table className="w-full min-w-[900px]">
                   <thead className="bg-muted/50 border-b border-border">
                     <tr>
                       <th className="px-4 py-3 text-left">
@@ -1283,16 +1283,24 @@ export default function Products() {
                           )}
                         </td>
                         <td className="px-4 py-4">
-                          <div className="flex items-center justify-end gap-2">
+                          <div className="flex items-center justify-end gap-2 flex-nowrap">
                             <button
                               onClick={() => router.push(`/products/editor/${product.id}`)}
-                              className="px-3 py-1.5 rounded-lg bg-[#4FA59C] text-white text-xs font-medium hover:bg-[#478F87] transition-all"
+                              className="px-3 py-1.5 rounded-lg bg-[#4FA59C] text-white text-xs font-medium hover:bg-[#478F87] transition-all whitespace-nowrap"
                             >
                               {product.isActive ? 'Manage' : 'Configure'}
                             </button>
+                            {!product.isActive && (
+                              <button
+                                onClick={() => handleQuickActivate(product)}
+                                className="px-3 py-1.5 rounded-lg bg-[#10B981] text-white text-xs font-medium hover:bg-[#059669] transition-all whitespace-nowrap"
+                              >
+                                Activate
+                              </button>
+                            )}
                             <button
                               onClick={() => handlePermanentDelete(product)}
-                              className="px-3 py-1.5 rounded-lg bg-[#EF4444] text-white text-xs font-medium hover:bg-[#DC2626] transition-all"
+                              className="px-3 py-1.5 rounded-lg bg-[#EF4444] text-white text-xs font-medium hover:bg-[#DC2626] transition-all whitespace-nowrap"
                             >
                               Delete
                             </button>
