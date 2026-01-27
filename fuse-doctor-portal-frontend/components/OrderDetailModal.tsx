@@ -28,6 +28,13 @@ export function OrderDetailModal({ order, isOpen, onClose, onApprove, onCancel, 
     const [retryingEmail, setRetryingEmail] = useState(false);
     const [retryingSpreadsheet, setRetryingSpreadsheet] = useState(false);
 
+    // Doctor license validation state
+    const [doctorLicenseStatesCoverage, setDoctorLicenseStatesCoverage] = useState<string[]>([]);
+    const [orderState, setOrderState] = useState<string | null>(null);
+    const [licenseValidationError, setLicenseValidationError] = useState<string | null>(null);
+    const [loadingLicenseCheck, setLoadingLicenseCheck] = useState(false);
+    const [isLicensedForOrderState, setIsLicensedForOrderState] = useState<boolean | null>(null);
+
     // Prescription length state
     const [prescriptionLengthMode, setPrescriptionLengthMode] = useState<'months' | 'custom'>('months');
     const [prescriptionMonths, setPrescriptionMonths] = useState(6);
@@ -84,8 +91,52 @@ export function OrderDetailModal({ order, isOpen, onClose, onApprove, onCancel, 
         if (order?.id && isOpen) {
             fetchPharmacyCoverage();
             fetchPrescriptionInfo();
+            checkDoctorLicense();
         }
     }, [order?.id, isOpen]);
+
+    const checkDoctorLicense = async () => {
+        if (!order?.shippingAddress?.state) {
+            setOrderState(null);
+            setIsLicensedForOrderState(null);
+            setLicenseValidationError(null);
+            return;
+        }
+
+        const state = order.shippingAddress.state.toUpperCase();
+        setOrderState(state);
+        setLoadingLicenseCheck(true);
+        setLicenseValidationError(null);
+
+        try {
+            const response = await apiClient.getDoctorDetails();
+            
+            if (response.success && response.data) {
+                const licensedStates = (response.data.doctorLicenseStatesCoverage || []).map((s: string) => s.toUpperCase());
+                setDoctorLicenseStatesCoverage(licensedStates);
+                
+                if (licensedStates.length === 0) {
+                    setIsLicensedForOrderState(false);
+                    setLicenseValidationError('You have not configured your license states coverage. Please update your license coverage in settings before approving orders.');
+                } else if (licensedStates.includes(state)) {
+                    setIsLicensedForOrderState(true);
+                    setLicenseValidationError(null);
+                } else {
+                    setIsLicensedForOrderState(false);
+                    setLicenseValidationError(`You are not licensed to approve prescriptions in ${order.shippingAddress.state}. Your licensed states: ${licensedStates.join(', ')}. Please update your license coverage in settings.`);
+                }
+            } else {
+                setIsLicensedForOrderState(false);
+                setLicenseValidationError('Unable to verify your license information. Please contact support.');
+            }
+        } catch (error) {
+            console.error('Failed to check doctor license:', error);
+            setIsLicensedForOrderState(null);
+            setLicenseValidationError('Failed to verify license information. Please try again.');
+        } finally {
+            setLoadingLicenseCheck(false);
+        }
+    };
 
     const fetchPharmacyCoverage = async () => {
         if (!order?.id) return;
@@ -1123,6 +1174,42 @@ export function OrderDetailModal({ order, isOpen, onClose, onApprove, onCancel, 
                         </button>
                     </section>
 
+                    {/* License Validation Warning */}
+                    {orderState && (
+                        <section>
+                            {loadingLicenseCheck ? (
+                                <div className="bg-gray-50 border border-gray-200 p-4 rounded-lg">
+                                    <p className="text-sm text-gray-600">Checking license coverage...</p>
+                                </div>
+                            ) : isLicensedForOrderState === false ? (
+                                <div className="bg-red-50 border border-red-200 p-4 rounded-lg">
+                                    <p className="font-medium text-red-900 mb-2">⚠️ License Coverage Required</p>
+                                    <p className="text-sm text-red-800">{licenseValidationError}</p>
+                                    {order.shippingAddress?.state && (
+                                        <p className="text-sm text-red-700 mt-2">
+                                            <strong>Order State:</strong> {order.shippingAddress.state}
+                                            {doctorLicenseStatesCoverage.length > 0 && (
+                                                <>
+                                                    <br />
+                                                    <strong>Your Licensed States:</strong> {doctorLicenseStatesCoverage.join(', ')}
+                                                </>
+                                            )}
+                                        </p>
+                                    )}
+                                </div>
+                            ) : isLicensedForOrderState === true ? (
+                                <div className="bg-green-50 border border-green-200 p-4 rounded-lg">
+                                    <p className="font-medium text-green-900">✓ Licensed for {order.shippingAddress?.state}</p>
+                                    {doctorLicenseStatesCoverage.length > 0 && (
+                                        <p className="text-sm text-green-700 mt-1">
+                                            Licensed states: {doctorLicenseStatesCoverage.join(', ')}
+                                        </p>
+                                    )}
+                                </div>
+                            ) : null}
+                        </section>
+                    )}
+
                     {/* Auto Approval Info */}
                     {order.autoApprovedByDoctor && (
                         <section>
@@ -1176,9 +1263,23 @@ export function OrderDetailModal({ order, isOpen, onClose, onApprove, onCancel, 
                             </button>
                             <button
                                 onClick={handleApprove}
-                                disabled={approving || cancelling || loadingCoverage || !!coverageError || pharmacyCoverages.length === 0}
+                                disabled={
+                                    approving || 
+                                    cancelling || 
+                                    loadingCoverage || 
+                                    !!coverageError || 
+                                    pharmacyCoverages.length === 0 ||
+                                    isLicensedForOrderState === false ||
+                                    loadingLicenseCheck
+                                }
                                 className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                                title={coverageError ? 'Cannot approve: ' + coverageError : ''}
+                                title={
+                                    coverageError 
+                                        ? 'Cannot approve: ' + coverageError 
+                                        : isLicensedForOrderState === false 
+                                        ? licenseValidationError || 'Not licensed for this state'
+                                        : ''
+                                }
                             >
                                 {approving ? 'Approving...' : 'Approve Order'}
                             </button>
