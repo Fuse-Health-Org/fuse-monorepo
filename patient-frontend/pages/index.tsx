@@ -1109,8 +1109,9 @@ export default function LandingPage() {
       {/* Footer */}
       <footer style={{ backgroundColor: websiteData?.footerColor || "#0d3d3d", color: "white", padding: "4rem 0 2rem" }}>
         <div style={{ maxWidth: "1280px", margin: "0 auto", padding: "0 1.5rem" }}>
-          {/* Main Footer Grid: Left Sections | Middle Disclaimers | Right Sections */}
+          {/* Main Footer Grid: Left Sections | Middle Disclaimers | Right Sections. Single column on mobile via .brand-portal-footer-grid */}
           <div
+            className="brand-portal-footer-grid"
             style={{
               display: "grid",
               gridTemplateColumns: "1fr 2fr 1fr",
