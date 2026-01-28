@@ -645,7 +645,16 @@ export default function ProgramEditor() {
     }
 
     const filteredTemplates = templates
-        .filter(t => t.title.toLowerCase().includes(templateSearch.toLowerCase()))
+        .filter(t => {
+            // Only show custom templates (not system)
+            if (t.formTemplateType === 'system') return false
+            
+            // Only show templates that have products
+            if (!t.formProducts || t.formProducts.length === 0) return false
+            
+            // Apply search filter
+            return t.title.toLowerCase().includes(templateSearch.toLowerCase())
+        })
         .sort((a, b) => {
             // Selected template always comes first
             if (a.id === medicalTemplateId) return -1
