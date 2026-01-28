@@ -127,6 +127,10 @@ export default function ProgramEditor() {
     // Enabled forms for each product
     const [enabledForms, setEnabledForms] = useState<EnabledForm[]>([])
     const [copiedUrl, setCopiedUrl] = useState<string | null>(null)
+    
+    // Track which products are activated for this clinic (have TenantProduct entries)
+    const [activatedProductIds, setActivatedProductIds] = useState<Set<string>>(new Set())
+    const [activatingProductId, setActivatingProductId] = useState<string | null>(null)
 
     // Program mode: 'unified' = one program for all products, 'per_product' = unique program per product
     const [programMode, setProgramMode] = useState<'unified' | 'per_product'>('unified')
@@ -197,6 +201,30 @@ export default function ProgramEditor() {
         }
         fetchClinic()
     }, [token, user?.clinicId])
+
+    // Fetch TenantProducts to know which products are activated for this clinic
+    useEffect(() => {
+        const fetchTenantProducts = async () => {
+            if (!token) return
+            try {
+                const response = await fetch(`${API_URL}/tenant-products`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                })
+                if (response.ok) {
+                    const data = await response.json()
+                    if (Array.isArray(data?.data)) {
+                        const activeProductIds = new Set<string>(
+                            data.data.filter((tp: any) => tp.isActive).map((tp: any) => tp.productId)
+                        )
+                        setActivatedProductIds(activeProductIds)
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to load tenant products:', err)
+            }
+        }
+        fetchTenantProducts()
+    }, [token])
 
     // Load selected template details and forms when template is selected
     useEffect(() => {
@@ -345,6 +373,42 @@ export default function ProgramEditor() {
             console.error('Error fetching templates:', err)
         } finally {
             setTemplatesLoading(false)
+        }
+    }
+
+    // Activate a product for the current clinic (create TenantProduct entry)
+    const handleActivateProduct = async (productId: string) => {
+        if (!token || !productId) return
+        
+        setActivatingProductId(productId)
+        try {
+            const response = await fetch(`${API_URL}/tenant-products/update-selection`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    products: [{ productId, isActive: true }]
+                })
+            })
+
+            if (response.ok) {
+                // Add to activated set
+                setActivatedProductIds(prev => {
+                    const newSet = new Set(Array.from(prev))
+                    newSet.add(productId)
+                    return newSet
+                })
+            } else {
+                const data = await response.json()
+                setError(data.message || 'Failed to activate product')
+            }
+        } catch (err) {
+            console.error('Error activating product:', err)
+            setError('Failed to activate product')
+        } finally {
+            setActivatingProductId(null)
         }
     }
 
@@ -1538,6 +1602,31 @@ export default function ProgramEditor() {
                                 <span className="text-xs">Click the circle next to a product to use its image as the program's display image on the frontend.</span>
                             </p>
                             
+                            {/* Warning for deactivated products */}
+                            {(() => {
+                                const deactivatedProducts = selectedTemplateDetails.formProducts
+                                    .filter(fp => fp.product && !activatedProductIds.has(fp.product.id))
+                                if (deactivatedProducts.length > 0) {
+                                    return (
+                                        <div className="flex flex-col gap-2 p-4 mb-6 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                                            <div className="flex items-center gap-2">
+                                                <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+                                                <p className="text-sm text-amber-700 dark:text-amber-300 font-medium">
+                                                    {deactivatedProducts.length === 1 
+                                                        ? '1 product in this template is not activated for your brand'
+                                                        : `${deactivatedProducts.length} products in this template are not activated for your brand`
+                                                    }
+                                                </p>
+                                            </div>
+                                            <p className="text-xs text-amber-600 dark:text-amber-400 ml-7">
+                                                Deactivated products won't be available for purchase. Use the "Activate" button below to enable them.
+                                            </p>
+                                        </div>
+                                    )
+                                }
+                                return null
+                            })()}
+
                             {/* Program Mode Toggle */}
                             <div className="bg-muted/50 rounded-lg p-4 mb-6">
                                 <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
@@ -1602,11 +1691,19 @@ export default function ProgramEditor() {
                                         const product = fp.product!
                                         const productForms = enabledForms.filter(f => f.productId === product.id)
                                         const isDisplayProduct = frontendDisplayProductId === product.id
+                                        const isActivated = activatedProductIds.has(product.id)
+                                        const isActivating = activatingProductId === product.id
                                         
                                         return (
-                                            <div key={fp.id} className={`border rounded-xl overflow-hidden transition-all ${isDisplayProduct ? 'border-primary ring-2 ring-primary/20' : 'border-border'}`}>
+                                            <div key={fp.id} className={`border rounded-xl overflow-hidden transition-all ${
+                                                !isActivated 
+                                                    ? 'border-amber-300 dark:border-amber-700 bg-amber-50/50 dark:bg-amber-950/20' 
+                                                    : isDisplayProduct 
+                                                        ? 'border-primary ring-2 ring-primary/20' 
+                                                        : 'border-border'
+                                            }`}>
                                                 {/* Product Header */}
-                                                <div className="bg-muted/30 p-4 border-b border-border">
+                                                <div className={`p-4 border-b border-border ${!isActivated ? 'bg-amber-100/50 dark:bg-amber-900/20' : 'bg-muted/30'}`}>
                                                     <div className="flex items-center gap-4">
                                                         {/* Display Image Selection Radio */}
                                                         <div className="flex flex-col items-center gap-1">
@@ -1632,11 +1729,18 @@ export default function ProgramEditor() {
                                                             <img
                                                                 src={product.imageUrl}
                                                                 alt={product.name}
-                                                                className={`w-16 h-16 rounded-lg object-cover border ${isDisplayProduct ? 'border-primary' : 'border-border'}`}
+                                                                className={`w-16 h-16 rounded-lg object-cover border ${isDisplayProduct ? 'border-primary' : 'border-border'} ${!isActivated ? 'opacity-60' : ''}`}
                                                             />
                                                         )}
                                                         <div className="flex-1">
-                                                            <h4 className="font-semibold text-foreground">{product.name}</h4>
+                                                            <div className="flex items-center gap-2">
+                                                                <h4 className={`font-semibold ${!isActivated ? 'text-muted-foreground' : 'text-foreground'}`}>{product.name}</h4>
+                                                                {!isActivated && (
+                                                                    <Badge variant="outline" className="text-xs bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700">
+                                                                        Not Activated
+                                                                    </Badge>
+                                                                )}
+                                                            </div>
                                                             {product.placeholderSig && (
                                                                 <p className="text-sm text-muted-foreground mt-1">
                                                                     <span className="font-medium">SIG:</span> {product.placeholderSig}
@@ -1662,8 +1766,33 @@ export default function ProgramEditor() {
                                                                     {formatPrice(product.pharmacyWholesaleCost || product.price || 0)}
                                                                 </div>
                                                             </div>
+                                                            {/* Activate button for deactivated products */}
+                                                            {!isActivated && (
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="default"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation()
+                                                                        handleActivateProduct(product.id)
+                                                                    }}
+                                                                    disabled={isActivating}
+                                                                    className="text-xs bg-amber-600 hover:bg-amber-700"
+                                                                >
+                                                                    {isActivating ? (
+                                                                        <>
+                                                                            <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mr-1" />
+                                                                            Activating...
+                                                                        </>
+                                                                    ) : (
+                                                                        <>
+                                                                            <Check className="h-3 w-3 mr-1" />
+                                                                            Activate
+                                                                        </>
+                                                                    )}
+                                                                </Button>
+                                                            )}
                                                             {/* Configure button for per-product mode */}
-                                                            {programMode === 'per_product' && (
+                                                            {programMode === 'per_product' && isActivated && (
                                                                 <Button
                                                                     size="sm"
                                                                     variant={individualProductPrograms[product.id] ? 'outline' : 'default'}
@@ -1809,21 +1938,28 @@ export default function ProgramEditor() {
                                                     )
                                                 })()}
 
-                                                {/* No forms message */}
+                                                {/* No forms message - different for activated vs deactivated */}
                                                 {productForms.length === 0 && (
                                                     <div className="p-4">
-                                                        <div className="text-sm text-muted-foreground flex items-center gap-2">
-                                                            <FileText className="h-4 w-4" />
-                                                            No forms enabled for this product yet. 
-                                                            <a 
-                                                                href={`/products/${product.id}`} 
-                                                                className="text-primary hover:underline"
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
-                                                            >
-                                                                Configure in Products →
-                                                            </a>
-                                                        </div>
+                                                        {isActivated ? (
+                                                            <div className="text-sm text-muted-foreground flex items-center gap-2">
+                                                                <FileText className="h-4 w-4" />
+                                                                No forms enabled for this product yet. 
+                                                                <a 
+                                                                    href={`/products/${product.id}`} 
+                                                                    className="text-primary hover:underline"
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                >
+                                                                    Configure in Products →
+                                                                </a>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="text-sm text-amber-600 dark:text-amber-400 flex items-center gap-2">
+                                                                <AlertTriangle className="h-4 w-4" />
+                                                                Activate this product first to configure forms and make it available for purchase.
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 )}
                                             </div>
