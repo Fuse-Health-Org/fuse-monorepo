@@ -1374,8 +1374,10 @@ export default function ProgramEditor() {
                                     ? `${protocol}://${clinicCustomDomain}${dashboardPrefix}/my-products/${id}/program`
                                     : null
                                 
-                                // Check if medical template is selected
+                                // Check if medical template is selected and has products
                                 const hasTemplate = !!medicalTemplateId
+                                const templateHasProducts = selectedTemplateDetails?.formProducts && selectedTemplateDetails.formProducts.length > 0
+                                const canPreview = hasTemplate && templateHasProducts
 
                                 return (
                                     <div className="border border-border rounded-xl overflow-hidden">
@@ -1428,6 +1430,21 @@ export default function ProgramEditor() {
                                                 </div>
                                             )}
 
+                                            {/* Warning when template is selected but has no products */}
+                                            {hasTemplate && !templateHasProducts && (
+                                                <div className="flex flex-col gap-2 p-3 mb-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                                                    <div className="flex items-center gap-2">
+                                                        <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+                                                        <p className="text-sm text-amber-700 dark:text-amber-300 font-medium">
+                                                            The selected template has no products attached
+                                                        </p>
+                                                    </div>
+                                                    <p className="text-xs text-amber-600 dark:text-amber-400 ml-6">
+                                                        You can attach products to medical templates in the <span className="font-semibold">Tenant Portal → Forms</span> section
+                                                    </p>
+                                                </div>
+                                            )}
+
                                             {/* Form URLs */}
                                             <div className="flex items-center gap-2 flex-wrap">
                                                 {/* Subdomain URL */}
@@ -1435,14 +1452,14 @@ export default function ProgramEditor() {
                                                     <Button 
                                                         size="sm" 
                                                         variant="outline" 
-                                                        onClick={() => hasTemplate && window.open(programUrl, '_blank')}
+                                                        onClick={() => canPreview && window.open(programUrl, '_blank')}
                                                         className="gap-1.5"
-                                                        disabled={!hasTemplate}
+                                                        disabled={!canPreview}
                                                     >
                                                         <ExternalLink className="h-3.5 w-3.5" />
                                                         Preview Subdomain
                                                     </Button>
-                                                    {hasTemplate && (
+                                                    {canPreview && (
                                                         <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 bg-foreground text-background text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50 max-w-xs truncate">
                                                             {programUrl}
                                                         </div>
@@ -1451,10 +1468,10 @@ export default function ProgramEditor() {
                                                 <Button 
                                                     size="sm" 
                                                     variant="ghost" 
-                                                    onClick={() => hasTemplate && handleCopyUrl(programUrl, 'program-subdomain')}
+                                                    onClick={() => canPreview && handleCopyUrl(programUrl, 'program-subdomain')}
                                                     className="h-8 w-8 p-0"
                                                     title="Copy subdomain URL"
-                                                    disabled={!hasTemplate}
+                                                    disabled={!canPreview}
                                                 >
                                                     {copiedUrl === 'program-subdomain' ? (
                                                         <Check className="h-3.5 w-3.5 text-green-500" />
@@ -1471,14 +1488,14 @@ export default function ProgramEditor() {
                                                             <Button 
                                                                 size="sm" 
                                                                 variant="outline" 
-                                                                onClick={() => hasTemplate && window.open(customProgramUrl, '_blank')}
+                                                                onClick={() => canPreview && window.open(customProgramUrl, '_blank')}
                                                                 className="gap-1.5"
-                                                                disabled={!hasTemplate}
+                                                                disabled={!canPreview}
                                                             >
                                                                 <ExternalLink className="h-3.5 w-3.5" />
                                                                 Preview Custom Domain
                                                             </Button>
-                                                            {hasTemplate && (
+                                                            {canPreview && (
                                                                 <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 bg-foreground text-background text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50 max-w-xs truncate">
                                                                     {customProgramUrl}
                                                                 </div>
@@ -1487,10 +1504,10 @@ export default function ProgramEditor() {
                                                         <Button 
                                                             size="sm" 
                                                             variant="ghost" 
-                                                            onClick={() => hasTemplate && handleCopyUrl(customProgramUrl, 'program-custom')}
+                                                            onClick={() => canPreview && handleCopyUrl(customProgramUrl, 'program-custom')}
                                                             className="h-8 w-8 p-0"
                                                             title="Copy custom domain URL"
-                                                            disabled={!hasTemplate}
+                                                            disabled={!canPreview}
                                                         >
                                                             {copiedUrl === 'program-custom' ? (
                                                                 <Check className="h-3.5 w-3.5 text-green-500" />
