@@ -110,20 +110,20 @@ export function OrderDetailModal({ order, isOpen, onClose, onApprove, onCancel, 
 
         try {
             const response = await apiClient.getDoctorDetails();
-            
+
             if (response.success && response.data) {
                 const licensedStates = (response.data.doctorLicenseStatesCoverage || []).map((s: string) => s.toUpperCase());
                 setDoctorLicenseStatesCoverage(licensedStates);
-                
+
                 if (licensedStates.length === 0) {
                     setIsLicensedForOrderState(false);
-                    setLicenseValidationError('You have not configured your license states coverage. Please update your license coverage in settings before approving orders.');
+                    setLicenseValidationError('You have not configured your license states coverage. Please update your license coverage in settings before approving orders. (Settings -> License Coverage)');
                 } else if (licensedStates.includes(state)) {
                     setIsLicensedForOrderState(true);
                     setLicenseValidationError(null);
                 } else {
                     setIsLicensedForOrderState(false);
-                    setLicenseValidationError(`You are not licensed to approve prescriptions in ${order.shippingAddress.state}. Your licensed states: ${licensedStates.join(', ')}. Please update your license coverage in settings.`);
+                    setLicenseValidationError(`You (the doctor) are not licensed to approve prescriptions in ${order.shippingAddress.state}. Please update your license coverage in settings. (Settings -> License Coverage)`);
                 }
             } else {
                 setIsLicensedForOrderState(false);
@@ -1264,21 +1264,21 @@ export function OrderDetailModal({ order, isOpen, onClose, onApprove, onCancel, 
                             <button
                                 onClick={handleApprove}
                                 disabled={
-                                    approving || 
-                                    cancelling || 
-                                    loadingCoverage || 
-                                    !!coverageError || 
+                                    approving ||
+                                    cancelling ||
+                                    loadingCoverage ||
+                                    !!coverageError ||
                                     pharmacyCoverages.length === 0 ||
                                     isLicensedForOrderState === false ||
                                     loadingLicenseCheck
                                 }
                                 className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
                                 title={
-                                    coverageError 
-                                        ? 'Cannot approve: ' + coverageError 
-                                        : isLicensedForOrderState === false 
-                                        ? licenseValidationError || 'Not licensed for this state'
-                                        : ''
+                                    coverageError
+                                        ? 'Cannot approve: ' + coverageError
+                                        : isLicensedForOrderState === false
+                                            ? licenseValidationError || 'Not licensed for this state'
+                                            : ''
                                 }
                             >
                                 {approving ? 'Approving...' : 'Approve Order'}

@@ -56,7 +56,7 @@ export default function Settings() {
     }
 
     // Load license coverage if user is a doctor
-    if (user && (user.role === 'doctor' || user.userRoles?.doctor)) {
+    if (user?.userRoles?.doctor) {
       loadLicenseCoverage()
     }
   }, [user, router])
@@ -257,7 +257,7 @@ export default function Settings() {
                     Password
                   </div>
                 </button>
-                {(user?.role === 'doctor' || user?.userRoles?.doctor) && (
+                {user?.userRoles?.doctor && (
                   <button
                     onClick={() => setActiveTab('license')}
                     className={`px-4 py-2 font-medium text-sm transition-colors ${
@@ -495,7 +495,7 @@ export default function Settings() {
               )}
 
               {/* License Coverage Tab */}
-              {activeTab === 'license' && (user?.role === 'doctor' || user?.userRoles?.doctor) && (
+              {activeTab === 'license' && user?.userRoles?.doctor && (
                 <Card>
                   <CardHeader>
                     <CardTitle>License Coverage</CardTitle>
