@@ -3062,7 +3062,23 @@ app.get("/clinic/allow-custom-domain", async (req, res) => {
         const withoutPlatform = baseDomain.slice(0, -platformDomain.length);
         const parts = withoutPlatform.split('.');
 
-        // Only allow exactly 2-part subdomains: <affiliate>.<brand> or admin.<brand>
+        // Handle single-part subdomain: <brand>.fusehealth.com
+        if (parts.length === 1) {
+          const brandSlug = parts[0];
+          
+          // Check if clinic exists with this slug
+          const brandClinic = await Clinic.findOne({
+            where: { slug: brandSlug },
+            attributes: ["id"],
+          });
+
+          if (brandClinic) {
+            console.log(`✅ [allow-custom-domain] Allowing brand subdomain: ${baseDomain}`);
+            return res.status(200).send("ok");
+          }
+        }
+
+        // Handle 2-part subdomains: <affiliate>.<brand> or admin.<brand>
         if (parts.length === 2) {
           const [firstPart, brandSlug] = parts;
 
