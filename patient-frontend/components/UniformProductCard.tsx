@@ -176,7 +176,7 @@ export const UniformProductCard: React.FC<UniformProductCardProps> = ({
         )}
       </div>
 
-      {/* Product Name */}
+      {/* Product Name - Fixed 2 lines max */}
       <h3 style={{
         fontFamily: CONFIG.fontFamily,
         fontSize: '1.25rem',
@@ -184,26 +184,38 @@ export const UniformProductCard: React.FC<UniformProductCardProps> = ({
         fontWeight: 400,
         color: isHovered ? '#525252' : 'inherit',
         transition: 'color 0.3s ease',
+        height: '3rem', // Fixed height for 2 lines
+        lineHeight: '1.5rem',
+        overflow: 'hidden',
+        display: '-webkit-box',
+        WebkitLineClamp: 2,
+        WebkitBoxOrient: 'vertical' as const,
       }}>
         {product.name}
       </h3>
 
-      {/* Description - Fixed styling */}
+      {/* Description - Fixed 3 lines max */}
       <p style={{
         fontSize: '0.875rem',
         color: '#525252',
         marginBottom: '0.75rem',
-        minHeight: '2.5rem',
+        height: '3.75rem', // Fixed height for 3 lines
+        lineHeight: '1.25rem',
+        overflow: 'hidden',
+        display: '-webkit-box',
+        WebkitLineClamp: 3,
+        WebkitBoxOrient: 'vertical' as const,
       }}>
         {product.description || 'Premium health product'}
       </p>
 
-      {/* Price - Fixed styling */}
+      {/* Price - Fixed styling and height */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
         gap: '0.5rem',
         marginBottom: '0.75rem',
+        height: '1.5rem', // Fixed height
       }}>
         <span style={{ fontWeight: 600 }}>
           From ${product.price.toFixed(2)}/mo
@@ -217,12 +229,14 @@ export const UniformProductCard: React.FC<UniformProductCardProps> = ({
         </span>
       </div>
 
-      {/* Badges - Fixed styling */}
+      {/* Badges - Fixed styling and height */}
       <div style={{
         display: 'flex',
         gap: '0.5rem',
         flexWrap: 'wrap',
         marginBottom: '1rem',
+        height: '1.75rem', // Fixed height for single row of badges
+        overflow: 'hidden',
       }}>
         {badges.map((badge, idx) => (
           <span

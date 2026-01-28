@@ -691,6 +691,7 @@ export default function LandingPage() {
             </div>
           )}
         </div>
+        {/* Program Name - Fixed 2 lines max */}
         <h3 style={{
           fontFamily: "Georgia, serif",
           fontSize: "1.25rem",
@@ -698,18 +699,50 @@ export default function LandingPage() {
           fontWeight: 400,
           color: isHovered ? "#525252" : "inherit",
           transition: "color 0.3s ease",
+          height: "3rem", // Fixed height for 2 lines
+          lineHeight: "1.5rem",
+          overflow: "hidden",
+          display: "-webkit-box",
+          WebkitLineClamp: 2,
+          WebkitBoxOrient: "vertical" as const,
         }}>
           {program.name}
         </h3>
-        <p style={{ fontSize: "0.875rem", color: "#525252", marginBottom: "0.75rem", minHeight: "2.5rem" }}>
+        {/* Description - Fixed 3 lines max */}
+        <p style={{
+          fontSize: "0.875rem",
+          color: "#525252",
+          marginBottom: "0.75rem",
+          height: "3.75rem", // Fixed height for 3 lines
+          lineHeight: "1.25rem",
+          overflow: "hidden",
+          display: "-webkit-box",
+          WebkitLineClamp: 3,
+          WebkitBoxOrient: "vertical" as const,
+        }}>
           {program.description || program.medicalTemplate?.title || "Comprehensive health program"}
         </p>
-        {program.fromPrice && program.fromPrice > 0 && (
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.75rem" }}>
+        {/* Price - Fixed height */}
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "0.5rem",
+          marginBottom: "0.75rem",
+          height: "1.5rem", // Fixed height
+        }}>
+          {program.fromPrice && program.fromPrice > 0 && (
             <span style={{ fontWeight: 600 }}>From ${program.fromPrice.toFixed(2)}/mo</span>
-          </div>
-        )}
-        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "1rem" }}>
+          )}
+        </div>
+        {/* Badges - Fixed height */}
+        <div style={{
+          display: "flex",
+          gap: "0.5rem",
+          flexWrap: "wrap",
+          marginBottom: "1rem",
+          height: "1.75rem", // Fixed height for single row of badges
+          overflow: "hidden",
+        }}>
           <span
             style={{
               backgroundColor: "#6b7280",
