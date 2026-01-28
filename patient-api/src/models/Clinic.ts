@@ -175,6 +175,17 @@ export default class Clinic extends Entity {
     @BelongsTo(() => User, 'referrerDoctorId')
     declare referrerDoctor?: User;
 
+    // Main doctor - the doctor currently responsible for this clinic
+    @ForeignKey(() => User)
+    @Column({
+        type: DataType.UUID,
+        allowNull: true,
+    })
+    declare mainDoctorId?: string;
+
+    @BelongsTo(() => User, 'mainDoctorId')
+    declare mainDoctor?: User;
+
     @HasOne(() => Subscription)
     declare subscription?: Subscription;
 
