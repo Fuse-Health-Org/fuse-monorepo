@@ -14674,21 +14674,31 @@ app.put("/organization/update", authenticateJWT, async (req, res) => {
 
         if (isCustomDomain !== undefined) {
           updateData.isCustomDomain = isCustomDomain;
+          
+          // If switching to subdomain (isCustomDomain = false), clear customDomain
+          if (isCustomDomain === false) {
+            updateData.customDomain = null;
+          }
         }
 
         if (customDomain !== undefined) {
-          // Normalize custom domain to bare hostname (lowercase, no protocol/path/trailing dot)
-          try {
-            const candidate = customDomain.trim();
-            const url = new URL(
-              candidate.startsWith("http") ? candidate : `https://${candidate}`
-            );
-            let host = url.hostname.toLowerCase();
-            if (host.endsWith(".")) host = host.slice(0, -1);
-            updateData.customDomain = host;
-          } catch {
-            // Fallback to raw value (will be validated elsewhere if needed)
-            updateData.customDomain = customDomain;
+          // Convert empty string to null to avoid unique constraint violations
+          if (!customDomain || customDomain.trim() === '') {
+            updateData.customDomain = null;
+          } else {
+            // Normalize custom domain to bare hostname (lowercase, no protocol/path/trailing dot)
+            try {
+              const candidate = customDomain.trim();
+              const url = new URL(
+                candidate.startsWith("http") ? candidate : `https://${candidate}`
+              );
+              let host = url.hostname.toLowerCase();
+              if (host.endsWith(".")) host = host.slice(0, -1);
+              updateData.customDomain = host;
+            } catch {
+              // Fallback to raw value (will be validated elsewhere if needed)
+              updateData.customDomain = customDomain;
+            }
           }
         }
 
@@ -14744,13 +14754,43 @@ app.put("/organization/update", authenticateJWT, async (req, res) => {
           : null,
       },
     });
-  } catch (error) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("❌ Error updating organization:", error);
-    } else {
-      console.error("❌ Error updating organization");
+  } catch (error: any) {
+    console.error("❌ Error updating organization:", error?.message || error);
+    if (error?.errors) {
+      console.error("❌ Sequelize errors:", JSON.stringify(error.errors, null, 2));
     }
-    res.status(500).json({ success: false, message: "Internal server error" });
+    
+    // Handle Sequelize unique constraint violations
+    if (error?.name === 'SequelizeUniqueConstraintError') {
+      const field = error?.errors?.[0]?.path;
+      const value = error?.errors?.[0]?.value;
+      
+      if (field === 'customDomain') {
+        return res.status(400).json({ 
+          success: false, 
+          message: `The custom domain "${value}" is already in use by another organization. Please choose a different domain.` 
+        });
+      }
+      
+      return res.status(400).json({ 
+        success: false, 
+        message: `This ${field} is already in use. Please choose a different value.` 
+      });
+    }
+    
+    // Handle other validation errors
+    if (error?.name === 'SequelizeValidationError') {
+      const messages = error?.errors?.map((e: any) => e.message).join(', ');
+      return res.status(400).json({ 
+        success: false, 
+        message: messages || 'Validation error occurred' 
+      });
+    }
+    
+    res.status(500).json({ 
+      success: false, 
+      message: error?.message || "Internal server error" 
+    });
   }
 });
 
