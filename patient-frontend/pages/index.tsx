@@ -369,7 +369,17 @@ export default function LandingPage() {
         console.log('📋 Programs data:', programsData);
 
         if (Array.isArray(programsData)) {
-          setPrograms(programsData);
+          // Filter out programs that have a medical template but no products attached
+          const filteredPrograms = programsData.filter((program: Program) => {
+            // If program has a medical template, it must have products (fromPrice will be set)
+            if (program.medicalTemplateId) {
+              // Only show if fromPrice exists (meaning template has products)
+              return program.fromPrice !== null && program.fromPrice !== undefined;
+            }
+            // Programs without templates can still show (though they might be disabled)
+            return true;
+          });
+          setPrograms(filteredPrograms);
         } else {
           console.error('❌ Programs data is not an array:', programsData);
           setPrograms([]);
