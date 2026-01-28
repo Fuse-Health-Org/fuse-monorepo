@@ -758,14 +758,20 @@ export default function ProgramEditor() {
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium mb-2">
-                                        Description (Optional)
-                                    </label>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <label className="block text-sm font-medium">
+                                            Description (Optional)
+                                        </label>
+                                        <span className="text-xs text-muted-foreground">
+                                            {116 - description.length} characters remaining
+                                        </span>
+                                    </div>
                                     <textarea
                                         value={description}
                                         onChange={(e) => setDescription(e.target.value)}
                                         placeholder="Describe what this program includes..."
                                         rows={3}
+                                        maxLength={116}
                                         className="w-full px-3 py-2 border border-input rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                                     />
                                 </div>
