@@ -1440,7 +1440,7 @@ export default function ProgramEditor() {
                                                         </p>
                                                     </div>
                                                     <p className="text-xs text-amber-600 dark:text-amber-400 ml-6">
-                                                        You can attach products to medical templates in the <span className="font-semibold">Tenant Portal → Forms</span> section
+                                                        A doctor can change the products attached to each medical template
                                                     </p>
                                                 </div>
                                             )}
