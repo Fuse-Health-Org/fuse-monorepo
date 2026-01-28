@@ -51,6 +51,7 @@ interface ClinicInfo {
   parentClinicName?: string;
   parentClinicHeroImageUrl?: string;
   patientPortalDashboardFormat?: PatientPortalDashboardFormat;
+  defaultFormColor?: string;
 }
 
 interface Product {
@@ -532,6 +533,9 @@ export default function LandingPage() {
       }
     };
 
+    // Use clinic's default form color or fallback to neutral gray
+    const buttonColor = clinicInfo?.defaultFormColor || "#374151";
+
     return (
       <UniformProductCard
         key={product.id}
@@ -543,12 +547,12 @@ export default function LandingPage() {
         onHover={() => setHoveredCardIndex(cardId)}
         onLeave={() => setHoveredCardIndex(null)}
         onLikeClick={handleLikeClick}
-        primaryColor="#374151"
+        primaryColor={buttonColor}
         renderGetStartedButton={(formId, slug) => (
           <GetStartedButton
             formId={formId}
             slug={slug}
-            primaryColor="#374151"
+            primaryColor={buttonColor}
           />
         )}
       />
@@ -566,6 +570,9 @@ export default function LandingPage() {
     // Program colors - neutral tones
     const programColors = ["#525252", "#4b5563", "#6b7280", "#374151"];
     const cardColor = programColors[index % 4];
+
+    // Use clinic's default form color or fallback to neutral gray
+    const buttonColor = clinicInfo?.defaultFormColor || "#374151";
 
     // Use the frontend display product image if available
     const displayImageUrl = program.frontendDisplayProduct?.imageUrl;
@@ -770,7 +777,7 @@ export default function LandingPage() {
               fontSize: "0.875rem",
               fontWeight: 600,
               textDecoration: "none",
-              backgroundColor: "#374151",
+              backgroundColor: buttonColor,
               color: "white",
               cursor: "pointer",
               border: "none",

@@ -3933,6 +3933,7 @@ app.get("/custom-website/by-slug/:slug", async (req, res) => {
         parentClinicName,
         parentClinicHeroImageUrl,
         patientPortalDashboardFormat: clinic.patientPortalDashboardFormat,
+        defaultFormColor: clinic.defaultFormColor,
       }
     });
   } catch (error) {
