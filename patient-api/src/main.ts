@@ -52,6 +52,7 @@ import TreatmentService from "./services/treatment.service";
 import PaymentService from "./services/payment.service";
 import ClinicService from "./services/clinic.service";
 import { processStripeWebhook } from "./services/stripe/webhook";
+import { getDefaultCustomWebsiteValues, getDefaultFooterValues, getDefaultSocialMediaValues } from "./utils/customWebsiteDefaults";
 import TreatmentProducts from "./models/TreatmentProducts";
 import TreatmentPlan, { BillingInterval } from "./models/TreatmentPlan";
 import ShippingOrder from "./models/ShippingOrder";
@@ -898,49 +899,7 @@ app.post("/auth/signup", async (req, res) => {
 
       // Create default CustomWebsite for the new clinic
       try {
-        await CustomWebsite.create({
-          clinicId: clinic.id,
-          portalTitle: "Welcome to Our Portal",
-          portalDescription: "Your trusted healthcare partner. Browse our products and services below.",
-          primaryColor: "#000000",
-          fontFamily: "Playfair Display",
-          logo: "",
-          heroImageUrl: "https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=1920&q=80",
-          heroTitle: "Your Daily Health, Simplified",
-          heroSubtitle: "All-in-one nutritional support in one simple drink",
-          isActive: true,
-          footerColor: "#000000",
-          footerCategories: [
-            {
-              name: "NAVIGATION LINKS",
-              visible: true,
-              urls: [
-                { label: "Bundles", url: "/#bundles" },
-                { label: "Programs", url: "/#programs" },
-                { label: "Performance", url: "/#performance" },
-                { label: "Weight Loss", url: "/#weightloss" },
-                { label: "Wellness", url: "/#wellness" }
-              ]
-            },
-            { name: "Section 2", visible: false, urls: [] },
-            { name: "Section 3", visible: false, urls: [] },
-            { name: "Section 4", visible: false, urls: [] }
-          ],
-          section1: "NAVIGATION LINKS",
-          section2: null,
-          section3: null,
-          section4: null,
-          socialMediaSection: "SOCIAL MEDIA",
-          useDefaultDisclaimer: true,
-          footerDisclaimer: null,
-          socialMediaLinks: {
-            instagram: { enabled: true, url: "" },
-            facebook: { enabled: true, url: "" },
-            twitter: { enabled: true, url: "" },
-            tiktok: { enabled: true, url: "" },
-            youtube: { enabled: true, url: "" }
-          }
-        });
+        await CustomWebsite.create(getDefaultCustomWebsiteValues(clinic.id));
         if (process.env.NODE_ENV === "development") {
           console.log("✅ CustomWebsite created for clinic:", clinic.id);
         }
@@ -3642,7 +3601,7 @@ app.post("/custom-website/toggle-active", authenticateJWT, async (req, res) => {
     } else {
       // Create a new custom website with default values and the specified isActive state
       customWebsite = await CustomWebsite.create({
-        clinicId: user.clinicId,
+        ...getDefaultCustomWebsiteValues(user.clinicId),
         isActive
       });
     }
@@ -3659,6 +3618,126 @@ app.post("/custom-website/toggle-active", authenticateJWT, async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to toggle portal status"
+    });
+  }
+});
+
+// Reset footer section to defaults
+app.post("/custom-website/reset-footer", authenticateJWT, async (req, res) => {
+  try {
+    const currentUser = getCurrentUser(req);
+    if (!currentUser) {
+      return res.status(401).json({
+        success: false,
+        message: "Not authenticated"
+      });
+    }
+
+    const user = await User.findByPk(currentUser.id, {
+      include: [{ model: UserRoles, as: 'userRoles', required: false }]
+    });
+    if (!user || !user.clinicId) {
+      return res.status(404).json({
+        success: false,
+        message: "User or clinic not found"
+      });
+    }
+
+    // Only allow brand users to modify portal settings
+    if (!user.hasAnyRoleSync(['brand', 'doctor', 'admin', 'superAdmin'])) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied"
+      });
+    }
+
+    const customWebsite = await CustomWebsite.findOne({
+      where: { clinicId: user.clinicId }
+    });
+
+    if (!customWebsite) {
+      return res.status(404).json({
+        success: false,
+        message: "Custom website not found"
+      });
+    }
+
+    // Reset footer section to defaults
+    const defaultFooterValues = getDefaultFooterValues();
+    await customWebsite.update(defaultFooterValues);
+
+    console.log('🔄 Footer section reset to defaults for clinic:', user.clinicId);
+
+    res.status(200).json({
+      success: true,
+      message: "Footer section reset to defaults successfully",
+      data: customWebsite
+    });
+  } catch (error) {
+    console.error('Error resetting footer section:', error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to reset footer section"
+    });
+  }
+});
+
+// Reset social media section to defaults
+app.post("/custom-website/reset-social-media", authenticateJWT, async (req, res) => {
+  try {
+    const currentUser = getCurrentUser(req);
+    if (!currentUser) {
+      return res.status(401).json({
+        success: false,
+        message: "Not authenticated"
+      });
+    }
+
+    const user = await User.findByPk(currentUser.id, {
+      include: [{ model: UserRoles, as: 'userRoles', required: false }]
+    });
+    if (!user || !user.clinicId) {
+      return res.status(404).json({
+        success: false,
+        message: "User or clinic not found"
+      });
+    }
+
+    // Only allow brand users to modify portal settings
+    if (!user.hasAnyRoleSync(['brand', 'doctor', 'admin', 'superAdmin'])) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied"
+      });
+    }
+
+    const customWebsite = await CustomWebsite.findOne({
+      where: { clinicId: user.clinicId }
+    });
+
+    if (!customWebsite) {
+      return res.status(404).json({
+        success: false,
+        message: "Custom website not found"
+      });
+    }
+
+    // Reset social media section to defaults
+    const defaultSocialMediaValues = getDefaultSocialMediaValues();
+    await customWebsite.update(defaultSocialMediaValues);
+
+    console.log('🔄 Social media section reset to defaults for clinic:', user.clinicId);
+
+    res.status(200).json({
+      success: true,
+      message: "Social media section reset to defaults successfully",
+      data: customWebsite
+    });
+  } catch (error) {
+    console.error('Error resetting social media section:', error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to reset social media section"
     });
   }
 });

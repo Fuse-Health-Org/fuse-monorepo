@@ -5,7 +5,7 @@ import Layout from "@/components/Layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Monitor, Smartphone, Upload, Link as LinkIcon, Globe, Crown, ExternalLink, Trash2, Plus, ChevronDown, GripVertical, Pencil, Check, X } from "lucide-react"
+import { Monitor, Smartphone, Upload, Link as LinkIcon, Globe, Crown, ExternalLink, Trash2, Plus, ChevronDown, GripVertical, Pencil, Check, X, RotateCcw } from "lucide-react"
 import { Switch } from "@/components/ui/switch"
 import { ToastManager } from "@/components/ui/toast"
 import { useToast } from "@/hooks/use-toast"
@@ -77,6 +77,8 @@ export default function PortalPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isUploadingLogo, setIsUploadingLogo] = useState(false)
   const [isUploadingHero, setIsUploadingHero] = useState(false)
+  const [isResettingFooter, setIsResettingFooter] = useState(false)
+  const [isResettingSocialMedia, setIsResettingSocialMedia] = useState(false)
   const [logoInputMode, setLogoInputMode] = useState<"file" | "url">(() => {
     if (typeof window !== "undefined") {
       const saved = window.localStorage.getItem("portal-logo-input-mode")
@@ -284,6 +286,90 @@ export default function PortalPage() {
       )
     } finally {
       setIsSaving(false)
+    }
+  }
+
+  const handleResetFooter = async () => {
+    if (!confirm("Are you sure you want to reset the footer section to default values? This will clear all footer categories and links.")) {
+      return
+    }
+
+    setIsResettingFooter(true)
+    try {
+      const response = await authenticatedFetch(`${API_URL}/custom-website/reset-footer`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success && data.data) {
+          // Update settings with the reset values
+          setSettings({
+            ...settings,
+            footerColor: data.data.footerColor,
+            footerCategories: data.data.footerCategories,
+            useDefaultDisclaimer: data.data.useDefaultDisclaimer,
+            footerDisclaimer: data.data.footerDisclaimer,
+          })
+          success("Footer section reset to defaults successfully!", "Footer Reset")
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({}))
+        error(
+          errorData.message || "Failed to reset footer section",
+          "Reset Failed"
+        )
+      }
+    } catch (err) {
+      console.error("Error resetting footer section:", err)
+      error(
+        err instanceof Error ? err.message : "Error resetting footer section",
+        "Error"
+      )
+    } finally {
+      setIsResettingFooter(false)
+    }
+  }
+
+  const handleResetSocialMedia = async () => {
+    if (!confirm("Are you sure you want to reset the social media section to default values? This will clear all social media links.")) {
+      return
+    }
+
+    setIsResettingSocialMedia(true)
+    try {
+      const response = await authenticatedFetch(`${API_URL}/custom-website/reset-social-media`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success && data.data) {
+          // Update settings with the reset values
+          setSettings({
+            ...settings,
+            socialMediaSection: data.data.socialMediaSection,
+            socialMediaLinks: data.data.socialMediaLinks,
+          })
+          success("Social media section reset to defaults successfully!", "Social Media Reset")
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({}))
+        error(
+          errorData.message || "Failed to reset social media section",
+          "Reset Failed"
+        )
+      }
+    } catch (err) {
+      console.error("Error resetting social media section:", err)
+      error(
+        err instanceof Error ? err.message : "Error resetting social media section",
+        "Error"
+      )
+    } finally {
+      setIsResettingSocialMedia(false)
     }
   }
 
@@ -921,17 +1007,30 @@ export default function PortalPage() {
                 <div className="space-y-3 pt-2 border-t">
                   <div className="flex items-center justify-between">
                     <label className="text-sm font-medium">Footer Sections</label>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setIsAddingCategory(true)}
-                      className="h-8"
-                      disabled={(settings.footerCategories || []).length >= 4}
-                      title={(settings.footerCategories || []).length >= 4 ? "Maximum 4 sections allowed" : "Add Category"}
-                    >
-                      <Plus className="h-4 w-4 mr-1" />
-                      Add Category
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleResetFooter}
+                        className="h-8"
+                        disabled={isResettingFooter}
+                        title="Reset to default footer"
+                      >
+                        <RotateCcw className="h-4 w-4 mr-1" />
+                        {isResettingFooter ? "Resetting..." : "Reset"}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsAddingCategory(true)}
+                        className="h-8"
+                        disabled={(settings.footerCategories || []).length >= 4}
+                        title={(settings.footerCategories || []).length >= 4 ? "Maximum 4 sections allowed" : "Add Category"}
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Add Category
+                      </Button>
+                    </div>
                   </div>
                   <div className="space-y-2">
                     {(settings.footerCategories || []).map((category, index) => {
@@ -1242,9 +1341,22 @@ export default function PortalPage() {
 
                 {/* Social Media Links */}
                 <div className="space-y-3 pt-4 border-t">
-                  <div>
-                    <label className="text-sm font-medium">Social Media Links</label>
-                    <CardDescription className="text-xs">Configure which social media icons appear and their links</CardDescription>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <label className="text-sm font-medium">Social Media Links</label>
+                      <CardDescription className="text-xs">Configure which social media icons appear and their links</CardDescription>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleResetSocialMedia}
+                      className="h-8"
+                      disabled={isResettingSocialMedia}
+                      title="Reset to default social media settings"
+                    >
+                      <RotateCcw className="h-4 w-4 mr-1" />
+                      {isResettingSocialMedia ? "Resetting..." : "Reset"}
+                    </Button>
                   </div>
                   
                   {/* Social Media Section Title */}
