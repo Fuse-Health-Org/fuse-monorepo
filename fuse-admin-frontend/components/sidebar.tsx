@@ -105,9 +105,28 @@ export function Sidebar() {
           console.log("data.data", data.data);
           const needsTutorial = data.data.tutorialFinished === false && data.data.status === "active" && data.data.stripeCustomerId !== null;
           console.log("needsTutorial", needsTutorial);
-          setRunTutorial(needsTutorial);
+          
           // Set tutorial step from DB, default to 0 if not set
-          setTutorialStep(data.data.tutorialStep || 0);
+          const step = data.data.tutorialStep || 0;
+          setTutorialStep(step);
+
+          // If tutorial needs to run and we're at step 0, 1, or 2, redirect to settings page
+          // because those steps' target elements are on the settings page
+          if (needsTutorial && step <= 2 && router.pathname !== '/settings') {
+            console.log("📍 Tutorial step", step, "requires settings page, redirecting...");
+            router.push('/settings');
+            // Don't start tutorial yet - it will start after redirect when this runs again
+            return;
+          }
+
+          // Add small delay to ensure page elements are rendered before starting tutorial
+          if (needsTutorial) {
+            setTimeout(() => {
+              setRunTutorial(true);
+            }, 500);
+          } else {
+            setRunTutorial(false);
+          }
         }
       }
     } catch (error) {
@@ -117,7 +136,7 @@ export function Sidebar() {
 
   useEffect(() => {
     fetchSubscriptionBasicInfo()
-  }, [])
+  }, [router.pathname])
 
   const handleRefreshSubscription = async () => {
     if (isRefreshing) return
