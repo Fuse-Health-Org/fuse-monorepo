@@ -8,7 +8,7 @@
     "start": "node dist/main.js",
     "migrate": "pnpm with-env sequelize db:migrate",
     "migrate:undo": "pnpm with-env sequelize db:migrate:undo",
-    "dev": "pnpm with-env ts-node-dev --respawn src/main.ts",
+    "dev": "pnpm with-env ts-node-dev --respawn -r tsconfig-paths/register src/main.ts",
     "pm2:start": "pnpm with-env pm2 start bundle/main.js -i 1 --name patient-api --node-args='--max-old-space-size=1024 --no-warnings'",
     "pm2:reload": "pnpm build && pnpm with-env pm2 reload patient-api --update-env",
     "pm2:reload-no-build": "pnpm with-env pm2 reload patient-api --update-env",
@@ -57,6 +57,7 @@
     "@types/node-cron": "^3.0.11",
     "@types/pdfkit": "^0.13.4",
     "dotenv-cli": "catalog:",
+    "tsconfig-paths": "catalog:",
     "ts-node-dev": "^2.0.0",
     "tsup": "^8.5.0",
     "typescript": "catalog:"

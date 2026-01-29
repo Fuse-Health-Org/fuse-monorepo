@@ -123,21 +123,17 @@ import BrandTreatment from "./models/BrandTreatment";
 import Questionnaire from "./models/Questionnaire";
 import QuestionnaireCustomization from "./models/QuestionnaireCustomization";
 import CustomWebsite from "./models/CustomWebsite";
-import AffiliateProductImage from "./models/AffiliateProductImage";
 import TenantProductService from "./services/tenantProduct.service";
 import QuestionnaireStep from "./models/QuestionnaireStep";
-import DashboardService from "./services/dashboard.service";
 import DoctorPatientChats from "./models/DoctorPatientChats";
-import WebSocketService from "./services/websocket.service";
 import SmsService from "./services/sms.service";
-import { sequenceRoutes, webhookRoutes } from "./features/sequences";
-import { templateRoutes } from "./features/templates";
-import { contactRoutes } from "./features/contacts";
-import { tagRoutes } from "./features/tags";
+import { sequenceRoutes, webhookRoutes } from "@endpoints/sequences";
+import dashboardRoutes from "@endpoints/dashboard/routes/dashboard.routes";
+import { templateRoutes } from "@endpoints/templates";
+import { contactRoutes } from "@endpoints/contacts";
+import { tagRoutes } from "@endpoints/tags";
 import { GlobalFees } from "./models/GlobalFees";
 import { WebsiteBuilderConfigs, DEFAULT_FOOTER_DISCLAIMER } from "./models/WebsiteBuilderConfigs";
-import SupportTicket from "./models/SupportTicket";
-import TicketMessage from "./models/TicketMessage";
 
 // Helper function to fetch global fees from database
 async function getGlobalFees() {
@@ -366,6 +362,7 @@ app.use("/", webhookRoutes);
 app.use("/", templateRoutes);
 app.use("/", contactRoutes);
 app.use("/", tagRoutes);
+app.use("/", dashboardRoutes);
 
 // Clone 'doctor' steps from master_template into a target questionnaire (preserve order)
 app.post(
@@ -15184,268 +15181,6 @@ app.put("/users/profile", authenticateJWT, async (req, res) => {
   }
 });
 
-// ========================================
-// Dashboard Analytics Endpoints
-// ========================================
-
-// Get dashboard metrics
-app.get("/dashboard/metrics", authenticateJWT, async (req, res) => {
-  try {
-    const currentUser = getCurrentUser(req);
-    if (!currentUser) {
-      return res
-        .status(401)
-        .json({ success: false, message: "Not authenticated" });
-    }
-
-    const { startDate, endDate, clinicId } = req.query;
-
-    if (!clinicId || typeof clinicId !== "string") {
-      return res
-        .status(400)
-        .json({ success: false, message: "clinicId is required" });
-    }
-
-    // Verify user has access to this clinic
-    const user = await User.findByPk(currentUser.id);
-    if (!user || user.clinicId !== clinicId) {
-      return res
-        .status(403)
-        .json({ success: false, message: "Access denied to this clinic" });
-    }
-
-    const start = startDate
-      ? new Date(startDate as string)
-      : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const end = endDate ? new Date(endDate as string) : new Date();
-
-    const dashboardService = new DashboardService();
-    const metrics = await dashboardService.getDashboardMetrics(clinicId, {
-      start,
-      end,
-    });
-
-    res.json({ success: true, data: metrics });
-  } catch (error) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("❌ Error fetching dashboard metrics:", error);
-    } else {
-      console.error("❌ Error fetching dashboard metrics");
-    }
-    res
-      .status(500)
-      .json({ success: false, message: "Failed to fetch dashboard metrics" });
-  }
-});
-
-// Get revenue chart data
-app.get("/dashboard/revenue-chart", authenticateJWT, async (req, res) => {
-  try {
-    const currentUser = getCurrentUser(req);
-    if (!currentUser) {
-      return res
-        .status(401)
-        .json({ success: false, message: "Not authenticated" });
-    }
-
-    const { startDate, endDate, interval, clinicId } = req.query;
-
-    if (!clinicId || typeof clinicId !== "string") {
-      return res
-        .status(400)
-        .json({ success: false, message: "clinicId is required" });
-    }
-
-    // Verify user has access to this clinic
-    const user = await User.findByPk(currentUser.id);
-    if (!user || user.clinicId !== clinicId) {
-      return res
-        .status(403)
-        .json({ success: false, message: "Access denied to this clinic" });
-    }
-
-    const start = startDate
-      ? new Date(startDate as string)
-      : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const end = endDate ? new Date(endDate as string) : new Date();
-    const chartInterval =
-      interval === "daily" || interval === "weekly" ? interval : "daily";
-
-    const dashboardService = new DashboardService();
-    const chartData = await dashboardService.getRevenueOverTime(
-      clinicId,
-      { start, end },
-      chartInterval
-    );
-
-    res.json({ success: true, data: chartData });
-  } catch (error) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("❌ Error fetching revenue chart:", error);
-    } else {
-      console.error("❌ Error fetching revenue chart");
-    }
-    res
-      .status(500)
-      .json({ success: false, message: "Failed to fetch revenue chart" });
-  }
-});
-
-// Get earnings report
-app.get("/dashboard/earnings-report", authenticateJWT, async (req, res) => {
-  try {
-    const currentUser = getCurrentUser(req);
-    if (!currentUser) {
-      return res
-        .status(401)
-        .json({ success: false, message: "Not authenticated" });
-    }
-
-    const { startDate, endDate, clinicId } = req.query;
-
-    if (!clinicId || typeof clinicId !== "string") {
-      return res
-        .status(400)
-        .json({ success: false, message: "clinicId is required" });
-    }
-
-    // Verify user has access to this clinic
-    const user = await User.findByPk(currentUser.id);
-    if (!user || user.clinicId !== clinicId) {
-      return res
-        .status(403)
-        .json({ success: false, message: "Access denied to this clinic" });
-    }
-
-    const start = startDate
-      ? new Date(startDate as string)
-      : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const end = endDate ? new Date(endDate as string) : new Date();
-
-    const dashboardService = new DashboardService();
-    const earningsReport = await dashboardService.getEarningsReport(clinicId, {
-      start,
-      end,
-    });
-
-    res.json({ success: true, data: earningsReport });
-  } catch (error) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("❌ Error fetching earnings report:", error);
-    } else {
-      console.error("❌ Error fetching earnings report");
-    }
-    res
-      .status(500)
-      .json({ success: false, message: "Failed to fetch earnings report" });
-  }
-});
-
-// Get recent activity
-app.get("/dashboard/recent-activity", authenticateJWT, async (req, res) => {
-  try {
-    const currentUser = getCurrentUser(req);
-    if (!currentUser) {
-      return res
-        .status(401)
-        .json({ success: false, message: "Not authenticated" });
-    }
-
-    const { limit, clinicId } = req.query;
-
-    if (!clinicId || typeof clinicId !== "string") {
-      return res
-        .status(400)
-        .json({ success: false, message: "clinicId is required" });
-    }
-
-    // Verify user has access to this clinic
-    const user = await User.findByPk(currentUser.id);
-    if (!user || user.clinicId !== clinicId) {
-      return res
-        .status(403)
-        .json({ success: false, message: "Access denied to this clinic" });
-    }
-
-    const activityLimit = limit ? parseInt(limit as string) : 10;
-
-    const dashboardService = new DashboardService();
-    const recentActivity = await dashboardService.getRecentActivity(
-      clinicId,
-      activityLimit
-    );
-
-    res.json({ success: true, data: recentActivity });
-  } catch (error) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("❌ Error fetching recent activity:", error);
-    } else {
-      console.error("❌ Error fetching recent activity");
-    }
-    res
-      .status(500)
-      .json({ success: false, message: "Failed to fetch recent activity" });
-  }
-});
-
-// Get projected recurring revenue (for remaining days of month)
-app.get("/dashboard/projected-revenue", authenticateJWT, async (req, res) => {
-  try {
-    const currentUser = getCurrentUser(req);
-    if (!currentUser) {
-      return res
-        .status(401)
-        .json({ success: false, message: "Not authenticated" });
-    }
-
-    const { endDate, daysToProject, clinicId } = req.query;
-
-    if (!clinicId || typeof clinicId !== "string") {
-      return res
-        .status(400)
-        .json({ success: false, message: "clinicId is required" });
-    }
-
-    if (!daysToProject) {
-      return res
-        .status(400)
-        .json({ success: false, message: "daysToProject is required" });
-    }
-
-    // Verify user has access to this clinic
-    const user = await User.findByPk(currentUser.id);
-    if (!user || user.clinicId !== clinicId) {
-      return res
-        .status(403)
-        .json({ success: false, message: "Access denied to this clinic" });
-    }
-
-    const projectionEndDate = endDate
-      ? new Date(endDate as string)
-      : new Date();
-    const days = parseInt(daysToProject as string);
-
-    const dashboardService = new DashboardService();
-    const projectedRevenue =
-      await dashboardService.getProjectedRecurringRevenue(
-        clinicId,
-        projectionEndDate,
-        days
-      );
-
-    res.json({ success: true, data: projectedRevenue });
-  } catch (error) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("❌ Error fetching projected revenue:", error);
-    } else {
-      console.error("❌ Error fetching projected revenue");
-    }
-    res
-      .status(500)
-      .json({ success: false, message: "Failed to fetch projected revenue" });
-  }
-});
-
 const PORT = process.env.PORT || 3001;
 
 // Initialize database connection and start server
@@ -18321,4 +18056,3 @@ app.delete("/tenant-products/:id", authenticateJWT, async (req, res) => {
 // ✅ MESSAGE TEMPLATES & WEBHOOKS MOVED TO: src/features/
 // - Templates: features/templates/
 // - Webhooks: features/sequences/webhooks/
-

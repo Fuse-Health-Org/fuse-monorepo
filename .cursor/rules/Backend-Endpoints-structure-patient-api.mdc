@@ -1,0 +1,12 @@
+---
+alwaysApply: true
+---
+
+Backend – Endpoints structure (patient-api)
+When implementing new backend functionality in patient-api, always check first if the related entity folder already exists under patient-api/src/endpoints/.
+If the entity folder exists: implement the new logic inside that existing endpoint slice, following the current structure and conventions (keep routes/controllers/services/validators organized the same way as the existing endpoint).
+If the entity folder does not exist yet: create a new endpoint folder for that entity under patient-api/src/endpoints/<entity>/ and add at minimum:
+a controller file (e.g. controllers/<entity>.controller.ts)
+a route file (e.g. routes/<entity>.routes.ts)
+any additional supporting files/folders needed (services, validators, utils) while keeping the overall backend structure consistent.
+Avoid creating duplicate endpoints or new folders when an existing entity endpoint can be extended.
