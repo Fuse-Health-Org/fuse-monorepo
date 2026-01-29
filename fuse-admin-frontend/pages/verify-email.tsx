@@ -5,16 +5,24 @@ import Link from 'next/link'
 import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { CheckCircle, XCircle, Loader2, Building2 } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { CheckCircle, XCircle, Loader2, Building2, Mail } from 'lucide-react'
 
 export default function VerifyEmail() {
   const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'invalid'>('loading')
   const [message, setMessage] = useState('')
   const [isLoggingIn, setIsLoggingIn] = useState(false)
+  const [showResendForm, setShowResendForm] = useState(false)
+  const [resendEmail, setResendEmail] = useState('')
+  const [resendStatus, setResendStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
+  const [resendMessage, setResendMessage] = useState('')
   const router = useRouter()
   const { token: queryToken } = router.query
 
   useEffect(() => {
+    // Wait for router to be ready before checking query params
+    if (!router.isReady) return
+
     if (!queryToken || typeof queryToken !== 'string') {
       setStatus('invalid')
       setMessage('Invalid verification link')
@@ -22,7 +30,7 @@ export default function VerifyEmail() {
     }
 
     verifyEmail(queryToken)
-  }, [queryToken])
+  }, [router.isReady, queryToken])
 
   const verifyEmail = async (token: string) => {
     try {
@@ -59,9 +67,35 @@ export default function VerifyEmail() {
   }
 
   const handleResendEmail = async () => {
-    // This would require implementing a resend verification email endpoint
-    // For now, redirect to signup
-    router.push('/signup')
+    if (!resendEmail) {
+      setShowResendForm(true)
+      return
+    }
+
+    try {
+      setResendStatus('sending')
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+      const response = await fetch(`${apiUrl}/auth/resend-verification`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: resendEmail }),
+      })
+      
+      const data = await response.json()
+
+      if (response.ok && data.success) {
+        setResendStatus('sent')
+        setResendMessage('Verification email sent! Please check your inbox.')
+      } else {
+        setResendStatus('error')
+        setResendMessage(data.message || 'Failed to send verification email')
+      }
+    } catch (error) {
+      setResendStatus('error')
+      setResendMessage('Network error. Please try again.')
+    }
   }
 
   const getStatusIcon = () => {
@@ -154,13 +188,56 @@ export default function VerifyEmail() {
                 )}
 
                 {(status === 'error' || status === 'invalid') && (
-                  <div className="space-y-2">
-                    <Button 
-                      onClick={handleResendEmail}
-                      className="w-full"
-                    >
-                      Request New Verification Email
-                    </Button>
+                  <div className="space-y-4">
+                    {!showResendForm ? (
+                      <Button 
+                        onClick={() => setShowResendForm(true)}
+                        className="w-full"
+                      >
+                        <Mail className="w-4 h-4 mr-2" />
+                        Request New Verification Email
+                      </Button>
+                    ) : resendStatus === 'sent' ? (
+                      <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                        <div className="flex items-center gap-2 text-green-700">
+                          <CheckCircle className="w-5 h-5" />
+                          <span className="font-medium">{resendMessage}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <p className="text-sm text-muted-foreground">
+                          Enter your email address to receive a new verification link:
+                        </p>
+                        <Input
+                          type="email"
+                          placeholder="your@email.com"
+                          value={resendEmail}
+                          onChange={(e) => setResendEmail(e.target.value)}
+                          disabled={resendStatus === 'sending'}
+                        />
+                        {resendStatus === 'error' && (
+                          <p className="text-sm text-red-600">{resendMessage}</p>
+                        )}
+                        <Button 
+                          onClick={handleResendEmail}
+                          className="w-full"
+                          disabled={!resendEmail || resendStatus === 'sending'}
+                        >
+                          {resendStatus === 'sending' ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Sending...
+                            </>
+                          ) : (
+                            <>
+                              <Mail className="w-4 h-4 mr-2" />
+                              Send Verification Email
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    )}
                     <p className="text-xs text-muted-foreground">
                       Or{' '}
                       <Link href="/signin" className="text-primary hover:underline">

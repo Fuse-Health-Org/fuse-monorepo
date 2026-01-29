@@ -2687,6 +2687,92 @@ app.get("/auth/verify-email", async (req, res) => {
   }
 });
 
+// Resend verification email endpoint
+app.post("/auth/resend-verification", async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email || typeof email !== "string") {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required",
+      });
+    }
+
+    // Find user by email
+    const user = await User.findOne({
+      where: {
+        email: email.toLowerCase().trim(),
+      },
+    });
+
+    if (!user) {
+      // For security, don't reveal if email exists
+      return res.status(200).json({
+        success: true,
+        message: "If an account exists with this email, a verification email will be sent.",
+      });
+    }
+
+    // Check if user is already activated
+    if (user.activated) {
+      return res.status(200).json({
+        success: true,
+        message: "This account is already verified. You can sign in.",
+      });
+    }
+
+    // Generate new activation token
+    const activationToken = user.generateActivationToken();
+    await user.save();
+
+    // Get frontend origin from request
+    const frontendOrigin =
+      req.get("origin") || req.get("referer")?.split("/").slice(0, 3).join("/");
+
+    // Send verification email based on user role
+    let emailSent = false;
+    const isBrand = user.role === "brand";
+
+    if (isBrand) {
+      emailSent = await MailsSender.sendBrandVerificationEmail(
+        user.email,
+        activationToken,
+        user.firstName,
+        frontendOrigin
+      );
+    } else {
+      emailSent = await MailsSender.sendVerificationEmail(
+        user.email,
+        activationToken,
+        user.firstName,
+        frontendOrigin
+      );
+    }
+
+    if (emailSent) {
+      console.log("✅ Verification email resent to:", email);
+    } else {
+      console.error("❌ Failed to resend verification email to:", email);
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "If an account exists with this email, a verification email will be sent.",
+    });
+  } catch (error) {
+    if (process.env.NODE_ENV === "development") {
+      console.error("Resend verification error:", error);
+    } else {
+      console.error("Resend verification error occurred");
+    }
+    res.status(500).json({
+      success: false,
+      message: "Failed to send verification email. Please try again.",
+    });
+  }
+});
+
 app.post("/auth/signout", authenticateJWT, async (req, res) => {
   try {
     // HIPAA Audit: Log logout
