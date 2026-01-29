@@ -5,13 +5,22 @@ export const tutorialSteps = [
       "Welcome! Here you can customize your company logo. Click to upload an image.",
     placement: "left" as const,
     disableBeacon: true,
-    disableScrolling: true,
   },
   {
     target: "#tutorial-step-2",
     content: "Here you can configure all your organization information.",
     placement: "top" as const,
     disableScrolling: true,
+    // Hide overlay/spotlight for this step to prevent blinking when scrolling
+    styles: {
+      overlay: {
+        opacity: 0,
+        pointerEvents: 'none' as const,
+      },
+      spotlight: {
+        opacity: 0,
+      },
+    },
   },
   {
     target: "#tutorial-step-3",

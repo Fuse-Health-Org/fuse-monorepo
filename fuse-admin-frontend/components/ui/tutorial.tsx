@@ -149,7 +149,6 @@ const Tutorial = ({
       showSkipButton={true}
       disableCloseOnEsc={false}
       disableOverlayClose={false}
-      disableScrolling={false}
       disableScrollParentFix={true}
       spotlightClicks={true}
       // Control stepIndex - update it when callback tells us step changed
@@ -159,6 +158,13 @@ const Tutorial = ({
         hideArrow: false,
         styles: {
           floater: {
+            transition: 'none',
+            filter: 'none',
+          },
+          wrapper: {
+            transition: 'none',
+          },
+          arrow: {
             transition: 'none',
           },
         },
@@ -170,6 +176,16 @@ const Tutorial = ({
         },
         overlay: {
           pointerEvents: 'none' as const, // Allow scroll through overlay
+          transition: 'none',
+          animation: 'none',
+        },
+        overlayLegacy: {
+          transition: 'none',
+          animation: 'none',
+        },
+        overlayLegacyCenter: {
+          transition: 'none',
+          animation: 'none',
         },
         buttonNext: {
           backgroundColor: '#166534', // Dark green
@@ -196,10 +212,17 @@ const Tutorial = ({
         spotlight: {
           borderRadius: '8px',
           pointerEvents: 'none' as const, // Allow scroll through spotlight
+          transition: 'none',
+          animation: 'none',
+        },
+        spotlightLegacy: {
+          transition: 'none',
+          animation: 'none',
         },
         tooltip: {
           borderRadius: '8px',
           pointerEvents: 'auto' as const, // Re-enable clicks on tooltip
+          transition: 'none',
         },
         tooltipContainer: {
           textAlign: 'left',
