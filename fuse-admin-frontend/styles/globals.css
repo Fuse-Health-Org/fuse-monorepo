@@ -136,6 +136,22 @@
   --joyride-color-primary: #166534 !important;
 }
 
+/* Disable spotlight transitions/animations to prevent blinking on scroll */
+[class*="__react-joyride"] [class*="spotlight"] {
+  transition: none !important;
+  animation: none !important;
+}
+
+[class*="__react-joyride"] [class*="overlay"] {
+  transition: none !important;
+  animation: none !important;
+}
+
+/* Ensure floater doesn't animate on scroll */
+[class*="__floater"] {
+  transition: none !important;
+}
+
 /* Sidebar scrollbar styles */
 .bg-sidebar nav.overflow-y-auto::-webkit-scrollbar {
   width: 8px;

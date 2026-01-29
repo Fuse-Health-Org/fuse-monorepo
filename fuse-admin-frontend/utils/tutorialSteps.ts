@@ -5,11 +5,13 @@ export const tutorialSteps = [
       "Welcome! Here you can customize your company logo. Click to upload an image.",
     placement: "left" as const,
     disableBeacon: true,
+    disableScrolling: true,
   },
   {
     target: "#tutorial-step-2",
     content: "Here you can configure all your organization information.",
     placement: "top" as const,
+    disableScrolling: true,
   },
   {
     target: "#tutorial-step-3",

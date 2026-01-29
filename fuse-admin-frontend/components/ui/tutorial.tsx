@@ -149,11 +149,27 @@ const Tutorial = ({
       showSkipButton={true}
       disableCloseOnEsc={false}
       disableOverlayClose={false}
+      disableScrolling={false}
+      disableScrollParentFix={true}
+      spotlightClicks={true}
       // Control stepIndex - update it when callback tells us step changed
       stepIndex={runTutorial && currentStepIndex !== undefined ? currentStepIndex : undefined}
+      floaterProps={{
+        disableAnimation: true,
+        hideArrow: false,
+        styles: {
+          floater: {
+            transition: 'none',
+          },
+        },
+      }}
       styles={{
         options: {
           primaryColor: '#166534', // Dark green instead of red
+          overlayColor: 'rgba(0, 0, 0, 0.4)', // Lighter overlay
+        },
+        overlay: {
+          pointerEvents: 'none' as const, // Allow scroll through overlay
         },
         buttonNext: {
           backgroundColor: '#166534', // Dark green
@@ -162,22 +178,28 @@ const Tutorial = ({
           padding: '8px 16px',
           fontSize: '14px',
           fontWeight: '500',
+          pointerEvents: 'auto' as const, // Re-enable clicks on buttons
         },
         buttonBack: {
           color: '#166534', // Dark green for back button text
           marginRight: '8px',
+          pointerEvents: 'auto' as const,
         },
         buttonSkip: {
           color: '#166534', // Dark green for skip button
+          pointerEvents: 'auto' as const,
         },
         buttonClose: {
           color: '#166534', // Dark green for close button
+          pointerEvents: 'auto' as const,
         },
         spotlight: {
           borderRadius: '8px',
+          pointerEvents: 'none' as const, // Allow scroll through spotlight
         },
         tooltip: {
           borderRadius: '8px',
+          pointerEvents: 'auto' as const, // Re-enable clicks on tooltip
         },
         tooltipContainer: {
           textAlign: 'left',
