@@ -5,6 +5,10 @@
     "jsx": "preserve",
     "rootDir": ".",
     "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@endpoints/*": ["./src/endpoints/*"]
+    },
     "outDir": "./dist",
     "module": "CommonJS",
     "moduleResolution": "node",
