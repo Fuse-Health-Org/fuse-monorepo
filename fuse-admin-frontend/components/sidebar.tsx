@@ -275,24 +275,15 @@ export function Sidebar() {
                 return;
               }
 
-              // If tutorial is running and Products tab is the current tutorial target,
-              // convert the click to a Next button click instead
+              // If tutorial is running and Products tab is the current tutorial target (step 2),
+              // advance the tutorial instead of just navigating
               if (runTutorial && item.id === 'tutorial-step-3') {
-                // Check if there's a Joyride tooltip visible (tutorial is active)
-                const joyrideTooltip = document.querySelector('[class*="__floater"]');
-                if (joyrideTooltip) {
+                const tutorialAdvance = (window as any).__tutorialAdvance;
+                const tutorialStep = (window as any).__tutorialCurrentStep;
+                if (tutorialAdvance && tutorialStep === 2) {
                   e.preventDefault();
-                  console.log('📍 Tutorial active - converting Products click to Next button click');
-                  // Click the Next/Continue button in the Joyride tooltip
-                  setTimeout(() => {
-                    const nextButton = document.querySelector('button[data-action="primary"]') as HTMLButtonElement;
-                    if (nextButton) {
-                      console.log('✅ Clicking Next button');
-                      nextButton.click();
-                    } else {
-                      console.log('⚠️ Next button not found');
-                    }
-                  }, 50);
+                  console.log('📍 Tutorial active - advancing from Products click');
+                  tutorialAdvance();
                   return;
                 }
               }

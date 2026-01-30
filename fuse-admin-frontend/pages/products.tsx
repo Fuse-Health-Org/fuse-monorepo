@@ -992,7 +992,20 @@ export default function Products() {
                             <button
                                 id="my-products-btn"
                                 className={`pb-3 border-b-2 transition-colors text-sm font-medium ${activeTab === 'my' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
-                                onClick={() => setActiveTab('my')}
+                                onClick={() => {
+                                    // Switch to My Products tab
+                                    setActiveTab('my');
+
+                                    // If tutorial is running on step 6 (My Products tab), advance the tutorial
+                                    const tutorialAdvance = (window as any).__tutorialAdvance;
+                                    const tutorialStep = (window as any).__tutorialCurrentStep;
+                                    if (tutorialAdvance && tutorialStep === 6) {
+                                        console.log('📍 Tutorial active on My Products tab - advancing');
+                                        setTimeout(() => {
+                                            tutorialAdvance();
+                                        }, 200);
+                                    }
+                                }}
                             >
                                 My Products
                             </button>
@@ -1301,18 +1314,14 @@ export default function Products() {
                                                                 // Activate the product
                                                                 handleEnableProduct(product.id);
 
-                                                                // If tutorial is running and targeting this button, advance the tutorial
-                                                                const joyrideTooltip = document.querySelector('[class*="__floater"]');
-                                                                if (joyrideTooltip) {
-                                                                    console.log('📍 Tutorial active on Activate button - will advance after activation');
-                                                                    // Wait for activation to complete, then click Next
+                                                                // If tutorial is running on step 5 (Activate button), advance the tutorial
+                                                                const tutorialAdvance = (window as any).__tutorialAdvance;
+                                                                const tutorialStep = (window as any).__tutorialCurrentStep;
+                                                                if (tutorialAdvance && tutorialStep === 5) {
+                                                                    console.log('📍 Tutorial active on Activate button - advancing');
                                                                     setTimeout(() => {
-                                                                        const nextButton = document.querySelector('button[data-action="primary"]') as HTMLButtonElement;
-                                                                        if (nextButton) {
-                                                                            console.log('✅ Clicking Next button to advance tutorial');
-                                                                            nextButton.click();
-                                                                        }
-                                                                    }, 500);
+                                                                        tutorialAdvance();
+                                                                    }, 300);
                                                                 }
                                                             }}
                                                             className="bg-green-600 hover:bg-green-700 text-white enable-product-btn"
