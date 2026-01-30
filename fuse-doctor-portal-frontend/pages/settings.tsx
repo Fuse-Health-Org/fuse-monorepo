@@ -7,11 +7,13 @@ import { Header } from '@/components/Header'
 import { useAuth } from '@/contexts/AuthContext'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Eye, EyeOff, User, Lock, Mail, Phone, Save } from 'lucide-react'
+import { Eye, EyeOff, User, Lock, Mail, Phone, Save, MapPin } from 'lucide-react'
+import { ApiClient } from '@/lib/api'
+import { US_STATES } from '@fuse/enums'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
 
-type Tab = 'profile' | 'password'
+type Tab = 'profile' | 'password' | 'license'
 
 export default function Settings() {
   const { user, authenticatedFetch } = useAuth()
@@ -35,6 +37,10 @@ export default function Settings() {
   const [showNewPassword, setShowNewPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
+  // License coverage fields
+  const [selectedStates, setSelectedStates] = useState<string[]>([])
+  const [loadingLicense, setLoadingLicense] = useState(false)
+
   useEffect(() => {
     if (!user) {
       router.push('/signin')
@@ -48,7 +54,61 @@ export default function Settings() {
       setEmail(user.email || '')
       setPhone(user.phone || '')
     }
+
+    // Load license coverage if user is a doctor
+    if (user?.userRoles?.doctor) {
+      loadLicenseCoverage()
+    }
   }, [user, router])
+
+  const loadLicenseCoverage = async () => {
+    setLoadingLicense(true)
+    try {
+      const apiClient = new ApiClient(authenticatedFetch)
+      const response = await apiClient.getDoctorDetails()
+      if (response.success) {
+        setSelectedStates(response.data.doctorLicenseStatesCoverage || [])
+      }
+    } catch (error) {
+      console.error('Failed to load license coverage:', error)
+      toast.error('Failed to load license coverage')
+    } finally {
+      setLoadingLicense(false)
+    }
+  }
+
+  const handleLicenseSave = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSaving(true)
+    setError('')
+
+    try {
+      const apiClient = new ApiClient(authenticatedFetch)
+      const response = await apiClient.updateDoctorDetails(selectedStates)
+
+      if (!response.success) {
+        throw new Error(response.message || 'Failed to update license coverage')
+      }
+
+      toast.success('License coverage updated successfully!')
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to update license coverage'
+      setError(errorMessage)
+      toast.error(errorMessage)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const toggleState = (stateCode: string) => {
+    setSelectedStates((prev) => {
+      if (prev.includes(stateCode)) {
+        return prev.filter((code) => code !== stateCode)
+      } else {
+        return [...prev, stateCode]
+      }
+    })
+  }
 
   const handleProfileSave = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -197,6 +257,21 @@ export default function Settings() {
                     Password
                   </div>
                 </button>
+                {user?.userRoles?.doctor && (
+                  <button
+                    onClick={() => setActiveTab('license')}
+                    className={`px-4 py-2 font-medium text-sm transition-colors ${
+                      activeTab === 'license'
+                        ? 'text-primary border-b-2 border-primary'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4" />
+                      License Coverage
+                    </div>
+                  </button>
+                )}
               </div>
 
               {/* Error Message */}
@@ -415,6 +490,65 @@ export default function Settings() {
                         </Button>
                       </div>
                     </form>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* License Coverage Tab */}
+              {activeTab === 'license' && user?.userRoles?.doctor && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>License Coverage</CardTitle>
+                    <CardDescription>
+                      Select the US states where you are licensed to prescribe medications. You will only be able to approve orders for patients in these states.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {loadingLicense ? (
+                      <div className="text-center py-8 text-muted-foreground">Loading license coverage...</div>
+                    ) : (
+                      <form onSubmit={handleLicenseSave} className="space-y-4">
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-foreground">
+                            Licensed States ({selectedStates.length} selected)
+                          </label>
+                          <div className="border border-input rounded-md p-4 max-h-96 overflow-y-auto bg-background">
+                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                              {US_STATES.map((state) => (
+                                <label
+                                  key={state.key}
+                                  className="flex items-center space-x-2 cursor-pointer hover:bg-muted p-2 rounded"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedStates.includes(state.key)}
+                                    onChange={() => toggleState(state.key)}
+                                    className="w-4 h-4 text-primary border-input rounded focus:ring-primary"
+                                  />
+                                  <span className="text-sm text-foreground">
+                                    {state.key} - {state.name}
+                                  </span>
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Select all states where you hold an active medical license. This information is required to approve prescriptions.
+                          </p>
+                        </div>
+
+                        <div className="flex justify-end pt-4">
+                          <Button
+                            type="submit"
+                            disabled={saving}
+                            className="flex items-center gap-2"
+                          >
+                            <Save className="h-4 w-4" />
+                            {saving ? 'Saving...' : 'Save License Coverage'}
+                          </Button>
+                        </div>
+                      </form>
+                    )}
                   </CardContent>
                 </Card>
               )}

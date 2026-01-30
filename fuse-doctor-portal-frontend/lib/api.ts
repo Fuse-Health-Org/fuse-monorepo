@@ -125,6 +125,11 @@ export interface Chat {
     };
 }
 
+export interface DoctorDetails {
+    userId: string;
+    doctorLicenseStatesCoverage: string[];
+}
+
 export class ApiClient {
     constructor(private authenticatedFetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>) { }
 
@@ -306,6 +311,36 @@ export class ApiClient {
 
         if (!response.ok) {
             throw new Error('Failed to mark chat as read');
+        }
+
+        return response.json();
+    }
+
+    async getDoctorDetails(): Promise<{ success: boolean; data: DoctorDetails }> {
+        const response = await this.authenticatedFetch(`${API_URL}/doctor/details`);
+
+        if (!response.ok) {
+            throw new Error('Failed to fetch doctor details');
+        }
+
+        return response.json();
+    }
+
+    async updateDoctorDetails(doctorLicenseStatesCoverage: string[]): Promise<{
+        success: boolean;
+        message: string;
+        data: DoctorDetails;
+    }> {
+        const response = await this.authenticatedFetch(`${API_URL}/doctor/details`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ doctorLicenseStatesCoverage }),
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to update doctor details');
         }
 
         return response.json();

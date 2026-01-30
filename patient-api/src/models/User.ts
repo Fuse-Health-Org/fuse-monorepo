@@ -157,6 +157,13 @@ export default class User extends Entity {
   declare npiNumber?: string;
 
   @Column({
+    type: DataType.ARRAY(DataType.STRING),
+    allowNull: true,
+    defaultValue: [],
+  })
+  declare doctorLicenseStatesCoverage?: string[];
+
+  @Column({
     type: DataType.STRING,
     allowNull: true,
   })

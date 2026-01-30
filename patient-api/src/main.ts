@@ -51,6 +51,7 @@ import {
 import TreatmentService from "./services/treatment.service";
 import PaymentService from "./services/payment.service";
 import ClinicService from "./services/clinic.service";
+import { getDefaultCustomWebsiteValues, getDefaultFooterValues, getDefaultSocialMediaValues } from "./utils/customWebsiteDefaults";
 import TreatmentProducts from "./models/TreatmentProducts";
 import TreatmentPlan, { BillingInterval } from "./models/TreatmentPlan";
 import ShippingOrder from "./models/ShippingOrder";
@@ -894,49 +895,7 @@ app.post("/auth/signup", async (req, res) => {
 
       // Create default CustomWebsite for the new clinic
       try {
-        await CustomWebsite.create({
-          clinicId: clinic.id,
-          portalTitle: "Welcome to Our Portal",
-          portalDescription: "Your trusted healthcare partner. Browse our products and services below.",
-          primaryColor: "#000000",
-          fontFamily: "Playfair Display",
-          logo: "",
-          heroImageUrl: "https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=1920&q=80",
-          heroTitle: "Your Daily Health, Simplified",
-          heroSubtitle: "All-in-one nutritional support in one simple drink",
-          isActive: true,
-          footerColor: "#000000",
-          footerCategories: [
-            {
-              name: "NAVIGATION LINKS",
-              visible: true,
-              urls: [
-                { label: "Bundles", url: "/#bundles" },
-                { label: "Programs", url: "/#programs" },
-                { label: "Performance", url: "/#performance" },
-                { label: "Weight Loss", url: "/#weightloss" },
-                { label: "Wellness", url: "/#wellness" }
-              ]
-            },
-            { name: "Section 2", visible: false, urls: [] },
-            { name: "Section 3", visible: false, urls: [] },
-            { name: "Section 4", visible: false, urls: [] }
-          ],
-          section1: "NAVIGATION LINKS",
-          section2: null,
-          section3: null,
-          section4: null,
-          socialMediaSection: "SOCIAL MEDIA",
-          useDefaultDisclaimer: true,
-          footerDisclaimer: null,
-          socialMediaLinks: {
-            instagram: { enabled: true, url: "" },
-            facebook: { enabled: true, url: "" },
-            twitter: { enabled: true, url: "" },
-            tiktok: { enabled: true, url: "" },
-            youtube: { enabled: true, url: "" }
-          }
-        });
+        await CustomWebsite.create(getDefaultCustomWebsiteValues(clinic.id));
         if (process.env.NODE_ENV === "development") {
           console.log("✅ CustomWebsite created for clinic:", clinic.id);
         }
@@ -2724,6 +2683,80 @@ app.get("/auth/verify-email", async (req, res) => {
   }
 });
 
+// Resend verification email endpoint
+app.post("/auth/resend-verification", async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email || typeof email !== "string") {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required",
+      });
+    }
+
+    // Find user by email
+    const user = await User.findOne({
+      where: {
+        email: email.toLowerCase().trim(),
+      },
+    });
+
+    if (!user) {
+      // For security, don't reveal if email exists
+      return res.status(200).json({
+        success: true,
+        message: "If an account exists with this email, a verification email will be sent.",
+      });
+    }
+
+    // Check if user is already activated
+    if (user.activated) {
+      return res.status(200).json({
+        success: true,
+        message: "This account is already verified. You can sign in.",
+      });
+    }
+
+    // Generate new activation token
+    const activationToken = user.generateActivationToken();
+    await user.save();
+
+    // Get frontend origin from request
+    const frontendOrigin =
+      req.get("origin") || req.get("referer")?.split("/").slice(0, 3).join("/");
+
+    // Send verification email
+    const emailSent = await MailsSender.sendVerificationEmail(
+      user.email,
+      activationToken,
+      user.firstName,
+      frontendOrigin
+    );
+
+    if (emailSent) {
+      console.log("✅ Verification email resent to:", email);
+    } else {
+      console.error("❌ Failed to resend verification email to:", email);
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "If an account exists with this email, a verification email will be sent.",
+    });
+  } catch (error) {
+    if (process.env.NODE_ENV === "development") {
+      console.error("Resend verification error:", error);
+    } else {
+      console.error("Resend verification error occurred");
+    }
+    res.status(500).json({
+      success: false,
+      message: "Failed to send verification email. Please try again.",
+    });
+  }
+});
+
 app.post("/auth/signout", authenticateJWT, async (req, res) => {
   try {
     // HIPAA Audit: Log logout
@@ -3058,7 +3091,23 @@ app.get("/clinic/allow-custom-domain", async (req, res) => {
         const withoutPlatform = baseDomain.slice(0, -platformDomain.length);
         const parts = withoutPlatform.split('.');
 
-        // Only allow exactly 2-part subdomains: <affiliate>.<brand> or admin.<brand>
+        // Handle single-part subdomain: <brand>.fusehealth.com
+        if (parts.length === 1) {
+          const brandSlug = parts[0];
+
+          // Check if clinic exists with this slug
+          const brandClinic = await Clinic.findOne({
+            where: { slug: brandSlug },
+            attributes: ["id"],
+          });
+
+          if (brandClinic) {
+            console.log(`✅ [allow-custom-domain] Allowing brand subdomain: ${baseDomain}`);
+            return res.status(200).send("ok");
+          }
+        }
+
+        // Handle 2-part subdomains: <affiliate>.<brand> or admin.<brand>
         if (parts.length === 2) {
           const [firstPart, brandSlug] = parts;
 
@@ -3622,7 +3671,7 @@ app.post("/custom-website/toggle-active", authenticateJWT, async (req, res) => {
     } else {
       // Create a new custom website with default values and the specified isActive state
       customWebsite = await CustomWebsite.create({
-        clinicId: user.clinicId,
+        ...getDefaultCustomWebsiteValues(user.clinicId),
         isActive
       });
     }
@@ -3639,6 +3688,126 @@ app.post("/custom-website/toggle-active", authenticateJWT, async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to toggle portal status"
+    });
+  }
+});
+
+// Reset footer section to defaults
+app.post("/custom-website/reset-footer", authenticateJWT, async (req, res) => {
+  try {
+    const currentUser = getCurrentUser(req);
+    if (!currentUser) {
+      return res.status(401).json({
+        success: false,
+        message: "Not authenticated"
+      });
+    }
+
+    const user = await User.findByPk(currentUser.id, {
+      include: [{ model: UserRoles, as: 'userRoles', required: false }]
+    });
+    if (!user || !user.clinicId) {
+      return res.status(404).json({
+        success: false,
+        message: "User or clinic not found"
+      });
+    }
+
+    // Only allow brand users to modify portal settings
+    if (!user.hasAnyRoleSync(['brand', 'doctor', 'admin', 'superAdmin'])) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied"
+      });
+    }
+
+    const customWebsite = await CustomWebsite.findOne({
+      where: { clinicId: user.clinicId }
+    });
+
+    if (!customWebsite) {
+      return res.status(404).json({
+        success: false,
+        message: "Custom website not found"
+      });
+    }
+
+    // Reset footer section to defaults
+    const defaultFooterValues = getDefaultFooterValues();
+    await customWebsite.update(defaultFooterValues);
+
+    console.log('🔄 Footer section reset to defaults for clinic:', user.clinicId);
+
+    res.status(200).json({
+      success: true,
+      message: "Footer section reset to defaults successfully",
+      data: customWebsite
+    });
+  } catch (error) {
+    console.error('Error resetting footer section:', error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to reset footer section"
+    });
+  }
+});
+
+// Reset social media section to defaults
+app.post("/custom-website/reset-social-media", authenticateJWT, async (req, res) => {
+  try {
+    const currentUser = getCurrentUser(req);
+    if (!currentUser) {
+      return res.status(401).json({
+        success: false,
+        message: "Not authenticated"
+      });
+    }
+
+    const user = await User.findByPk(currentUser.id, {
+      include: [{ model: UserRoles, as: 'userRoles', required: false }]
+    });
+    if (!user || !user.clinicId) {
+      return res.status(404).json({
+        success: false,
+        message: "User or clinic not found"
+      });
+    }
+
+    // Only allow brand users to modify portal settings
+    if (!user.hasAnyRoleSync(['brand', 'doctor', 'admin', 'superAdmin'])) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied"
+      });
+    }
+
+    const customWebsite = await CustomWebsite.findOne({
+      where: { clinicId: user.clinicId }
+    });
+
+    if (!customWebsite) {
+      return res.status(404).json({
+        success: false,
+        message: "Custom website not found"
+      });
+    }
+
+    // Reset social media section to defaults
+    const defaultSocialMediaValues = getDefaultSocialMediaValues();
+    await customWebsite.update(defaultSocialMediaValues);
+
+    console.log('🔄 Social media section reset to defaults for clinic:', user.clinicId);
+
+    res.status(200).json({
+      success: true,
+      message: "Social media section reset to defaults successfully",
+      data: customWebsite
+    });
+  } catch (error) {
+    console.error('Error resetting social media section:', error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to reset social media section"
     });
   }
 });
@@ -3913,6 +4082,7 @@ app.get("/custom-website/by-slug/:slug", async (req, res) => {
         parentClinicName,
         parentClinicHeroImageUrl,
         patientPortalDashboardFormat: clinic.patientPortalDashboardFormat,
+        defaultFormColor: clinic.defaultFormColor,
       }
     });
   } catch (error) {
@@ -14562,21 +14732,31 @@ app.put("/organization/update", authenticateJWT, async (req, res) => {
 
         if (isCustomDomain !== undefined) {
           updateData.isCustomDomain = isCustomDomain;
+
+          // If switching to subdomain (isCustomDomain = false), clear customDomain
+          if (isCustomDomain === false) {
+            updateData.customDomain = null;
+          }
         }
 
         if (customDomain !== undefined) {
-          // Normalize custom domain to bare hostname (lowercase, no protocol/path/trailing dot)
-          try {
-            const candidate = customDomain.trim();
-            const url = new URL(
-              candidate.startsWith("http") ? candidate : `https://${candidate}`
-            );
-            let host = url.hostname.toLowerCase();
-            if (host.endsWith(".")) host = host.slice(0, -1);
-            updateData.customDomain = host;
-          } catch {
-            // Fallback to raw value (will be validated elsewhere if needed)
-            updateData.customDomain = customDomain;
+          // Convert empty string to null to avoid unique constraint violations
+          if (!customDomain || customDomain.trim() === '') {
+            updateData.customDomain = null;
+          } else {
+            // Normalize custom domain to bare hostname (lowercase, no protocol/path/trailing dot)
+            try {
+              const candidate = customDomain.trim();
+              const url = new URL(
+                candidate.startsWith("http") ? candidate : `https://${candidate}`
+              );
+              let host = url.hostname.toLowerCase();
+              if (host.endsWith(".")) host = host.slice(0, -1);
+              updateData.customDomain = host;
+            } catch {
+              // Fallback to raw value (will be validated elsewhere if needed)
+              updateData.customDomain = customDomain;
+            }
           }
         }
 
@@ -14632,13 +14812,43 @@ app.put("/organization/update", authenticateJWT, async (req, res) => {
           : null,
       },
     });
-  } catch (error) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("❌ Error updating organization:", error);
-    } else {
-      console.error("❌ Error updating organization");
+  } catch (error: any) {
+    console.error("❌ Error updating organization:", error?.message || error);
+    if (error?.errors) {
+      console.error("❌ Sequelize errors:", JSON.stringify(error.errors, null, 2));
     }
-    res.status(500).json({ success: false, message: "Internal server error" });
+
+    // Handle Sequelize unique constraint violations
+    if (error?.name === 'SequelizeUniqueConstraintError') {
+      const field = error?.errors?.[0]?.path;
+      const value = error?.errors?.[0]?.value;
+
+      if (field === 'customDomain') {
+        return res.status(400).json({
+          success: false,
+          message: `The custom domain "${value}" is already in use by another organization. Please choose a different domain.`
+        });
+      }
+
+      return res.status(400).json({
+        success: false,
+        message: `This ${field} is already in use. Please choose a different value.`
+      });
+    }
+
+    // Handle other validation errors
+    if (error?.name === 'SequelizeValidationError') {
+      const messages = error?.errors?.map((e: any) => e.message).join(', ');
+      return res.status(400).json({
+        success: false,
+        message: messages || 'Validation error occurred'
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: error?.message || "Internal server error"
+    });
   }
 });
 

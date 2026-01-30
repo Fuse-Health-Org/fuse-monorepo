@@ -10,6 +10,14 @@ interface User {
     firstName?: string
     lastName?: string
     phone?: string
+    userRoles?: {
+        patient?: boolean
+        doctor?: boolean
+        admin?: boolean
+        brand?: boolean
+        affiliate?: boolean
+        superAdmin?: boolean
+    }
 }
 
 interface MfaState {

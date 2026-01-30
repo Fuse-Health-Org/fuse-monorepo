@@ -116,6 +116,25 @@ class BrandSubscriptionService {
       const stripeCustomerId =
         await this.userService.getOrCreateCustomerId(user);
 
+      // Check for payment method ID - this should have been added by the webhook handler
+      if (!metadata.paymentMethodId) {
+        console.error('❌ SERVICE: No paymentMethodId in payment metadata:', {
+          paymentId,
+          brandSubscriptionId,
+          metadata,
+        });
+        return {
+          success: false,
+          error: "Payment method ID not found in payment metadata. The webhook may not have processed correctly.",
+        };
+      }
+
+      console.log('🔍 SERVICE: Creating subscription with:', {
+        customerId: stripeCustomerId,
+        priceId: brandSubPlan.stripePriceId,
+        paymentMethodId: metadata.paymentMethodId,
+      });
+
       const subscription =
         await this.stripeService.createSubscriptionAfterPayment({
           customerId: stripeCustomerId,

@@ -8,12 +8,15 @@ import { Input } from '@/components/ui/input'
 import {
   ArrowLeft,
   Check,
+  CheckCircle2,
   CreditCard,
   Shield,
   Lock,
   Building2,
   Star,
-  Users
+  Users,
+  XCircle,
+  Loader2
 } from 'lucide-react'
 import { loadStripe } from '@stripe/stripe-js'
 import {
@@ -54,6 +57,125 @@ interface CheckoutData {
   stripePriceId?: string
 }
 
+// Payment Processing Modal Component
+type PaymentModalState = 'processing' | 'success' | 'error'
+
+interface PaymentModalProps {
+  isOpen: boolean
+  state: PaymentModalState
+  errorMessage?: string
+  planName?: string
+  amount?: number
+  onClose: () => void
+  onRedirect: () => void
+}
+
+function PaymentModal({ isOpen, state, errorMessage, planName, amount, onClose, onRedirect }: PaymentModalProps) {
+  if (!isOpen) return null
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center">
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      
+      {/* Modal */}
+      <div className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+        {/* Header gradient */}
+        <div className={`h-2 ${
+          state === 'processing' ? 'bg-gradient-to-r from-blue-500 to-purple-500 animate-pulse' :
+          state === 'success' ? 'bg-gradient-to-r from-green-500 to-emerald-500' :
+          'bg-gradient-to-r from-red-500 to-orange-500'
+        }`} />
+        
+        <div className="p-8">
+          {/* Processing State */}
+          {state === 'processing' && (
+            <div className="text-center">
+              <div className="w-20 h-20 mx-auto mb-6 relative">
+                <div className="absolute inset-0 rounded-full border-4 border-blue-100"></div>
+                <div className="absolute inset-0 rounded-full border-4 border-blue-600 border-t-transparent animate-spin"></div>
+                <CreditCard className="absolute inset-0 m-auto w-8 h-8 text-blue-600" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Processing Payment</h2>
+              <p className="text-gray-600 mb-4">
+                Please wait while we securely process your payment...
+              </p>
+              <div className="bg-blue-50 rounded-lg p-4 mb-4">
+                <p className="text-sm text-blue-800 font-medium">
+                  {planName && `${planName} Plan`}
+                  {amount !== undefined && ` • $${amount.toLocaleString()}`}
+                </p>
+              </div>
+              <div className="flex items-center justify-center gap-2 text-sm text-gray-500">
+                <Lock className="w-4 h-4" />
+                <span>Secure payment powered by Stripe</span>
+              </div>
+              <p className="text-xs text-gray-400 mt-4">
+                Do not close or refresh this page
+              </p>
+            </div>
+          )}
+
+          {/* Success State */}
+          {state === 'success' && (
+            <div className="text-center">
+              <div className="w-20 h-20 mx-auto mb-6 bg-green-100 rounded-full flex items-center justify-center">
+                <CheckCircle2 className="w-12 h-12 text-green-600" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Payment Successful!</h2>
+              <p className="text-gray-600 mb-6">
+                Your subscription has been activated successfully.
+              </p>
+              <div className="bg-green-50 rounded-lg p-4 mb-6">
+                <p className="text-sm text-green-800 font-medium">
+                  {planName && `${planName} Plan`}
+                  {amount !== undefined && ` • $${amount.toLocaleString()}/month`}
+                </p>
+                <p className="text-xs text-green-600 mt-1">
+                  Your first charge of ${amount?.toLocaleString()} has been processed
+                </p>
+              </div>
+              <Button
+                onClick={onRedirect}
+                className="w-full bg-green-600 hover:bg-green-700 text-white py-3 text-lg font-semibold rounded-xl"
+              >
+                <Check className="w-5 h-5 mr-2" />
+                Go to Dashboard
+              </Button>
+            </div>
+          )}
+
+          {/* Error State */}
+          {state === 'error' && (
+            <div className="text-center">
+              <div className="w-20 h-20 mx-auto mb-6 bg-red-100 rounded-full flex items-center justify-center">
+                <XCircle className="w-12 h-12 text-red-600" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Payment Failed</h2>
+              <p className="text-gray-600 mb-4">
+                We couldn't process your payment.
+              </p>
+              {errorMessage && (
+                <div className="bg-red-50 rounded-lg p-4 mb-6">
+                  <p className="text-sm text-red-800">
+                    {errorMessage}
+                  </p>
+                </div>
+              )}
+              <Button
+                onClick={onClose}
+                className="w-full bg-gray-900 hover:bg-gray-800 text-white py-3 text-lg font-semibold rounded-xl"
+              >
+                Try Again
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // Checkout form component that uses Stripe hooks
 function CheckoutForm({ checkoutData, paymentData, token, intentClientSecret, onSuccess, onError }: {
   checkoutData: CheckoutData
@@ -63,10 +185,16 @@ function CheckoutForm({ checkoutData, paymentData, token, intentClientSecret, on
   onSuccess: () => void
   onError: (error: string) => void
 }) {
+  const router = useRouter()
   const stripe = useStripe()
   const elements = useElements()
   const [isProcessing, setIsProcessing] = useState(false)
   const [cardError, setCardError] = useState('')
+  
+  // Modal state
+  const [modalOpen, setModalOpen] = useState(false)
+  const [modalState, setModalState] = useState<PaymentModalState>('processing')
+  const [modalError, setModalError] = useState('')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -99,6 +227,9 @@ function CheckoutForm({ checkoutData, paymentData, token, intentClientSecret, on
 
     setIsProcessing(true)
     setCardError('')
+    setModalOpen(true)
+    setModalState('processing')
+    setModalError('')
 
     try {
       const paymentElement = elements.getElement(PaymentElement)
@@ -107,6 +238,8 @@ function CheckoutForm({ checkoutData, paymentData, token, intentClientSecret, on
       if (!paymentElement) {
         const errorMsg = 'Payment details form is not ready yet.'
         console.error('❌', errorMsg)
+        setModalState('error')
+        setModalError(errorMsg)
         onError(errorMsg)
         return
       }
@@ -116,6 +249,8 @@ function CheckoutForm({ checkoutData, paymentData, token, intentClientSecret, on
         const errorMsg = submitError.message || 'Please check your payment details and try again.'
         console.error('❌ Payment element submission error:', submitError)
         setCardError(errorMsg)
+        setModalState('error')
+        setModalError(errorMsg)
         onError(errorMsg)
         return
       }
@@ -140,6 +275,8 @@ function CheckoutForm({ checkoutData, paymentData, token, intentClientSecret, on
         const errorMsg = confirmError.message || 'Payment authorization failed.'
         console.error('❌ Payment confirmation error:', confirmError)
         setCardError(errorMsg)
+        setModalState('error')
+        setModalError(errorMsg)
         onError(errorMsg)
         return
       }
@@ -147,6 +284,8 @@ function CheckoutForm({ checkoutData, paymentData, token, intentClientSecret, on
       if (!paymentIntent) {
         const errorMsg = 'Stripe did not return a payment intent.'
         console.error('❌', errorMsg)
+        setModalState('error')
+        setModalError(errorMsg)
         onError(errorMsg)
         return
       }
@@ -154,6 +293,8 @@ function CheckoutForm({ checkoutData, paymentData, token, intentClientSecret, on
       if (paymentIntent.status !== 'succeeded' && paymentIntent.status !== 'requires_capture') {
         const errorMsg = `Downpayment not completed. Status: ${paymentIntent.status}`
         console.error('❌', errorMsg)
+        setModalState('error')
+        setModalError(errorMsg)
         onError(errorMsg)
         return
       }
@@ -165,6 +306,8 @@ function CheckoutForm({ checkoutData, paymentData, token, intentClientSecret, on
       if (!paymentMethodId) {
         const errorMsg = 'Unable to determine payment method after confirmation.'
         console.error('❌', errorMsg)
+        setModalState('error')
+        setModalError(errorMsg)
         onError(errorMsg)
         return
       }
@@ -208,144 +351,173 @@ function CheckoutForm({ checkoutData, paymentData, token, intentClientSecret, on
         const { error: subscriptionConfirmError } = await stripe.confirmCardPayment(subscriptionClientSecret)
 
         if (subscriptionConfirmError) {
-          setCardError(subscriptionConfirmError.message || 'Subscription authentication failed.')
-          onError(subscriptionConfirmError.message || 'Subscription payment failed')
+          const errorMsg = subscriptionConfirmError.message || 'Subscription authentication failed.'
+          setCardError(errorMsg)
+          setModalState('error')
+          setModalError(errorMsg)
+          onError(errorMsg)
           return
         }
       }
 
       // Subscription created successfully
       console.log('✅ Subscription created successfully:', subscriptionId)
+      setModalState('success')
       onSuccess()
 
     } catch (error: any) {
       console.error('Payment error:', error)
       const errorMessage = error.message || 'An unexpected error occurred'
       setCardError(errorMessage)
+      setModalState('error')
+      setModalError(errorMessage)
       onError(errorMessage)
-      // Show alert to user
-      alert(`Payment failed: ${errorMessage}`)
     } finally {
       setIsProcessing(false)
     }
   }
 
+  const handleModalClose = () => {
+    setModalOpen(false)
+    setModalState('processing')
+    setModalError('')
+  }
+
+  const handleModalRedirect = () => {
+    router.push('/plans?success=true&payment_intent=completed')
+  }
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Contact Information */}
-      <div>
-        <h3 className="font-semibold mb-4 flex items-center gap-2">
-          <CreditCard className="w-5 h-5 text-blue-600" />
-          Contact information
-        </h3>
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-2">Email address</label>
-            <Input
-              type="email"
-              placeholder="Enter your email"
-              value={paymentData.email}
-              onChange={(e) => paymentData.setEmail(e.target.value)}
-              autoComplete="email"
-              className="w-full"
-              required
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
+    <>
+      {/* Payment Processing Modal */}
+      <PaymentModal
+        isOpen={modalOpen}
+        state={modalState}
+        errorMessage={modalError}
+        planName={checkoutData.planName}
+        amount={checkoutData.subscriptionMonthlyPrice || checkoutData.planPrice}
+        onClose={handleModalClose}
+        onRedirect={handleModalRedirect}
+      />
+
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Contact Information */}
+        <fieldset disabled={isProcessing} className={isProcessing ? 'opacity-50 pointer-events-none' : ''}>
+        <div>
+          <h3 className="font-semibold mb-4 flex items-center gap-2">
+            <CreditCard className="w-5 h-5 text-blue-600" />
+            Contact information
+          </h3>
+          <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-2">First name</label>
+              <label className="block text-sm font-medium mb-2">Email address</label>
               <Input
-                type="text"
-                placeholder="First name"
-                value={paymentData.firstName}
-                onChange={(e) => paymentData.setFirstName(e.target.value)}
-                autoComplete="given-name"
+                type="email"
+                placeholder="Enter your email"
+                value={paymentData.email}
+                onChange={(e) => paymentData.setEmail(e.target.value)}
+                autoComplete="email"
                 className="w-full"
                 required
               />
             </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">First name</label>
+                <Input
+                  type="text"
+                  placeholder="First name"
+                  value={paymentData.firstName}
+                  onChange={(e) => paymentData.setFirstName(e.target.value)}
+                  autoComplete="given-name"
+                  className="w-full"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Last name</label>
+                <Input
+                  type="text"
+                  placeholder="Last name"
+                  value={paymentData.lastName}
+                  onChange={(e) => paymentData.setLastName(e.target.value)}
+                  autoComplete="family-name"
+                  className="w-full"
+                  required
+                />
+              </div>
+            </div>
             <div>
-              <label className="block text-sm font-medium mb-2">Last name</label>
+              <label className="block text-sm font-medium mb-2">Phone number</label>
               <Input
-                type="text"
-                placeholder="Last name"
-                value={paymentData.lastName}
-                onChange={(e) => paymentData.setLastName(e.target.value)}
-                autoComplete="family-name"
+                type="tel"
+                placeholder="(555) 123-4567"
+                value={paymentData.phone}
+                onChange={(e) => paymentData.setPhone(e.target.value)}
+                autoComplete="tel"
                 className="w-full"
                 required
               />
             </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-2">Phone number</label>
-            <Input
-              type="tel"
-              placeholder="(555) 123-4567"
-              value={paymentData.phone}
-              onChange={(e) => paymentData.setPhone(e.target.value)}
-              autoComplete="tel"
-              className="w-full"
-              required
-            />
           </div>
         </div>
-      </div>
 
-      {/* Stripe Payment Element */}
-      <div>
-        <h3 className="font-semibold mb-4 flex items-center gap-2">
-          <CreditCard className="w-5 h-5 text-blue-600" />
-          Payment method
-        </h3>
-        <div className="border rounded-lg p-4">
-          <PaymentElement options={paymentElementOptions} />
-          {cardError && (
-            <div className="mt-2 text-sm text-red-600">
-              {cardError}
-            </div>
+        {/* Stripe Payment Element */}
+        <div className="mt-6">
+          <h3 className="font-semibold mb-4 flex items-center gap-2">
+            <CreditCard className="w-5 h-5 text-blue-600" />
+            Payment method
+          </h3>
+          <div className="border rounded-lg p-4">
+            <PaymentElement options={paymentElementOptions} />
+            {cardError && (
+              <div className="mt-2 text-sm text-red-600">
+                {cardError}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Terms and Conditions */}
+        <div className="flex items-center justify-center gap-6 text-sm text-muted-foreground py-4">
+          <div className="flex items-center gap-2">
+            <span>By proceeding, you agree to our</span>
+            <a href="/terms" className="text-blue-600 hover:text-blue-700 underline">Terms & Conditions</a>
+            <span>and</span>
+            <a href="/privacy" className="text-blue-600 hover:text-blue-700 underline">Privacy Policy</a>
+          </div>
+        </div>
+
+        {/* CTA Button */}
+        <Button
+          type="submit"
+          disabled={!stripe || isProcessing}
+          className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 text-lg font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed rounded-xl"
+        >
+          {isProcessing ? (
+            <>
+              <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></div>
+              Processing payment...
+            </>
+          ) : (
+            <>
+              <CreditCard className="w-5 h-5 mr-2" />
+              <span>Pay ${checkoutData.subscriptionMonthlyPrice?.toLocaleString() || checkoutData.planPrice.toLocaleString()} & Get Started</span>
+            </>
           )}
+        </Button>
+
+        <div className="text-center space-y-2">
+          <p className="text-sm font-medium">
+            ✅ Subscription activates immediately after payment
+          </p>
+          <p className="text-xs text-muted-foreground">
+            You can add optional onboarding support later from Settings.
+          </p>
         </div>
-      </div>
-
-      {/* Terms and Conditions */}
-      <div className="flex items-center justify-center gap-6 text-sm text-muted-foreground py-4">
-        <div className="flex items-center gap-2">
-          <span>By proceeding, you agree to our</span>
-          <a href="/terms" className="text-blue-600 hover:text-blue-700 underline">Terms & Conditions</a>
-          <span>and</span>
-          <a href="/privacy" className="text-blue-600 hover:text-blue-700 underline">Privacy Policy</a>
-        </div>
-      </div>
-
-      {/* CTA Button */}
-      <Button
-        type="submit"
-        disabled={!stripe || isProcessing}
-        className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 text-lg font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed rounded-xl"
-      >
-        {isProcessing ? (
-          <>
-            <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></div>
-            Processing...
-          </>
-        ) : (
-          <>
-            <CreditCard className="w-5 h-5 mr-2" />
-            <span>Pay ${checkoutData.subscriptionMonthlyPrice?.toLocaleString() || checkoutData.planPrice.toLocaleString()} & Get Started</span>
-          </>
-        )}
-      </Button>
-
-      <div className="text-center space-y-2">
-        <p className="text-sm font-medium">
-          ✅ Subscription activates immediately after payment
-        </p>
-        <p className="text-xs text-muted-foreground">
-          You can add optional onboarding support later from Settings.
-        </p>
-      </div>
-    </form>
+      </fieldset>
+      </form>
+    </>
   )
 }
 
@@ -353,7 +525,6 @@ export default function CheckoutPage() {
   const router = useRouter()
   const { user, token, isLoading, refreshSubscription, subscription } = useAuth()
   const [checkoutData, setCheckoutData] = useState<CheckoutData | null>(null)
-  const [isProcessing, setIsProcessing] = useState(false)
   const [clientSecret, setClientSecret] = useState('')
 
   // Redirect to login if not authenticated

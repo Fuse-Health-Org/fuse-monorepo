@@ -105,9 +105,28 @@ export function Sidebar() {
           console.log("data.data", data.data);
           const needsTutorial = data.data.tutorialFinished === false && data.data.status === "active" && data.data.stripeCustomerId !== null;
           console.log("needsTutorial", needsTutorial);
-          setRunTutorial(needsTutorial);
+
           // Set tutorial step from DB, default to 0 if not set
-          setTutorialStep(data.data.tutorialStep || 0);
+          const step = data.data.tutorialStep || 0;
+          setTutorialStep(step);
+
+          // If tutorial needs to run and we're at step 0 or 1, redirect to settings page
+          // because those steps' target elements are on the settings page
+          if (needsTutorial && step <= 1 && router.pathname !== '/settings') {
+            console.log("📍 Tutorial step", step, "requires settings page, redirecting...");
+            router.push('/settings');
+            // Don't start tutorial yet - it will start after redirect when this runs again
+            return;
+          }
+
+          // Add small delay to ensure page elements are rendered before starting tutorial
+          if (needsTutorial) {
+            setTimeout(() => {
+              setRunTutorial(true);
+            }, 500);
+          } else {
+            setRunTutorial(false);
+          }
         }
       }
     } catch (error) {
@@ -117,7 +136,7 @@ export function Sidebar() {
 
   useEffect(() => {
     fetchSubscriptionBasicInfo()
-  }, [])
+  }, [router.pathname])
 
   const handleRefreshSubscription = async () => {
     if (isRefreshing) return
@@ -250,7 +269,27 @@ export function Sidebar() {
                 ? "bg-sidebar-accent text-sidebar-accent-foreground"
                 : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
             )}
-            onClick={disabled ? (e) => handleDisabledClick(e, item.name) : undefined}
+            onClick={(e) => {
+              if (disabled) {
+                handleDisabledClick(e, item.name);
+                return;
+              }
+
+              // If tutorial is running and Products tab is the current tutorial target (step 2),
+              // advance the tutorial instead of just navigating
+              // But don't auto-advance if we're navigating backwards
+              if (runTutorial && item.id === 'tutorial-step-3') {
+                const tutorialAdvance = (window as any).__tutorialAdvance;
+                const tutorialStep = (window as any).__tutorialCurrentStep;
+                const isNavigatingBackwards = (window as any).__tutorialNavigatingBackwards;
+                if (tutorialAdvance && tutorialStep === 2 && !isNavigatingBackwards) {
+                  e.preventDefault();
+                  console.log('📍 Tutorial active - advancing from Products click');
+                  tutorialAdvance();
+                  return;
+                }
+              }
+            }}
           >
             <div className="flex items-center">
               <item.icon className="mr-3 h-4 w-4" />

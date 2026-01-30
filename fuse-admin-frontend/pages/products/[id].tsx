@@ -305,10 +305,12 @@ export default function ProductDetail() {
                 ])
 
                 // Process tenant product
+                let tenantProdExists = false
                 if (tpRes.ok) {
                     const list = await tpRes.json().then(r => r?.data || [])
                     const tenantProd = list.find((r: any) => r?.productId === id)
                     setTenantProduct(tenantProd || null)
+                    tenantProdExists = !!tenantProd
                 }
 
                 // Process global structures - show structures themselves, not underlying forms
@@ -377,16 +379,27 @@ export default function ProductDetail() {
                 setTemplates(displayTemplates)
 
                 // Process enabled forms
+                // Store fetched forms in a local variable to avoid stale closure issues
+                let fetchedEnabledForms: any[] = []
                 if (tpfRes.ok) {
                     const data = await tpfRes.json()
-                    setEnabledForms(Array.isArray(data?.data) ? data.data : [])
+                    fetchedEnabledForms = Array.isArray(data?.data) ? data.data : []
+                    setEnabledForms(fetchedEnabledForms)
                 }
 
                 // Auto-enable exactly 1 form per Global Form Structure
                 // Forms are built from global structure blueprint - no questionnaire needed
+                // Only auto-enable if tenant product exists (product is activated)
                 const enabledTracker = new Set<string>()
+                
+                // Skip auto-enable if no tenant product exists yet (product not activated)
+                if (!tenantProdExists) {
+                    console.log('Skipping auto-enable: product not activated yet')
+                }
 
                 for (const template of displayTemplates) {
+                    // Skip auto-enable if product is not activated
+                    if (!tenantProdExists) break
                     const structureId = (template as any)._structureId || 'default'
                     const trackingKey = `${structureId}:${String(id)}` // Product ID is the key
 
@@ -394,7 +407,8 @@ export default function ProductDetail() {
                     if (enabledTracker.has(trackingKey)) continue
 
                     // Check if a form exists for this structure + product
-                    const existingFormsForStructure = enabledForms.filter((f: any) =>
+                    // Use fetchedEnabledForms (local variable) instead of enabledForms (stale closure)
+                    const existingFormsForStructure = fetchedEnabledForms.filter((f: any) =>
                         (f?.globalFormStructureId ?? 'default') === structureId
                     )
 
@@ -416,7 +430,9 @@ export default function ProductDetail() {
                             if (res.ok) {
                                 const formData = await res.json()
                                 if (formData?.success && formData?.data) {
-                                    setEnabledForms(prev => [...prev, formData.data])
+                                    // Also update local variable to prevent duplicate creations in same loop
+                                    fetchedEnabledForms = [...fetchedEnabledForms, formData.data]
+                                    setEnabledForms(fetchedEnabledForms)
                                     enabledTracker.add(trackingKey)
                                     console.log(`✅ Form created for structure ${structureId}`)
                                 }
@@ -581,8 +597,6 @@ export default function ProductDetail() {
                 setEnabledForms(prev => [...prev.filter((f: any) => f?.questionnaireId !== questionnaireId), data.data])
                 // Reload customizations
                 await fetchCustomizations()
-                // TenantProduct creation is ensured by the backend before creating the form
-                window.location.reload()
             } else {
                 throw new Error(data?.message || 'Failed to enable form')
             }

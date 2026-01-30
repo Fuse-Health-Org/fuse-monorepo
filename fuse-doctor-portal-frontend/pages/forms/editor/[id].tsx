@@ -7,9 +7,11 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Input } from "@/components/ui/input"
-import { Loader2, ArrowLeft, Save, Plus, Trash2, GripVertical, MessageSquare, Info, Edit, X, Code2, ChevronDown, ChevronUp, RefreshCw, GitBranch, Eye, StopCircle, Link2, Unlink, FileText, Calculator } from "lucide-react"
+import { Loader2, ArrowLeft, Save, Plus, Trash2, GripVertical, MessageSquare, Info, Edit, X, Code2, ChevronDown, ChevronUp, RefreshCw, GitBranch, Eye, StopCircle, Link2, Unlink, FileText, Calculator, Package } from "lucide-react"
 import { useAuth } from "@/contexts/AuthContext"
 import { QuestionEditor } from "../QuestionEditor"
+import { useProducts } from "@/hooks/useProducts"
+import { ProductAssignmentModal } from "@/components/ProductAssignmentModal"
 
 interface Step {
   id: string
@@ -123,6 +125,18 @@ export default function TemplateEditor() {
     options: [],
     rules: []
   })
+
+  // Product assignment modal state
+  const [showProductModal, setShowProductModal] = useState(false)
+  const [showNoProductsWarning, setShowNoProductsWarning] = useState(false)
+  const [pendingSave, setPendingSave] = useState(false)
+
+  // Use products hook
+  const {
+    products,
+    assignProductsToForm,
+    getAssignedProducts,
+  } = useProducts(baseUrl)
 
   useEffect(() => {
     if (!token) return
@@ -1785,7 +1799,7 @@ export default function TemplateEditor() {
     }
   }
 
-  const handleSave = async () => {
+  const performSave = async () => {
     if (!template || saving) return
 
     setSaving(true)
@@ -1825,7 +1839,32 @@ export default function TemplateEditor() {
       setSaveMessage(`❌ ${err.message || "Failed to save template"}`)
     } finally {
       setSaving(false)
+      setPendingSave(false)
     }
+  }
+
+  const handleSave = async () => {
+    if (!template || saving) return
+
+    // Check if products are assigned
+    const assignedProducts = getAssignedProducts(template.id)
+    if (assignedProducts.length === 0) {
+      setShowNoProductsWarning(true)
+      setPendingSave(true)
+      return
+    }
+
+    await performSave()
+  }
+
+  const handleConfirmSaveWithoutProducts = async () => {
+    setShowNoProductsWarning(false)
+    await performSave()
+  }
+
+  const handleCancelSave = () => {
+    setShowNoProductsWarning(false)
+    setPendingSave(false)
   }
 
   if (loading) {
@@ -2023,6 +2062,61 @@ export default function TemplateEditor() {
                         formStatus === 'ready_for_review' ? 'Ready for Review' :
                           'Ready'}
                     </Badge>
+                  </div>
+                </div>
+
+                {/* Products Assignment Section - Prominent */}
+                <div 
+                  className={`rounded-2xl p-6 shadow-lg border-2 transition-all ${
+                    getAssignedProducts(template.id).length === 0
+                      ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-300 dark:border-amber-700 hover:shadow-xl'
+                      : 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-300 dark:border-emerald-700 hover:shadow-xl'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-start gap-4">
+                      <div className={`p-3 rounded-xl ${
+                        getAssignedProducts(template.id).length === 0
+                          ? 'bg-amber-100 dark:bg-amber-900/40'
+                          : 'bg-emerald-100 dark:bg-emerald-900/40'
+                      }`}>
+                        <Package className={`h-6 w-6 ${
+                          getAssignedProducts(template.id).length === 0
+                            ? 'text-amber-600 dark:text-amber-400'
+                            : 'text-emerald-600 dark:text-emerald-400'
+                        }`} />
+                      </div>
+                      <div>
+                        <h3 className={`text-lg font-semibold mb-1 ${
+                          getAssignedProducts(template.id).length === 0
+                            ? 'text-amber-900 dark:text-amber-100'
+                            : 'text-emerald-900 dark:text-emerald-100'
+                        }`}>
+                          {getAssignedProducts(template.id).length === 0 ? 'Assign Products to Template' : 'Products Assigned'}
+                        </h3>
+                        <p className={`text-sm ${
+                          getAssignedProducts(template.id).length === 0
+                            ? 'text-amber-700 dark:text-amber-300'
+                            : 'text-emerald-700 dark:text-emerald-300'
+                        }`}>
+                          {getAssignedProducts(template.id).length === 0
+                            ? 'This template needs products assigned before brands can use it to build programs'
+                            : `${getAssignedProducts(template.id).length} ${getAssignedProducts(template.id).length === 1 ? 'product' : 'products'} currently assigned to this template`
+                          }
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      onClick={() => setShowProductModal(true)}
+                      className={`px-6 py-2.5 rounded-full font-semibold shadow-md hover:shadow-lg transition-all ${
+                        getAssignedProducts(template.id).length === 0
+                          ? 'bg-amber-600 hover:bg-amber-700 text-white'
+                          : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                      }`}
+                    >
+                      <Package className="h-4 w-4 mr-2" />
+                      {getAssignedProducts(template.id).length === 0 ? 'Assign Products' : 'Manage Products'}
+                    </Button>
                   </div>
                 </div>
 
@@ -3831,6 +3925,86 @@ export default function TemplateEditor() {
           </div>
         )
       })()}
+
+      {/* Product Assignment Modal */}
+      {template && (
+        <ProductAssignmentModal
+          isOpen={showProductModal}
+          onClose={() => setShowProductModal(false)}
+          formTitle={template.title}
+          formId={template.id}
+          products={products}
+          assignedProductIds={getAssignedProducts(template.id)}
+          initialProductOfferType={template.productOfferType || 'single_choice'}
+          onSave={async (productIds, productOfferType) => {
+            await assignProductsToForm(template.id, productIds, productOfferType)
+            // Update the template's productOfferType in local state
+            setTemplate((prev: any) => ({ ...prev, productOfferType }))
+          }}
+        />
+      )}
+
+      {/* No Products Warning Modal */}
+      {showNoProductsWarning && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-lg bg-card rounded-2xl shadow-2xl border border-border">
+            {/* Header */}
+            <div className="bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800 p-6 rounded-t-2xl">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-xl bg-amber-100 dark:bg-amber-900/40">
+                  <Package className="h-6 w-6 text-amber-600 dark:text-amber-400" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-semibold text-amber-900 dark:text-amber-100">
+                    No Products Assigned
+                  </h2>
+                  <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                    This template won't be usable by brands
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="p-6">
+              <p className="text-muted-foreground leading-relaxed mb-4">
+                You are saving the template without any products assigned. This means <strong className="text-foreground">brands won't be able to use this template</strong> to build programs.
+              </p>
+              <p className="text-muted-foreground leading-relaxed">
+                If you want brands to use this template, please assign some products before saving.
+              </p>
+            </div>
+
+            {/* Footer */}
+            <div className="bg-muted/30 p-6 rounded-b-2xl flex gap-3">
+              <Button
+                onClick={handleCancelSave}
+                variant="outline"
+                className="flex-1 rounded-full"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  setShowNoProductsWarning(false)
+                  setShowProductModal(true)
+                }}
+                className="flex-1 rounded-full bg-[#4FA59C] hover:bg-[#478F87] text-white"
+              >
+                <Package className="h-4 w-4 mr-2" />
+                Assign Products
+              </Button>
+              <Button
+                onClick={handleConfirmSaveWithoutProducts}
+                variant="outline"
+                className="flex-1 rounded-full border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400 dark:hover:bg-amber-900/20"
+              >
+                Save Anyway
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

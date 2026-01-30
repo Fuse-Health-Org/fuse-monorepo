@@ -582,11 +582,23 @@ export function registerDoctorEndpoints(
         for (const order of orders) {
           try {
             const result = await orderService.approveOrder(order.id, prescriptionDays, doctorUserId);
-            results.push({
-              orderId: order.id,
-              orderNumber: order.orderNumber,
-              ...result,
-            });
+            // Check if approval was successful
+            if (result.success) {
+              results.push({
+                orderId: order.id,
+                orderNumber: order.orderNumber,
+                ...result,
+              });
+            } else {
+              // Approval failed (e.g., license validation failed)
+              results.push({
+                orderId: order.id,
+                orderNumber: order.orderNumber,
+                success: false,
+                message: result.message || "Failed to approve order",
+                error: result.error || "Unknown error",
+              });
+            }
           } catch (error) {
             results.push({
               orderId: order.id,
@@ -1729,6 +1741,153 @@ export function registerDoctorEndpoints(
           message: "Failed to retry spreadsheet write",
           error: error instanceof Error ? error.message : "Unknown error",
         });
+      }
+    }
+  );
+
+  // Get doctor details (license states coverage)
+  app.get(
+    "/doctor/details",
+    authenticateJWT,
+    async (req: any, res: any) => {
+      try {
+        const currentUser = getCurrentUser(req);
+        if (!currentUser) {
+          return res
+            .status(401)
+            .json({ success: false, message: "Unauthorized" });
+        }
+
+        const user = await User.findByPk(currentUser.id, {
+          include: [{ model: UserRoles, as: 'userRoles' }]
+        });
+        if (!user) {
+          return res
+            .status(401)
+            .json({ success: false, message: "User not found" });
+        }
+
+        if (!user.hasAnyRoleSync(['doctor', 'admin'])) {
+          return res.status(403).json({
+            success: false,
+            message: "Access denied. Doctor or admin role required.",
+          });
+        }
+
+        // Return doctor license states coverage from User model
+        res.json({
+          success: true,
+          data: {
+            userId: user.id,
+            doctorLicenseStatesCoverage: user.doctorLicenseStatesCoverage || [],
+          },
+        });
+      } catch (error) {
+        console.error(
+          "❌ Error fetching doctor details:",
+          error instanceof Error ? error.message : String(error)
+        );
+        res
+          .status(500)
+          .json({ success: false, message: "Failed to fetch doctor details" });
+      }
+    }
+  );
+
+  // Update doctor details (license states coverage)
+  app.post(
+    "/doctor/details",
+    authenticateJWT,
+    async (req: any, res: any) => {
+      try {
+        const currentUser = getCurrentUser(req);
+        if (!currentUser) {
+          return res
+            .status(401)
+            .json({ success: false, message: "Unauthorized" });
+        }
+
+        const user = await User.findByPk(currentUser.id, {
+          include: [{ model: UserRoles, as: 'userRoles' }]
+        });
+        if (!user) {
+          return res
+            .status(401)
+            .json({ success: false, message: "User not found" });
+        }
+
+        if (!user.hasAnyRoleSync(['doctor', 'admin'])) {
+          return res.status(403).json({
+            success: false,
+            message: "Access denied. Doctor or admin role required.",
+          });
+        }
+
+        const { doctorLicenseStatesCoverage } = req.body;
+
+        // Validate input
+        if (!Array.isArray(doctorLicenseStatesCoverage)) {
+          return res.status(400).json({
+            success: false,
+            message: "doctorLicenseStatesCoverage must be an array",
+          });
+        }
+
+        // Validate state codes (2-letter US state codes)
+        const validUSStates = [
+          'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
+          'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
+          'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
+          'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
+          'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY', 'DC'
+        ];
+
+        const invalidStates = doctorLicenseStatesCoverage.filter(
+          (state: string) => !validUSStates.includes(state.toUpperCase())
+        );
+
+        if (invalidStates.length > 0) {
+          return res.status(400).json({
+            success: false,
+            message: `Invalid state codes: ${invalidStates.join(', ')}`,
+          });
+        }
+
+        // Normalize state codes to uppercase
+        const normalizedStates = doctorLicenseStatesCoverage.map((state: string) =>
+          state.toUpperCase()
+        );
+
+        // Update doctor license states coverage in User model
+        user.doctorLicenseStatesCoverage = normalizedStates;
+        await user.save();
+
+        // HIPAA Audit: Log doctor details update
+        await AuditService.logFromRequest(req, {
+          action: AuditAction.UPDATE,
+          resourceType: AuditResourceType.USER,
+          resourceId: currentUser.id,
+          details: {
+            updatedLicenseStates: normalizedStates,
+          },
+        });
+
+        res.json({
+          success: true,
+          message: "Doctor details updated successfully",
+          data: {
+            userId: user.id,
+            doctorLicenseStatesCoverage: user.doctorLicenseStatesCoverage,
+          },
+        });
+      } catch (error) {
+        console.error(
+          "❌ Error updating doctor details:",
+          error instanceof Error ? error.message : String(error)
+        );
+        res
+          .status(500)
+          .json({ success: false, message: "Failed to update doctor details" });
       }
     }
   );

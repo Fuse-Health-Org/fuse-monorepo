@@ -97,33 +97,38 @@ router.get('/public/programs/by-clinic/:clinicSlug', async (req: Request, res: R
     });
 
     // Build simplified response for frontend with cheapest product price
+    // Only include programs that have at least one activated product (TenantProduct with isActive=true)
     const programsData = await Promise.all(programs.map(async (program) => {
       let cheapestPrice: number | null = null;
+      let hasActivatedProduct = false;
 
       // Get products from the program's medical template
       const medicalTemplate = program.medicalTemplate as any;
       if (medicalTemplate && medicalTemplate.formProducts) {
         const formProducts = medicalTemplate.formProducts as any[];
         
-        // Calculate cheapest price from tenant products
+        // Calculate cheapest price from ACTIVATED tenant products only
         for (const fp of formProducts) {
           if (!fp.product) continue;
           
-          // Try to get tenant-specific pricing
+          // Only consider products that have an ACTIVE TenantProduct for this clinic
           const tenantProduct = await TenantProduct.findOne({
             where: {
               productId: fp.product.id,
               clinicId: programClinicId,
+              isActive: true, // Must be explicitly activated
             },
             attributes: ['price', 'isActive'],
           });
 
-          const productPrice = tenantProduct && tenantProduct.isActive 
-            ? Number(tenantProduct.price) || 0 
-            : Number(fp.product.price) || 0;
+          // Only count this product if it has an active TenantProduct
+          if (tenantProduct && tenantProduct.isActive) {
+            hasActivatedProduct = true;
+            const productPrice = Number(tenantProduct.price) || Number(fp.product.price) || 0;
 
-          if (productPrice > 0 && (cheapestPrice === null || productPrice < cheapestPrice)) {
-            cheapestPrice = productPrice;
+            if (productPrice > 0 && (cheapestPrice === null || productPrice < cheapestPrice)) {
+              cheapestPrice = productPrice;
+            }
           }
         }
       }
@@ -147,14 +152,19 @@ router.get('/public/programs/by-clinic/:clinicSlug', async (req: Request, res: R
           imageUrl: (program.frontendDisplayProduct as any).imageUrl,
           slug: (program.frontendDisplayProduct as any).slug,
         } : null,
-        // Cheapest product price from the program
+        // Cheapest product price from the program (null if no activated products)
         fromPrice: cheapestPrice,
+        // Flag to indicate if program has any activated products
+        hasActivatedProducts: hasActivatedProduct,
       };
     }));
 
+    // Filter out programs that have no activated products
+    const filteredPrograms = programsData.filter(p => p.hasActivatedProducts);
+
     return res.json({
       success: true,
-      data: programsData,
+      data: filteredPrograms,
       isAffiliate,
     });
   } catch (error) {

@@ -92,6 +92,9 @@ export default function ClientManagement() {
   const [checkingData, setCheckingData] = useState(false)
   const [loadingClinicData, setLoadingClinicData] = useState(false)
   const [clinicDataCheck, setClinicDataCheck] = useState<{hasData: boolean, ordersCount: number, paymentsCount: number, prescriptionsCount: number} | null>(null)
+  const [mainDoctorId, setMainDoctorId] = useState<string | null>(null)
+  const [doctors, setDoctors] = useState<User[]>([])
+  const [loadingDoctors, setLoadingDoctors] = useState(false)
 
   // BrandSubscription form state
   const [formData, setFormData] = useState({
@@ -124,6 +127,7 @@ export default function ClientManagement() {
   useEffect(() => {
     fetchUsers()
     fetchAvailablePlans()
+    fetchDoctors()
   }, [])
 
   const fetchAvailablePlans = async () => {
@@ -183,9 +187,31 @@ export default function ClientManagement() {
         const format = result.data?.patientPortalDashboardFormat || 'fuse'
         setPatientPortalDashboardFormat(format)
         setOriginalPatientPortalDashboardFormat(format)
+        setMainDoctorId(result.data?.mainDoctorId || result.data?.mainDoctor?.id || null)
       }
     } catch (error) {
       console.error('Error fetching clinic data:', error)
+    }
+  }
+
+  const fetchDoctors = async () => {
+    setLoadingDoctors(true)
+    try {
+      const response = await fetch(`${baseUrl}/admin/users?role=doctor&limit=1000`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        setDoctors(result.data?.users || [])
+      }
+    } catch (error) {
+      console.error('Error fetching doctors:', error)
+      toast.error('Failed to load doctors')
+    } finally {
+      setLoadingDoctors(false)
     }
   }
 
@@ -460,6 +486,28 @@ export default function ClientManagement() {
         const formatResult = await formatResponse.json()
         console.log('✅ [Client Mgmt Frontend] Format save response:', formatResult)
         setOriginalPatientPortalDashboardFormat(patientPortalDashboardFormat)
+      }
+
+      // Update main doctor if patientPortalDashboardFormat is FUSE
+      if (patientPortalDashboardFormat === 'fuse') {
+        const mainDoctorResponse = await fetch(`${baseUrl}/admin/users/${selectedUser.id}/clinic/main-doctor`, {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            mainDoctorId: mainDoctorId || null,
+          }),
+        })
+
+        if (!mainDoctorResponse.ok) {
+          const errorData = await mainDoctorResponse.json()
+          throw new Error(errorData.message || 'Failed to update main doctor')
+        }
+
+        const mainDoctorResult = await mainDoctorResponse.json()
+        console.log('✅ [Client Mgmt Frontend] Main doctor save response:', mainDoctorResult)
       }
 
       toast.success('Settings updated successfully')
@@ -1114,7 +1162,13 @@ export default function ClientManagement() {
                                 </label>
                                 <select
                                   value={patientPortalDashboardFormat}
-                                  onChange={(e) => setPatientPortalDashboardFormat(e.target.value)}
+                                  onChange={(e) => {
+                                    setPatientPortalDashboardFormat(e.target.value)
+                                    // Reset mainDoctorId if switching away from FUSE
+                                    if (e.target.value !== 'fuse') {
+                                      setMainDoctorId(null)
+                                    }
+                                  }}
                                   disabled={saving || checkingData}
                                   className="w-full max-w-md px-3 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4FA59C] bg-background text-foreground"
                                 >
@@ -1143,6 +1197,45 @@ export default function ClientManagement() {
                                 )}
                               </div>
                             </div>
+
+                            {/* Main Doctor (only for FUSE format) */}
+                            {patientPortalDashboardFormat === 'fuse' && (
+                              <div className="space-y-4 pt-6 border-t border-border">
+                                <h3 className="font-semibold text-foreground">Responsible Doctor</h3>
+                                <p className="text-sm text-muted-foreground">
+                                  Select the doctor who is currently responsible for this clinic. This is different from the referrer doctor (who made the referral).
+                                </p>
+                                
+                                <div>
+                                  <label className="block text-sm font-medium text-foreground mb-2">
+                                    Main Doctor
+                                  </label>
+                                  {loadingDoctors ? (
+                                    <div className="flex items-center space-x-2 text-muted-foreground">
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                      <span className="text-sm">Loading doctors...</span>
+                                    </div>
+                                  ) : (
+                                    <select
+                                      value={mainDoctorId || ''}
+                                      onChange={(e) => setMainDoctorId(e.target.value || null)}
+                                      disabled={saving}
+                                      className="w-full max-w-md px-3 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4FA59C] bg-background text-foreground"
+                                    >
+                                      <option value="">No doctor assigned</option>
+                                      {doctors.map((doctor) => (
+                                        <option key={doctor.id} value={doctor.id}>
+                                          {doctor.firstName} {doctor.lastName} ({doctor.email})
+                                        </option>
+                                      ))}
+                                    </select>
+                                  )}
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    The main doctor is responsible for managing this clinic. This can be changed at any time.
+                                  </p>
+                                </div>
+                              </div>
+                            )}
 
                             {/* Save Button */}
                             <div className="flex justify-end pt-4 border-t border-border">

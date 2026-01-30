@@ -926,11 +926,11 @@ export default function Settings({
   const currentPlan = plans.find((p) => p.planType === currentPlanType);
 
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex min-h-screen h-screen bg-background overflow-hidden">
       <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col min-h-0">
         <Header />
-        <main className="flex-1 overflow-y-auto p-6 h-full">
+        <main className="flex-1 overflow-y-auto p-6">
           <div className="max-w-6xl mx-auto space-y-6">
             <div className="flex items-start justify-between">
               <div>
@@ -1483,15 +1483,14 @@ export default function Settings({
                               <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
                                 The dashboard experience your patients see when they sign in. This affects the entire patient portal navigation and features.
                               </p>
-                              
+
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {/* Fuse Dashboard Option */}
                                 <div
-                                  className={`relative p-4 rounded-xl border-2 text-left transition-all ${
-                                    organizationData.patientPortalDashboardFormat === "fuse"
+                                  className={`relative p-4 rounded-xl border-2 text-left transition-all ${organizationData.patientPortalDashboardFormat === "fuse"
                                       ? "border-purple-500 bg-white dark:bg-gray-900 shadow-lg ring-2 ring-purple-500/20"
                                       : "border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 opacity-60"
-                                  }`}
+                                    }`}
                                 >
                                   {organizationData.patientPortalDashboardFormat === "fuse" && (
                                     <div className="absolute bottom-3 right-3">
@@ -1523,11 +1522,10 @@ export default function Settings({
 
                                 {/* MD Integrations Dashboard Option */}
                                 <div
-                                  className={`relative p-4 rounded-xl border-2 text-left transition-all ${
-                                    organizationData.patientPortalDashboardFormat === "md-integrations"
+                                  className={`relative p-4 rounded-xl border-2 text-left transition-all ${organizationData.patientPortalDashboardFormat === "md-integrations"
                                       ? "border-purple-500 bg-white dark:bg-gray-900 shadow-lg ring-2 ring-purple-500/20"
                                       : "border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 opacity-60"
-                                  }`}
+                                    }`}
                                 >
                                   {organizationData.patientPortalDashboardFormat === "md-integrations" && (
                                     <div className="absolute bottom-3 right-3">
@@ -1596,8 +1594,8 @@ export default function Settings({
                                   setOrganizationData((prev) => ({ ...prev, defaultFormColor: preset.color }));
                                 }}
                                 className={`relative group h-16 rounded-lg transition-all ${organizationData.defaultFormColor === preset.color
-                                    ? "ring-2 ring-offset-2 ring-primary scale-105"
-                                    : "hover:scale-105 hover:shadow-lg"
+                                  ? "ring-2 ring-offset-2 ring-primary scale-105"
+                                  : "hover:scale-105 hover:shadow-lg"
                                   }`}
                                 style={{ backgroundColor: preset.color }}
                                 title={preset.name}
@@ -2159,7 +2157,7 @@ export default function Settings({
 
       {/* Logo Upload Modal */}
       {showLogoModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black bg-opacity-50 backdrop-blur-sm">
           <div className="relative bg-background border border-border rounded-2xl shadow-2xl max-w-md w-full p-6 animate-in fade-in zoom-in duration-200">
             {/* Close button */}
             <button
