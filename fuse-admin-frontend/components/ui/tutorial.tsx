@@ -380,7 +380,7 @@ const Tutorial: React.FC<TutorialProps> = ({
                 Step {currentStep + 1} of {totalSteps}
               </span>
 
-              {currentStep > 0 && (
+              {currentStep > 0 && !currentStepData.hideNextButton && (
                 <button
                   onClick={handleBack}
                   className="px-3 py-1.5 text-sm text-green-700 hover:text-green-800 transition-colors"
@@ -389,12 +389,14 @@ const Tutorial: React.FC<TutorialProps> = ({
                 </button>
               )}
 
-              <button
-                onClick={handleNext}
-                className="px-4 py-1.5 text-sm bg-green-700 hover:bg-green-800 text-white rounded-md transition-colors"
-              >
-                {currentStep === totalSteps - 1 ? (endLabel || 'Finish') : 'Next'}
-              </button>
+              {!currentStepData.hideNextButton && (
+                <button
+                  onClick={handleNext}
+                  className="px-4 py-1.5 text-sm bg-green-700 hover:bg-green-800 text-white rounded-md transition-colors"
+                >
+                  {currentStep === totalSteps - 1 ? (endLabel || 'Finish') : 'Next'}
+                </button>
+              )}
             </div>
           </div>
         </div>

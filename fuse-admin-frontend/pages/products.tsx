@@ -996,10 +996,10 @@ export default function Products() {
                                     // Switch to My Products tab
                                     setActiveTab('my');
 
-                                    // If tutorial is running on step 6 (My Products tab), advance the tutorial
+                                    // If tutorial is running on step 5 (My Products tab), advance the tutorial
                                     const tutorialAdvance = (window as any).__tutorialAdvance;
                                     const tutorialStep = (window as any).__tutorialCurrentStep;
-                                    if (tutorialAdvance && tutorialStep === 6) {
+                                    if (tutorialAdvance && tutorialStep === 5) {
                                         console.log('📍 Tutorial active on My Products tab - advancing');
                                         setTimeout(() => {
                                             tutorialAdvance();
@@ -1328,10 +1328,10 @@ export default function Products() {
                                                                 // Activate the product
                                                                 handleEnableProduct(product.id);
 
-                                                                // If tutorial is running, simply advance to next step
+                                                                // If tutorial is running on step 4 (showing first product), advance to next step
                                                                 const tutorialAdvance = (window as any).__tutorialAdvance;
                                                                 const tutorialStep = (window as any).__tutorialCurrentStep;
-                                                                if (tutorialAdvance && (tutorialStep === 4 || tutorialStep === 5)) {
+                                                                if (tutorialAdvance && tutorialStep === 4) {
                                                                     console.log('📍 Tutorial active - advancing after product activation');
                                                                     setTimeout(() => {
                                                                         tutorialAdvance();

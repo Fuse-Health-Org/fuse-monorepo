@@ -4,6 +4,7 @@ export interface TutorialStep {
   placement?: 'top' | 'bottom' | 'left' | 'right';
   disableBeacon?: boolean;
   hideOverlay?: boolean;
+  hideNextButton?: boolean;
 }
 
 export const tutorialSteps: TutorialStep[] = [
@@ -30,13 +31,9 @@ export const tutorialSteps: TutorialStep[] = [
   },
   {
     target: "#first-product-item",
-    content: "Perfect! Here you can add new products to your catalog.",
+    content: "Perfect! Here you can add new products to your catalog. Click \"Activate\".",
     placement: "top",
-  },
-  {
-    target: ".enable-product-btn",
-    content: "Let's enable your first product!",
-    placement: "top",
+    hideNextButton: true,
   },
   {
     target: "#my-products-btn",
