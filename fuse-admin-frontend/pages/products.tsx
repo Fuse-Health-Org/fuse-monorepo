@@ -1297,7 +1297,23 @@ export default function Products() {
                                                             size="sm"
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
+
+                                                                // Activate the product
                                                                 handleEnableProduct(product.id);
+
+                                                                // If tutorial is running and targeting this button, advance the tutorial
+                                                                const joyrideTooltip = document.querySelector('[class*="__floater"]');
+                                                                if (joyrideTooltip) {
+                                                                    console.log('📍 Tutorial active on Activate button - will advance after activation');
+                                                                    // Wait for activation to complete, then click Next
+                                                                    setTimeout(() => {
+                                                                        const nextButton = document.querySelector('button[data-action="primary"]') as HTMLButtonElement;
+                                                                        if (nextButton) {
+                                                                            console.log('✅ Clicking Next button to advance tutorial');
+                                                                            nextButton.click();
+                                                                        }
+                                                                    }, 500);
+                                                                }
                                                             }}
                                                             className="bg-green-600 hover:bg-green-700 text-white enable-product-btn"
                                                         >
