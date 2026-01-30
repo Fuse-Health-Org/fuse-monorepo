@@ -216,8 +216,13 @@ const Tutorial: React.FC<TutorialProps> = ({
       }, 100);
     }
 
-    // Step 6: My Products tab step - don't auto-click, user already activated and switched tabs
-    // The tab switch happens when clicking Activate, so just show the tooltip
+    // Step 6: Switch to My Products tab to show the enabled product
+    if (stepIndex === 6) {
+      console.log('📍 Switching to My Products tab for final step');
+      setTimeout(() => {
+        document.getElementById('my-products-btn')?.click();
+      }, 100);
+    }
   }, [router, activeSteps]);
 
   // Public method to advance tutorial (can be called from outside)
