@@ -2017,6 +2017,86 @@ app.get("/admin/doctor-applications", authenticateJWT, async (req, res) => {
   }
 });
 
+// Get all approved doctors
+app.get("/admin/approved-doctors", authenticateJWT, async (req, res) => {
+  try {
+    const currentUser = (req as any).user;
+
+    if (!currentUser) {
+      return res.status(401).json({
+        success: false,
+        message: "Not authenticated",
+      });
+    }
+
+    // Load full user with roles
+    const user = await User.findByPk(currentUser.userId, {
+      include: [{ model: UserRoles, as: "userRoles" }],
+    });
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Only admin, superAdmin, or brand can access approved doctors
+    if (!user.hasAnyRoleSync(["admin", "superAdmin", "brand"])) {
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized: Only admins or brand users can view approved doctors",
+      });
+    }
+
+    // Get all users with doctor role who are approved
+    const approvedDoctors = await User.findAll({
+      where: {
+        role: "doctor",
+        isApprovedDoctor: true,
+      },
+      attributes: [
+        "id",
+        "firstName",
+        "lastName",
+        "email",
+        "phoneNumber",
+        "npiNumber",
+        "doctorLicenseStatesCoverage",
+        "createdAt",
+        "activated",
+        "website",
+        "businessType",
+        "city",
+        "state",
+        "isApprovedDoctor",
+      ],
+      order: [["createdAt", "DESC"]],
+    });
+
+    if (process.env.NODE_ENV === "development") {
+      console.log(`✅ Found ${approvedDoctors.length} approved doctors`);
+    }
+
+    res.status(200).json({
+      success: true,
+      data: approvedDoctors,
+      count: approvedDoctors.length,
+    });
+  } catch (error) {
+    // HIPAA: Do not log detailed errors in production
+    if (process.env.NODE_ENV === "development") {
+      console.error("❌ Error fetching approved doctors:", error);
+    } else {
+      console.error("❌ Error fetching approved doctors");
+    }
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch approved doctors",
+    });
+  }
+});
+
 // Approve a doctor application
 app.post(
   "/admin/doctor-applications/:userId/approve",
