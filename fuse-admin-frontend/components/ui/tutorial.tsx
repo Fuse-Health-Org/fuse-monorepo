@@ -264,15 +264,18 @@ const Tutorial: React.FC<TutorialProps> = ({
       (window as any).__tutorialAdvance = advanceTutorial;
       (window as any).__tutorialJumpToStep = jumpToStep;
       (window as any).__tutorialCurrentStep = currentStep;
+      (window as any).__tutorialNavigatingBackwards = false; // Flag to prevent auto-advance during back navigation
     } else {
       delete (window as any).__tutorialAdvance;
       delete (window as any).__tutorialJumpToStep;
       delete (window as any).__tutorialCurrentStep;
+      delete (window as any).__tutorialNavigatingBackwards;
     }
     return () => {
       delete (window as any).__tutorialAdvance;
       delete (window as any).__tutorialJumpToStep;
       delete (window as any).__tutorialCurrentStep;
+      delete (window as any).__tutorialNavigatingBackwards;
     };
   }, [runTutorial, advanceTutorial, jumpToStep, currentStep]);
 
@@ -285,24 +288,51 @@ const Tutorial: React.FC<TutorialProps> = ({
     if (currentStep > 0) {
       const prevStep = currentStep - 1;
 
+      // Set flag to prevent auto-advance during backwards navigation
+      (window as any).__tutorialNavigatingBackwards = true;
+
       // Handle specific navigation when going backwards
-      // Step 3 -> 2: Navigate back to settings page
-      if (currentStep === 3 && router.pathname !== '/settings') {
+      // From step 3 (index 2): Navigate back to settings page
+      if (currentStep === 2 && router.pathname !== '/settings') {
         console.log('📍 Going back from step 3 to 2 - navigating to Settings');
         setIsNavigating(true);
         await router.push('/settings');
         setIsNavigating(false);
+        setCurrentStep(prevStep);
+        handleUpdateStep(prevStep);
       }
-      // Step 6 -> 5: Switch from My Products to Select Products tab
-      else if (currentStep === 6) {
-        console.log('📍 Going back from step 6 to 5 - switching to Select Products tab');
+      // From step 5 (index 4): Ensure we're on Select Products tab
+      else if (currentStep === 4) {
+        console.log('📍 Going back from step 5 to 4 - switching to Select Products tab');
+        // Click the tab first
+        document.getElementById('select-products-btn')?.click();
+        // Wait for tab switch to complete, THEN update the step
         setTimeout(() => {
-          document.getElementById('select-products-btn')?.click();
-        }, 100);
+          setCurrentStep(prevStep);
+          handleUpdateStep(prevStep);
+        }, 300);
+      }
+      // From step 6 (index 5): Switch to Select Products tab
+      else if (currentStep === 5) {
+        console.log('📍 Going back from step 6 to 5 - switching to Select Products tab');
+        // Click the tab first
+        document.getElementById('select-products-btn')?.click();
+        // Wait for tab switch to complete, THEN update the step
+        setTimeout(() => {
+          setCurrentStep(prevStep);
+          handleUpdateStep(prevStep);
+        }, 300);
+      }
+      else {
+        // No special navigation needed, just go back
+        setCurrentStep(prevStep);
+        handleUpdateStep(prevStep);
       }
 
-      setCurrentStep(prevStep);
-      handleUpdateStep(prevStep);
+      // Clear the flag after a longer delay
+      setTimeout(() => {
+        (window as any).__tutorialNavigatingBackwards = false;
+      }, 600);
     }
   }, [currentStep, handleUpdateStep, router]);
 

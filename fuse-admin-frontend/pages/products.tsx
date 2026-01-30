@@ -997,9 +997,11 @@ export default function Products() {
                                     setActiveTab('my');
 
                                     // If tutorial is running on step 5 (My Products tab), advance the tutorial
+                                    // But don't auto-advance if we're navigating backwards
                                     const tutorialAdvance = (window as any).__tutorialAdvance;
                                     const tutorialStep = (window as any).__tutorialCurrentStep;
-                                    if (tutorialAdvance && tutorialStep === 5) {
+                                    const isNavigatingBackwards = (window as any).__tutorialNavigatingBackwards;
+                                    if (tutorialAdvance && tutorialStep === 5 && !isNavigatingBackwards) {
                                         console.log('📍 Tutorial active on My Products tab - advancing');
                                         setTimeout(() => {
                                             tutorialAdvance();
@@ -1017,9 +1019,11 @@ export default function Products() {
                                     setActiveTab('select');
 
                                     // If tutorial is running on step 3 (Select Products tab), advance the tutorial
+                                    // But don't auto-advance if we're navigating backwards
                                     const tutorialAdvance = (window as any).__tutorialAdvance;
                                     const tutorialStep = (window as any).__tutorialCurrentStep;
-                                    if (tutorialAdvance && tutorialStep === 3) {
+                                    const isNavigatingBackwards = (window as any).__tutorialNavigatingBackwards;
+                                    if (tutorialAdvance && tutorialStep === 3 && !isNavigatingBackwards) {
                                         console.log('📍 Tutorial active on Select Products tab - advancing');
                                         setTimeout(() => {
                                             tutorialAdvance();

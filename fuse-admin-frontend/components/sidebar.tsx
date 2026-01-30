@@ -277,10 +277,12 @@ export function Sidebar() {
 
               // If tutorial is running and Products tab is the current tutorial target (step 2),
               // advance the tutorial instead of just navigating
+              // But don't auto-advance if we're navigating backwards
               if (runTutorial && item.id === 'tutorial-step-3') {
                 const tutorialAdvance = (window as any).__tutorialAdvance;
                 const tutorialStep = (window as any).__tutorialCurrentStep;
-                if (tutorialAdvance && tutorialStep === 2) {
+                const isNavigatingBackwards = (window as any).__tutorialNavigatingBackwards;
+                if (tutorialAdvance && tutorialStep === 2 && !isNavigatingBackwards) {
                   e.preventDefault();
                   console.log('📍 Tutorial active - advancing from Products click');
                   tutorialAdvance();
