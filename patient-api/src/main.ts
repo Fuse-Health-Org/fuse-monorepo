@@ -26,7 +26,6 @@ import BrandSubscriptionPlans from "./models/BrandSubscriptionPlans";
 import TierConfiguration from "./models/TierConfiguration";
 import TenantCustomFeatures from "./models/TenantCustomFeatures";
 import Subscription from "./models/Subscription";
-// import TenantProduct from "./models/TenantProduct";
 import {
   createJWTToken,
   authenticateJWT,
