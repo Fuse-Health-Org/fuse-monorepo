@@ -1328,14 +1328,13 @@ export default function Products() {
                                                                 // Activate the product
                                                                 handleEnableProduct(product.id);
 
-                                                                // If tutorial is running on step 4 or 5, jump to step 6 (My Products)
-                                                                // This skips the orphaned "Activate" button step since we just activated the product
-                                                                const tutorialJumpToStep = (window as any).__tutorialJumpToStep;
+                                                                // If tutorial is running, simply advance to next step
+                                                                const tutorialAdvance = (window as any).__tutorialAdvance;
                                                                 const tutorialStep = (window as any).__tutorialCurrentStep;
-                                                                if (tutorialJumpToStep && (tutorialStep === 4 || tutorialStep === 5)) {
-                                                                    console.log('📍 Tutorial active - jumping to My Products tab step');
+                                                                if (tutorialAdvance && (tutorialStep === 4 || tutorialStep === 5)) {
+                                                                    console.log('📍 Tutorial active - advancing after product activation');
                                                                     setTimeout(() => {
-                                                                        tutorialJumpToStep(6); // Jump to "My Products" step
+                                                                        tutorialAdvance();
                                                                     }, 300);
                                                                 }
                                                             }}
