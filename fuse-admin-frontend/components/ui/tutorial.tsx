@@ -281,13 +281,30 @@ const Tutorial: React.FC<TutorialProps> = ({
     advanceTutorial();
   }, [advanceTutorial]);
 
-  const handleBack = useCallback(() => {
+  const handleBack = useCallback(async () => {
     if (currentStep > 0) {
       const prevStep = currentStep - 1;
+
+      // Handle specific navigation when going backwards
+      // Step 3 -> 2: Navigate back to settings page
+      if (currentStep === 3 && router.pathname !== '/settings') {
+        console.log('📍 Going back from step 3 to 2 - navigating to Settings');
+        setIsNavigating(true);
+        await router.push('/settings');
+        setIsNavigating(false);
+      }
+      // Step 6 -> 5: Switch from My Products to Select Products tab
+      else if (currentStep === 6) {
+        console.log('📍 Going back from step 6 to 5 - switching to Select Products tab');
+        setTimeout(() => {
+          document.getElementById('select-products-btn')?.click();
+        }, 100);
+      }
+
       setCurrentStep(prevStep);
       handleUpdateStep(prevStep);
     }
-  }, [currentStep, handleUpdateStep]);
+  }, [currentStep, handleUpdateStep, router]);
 
   const handleSkip = useCallback(() => {
     console.log('⏭️ Tutorial skipped at step', currentStep);
