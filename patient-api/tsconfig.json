@@ -7,7 +7,10 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "@endpoints/*": ["./src/endpoints/*"]
+      "@endpoints/*": ["./src/endpoints/*"],
+      "@models/*": ["./src/models/*"],
+      "@services/*": ["./src/services/*"],
+      "@utils/*": ["./src/utils/*"]
     },
     "outDir": "./dist",
     "module": "CommonJS",

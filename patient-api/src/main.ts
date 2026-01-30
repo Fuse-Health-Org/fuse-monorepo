@@ -51,7 +51,6 @@ import {
 import TreatmentService from "./services/treatment.service";
 import PaymentService from "./services/payment.service";
 import ClinicService from "./services/clinic.service";
-import { processStripeWebhook } from "./services/stripe/webhook";
 import TreatmentProducts from "./models/TreatmentProducts";
 import TreatmentPlan, { BillingInterval } from "./models/TreatmentPlan";
 import ShippingOrder from "./models/ShippingOrder";
@@ -71,7 +70,6 @@ import {
   signInSchema,
   signUpSchema,
   forgotPasswordSchema,
-  resetPasswordSchema,
   resetPasswordWithCodeSchema,
   updateProfileSchema,
   clinicUpdateSchema,
@@ -99,7 +97,6 @@ import {
   patientUpdateSchema,
   brandTreatmentSchema,
   organizationUpdateSchema,
-  // updateTenantProductPriceSchema,
   listProductsSchema,
 } from "@fuse/validators";
 import TreatmentPlanService from "./services/treatmentPlan.service";
@@ -115,7 +112,6 @@ import TenantProduct from "./models/TenantProduct";
 import FormProducts from "./models/FormProducts";
 import GlobalFormStructure from "./models/GlobalFormStructure";
 import Program from "./models/Program";
-// import QuestionnaireStep twice causes duplicate identifier; keep single import below
 import Question from "./models/Question";
 import QuestionOption from "./models/QuestionOption";
 import { assignTemplatesSchema } from "./validators/formTemplates";
@@ -127,11 +123,12 @@ import TenantProductService from "./services/tenantProduct.service";
 import QuestionnaireStep from "./models/QuestionnaireStep";
 import DoctorPatientChats from "./models/DoctorPatientChats";
 import SmsService from "./services/sms.service";
-import { sequenceRoutes, webhookRoutes } from "@endpoints/sequences";
+import { sequenceRoutes, webhookRoutes as sequenceWebhookRoutes } from "@endpoints/sequences";
 import dashboardRoutes from "@endpoints/dashboard/routes/dashboard.routes";
 import { templateRoutes } from "@endpoints/templates";
 import { contactRoutes } from "@endpoints/contacts";
 import { tagRoutes } from "@endpoints/tags";
+import { stripeRoutes, webhookRoutes as stripeWebhookRoutes } from "@endpoints/stripe";
 import { GlobalFees } from "./models/GlobalFees";
 import { WebsiteBuilderConfigs, DEFAULT_FOOTER_DISCLAIMER } from "./models/WebsiteBuilderConfigs";
 
@@ -358,11 +355,13 @@ app.use((req, res, next) => {
 
 // Register refactored routes
 app.use("/", sequenceRoutes);
-app.use("/", webhookRoutes);
+app.use("/", sequenceWebhookRoutes);
 app.use("/", templateRoutes);
 app.use("/", contactRoutes);
 app.use("/", tagRoutes);
 app.use("/", dashboardRoutes);
+app.use("/", stripeRoutes);
+app.use("/", stripeWebhookRoutes);
 
 // Clone 'doctor' steps from master_template into a target questionnaire (preserve order)
 app.post(
@@ -8390,264 +8389,156 @@ app.post("/payments/clinic/sub", authenticateJWT, async (req, res) => {
   }
 });
 
-// ========== Stripe Connect Endpoints ==========
+// app.post("/stripe/connect/session", authenticateJWT, async (req, res) => {
+//   try {
+//     const currentUser = getCurrentUser(req);
 
-// Import Stripe Connect Service
-import StripeConnectService from "./services/stripe/connect.service";
+//     if (!currentUser) {
+//       return res.status(401).json({
+//         success: false,
+//         message: "Not authenticated",
+//       });
+//     }
 
-// Create Account Session for Stripe Connect embedded components
-app.post("/stripe/connect/session", authenticateJWT, async (req, res) => {
-  try {
-    const currentUser = getCurrentUser(req);
+//     const userWithClinic: any = currentUser;
+//     const clinicId = userWithClinic?.clinicId;
 
-    if (!currentUser) {
-      return res.status(401).json({
-        success: false,
-        message: "Not authenticated",
-      });
-    }
+//     if (!clinicId) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "No clinic associated with user",
+//       });
+//     }
 
-    const userWithClinic: any = currentUser;
-    const clinicId = userWithClinic?.clinicId;
+//     // Get merchant model from request body (defaults to 'platform')
+//     const { merchantModel } = req.body;
+//     const validMerchantModel =
+//       merchantModel === "direct" ? "direct" : "platform";
 
-    if (!clinicId) {
-      return res.status(400).json({
-        success: false,
-        message: "No clinic associated with user",
-      });
-    }
+//     console.log(
+//       `🔄 Creating Stripe Connect session for clinic: ${clinicId} (${validMerchantModel} model)`
+//     );
 
-    // Get merchant model from request body (defaults to 'platform')
-    const { merchantModel } = req.body;
-    const validMerchantModel =
-      merchantModel === "direct" ? "direct" : "platform";
+//     // Create account session with merchant model
+//     const clientSecret = await StripeConnectService.createAccountSession(
+//       clinicId,
+//       validMerchantModel
+//     );
 
-    console.log(
-      `🔄 Creating Stripe Connect session for clinic: ${clinicId} (${validMerchantModel} model)`
-    );
+//     if (!clientSecret) {
+//       throw new Error("Client secret was not generated");
+//     }
 
-    // Create account session with merchant model
-    const clientSecret = await StripeConnectService.createAccountSession(
-      clinicId,
-      validMerchantModel
-    );
-
-    if (!clientSecret) {
-      throw new Error("Client secret was not generated");
-    }
-
-    res.status(200).json({
-      success: true,
-      data: {
-        client_secret: clientSecret,
-      },
-    });
-  } catch (error: any) {
-    console.error("❌ Error creating Stripe Connect session:", error);
-    if (error.type === 'StripeInvalidRequestError') {
-      console.error("❌ Stripe error details:", JSON.stringify(error.raw, null, 2));
-    }
-    res.status(500).json({
-      success: false,
-      message: error.message || "Failed to create Connect session",
-      error: process.env.NODE_ENV === "development" ? error.stack : undefined,
-    });
-  }
-});
-
-// Get Stripe Connect account status
-app.get("/stripe/connect/status", authenticateJWT, async (req, res) => {
-  try {
-    const currentUser = getCurrentUser(req);
-
-    if (!currentUser) {
-      return res.status(401).json({
-        success: false,
-        message: "Not authenticated",
-      });
-    }
-
-    const userWithClinic: any = currentUser;
-    const clinicId = userWithClinic?.clinicId;
-
-    if (!clinicId) {
-      return res.status(400).json({
-        success: false,
-        message: "No clinic associated with user",
-      });
-    }
-
-    console.log(`🔍 Fetching Stripe Connect status for clinic: ${clinicId}`);
-
-    // Get account status
-    const status = await StripeConnectService.getAccountStatus(clinicId);
-
-    res.status(200).json({
-      success: true,
-      data: status,
-    });
-  } catch (error: any) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("❌ Error fetching Stripe Connect status:", error);
-    } else {
-      console.error("❌ Error fetching Stripe Connect status");
-    }
-    res.status(500).json({
-      success: false,
-      message: error.message || "Failed to fetch Connect status",
-    });
-  }
-});
-
-// Create account link for onboarding (alternative to embedded components)
-app.post("/stripe/connect/account-link", authenticateJWT, async (req, res) => {
-  try {
-    const currentUser = getCurrentUser(req);
-
-    if (!currentUser) {
-      return res.status(401).json({
-        success: false,
-        message: "Not authenticated",
-      });
-    }
-
-    const userWithClinic: any = currentUser;
-    const clinicId = userWithClinic?.clinicId;
-
-    if (!clinicId) {
-      return res.status(400).json({
-        success: false,
-        message: "No clinic associated with user",
-      });
-    }
-
-    const { refreshUrl, returnUrl } = req.body;
-
-    if (!refreshUrl || !returnUrl) {
-      return res.status(400).json({
-        success: false,
-        message: "refreshUrl and returnUrl are required",
-      });
-    }
-
-    console.log(`🔄 Creating Stripe account link for clinic: ${clinicId}`);
-
-    const accountLinkUrl = await StripeConnectService.createAccountLink(
-      clinicId,
-      refreshUrl,
-      returnUrl
-    );
-
-    res.status(200).json({
-      success: true,
-      data: {
-        url: accountLinkUrl,
-      },
-    });
-  } catch (error: any) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("❌ Error creating account link:", error);
-    } else {
-      console.error("❌ Error creating account link");
-    }
-    res.status(500).json({
-      success: false,
-      message: error.message || "Failed to create account link",
-    });
-  }
-});
+//     res.status(200).json({
+//       success: true,
+//       data: {
+//         client_secret: clientSecret,
+//       },
+//     });
+//   } catch (error: any) {
+//     console.error("❌ Error creating Stripe Connect session:", error);
+//     if (error.type === 'StripeInvalidRequestError') {
+//       console.error("❌ Stripe error details:", JSON.stringify(error.raw, null, 2));
+//     }
+//     res.status(500).json({
+//       success: false,
+//       message: error.message || "Failed to create Connect session",
+//       error: process.env.NODE_ENV === "development" ? error.stack : undefined,
+//     });
+//   }
+// });
 
 // Webhook deduplication cache (in production, use Redis or database)
-const processedWebhooks = new Set<string>();
+// const processedWebhooks = new Set<string>();
 
 // Stripe webhook endpoint
-app.post(
-  "/webhook/stripe",
-  express.raw({ type: "application/json" }),
-  async (req, res) => {
-    const sig = req.headers["stripe-signature"];
-    const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
+// app.post(
+//   "/webhook/stripe",
+//   express.raw({ type: "application/json" }),
+//   async (req, res) => {
+//     const sig = req.headers["stripe-signature"];
+//     const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
-    // HIPAA: Do not log webhook body or secrets in production
-    if (process.env.NODE_ENV === "development") {
-      console.log("🔍 Webhook received - Body length:", req.body?.length);
-    }
+//     // HIPAA: Do not log webhook body or secrets in production
+//     if (process.env.NODE_ENV === "development") {
+//       console.log("🔍 Webhook received - Body length:", req.body?.length);
+//     }
 
-    // Extract timestamp from signature for deduplication
-    const sigString = Array.isArray(sig) ? sig[0] : sig;
-    const timestampMatch = sigString?.match(/t=(\d+)/);
-    const webhookTimestamp = timestampMatch ? timestampMatch[1] : null;
-    if (process.env.NODE_ENV === "development") {
-      console.log("🔍 Webhook timestamp:", webhookTimestamp);
-    }
+//     // Extract timestamp from signature for deduplication
+//     const sigString = Array.isArray(sig) ? sig[0] : sig;
+//     const timestampMatch = sigString?.match(/t=(\d+)/);
+//     const webhookTimestamp = timestampMatch ? timestampMatch[1] : null;
+//     if (process.env.NODE_ENV === "development") {
+//       console.log("🔍 Webhook timestamp:", webhookTimestamp);
+//     }
 
-    if (!endpointSecret) {
-      console.error("❌ STRIPE_WEBHOOK_SECRET not configured");
-      return res.status(400).send("Webhook secret not configured");
-    }
+//     if (!endpointSecret) {
+//       console.error("❌ STRIPE_WEBHOOK_SECRET not configured");
+//       return res.status(400).send("Webhook secret not configured");
+//     }
 
-    let event;
+//     let event;
 
-    try {
-      const signature = Array.isArray(sig) ? sig[0] : sig;
-      if (!signature) {
-        throw new Error("No signature provided");
-      }
-      event = stripe.webhooks.constructEvent(
-        req.body,
-        signature,
-        endpointSecret
-      );
-    } catch (err: any) {
-      // SECURITY: Generic error message - don't reveal internal details
-      console.error("❌ Webhook signature verification failed");
-      // SECURITY: Log details internally but don't expose to caller
-      if (process.env.NODE_ENV === "development") {
-        console.error("Debug - Error:", err.message);
-      }
-      return res.status(400).send("Invalid request");
-    }
+//     try {
+//       const signature = Array.isArray(sig) ? sig[0] : sig;
+//       if (!signature) {
+//         throw new Error("No signature provided");
+//       }
+//       event = stripe.webhooks.constructEvent(
+//         req.body,
+//         signature,
+//         endpointSecret
+//       );
+//     } catch (err: any) {
+//       // SECURITY: Generic error message - don't reveal internal details
+//       console.error("❌ Webhook signature verification failed");
+//       // SECURITY: Log details internally but don't expose to caller
+//       if (process.env.NODE_ENV === "development") {
+//         console.error("Debug - Error:", err.message);
+//       }
+//       return res.status(400).send("Invalid request");
+//     }
 
-    // Check for duplicate webhook events
-    const eventId = event.id;
-    if (processedWebhooks.has(eventId)) {
-      console.log("⚠️ Duplicate webhook event detected, skipping:", eventId);
-      return res.status(200).json({ received: true, duplicate: true });
-    }
+//     // Check for duplicate webhook events
+//     const eventId = event.id;
+//     if (processedWebhooks.has(eventId)) {
+//       console.log("⚠️ Duplicate webhook event detected, skipping:", eventId);
+//       return res.status(200).json({ received: true, duplicate: true });
+//     }
 
-    // Add to processed webhooks (keep only last 1000 to prevent memory leaks)
-    processedWebhooks.add(eventId);
-    if (processedWebhooks.size > 1000) {
-      const firstEvent = processedWebhooks.values().next().value;
-      if (firstEvent) {
-        processedWebhooks.delete(firstEvent);
-      }
-    }
+//     // Add to processed webhooks (keep only last 1000 to prevent memory leaks)
+//     processedWebhooks.add(eventId);
+//     if (processedWebhooks.size > 1000) {
+//       const firstEvent = processedWebhooks.values().next().value;
+//       if (firstEvent) {
+//         processedWebhooks.delete(firstEvent);
+//       }
+//     }
 
-    console.log(
-      "🎣 Stripe webhook event received:",
-      event.type,
-      "ID:",
-      eventId
-    );
+//     console.log(
+//       "🎣 Stripe webhook event received:",
+//       event.type,
+//       "ID:",
+//       eventId
+//     );
 
-    try {
-      // Process the event using the webhook service
-      await processStripeWebhook(event);
+//     try {
+//       // Process the event using the webhook service
+//       await processStripeWebhook(event);
 
-      // Return a 200 response to acknowledge receipt of the event
-      res.status(200).json({ received: true });
-    } catch (error) {
-      // HIPAA: Do not log detailed errors in production
-      if (process.env.NODE_ENV === "development") {
-        console.error("❌ Error processing webhook:", error);
-      } else {
-        console.error("❌ Error processing webhook");
-      }
-      res.status(500).json({ error: "Webhook processing failed" });
-    }
-  }
-);
+//       // Return a 200 response to acknowledge receipt of the event
+//       res.status(200).json({ received: true });
+//     } catch (error) {
+//       // HIPAA: Do not log detailed errors in production
+//       if (process.env.NODE_ENV === "development") {
+//         console.error("❌ Error processing webhook:", error);
+//       } else {
+//         console.error("❌ Error processing webhook");
+//       }
+//       res.status(500).json({ error: "Webhook processing failed" });
+//     }
+//   }
+// );
 
 // Get customers/users for a clinic
 app.get("/users/by-clinic/:clinicId", authenticateJWT, async (req, res) => {
