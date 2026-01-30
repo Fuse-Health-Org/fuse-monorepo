@@ -385,23 +385,45 @@ const Tutorial: React.FC<TutorialProps> = ({
                 Step {currentStep + 1} of {totalSteps}
               </span>
 
-              {currentStep > 0 && !currentStepData.hideNextButton && (
-                <button
-                  onClick={handleBack}
-                  className="px-3 py-1.5 text-sm text-green-700 hover:text-green-800 transition-colors"
-                >
-                  Back
-                </button>
-              )}
+              {(() => {
+                // Check if we should show Next button even if hideNextButton is true
+                // This happens when the first product is already enabled (user went back)
+                let showNextButton = !currentStepData.hideNextButton;
 
-              {!currentStepData.hideNextButton && (
-                <button
-                  onClick={handleNext}
-                  className="px-4 py-1.5 text-sm bg-green-700 hover:bg-green-800 text-white rounded-md transition-colors"
-                >
-                  {currentStep === totalSteps - 1 ? (endLabel || 'Finish') : 'Next'}
-                </button>
-              )}
+                if (currentStepData.hideNextButton && currentStepData.target === '#first-product-item') {
+                  // Check if the first product has "Enabled" text instead of "Activate"
+                  const firstProduct = document.getElementById('first-product-item');
+                  if (firstProduct) {
+                    const hasEnabledBadge = firstProduct.textContent?.includes('Enabled');
+                    const hasActivateButton = firstProduct.querySelector('.enable-product-btn');
+                    if (hasEnabledBadge && !hasActivateButton) {
+                      showNextButton = true;
+                    }
+                  }
+                }
+
+                return (
+                  <>
+                    {currentStep > 0 && showNextButton && (
+                      <button
+                        onClick={handleBack}
+                        className="px-3 py-1.5 text-sm text-green-700 hover:text-green-800 transition-colors"
+                      >
+                        Back
+                      </button>
+                    )}
+
+                    {showNextButton && (
+                      <button
+                        onClick={handleNext}
+                        className="px-4 py-1.5 text-sm bg-green-700 hover:bg-green-800 text-white rounded-md transition-colors"
+                      >
+                        {currentStep === totalSteps - 1 ? (endLabel || 'Finish') : 'Next'}
+                      </button>
+                    )}
+                  </>
+                );
+              })()}
             </div>
           </div>
         </div>
