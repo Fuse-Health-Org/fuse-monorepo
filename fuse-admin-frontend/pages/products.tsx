@@ -1012,7 +1012,20 @@ export default function Products() {
                             <button
                                 id="select-products-btn"
                                 className={`pb-3 border-b-2 transition-colors text-sm font-medium ${activeTab === 'select' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
-                                onClick={() => setActiveTab('select')}
+                                onClick={() => {
+                                    // Switch to Select Products tab
+                                    setActiveTab('select');
+
+                                    // If tutorial is running on step 3 (Select Products tab), advance the tutorial
+                                    const tutorialAdvance = (window as any).__tutorialAdvance;
+                                    const tutorialStep = (window as any).__tutorialCurrentStep;
+                                    if (tutorialAdvance && tutorialStep === 3) {
+                                        console.log('📍 Tutorial active on Select Products tab - advancing');
+                                        setTimeout(() => {
+                                            tutorialAdvance();
+                                        }, 200);
+                                    }
+                                }}
                             >
                                 Select Products
                             </button>
@@ -1159,6 +1172,7 @@ export default function Products() {
                                     return (
                                         <div
                                             key={product.id}
+                                            id={index === 0 ? 'first-product-item' : undefined}
                                             className={`flex items-center justify-between px-6 py-4 hover:bg-accent transition-colors ${quickEditMode ? 'cursor-default' : 'cursor-pointer'} ${index !== 0 ? 'border-t border-border' : ''}`}
                                             onClick={() => !quickEditMode && router.push(product.brandId ? `/custom-products/${product.id}` : `/products/${product.id}`)}
                                         >
@@ -1314,13 +1328,14 @@ export default function Products() {
                                                                 // Activate the product
                                                                 handleEnableProduct(product.id);
 
-                                                                // If tutorial is running on step 5 (Activate button), advance the tutorial
-                                                                const tutorialAdvance = (window as any).__tutorialAdvance;
+                                                                // If tutorial is running on step 4 or 5, jump to step 6 (My Products)
+                                                                // This skips the orphaned "Activate" button step since we just activated the product
+                                                                const tutorialJumpToStep = (window as any).__tutorialJumpToStep;
                                                                 const tutorialStep = (window as any).__tutorialCurrentStep;
-                                                                if (tutorialAdvance && tutorialStep === 5) {
-                                                                    console.log('📍 Tutorial active on Activate button - advancing');
+                                                                if (tutorialJumpToStep && (tutorialStep === 4 || tutorialStep === 5)) {
+                                                                    console.log('📍 Tutorial active - jumping to My Products tab step');
                                                                     setTimeout(() => {
-                                                                        tutorialAdvance();
+                                                                        tutorialJumpToStep(6); // Jump to "My Products" step
                                                                     }, 300);
                                                                 }
                                                             }}

@@ -216,8 +216,8 @@ const Tutorial: React.FC<TutorialProps> = ({
       }, 100);
     }
 
-    // Step 6 -> 7: Switch to my products tab
-    if (stepIndex === 7) {
+    // Step 6: Switch to my products tab (after activating product)
+    if (stepIndex === 6) {
       console.log('📍 Switching to My Products tab');
       setTimeout(() => {
         document.getElementById('my-products-btn')?.click();
@@ -242,20 +242,39 @@ const Tutorial: React.FC<TutorialProps> = ({
     }
   }, [currentStep, totalSteps, handleUpdateStep, handleStepNavigation, setRunTutorial, handleTutorialFinish, onFinish]);
 
-  // Expose advanceTutorial globally for element click handlers
+  // Public method to jump to a specific step
+  const jumpToStep = useCallback((stepIndex: number) => {
+    if (stepIndex >= 0 && stepIndex < totalSteps) {
+      console.log(`📍 Jumping to step ${stepIndex}`);
+      setCurrentStep(stepIndex);
+      handleUpdateStep(stepIndex);
+      handleStepNavigation(stepIndex);
+    } else if (stepIndex >= totalSteps) {
+      // Finish tutorial
+      console.log('✅ Tutorial completed');
+      setRunTutorial?.(false);
+      handleTutorialFinish(currentStep);
+      onFinish?.();
+    }
+  }, [totalSteps, handleUpdateStep, handleStepNavigation, setRunTutorial, handleTutorialFinish, onFinish, currentStep]);
+
+  // Expose tutorial control methods globally for element click handlers
   useEffect(() => {
     if (runTutorial) {
       (window as any).__tutorialAdvance = advanceTutorial;
+      (window as any).__tutorialJumpToStep = jumpToStep;
       (window as any).__tutorialCurrentStep = currentStep;
     } else {
       delete (window as any).__tutorialAdvance;
+      delete (window as any).__tutorialJumpToStep;
       delete (window as any).__tutorialCurrentStep;
     }
     return () => {
       delete (window as any).__tutorialAdvance;
+      delete (window as any).__tutorialJumpToStep;
       delete (window as any).__tutorialCurrentStep;
     };
-  }, [runTutorial, advanceTutorial, currentStep]);
+  }, [runTutorial, advanceTutorial, jumpToStep, currentStep]);
 
   // Button handlers
   const handleNext = useCallback(() => {
@@ -340,9 +359,9 @@ const Tutorial: React.FC<TutorialProps> = ({
           {/* Arrow */}
           <div
             className={`absolute w-3 h-3 bg-white transform rotate-45 ${tooltipPosition.arrowPosition === 'top' ? '-top-1.5 left-1/2 -translate-x-1/2' :
-                tooltipPosition.arrowPosition === 'bottom' ? '-bottom-1.5 left-1/2 -translate-x-1/2' :
-                  tooltipPosition.arrowPosition === 'left' ? 'top-1/2 -left-1.5 -translate-y-1/2' :
-                    'top-1/2 -right-1.5 -translate-y-1/2'
+              tooltipPosition.arrowPosition === 'bottom' ? '-bottom-1.5 left-1/2 -translate-x-1/2' :
+                tooltipPosition.arrowPosition === 'left' ? 'top-1/2 -left-1.5 -translate-y-1/2' :
+                  'top-1/2 -right-1.5 -translate-y-1/2'
               }`}
             style={{ boxShadow: '-1px -1px 2px rgba(0,0,0,0.1)' }}
           />

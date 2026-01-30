@@ -29,7 +29,7 @@ export const tutorialSteps: TutorialStep[] = [
     placement: "right",
   },
   {
-    target: ".product-card",
+    target: "#first-product-item",
     content: "Perfect! Here you can add new products to your catalog.",
     placement: "top",
   },
@@ -44,7 +44,7 @@ export const tutorialSteps: TutorialStep[] = [
     placement: "right",
   },
   {
-    target: ".product-card",
+    target: "#first-product-item",
     content: "Perfect! Here is your product enabled.",
     placement: "top",
   },
