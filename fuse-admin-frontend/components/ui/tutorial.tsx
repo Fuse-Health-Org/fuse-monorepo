@@ -350,31 +350,104 @@ const Tutorial: React.FC<TutorialProps> = ({
 
   return createPortal(
     <div className="fixed inset-0 z-[9999] pointer-events-none">
-      {/* Overlay with spotlight hole */}
+      {/* Overlay using 4 rectangles around the spotlight - creates a real hole for pointer events */}
       {!hideOverlay && targetRect && (
-        <svg className="absolute inset-0 w-full h-full pointer-events-none">
-          <defs>
-            <mask id="tutorial-mask">
-              <rect x="0" y="0" width="100%" height="100%" fill="white" />
-              <rect
-                x={targetRect.left}
-                y={targetRect.top}
-                width={targetRect.width}
-                height={targetRect.height}
-                rx="8"
-                fill="black"
-              />
-            </mask>
-          </defs>
-          <rect
-            x="0"
-            y="0"
-            width="100%"
-            height="100%"
-            fill="rgba(0, 0, 0, 0.5)"
-            mask="url(#tutorial-mask)"
+        <>
+          {/* Top overlay */}
+          <div
+            className="absolute bg-black/50"
+            style={{
+              top: 0,
+              left: 0,
+              right: 0,
+              height: targetRect.top,
+              pointerEvents: 'auto',
+            }}
           />
-        </svg>
+          {/* Bottom overlay */}
+          <div
+            className="absolute bg-black/50"
+            style={{
+              top: targetRect.top + targetRect.height,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              pointerEvents: 'auto',
+            }}
+          />
+          {/* Left overlay */}
+          <div
+            className="absolute bg-black/50"
+            style={{
+              top: targetRect.top,
+              left: 0,
+              width: targetRect.left,
+              height: targetRect.height,
+              pointerEvents: 'auto',
+            }}
+          />
+          {/* Right overlay */}
+          <div
+            className="absolute bg-black/50"
+            style={{
+              top: targetRect.top,
+              left: targetRect.left + targetRect.width,
+              right: 0,
+              height: targetRect.height,
+              pointerEvents: 'auto',
+            }}
+          />
+        </>
+      )}
+
+      {/* Invisible overlay for when visual overlay is hidden - still blocks clicks outside target */}
+      {hideOverlay && targetRect && (
+        <>
+          {/* Top invisible blocker */}
+          <div
+            className="absolute"
+            style={{
+              top: 0,
+              left: 0,
+              right: 0,
+              height: targetRect.top,
+              pointerEvents: 'auto',
+            }}
+          />
+          {/* Bottom invisible blocker */}
+          <div
+            className="absolute"
+            style={{
+              top: targetRect.top + targetRect.height,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              pointerEvents: 'auto',
+            }}
+          />
+          {/* Left invisible blocker */}
+          <div
+            className="absolute"
+            style={{
+              top: targetRect.top,
+              left: 0,
+              width: targetRect.left,
+              height: targetRect.height,
+              pointerEvents: 'auto',
+            }}
+          />
+          {/* Right invisible blocker */}
+          <div
+            className="absolute"
+            style={{
+              top: targetRect.top,
+              left: targetRect.left + targetRect.width,
+              right: 0,
+              height: targetRect.height,
+              pointerEvents: 'auto',
+            }}
+          />
+        </>
       )}
 
       {/* Highlight border around target */}
