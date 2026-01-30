@@ -292,8 +292,23 @@ const Tutorial: React.FC<TutorialProps> = ({
       (window as any).__tutorialNavigatingBackwards = true;
 
       // Handle specific navigation when going backwards
+      // From step 2 (index 1): Scroll to top of settings page for logo
+      if (currentStep === 1) {
+        console.log('📍 Going back from step 2 to 1 - scrolling to top');
+        // Find the main scrollable container
+        const mainContent = document.querySelector('main');
+        if (mainContent) {
+          mainContent.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        // Wait for scroll to complete before updating step
+        setTimeout(() => {
+          setCurrentStep(prevStep);
+          handleUpdateStep(prevStep);
+        }, 400);
+      }
       // From step 3 (index 2): Navigate back to settings page
-      if (currentStep === 2 && router.pathname !== '/settings') {
+      else if (currentStep === 2 && router.pathname !== '/settings') {
         console.log('📍 Going back from step 3 to 2 - navigating to Settings');
         setIsNavigating(true);
         await router.push('/settings');
