@@ -105,14 +105,14 @@ export function Sidebar() {
           console.log("data.data", data.data);
           const needsTutorial = data.data.tutorialFinished === false && data.data.status === "active" && data.data.stripeCustomerId !== null;
           console.log("needsTutorial", needsTutorial);
-          
+
           // Set tutorial step from DB, default to 0 if not set
           const step = data.data.tutorialStep || 0;
           setTutorialStep(step);
 
-          // If tutorial needs to run and we're at step 0, 1, or 2, redirect to settings page
+          // If tutorial needs to run and we're at step 0 or 1, redirect to settings page
           // because those steps' target elements are on the settings page
-          if (needsTutorial && step <= 2 && router.pathname !== '/settings') {
+          if (needsTutorial && step <= 1 && router.pathname !== '/settings') {
             console.log("📍 Tutorial step", step, "requires settings page, redirecting...");
             router.push('/settings');
             // Don't start tutorial yet - it will start after redirect when this runs again
@@ -269,7 +269,34 @@ export function Sidebar() {
                 ? "bg-sidebar-accent text-sidebar-accent-foreground"
                 : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
             )}
-            onClick={disabled ? (e) => handleDisabledClick(e, item.name) : undefined}
+            onClick={(e) => {
+              if (disabled) {
+                handleDisabledClick(e, item.name);
+                return;
+              }
+
+              // If tutorial is running and Products tab is the current tutorial target,
+              // convert the click to a Next button click instead
+              if (runTutorial && item.id === 'tutorial-step-3') {
+                // Check if there's a Joyride tooltip visible (tutorial is active)
+                const joyrideTooltip = document.querySelector('[class*="__floater"]');
+                if (joyrideTooltip) {
+                  e.preventDefault();
+                  console.log('📍 Tutorial active - converting Products click to Next button click');
+                  // Click the Next/Continue button in the Joyride tooltip
+                  setTimeout(() => {
+                    const nextButton = document.querySelector('button[data-action="primary"]') as HTMLButtonElement;
+                    if (nextButton) {
+                      console.log('✅ Clicking Next button');
+                      nextButton.click();
+                    } else {
+                      console.log('⚠️ Next button not found');
+                    }
+                  }, 50);
+                  return;
+                }
+              }
+            }}
           >
             <div className="flex items-center">
               <item.icon className="mr-3 h-4 w-4" />

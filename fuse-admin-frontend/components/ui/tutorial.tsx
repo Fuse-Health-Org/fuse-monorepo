@@ -25,6 +25,8 @@ const Tutorial = ({
   const { authenticatedFetch } = useAuth();
   // Track the current step index - only set on start, then update via callback
   const [currentStepIndex, setCurrentStepIndex] = React.useState<number | undefined>(undefined);
+  // Track if we're waiting for page navigation
+  const [isNavigating, setIsNavigating] = React.useState(false);
 
   const handleTutorialFinish = async (step?: number) => {
     try {
@@ -80,9 +82,10 @@ const Tutorial = ({
   }, [runTutorial, initialStep, currentStepIndex]);
 
   const handleJoyrideCallback = (data: any) => {
-    const { status, action, index, type, step } = data;
+    const { status, action, index, type, step, lifecycle } = data;
+    const totalSteps = (steps || tutorialSteps).length;
 
-    console.log('🔍 Joyride callback:', { status, action, index, type, step });
+    console.log('🔍 Joyride callback:', { status, action, index, type, lifecycle, totalSteps, step: step?.target });
 
     // Update local step index when step changes (this is needed for controlled stepIndex)
     if (type === "step:after") {
@@ -112,17 +115,37 @@ const Tutorial = ({
     // Handle special navigation cases - use setTimeout to avoid interrupting Joyride flow
     if (action === "next") {
       if (index === 3) {
-        // After moving to step 3, navigate to products page
+        // We just moved to step 3, which is on products page - navigate there
+        console.log('📍 Moving to step 3 - navigating to products page');
+        setIsNavigating(true);
         setTimeout(() => {
-          router.push("/products");
+          router.push("/products").then(() => {
+            // Wait for the target element to appear
+            const checkElement = setInterval(() => {
+              const element = document.getElementById("select-products-btn");
+              if (element) {
+                console.log('✅ Target element found, resuming tutorial');
+                clearInterval(checkElement);
+                setIsNavigating(false);
+              }
+            }, 100);
+            // Timeout after 5 seconds
+            setTimeout(() => {
+              clearInterval(checkElement);
+              setIsNavigating(false);
+              console.log('⚠️ Timeout waiting for element, resuming tutorial anyway');
+            }, 5000);
+          });
         }, 100);
       } else if (index === 4) {
-        // After moving to step 4, click select products button
+        // At step 4, click select products button to open modal
+        console.log('📍 Moving to step 4 - clicking select products button');
         setTimeout(() => {
           document.getElementById("select-products-btn")?.click();
         }, 300);
       } else if (index === 7) {
-        // After moving to step 7, click enable product and my products buttons
+        // At step 7, enable product and switch to my products tab
+        console.log('📍 Moving to step 7 - enabling product and switching tabs');
         setTimeout(() => {
           const el = document.getElementsByClassName("enable-product-btn")[0] as HTMLElement | undefined;
           if (el) el.click();
@@ -131,10 +154,29 @@ const Tutorial = ({
       }
     }
 
-    // When tutorial is finished, skipped, or closed, mark as finished with current step
-    if (status === "finished" || status === "skipped" || status === "closed") {
+    // Handle tutorial completion - only mark as truly finished in specific cases
+    if (status === "skipped") {
+      // User explicitly skipped - mark as finished
+      console.log('⏭️ Tutorial skipped by user at step', index);
       setRunTutorial?.(false);
-      // Use the current index (step) when closing/skipping
+      handleTutorialFinish(index);
+    } else if (status === "finished") {
+      // Check if we're actually at the last step
+      const isLastStep = index >= totalSteps - 1;
+      if (isLastStep) {
+        console.log('✅ Tutorial completed at final step', index);
+        setRunTutorial?.(false);
+        handleTutorialFinish(index);
+      } else {
+        // Joyride triggered "finished" but we're not at the last step
+        // This can happen when target element is not found after navigation
+        console.log('⚠️ Joyride reported finished at step', index, 'but not at last step. Ignoring.');
+        // Don't mark as finished - the tutorial should continue when targets are found
+      }
+    } else if (action === "close" && type === "step:after") {
+      // User clicked close button
+      console.log('❌ Tutorial closed by user at step', index);
+      setRunTutorial?.(false);
       handleTutorialFinish(index);
     }
   };
@@ -142,7 +184,7 @@ const Tutorial = ({
   return (
     <Joyride
       steps={steps || tutorialSteps}
-      run={runTutorial}
+      run={runTutorial && !isNavigating}
       callback={handleJoyrideCallback}
       continuous={true}
       showProgress={true}
