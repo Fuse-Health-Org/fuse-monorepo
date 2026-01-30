@@ -5,7 +5,8 @@ import Link from 'next/link'
 import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Eye, EyeOff, Stethoscope, User, Mail, Phone } from 'lucide-react'
+import { Eye, EyeOff, Stethoscope, User, Mail, Phone, MapPin } from 'lucide-react'
+import { US_STATES } from '@fuse/enums'
 
 interface FormData {
     firstName: string
@@ -15,6 +16,7 @@ interface FormData {
     confirmPassword: string
     phoneNumber: string
     npiNumber: string
+    licensedStates: string[]
 }
 
 export default function SignUp() {
@@ -25,7 +27,8 @@ export default function SignUp() {
         password: '',
         confirmPassword: '',
         phoneNumber: '',
-        npiNumber: ''
+        npiNumber: '',
+        licensedStates: []
     })
     const [showPassword, setShowPassword] = useState(false)
     const [showConfirmPassword, setShowConfirmPassword] = useState(false)
@@ -63,6 +66,20 @@ export default function SignUp() {
         }
     }
 
+    const toggleState = (stateCode: string) => {
+        setFormData(prev => {
+            const currentStates = prev.licensedStates || []
+            const newStates = currentStates.includes(stateCode)
+                ? currentStates.filter(code => code !== stateCode)
+                : [...currentStates, stateCode]
+            
+            return {
+                ...prev,
+                licensedStates: newStates
+            }
+        })
+    }
+
     const validateForm = (): string | null => {
         // Required fields validation
         const requiredFields = ['firstName', 'lastName', 'email', 'password', 'confirmPassword', 'phoneNumber', 'npiNumber']
@@ -77,6 +94,11 @@ export default function SignUp() {
         // NPI number validation (must be exactly 10 digits)
         if (!/^\d{10}$/.test(formData.npiNumber.trim())) {
             return 'NPI number must be exactly 10 digits'
+        }
+
+        // License coverage validation
+        if (!formData.licensedStates || formData.licensedStates.length === 0) {
+            return 'You must select at least one state where you are licensed to prescribe'
         }
 
         // Email validation
@@ -118,20 +140,24 @@ export default function SignUp() {
 
         try {
             const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+            
+            const signupData = {
+                firstName: formData.firstName,
+                lastName: formData.lastName,
+                email: formData.email,
+                password: formData.password,
+                role: 'doctor',
+                phoneNumber: formData.phoneNumber,
+                npiNumber: formData.npiNumber,
+                doctorLicenseStatesCoverage: formData.licensedStates
+            }
+            
             const response = await fetch(`${apiUrl}/auth/signup`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                    firstName: formData.firstName,
-                    lastName: formData.lastName,
-                    email: formData.email,
-                    password: formData.password,
-                    role: 'doctor',
-                    phoneNumber: formData.phoneNumber,
-                    npiNumber: formData.npiNumber
-                }),
+                body: JSON.stringify(signupData),
             })
 
             const data = await response.json()
@@ -310,6 +336,37 @@ export default function SignUp() {
                                     </p>
                                 </div>
 
+                                {/* License Coverage */}
+                                <div className="space-y-2">
+                                    <label htmlFor="licenseCoverage" className="text-sm font-medium text-foreground flex items-center gap-2">
+                                        <MapPin className="h-4 w-4 text-muted-foreground" />
+                                        License Coverage *
+                                    </label>
+                                    <div className="border border-input rounded-md p-4 max-h-64 overflow-y-auto bg-background">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                                            {US_STATES.map((state) => (
+                                                <label
+                                                    key={state.key}
+                                                    className="flex items-center space-x-2 cursor-pointer hover:bg-muted p-2 rounded text-sm"
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={formData.licensedStates.includes(state.key)}
+                                                        onChange={() => toggleState(state.key)}
+                                                        className="w-4 h-4 text-primary border-input rounded focus:ring-primary"
+                                                    />
+                                                    <span className="text-foreground">
+                                                        {state.key} - {state.name}
+                                                    </span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground">
+                                        Select all states where you hold an active medical license ({formData.licensedStates.length} selected)
+                                    </p>
+                                </div>
+
                                 {/* Password */}
                                 <div className="space-y-2">
                                     <label htmlFor="password" className="text-sm font-medium text-foreground">
@@ -408,7 +465,7 @@ export default function SignUp() {
                                 <Button
                                     type="submit"
                                     className="w-full"
-                                    disabled={isLoading || !agreedToTerms || !formData.npiNumber || formData.npiNumber.length !== 10}
+                                    disabled={isLoading || !agreedToTerms || !formData.npiNumber || formData.npiNumber.length !== 10 || formData.licensedStates.length === 0}
                                 >
                                     {isLoading ? 'Creating account...' : 'Create Doctor Account'}
                                 </Button>

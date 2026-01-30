@@ -772,6 +772,34 @@ app.post("/auth/signup", async (req, res) => {
       patientPortalDashboardFormat,
       invitationSlug,
     } = validation.data;
+    
+    // Extract doctorLicenseStatesCoverage separately to avoid TypeScript issues
+    const doctorLicenseStatesCoverage = (validation.data as any).doctorLicenseStatesCoverage;
+
+    // Validate required fields for doctor role
+    if (role === "doctor") {
+      if (!npiNumber || npiNumber.trim() === "") {
+        return res.status(400).json({
+          success: false,
+          message: "NPI number is required for doctor accounts",
+        });
+      }
+
+      if (!doctorLicenseStatesCoverage || !Array.isArray(doctorLicenseStatesCoverage) || doctorLicenseStatesCoverage.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: "At least one licensed state is required for doctor accounts. Please select the states where you hold an active medical license.",
+        });
+      }
+
+      // Validate NPI number format (must be exactly 10 digits)
+      if (!/^\d{10}$/.test(npiNumber.trim())) {
+        return res.status(400).json({
+          success: false,
+          message: "NPI number must be exactly 10 digits",
+        });
+      }
+    }
 
     // Handle brand invitation if provided
     let brandInvitation: BrandInvitation | null = null;
@@ -940,9 +968,14 @@ app.post("/auth/signup", async (req, res) => {
       businessType,
     });
 
-    // Set NPI number for doctors if provided
-    if (npiNumber && mappedRole === "doctor") {
-      user.npiNumber = npiNumber;
+    // Set NPI number and license coverage for doctors if provided
+    if (mappedRole === "doctor") {
+      if (npiNumber) {
+        user.npiNumber = npiNumber;
+      }
+      if (doctorLicenseStatesCoverage && Array.isArray(doctorLicenseStatesCoverage)) {
+        user.doctorLicenseStatesCoverage = doctorLicenseStatesCoverage;
+      }
       await user.save();
     }
 
@@ -1949,6 +1982,7 @@ app.get("/admin/doctor-applications", authenticateJWT, async (req, res) => {
         "email",
         "phoneNumber",
         "npiNumber",
+        "doctorLicenseStatesCoverage",
         "createdAt",
         "activated",
         "website",

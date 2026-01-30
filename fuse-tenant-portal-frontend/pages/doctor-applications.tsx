@@ -30,6 +30,7 @@ interface DoctorApplication {
   city?: string
   state?: string
   isApprovedDoctor: boolean
+  doctorLicenseStatesCoverage?: string[]
 }
 
 interface NpiVerification {
@@ -315,6 +316,27 @@ export default function DoctorApplications() {
                                 </span>
                               )
                             ) : null}
+                          </div>
+                        )}
+
+                        {doctor.doctorLicenseStatesCoverage && doctor.doctorLicenseStatesCoverage.length > 0 && (
+                          <div className="flex items-start gap-2 text-sm text-muted-foreground md:col-span-2">
+                            <MapPin className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                            <div className="flex-1">
+                              <div className="font-medium text-foreground mb-1">
+                                Licensed States ({doctor.doctorLicenseStatesCoverage.length})
+                              </div>
+                              <div className="flex flex-wrap gap-1">
+                                {doctor.doctorLicenseStatesCoverage.sort().map((stateCode) => (
+                                  <span
+                                    key={stateCode}
+                                    className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800"
+                                  >
+                                    {stateCode}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
                           </div>
                         )}
 
