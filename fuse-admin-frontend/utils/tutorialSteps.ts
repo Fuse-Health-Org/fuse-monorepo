@@ -17,7 +17,6 @@ export const tutorialSteps: TutorialStep[] = [
     target: "#tutorial-step-2",
     content: "Here you can configure all your organization information.",
     placement: "top",
-    hideOverlay: true, // Hide overlay to allow scrolling without visual issues
   },
   {
     target: "#tutorial-step-3",
