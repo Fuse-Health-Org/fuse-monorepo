@@ -13646,6 +13646,10 @@ async function startServer() {
   const { registerPublicEndpoints } = await import("./endpoints/public");
   registerPublicEndpoints(app);
 
+  // ============= AUTH ENDPOINTS =============
+  const { registerAuthEndpoints } = await import("./endpoints/auth");
+  registerAuthEndpoints(app, authenticateJWT);
+
   // ============= DOCTOR PORTAL ENDPOINTS =============
   const { registerDoctorEndpoints } = await import("./endpoints/doctor");
   registerDoctorEndpoints(app, authenticateJWT, getCurrentUser);
