@@ -131,6 +131,20 @@ export function registerAuthEndpoints(
             // Load UserRoles
             await user.getUserRoles();
 
+            // Check if doctor is approved - ONLY when logging into the Doctor Portal
+            const portalContext = req.headers['x-portal-context'];
+            const isDoctorPortal = portalContext === 'doctor';
+            
+            if (isDoctorPortal && user.hasAnyRoleSync(["doctor"]) && !user.isApprovedDoctor) {
+                await mfaRecord.destroy();
+                return res.status(403).json({
+                    success: false,
+                    message:
+                        "Your doctor application is currently under review. You will receive an email once your account is approved and you can access the Doctor Portal.",
+                    pendingApproval: true,
+                });
+            }
+
             // Mark MFA as verified and delete the record
             await mfaRecord.destroy();
 
@@ -734,11 +748,12 @@ export function registerAuthEndpoints(
                 });
             }
 
-            // Find user with this activation token
+            // Find user with this activation token and load roles
             const user = await User.findOne({
                 where: {
                     activationToken: token,
                 },
+                include: [{ model: UserRoles, as: "userRoles" }],
             });
 
             if (!user) {
@@ -786,14 +801,31 @@ export function registerAuthEndpoints(
                 console.log("🌐 Frontend origin detected for welcome email");
             }
 
-            // Send welcome email
+            // Doctors should verify email but NOT auto-login (need approval first)
+            // This only applies when verifying from the Doctor Portal
+            const portalContext = req.headers['x-portal-context'];
+            const isDoctorPortal = portalContext === 'doctor';
+            
+            if (isDoctorPortal && user.hasAnyRoleSync(["doctor"]) && !user.isApprovedDoctor) {
+                if (process.env.NODE_ENV === "development") {
+                    console.log("✅ Doctor email verified - awaiting approval, NOT logging in");
+                }
+                
+                return res.status(200).json({
+                    success: true,
+                    message: "Email verified successfully! Your application is now under review. You will be notified via email once approved and can then sign in.",
+                    requiresApproval: true,
+                });
+            }
+
+            // Send welcome email (skip for doctors on doctor portal as they already got pending review email)
             await MailsSender.sendWelcomeEmail(
                 user.email,
                 user.firstName,
                 frontendOrigin
             );
 
-            // Create JWT token for automatic login
+            // Create JWT token for automatic login (non-doctor users only)
             const authToken = createJWTToken(user);
 
             // HIPAA Audit: Log email verification and auto-login
@@ -1842,8 +1874,12 @@ export function registerAuthEndpoints(
                 });
             }
 
-            // Check if doctor is approved
-            if (user.role === "doctor" && !user.isApprovedDoctor) {
+            // Check if doctor is approved - ONLY when logging into the Doctor Portal
+            // Use X-Portal-Context header to identify the portal
+            const portalContext = req.headers['x-portal-context'];
+            const isDoctorPortal = portalContext === 'doctor';
+            
+            if (isDoctorPortal && user.hasAnyRoleSync(["doctor"]) && !user.isApprovedDoctor) {
                 // HIPAA Audit: Log failed login attempt (doctor not approved)
                 await AuditService.logLoginFailed(req, email, "Doctor account pending approval");
                 return res.status(403).json({

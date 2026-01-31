@@ -30,7 +30,11 @@ export default function VerifyEmail() {
             setStatus('loading')
 
             const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
-            const response = await fetch(`${apiUrl}/auth/verify-email?token=${token}`)
+            const response = await fetch(`${apiUrl}/auth/verify-email?token=${token}`, {
+                headers: {
+                    'X-Portal-Context': 'doctor',
+                },
+            })
             const data = await response.json()
 
             if (response.ok && data.success) {
