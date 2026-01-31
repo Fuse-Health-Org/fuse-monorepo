@@ -25,7 +25,11 @@ import {
 
 export function registerAuthEndpoints(
     app: Express,
-    authenticateJWT: any
+    authenticateJWT: any,
+    verificationCodes: Map<string, { code: string; expiresAt: number; firstName?: string }>,
+    passwordResetCodes: Map<string, { code: string; expiresAt: number; firstName?: string; verified: boolean }>,
+    generateUniqueSlug: (clinicName: string, excludeId?: string) => Promise<string>,
+    getDefaultCustomWebsiteValues: (clinicId: string) => any
 ) {
 
     // MFA Verify endpoint - verify OTP code and issue JWT token

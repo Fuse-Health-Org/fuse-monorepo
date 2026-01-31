@@ -67,11 +67,6 @@ import QuestionnaireStepService from "./services/questionnaireStep.service";
 import QuestionService from "./services/question.service";
 import { StripeService } from "@fuse/stripe";
 import {
-  signInSchema,
-  signUpSchema,
-  forgotPasswordSchema,
-  resetPasswordWithCodeSchema,
-  updateProfileSchema,
   clinicUpdateSchema,
   productCreateSchema,
   productUpdateSchema,
@@ -13648,7 +13643,7 @@ async function startServer() {
 
   // ============= AUTH ENDPOINTS =============
   const { registerAuthEndpoints } = await import("./endpoints/auth");
-  registerAuthEndpoints(app, authenticateJWT);
+  registerAuthEndpoints(app, authenticateJWT, verificationCodes, passwordResetCodes, generateUniqueSlug, getDefaultCustomWebsiteValues);
 
   // ============= DOCTOR PORTAL ENDPOINTS =============
   const { registerDoctorEndpoints } = await import("./endpoints/doctor");
