@@ -15,6 +15,13 @@ import MfaToken from "../../models/MfaToken";
 import User from "../../models/User";
 import UserRoles from "../../models/UserRoles";
 import { MailsSender } from "../../services/mailsSender";
+import {
+    signInSchema,
+    signUpSchema,
+    forgotPasswordSchema,
+    resetPasswordWithCodeSchema,
+    updateProfileSchema,
+} from "@fuse/validators";
 
 export function registerAuthEndpoints(
     app: Express,
