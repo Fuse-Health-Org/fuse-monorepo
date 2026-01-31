@@ -1,5 +1,20 @@
 import { Express } from "express";
-
+import {
+    AuditService,
+    AuditAction,
+    AuditResourceType,
+} from "../../services/audit.service";
+import Clinic, { PatientPortalDashboardFormat } from "../../models/Clinic";
+import BrandInvitation, { InvitationType } from "../../models/BrandInvitation";
+import {
+    createJWTToken,
+    getCurrentUser,
+} from "../../config/jwt";
+import CustomWebsite from "../../models/CustomWebsite";
+import MfaToken from "../../models/MfaToken";
+import User from "../../models/User";
+import UserRoles from "../../models/UserRoles";
+import { MailsSender } from "../../services/mailsSender";
 
 export function registerAuthEndpoints(
     app: Express,
