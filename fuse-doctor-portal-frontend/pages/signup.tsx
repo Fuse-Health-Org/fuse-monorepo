@@ -163,7 +163,9 @@ export default function SignUp() {
             const data = await response.json()
 
             if (response.ok && data.success) {
-                router.push('/signin?message=Account created successfully! Your application is under review and you will receive an email once approved.')
+                // Use the message from backend which includes email verification info
+                const message = encodeURIComponent(data.message || 'Account created successfully! Please check your email to verify your account.')
+                router.push(`/signin?message=${message}`)
             } else {
                 let errorMessage = 'Signup failed'
 
