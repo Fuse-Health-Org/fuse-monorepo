@@ -1393,7 +1393,9 @@ export function registerAuthEndpoints(
 
             const isDevelopment = process.env.NODE_ENV === "development";
 
-            if (isDevelopment) {
+            // Auto-activate non-doctor users in development mode
+            // Doctors must verify their email regardless of environment
+            if (isDevelopment && mappedRole !== "doctor") {
                 console.log("🧪 Development mode detected: auto-activating new user");
                 await user.update({
                     activated: true,
@@ -1442,16 +1444,32 @@ export function registerAuthEndpoints(
             // Send different emails based on role
             let emailSent = false;
             if (mappedRole === "doctor") {
-                // Doctors get a "pending review" email instead of activation email
-                emailSent = await MailsSender.sendDoctorApplicationPendingEmail(
+                // Doctors get BOTH verification email and pending review email
+                // 1. Send verification email first
+                const verificationEmailSent = await MailsSender.sendVerificationEmail(
+                    user.email,
+                    activationToken,
+                    user.firstName,
+                    frontendOrigin
+                );
+                if (verificationEmailSent) {
+                    console.log("📧 Doctor verification email sent successfully");
+                } else {
+                    console.log("❌ Failed to send doctor verification email, but user was created");
+                }
+                
+                // 2. Send pending review email
+                const pendingEmailSent = await MailsSender.sendDoctorApplicationPendingEmail(
                     user.email,
                     user.firstName
                 );
-                if (emailSent) {
+                if (pendingEmailSent) {
                     console.log("📧 Doctor application pending email sent successfully");
                 } else {
                     console.log("❌ Failed to send doctor application pending email, but user was created");
                 }
+                
+                emailSent = verificationEmailSent || pendingEmailSent;
             } else {
                 // Other roles get standard verification email
                 emailSent = await MailsSender.sendVerificationEmail(
@@ -1479,10 +1497,13 @@ export function registerAuthEndpoints(
                 success: true,
             });
 
+            const successMessage = mappedRole === "doctor"
+                ? "Doctor account created successfully! Please check your email to verify your account. Once verified, your application will be reviewed by our team."
+                : "User registered successfully. Please check your email to activate your account.";
+
             res.status(201).json({
                 success: true,
-                message:
-                    "User registered successfully. Please check your email to activate your account.",
+                message: successMessage,
                 user: user.toSafeJSON(), // Return safe user data
                 emailSent: emailSent,
             });
