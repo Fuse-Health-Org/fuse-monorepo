@@ -357,6 +357,20 @@ export default function DoctorApplications() {
                         </div>
                       </div>
 
+                      {activeTab === 'pending' && !doctor.activated && (
+                        <div className="mb-4 flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                          <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                          <div>
+                            <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                              Email Verification Pending
+                            </p>
+                            <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+                              This doctor must verify their email address before you can approve their application. They should have received a verification email at <strong>{doctor.email}</strong>.
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <Mail className="h-4 w-4 text-muted-foreground" />
@@ -464,34 +478,41 @@ export default function DoctorApplications() {
                           </div>
                         )}
 
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Calendar className="h-4 w-4 text-muted-foreground" />
-                          <span>
-                            Account{" "}
-                            {doctor.activated ? "activated" : "not activated"}
+                        <div className="flex items-center gap-2 text-sm">
+                          <Calendar className="h-4 w-4" />
+                          <span className={doctor.activated ? "text-green-600 dark:text-green-400 font-medium" : "text-amber-600 dark:text-amber-400 font-medium"}>
+                            Email {doctor.activated ? "verified ✓" : "not verified"}
                           </span>
                         </div>
                       </div>
                     </div>
 
                     {activeTab === 'pending' ? (
-                      <button
-                        onClick={() => handleApproveClick(doctor)}
-                        disabled={approvingId === doctor.id}
-                        className="ml-4 px-5 py-2.5 bg-[#4FA59C] hover:bg-[#478F87] text-white rounded-xl font-medium transition-all shadow-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {approvingId === doctor.id ? (
-                          <>
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                            Approving...
-                          </>
-                        ) : (
-                          <>
-                            <CheckCircle className="h-4 w-4" />
-                            Approve
-                          </>
+                      <div className="ml-4 flex flex-col gap-2">
+                        <button
+                          onClick={() => handleApproveClick(doctor)}
+                          disabled={approvingId === doctor.id || !doctor.activated}
+                          className="px-5 py-2.5 bg-[#4FA59C] hover:bg-[#478F87] text-white rounded-xl font-medium transition-all shadow-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[#4FA59C]"
+                          title={!doctor.activated ? "Doctor must verify their email first" : ""}
+                        >
+                          {approvingId === doctor.id ? (
+                            <>
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              Approving...
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle className="h-4 w-4" />
+                              Approve
+                            </>
+                          )}
+                        </button>
+                        {!doctor.activated && (
+                          <p className="text-xs text-amber-600 dark:text-amber-400 text-center">
+                            Awaiting email verification
+                          </p>
                         )}
-                      </button>
+                      </div>
                     ) : (
                       <div className="ml-4 px-5 py-2.5 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400 rounded-xl font-medium flex items-center gap-2">
                         <CheckCircle className="h-4 w-4" />

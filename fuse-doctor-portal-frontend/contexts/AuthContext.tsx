@@ -135,6 +135,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'X-Portal-Context': 'doctor',
                 },
                 body: JSON.stringify({ email, password }),
             })
@@ -191,6 +192,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'X-Portal-Context': 'doctor',
                 },
                 body: JSON.stringify({ mfaToken: mfa.token, code }),
             })

@@ -23,6 +23,8 @@ export default function VerifyEmail() {
         verifyEmail(queryToken)
     }, [queryToken])
 
+    const [requiresApproval, setRequiresApproval] = useState(false)
+
     const verifyEmail = async (token: string) => {
         try {
             setStatus('loading')
@@ -35,8 +37,14 @@ export default function VerifyEmail() {
                 setStatus('success')
                 setMessage(data.message || 'Account activated successfully!')
 
-                // Store the JWT token for automatic login
-                if (data.token && data.user) {
+                // Check if this is a doctor who needs approval
+                if (data.requiresApproval) {
+                    // Doctor verified email but needs approval - don't auto-login
+                    setIsLoggingIn(false)
+                    setRequiresApproval(true)
+                    // Message is already set from backend, show link to signin page
+                } else if (data.token && data.user) {
+                    // Regular user or approved doctor - store token and auto-login
                     localStorage.setItem('doctor_token', data.token)
                     localStorage.setItem('doctor_user', JSON.stringify(data.user))
 
@@ -143,7 +151,16 @@ export default function VerifyEmail() {
                                     </div>
                                 )}
 
-                                {status === 'success' && !isLoggingIn && (
+                                {status === 'success' && !isLoggingIn && requiresApproval && (
+                                    <Button
+                                        onClick={() => router.push('/signin')}
+                                        className="w-full"
+                                    >
+                                        Go to Sign In
+                                    </Button>
+                                )}
+
+                                {status === 'success' && !isLoggingIn && !requiresApproval && (
                                     <Button
                                         onClick={() => router.push('/')}
                                         className="w-full"
