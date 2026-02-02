@@ -6,6 +6,6 @@ const router = Router();
 
 router.post('/orders/create-payment-intent', authenticateJWT, createPaymentIntent);
 router.get('/orders/:id', authenticateJWT, getOrdersById);
-router.get('/orders/clinic/:clinicId', authenticateJWT, getOrdersByClinicId);
+router.get('/orders/by-clinic/:clinicId', authenticateJWT, getOrdersByClinicId);
 
 export default router;

@@ -85,7 +85,7 @@ class OrderService {
         };
       }
 
-      if (user.role !== "doctor" && user.role !== "brand") {
+      if (!user.hasAnyRoleSync(["doctor", "brand"])) {
         return {
           success: false,
           message: "Access denied",
