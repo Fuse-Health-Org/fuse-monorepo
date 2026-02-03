@@ -123,14 +123,19 @@ export default function ProgramTemplateEditor() {
     const fetchMedicalTemplates = async () => {
         try {
             setTemplatesLoading(true)
-            const response = await fetch(`${API_URL}/questionnaires/templates`, {
+            const response = await fetch(`${API_URL}/questionnaires/templates/product-forms`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             })
 
             if (response.ok) {
                 const data = await response.json()
                 if (data.success && Array.isArray(data.data)) {
-                    setTemplates(data.data)
+                    // Only include templates that have products attached (via FormProducts)
+                    const templatesWithProducts = data.data.filter((template: any) => {
+                        // Check if template has formProducts array with at least one entry
+                        return template.formProducts && Array.isArray(template.formProducts) && template.formProducts.length > 0
+                    })
+                    setTemplates(templatesWithProducts)
                 }
             }
         } catch (err) {

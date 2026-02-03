@@ -6079,7 +6079,7 @@ app.post("/payments/program/sub", async (req, res) => {
       name: `${program.name} Subscription`,
       metadata: {
         programId: program.id,
-        clinicId: program.clinicId,
+        clinicId: program.clinicId || '',
         selectedProductIds: selectedProductIds.join(","),
       },
     });
@@ -6094,7 +6094,7 @@ app.post("/payments/program/sub", async (req, res) => {
       },
       metadata: {
         programId: program.id,
-        clinicId: program.clinicId,
+        clinicId: program.clinicId || '',
         productsTotal: String(productsTotal),
         nonMedicalServicesFee: String(nonMedicalServicesFee),
       },

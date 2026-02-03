@@ -24,12 +24,12 @@ export default class Program extends Entity {
     @ForeignKey(() => Clinic)
     @Column({
         type: DataType.UUID,
-        allowNull: false,
+        allowNull: true, // Allow null for templates (templates are not clinic-specific)
     })
-    declare clinicId: string;
+    declare clinicId?: string;
 
     @BelongsTo(() => Clinic)
-    declare clinic: Clinic;
+    declare clinic?: Clinic;
 
     @ForeignKey(() => Questionnaire)
     @Column({
