@@ -326,6 +326,34 @@ const Tutorial: React.FC<TutorialProps> = ({
         }, 3000);
       });
     }
+
+    // Step 8: Navigate to overview page
+    if (stepIndex === 8) {
+      if (router.pathname !== '/') {
+        console.log('📍 Step 8 - navigating to overview page');
+        setIsNavigating(true);
+        await router.push('/');
+        setIsNavigating(false);
+      } else {
+        console.log('📍 Step 8 - already on overview page');
+      }
+
+      // Wait for element to appear
+      await new Promise<void>((resolve) => {
+        const checkElement = setInterval(() => {
+          if (document.getElementById('overview-dashboard')) {
+            clearInterval(checkElement);
+            console.log('📍 Found overview-dashboard element');
+            resolve();
+          }
+        }, 100);
+        setTimeout(() => {
+          clearInterval(checkElement);
+          console.log('⚠️ Timeout waiting for overview-dashboard');
+          resolve();
+        }, 3000);
+      });
+    }
   }, [router, activeSteps]);
 
   // Run step navigation when route changes to ensure adaptive steps work
@@ -465,6 +493,25 @@ const Tutorial: React.FC<TutorialProps> = ({
         console.log('📍 Going back from step 6 to 5 - navigating to Programs');
         setIsNavigating(true);
         await router.push('/programs');
+        setIsNavigating(false);
+        setCurrentStep(prevStep);
+        handleUpdateStep(prevStep);
+      }
+      // From step 7 (index 6): Stay on portal page
+      // From step 8 (index 7): Navigate back to portal page
+      else if (currentStep === 7 && router.pathname !== '/portal') {
+        console.log('📍 Going back from step 8 to 7 - navigating to Portal');
+        setIsNavigating(true);
+        await router.push('/portal');
+        setIsNavigating(false);
+        setCurrentStep(prevStep);
+        handleUpdateStep(prevStep);
+      }
+      // From step 9 (index 8): Navigate back to overview page (if somehow we're not there)
+      else if (currentStep === 8 && router.pathname !== '/') {
+        console.log('📍 Going back from step 9 to 8 - navigating to Overview');
+        setIsNavigating(true);
+        await router.push('/');
         setIsNavigating(false);
         setCurrentStep(prevStep);
         handleUpdateStep(prevStep);
