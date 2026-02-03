@@ -16,6 +16,7 @@ interface TierConfig {
   canCustomizeFormStructure: boolean;
   customTierCardText: string[] | null;
   isCustomTierCardTextActive: boolean;
+  fuseFeePercent: number | null;
 }
 
 interface Plan {
@@ -43,6 +44,8 @@ export default function TierManagement() {
   const [customTextDraft, setCustomTextDraft] = useState<string[]>([]);
   const [editingMaxProducts, setEditingMaxProducts] = useState<string | null>(null);
   const [maxProductsDraft, setMaxProductsDraft] = useState<number>(0);
+  const [editingFuseFee, setEditingFuseFee] = useState<string | null>(null);
+  const [fuseFeeDraft, setFuseFeeDraft] = useState<number | null>(null);
 
   useEffect(() => {
     if (token) {
@@ -249,6 +252,59 @@ export default function TierManagement() {
     setMaxProductsDraft(0);
   };
 
+  const handleStartEditingFuseFee = (planId: string, currentFuseFee: number | null) => {
+    setEditingFuseFee(planId);
+    setFuseFeeDraft(currentFuseFee);
+  };
+
+  const handleSaveFuseFee = async (planId: string) => {
+    if (!token) return;
+
+    setSaving(planId);
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/tiers/${planId}/config`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fuseFeePercent: fuseFeeDraft,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update fuse fee');
+      }
+
+      const result = await response.json();
+      console.log('✅ Updated tier config:', result.data);
+
+      // Update local state
+      setTiers(prevTiers => prevTiers.map(tier => {
+        if (tier.plan.id === planId) {
+          return {
+            ...tier,
+            config: result.data,
+          };
+        }
+        return tier;
+      }));
+
+      setEditingFuseFee(null);
+    } catch (error) {
+      console.error('Error updating fuse fee:', error);
+      alert('Failed to update fuse fee');
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  const handleCancelEditingFuseFee = () => {
+    setEditingFuseFee(null);
+    setFuseFeeDraft(null);
+  };
+
   return (
     <div className="flex h-screen bg-background">
       <Sidebar />
@@ -346,6 +402,50 @@ export default function TierManagement() {
                               </>
                             )}
                             <span className="text-xs text-muted-foreground">(-1 = unlimited)</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-muted-foreground">Fuse Fee:</span>{' '}
+                            {editingFuseFee === tier.plan.id ? (
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={fuseFeeDraft ?? ''}
+                                  onChange={(e) => setFuseFeeDraft(e.target.value ? parseFloat(e.target.value) : null)}
+                                  className="w-24 px-2 py-1 text-sm border border-input rounded focus:outline-none focus:ring-2 focus:ring-[#4FA59C] bg-background text-foreground"
+                                  placeholder="e.g., 5.0 or 17.0"
+                                />
+                                <span className="text-xs text-muted-foreground">%</span>
+                                <button
+                                  onClick={() => handleSaveFuseFee(tier.plan.id)}
+                                  disabled={saving === tier.plan.id}
+                                  className="p-1 text-[#4FA59C] hover:bg-teal-50 dark:hover:bg-teal-900/30 rounded transition-colors disabled:opacity-50"
+                                  title="Save"
+                                >
+                                  <Save className="h-4 w-4" />
+                                </button>
+                                <button
+                                  onClick={handleCancelEditingFuseFee}
+                                  className="p-1 text-muted-foreground hover:bg-muted rounded transition-colors"
+                                  title="Cancel"
+                                >
+                                  <X className="h-4 w-4" />
+                                </button>
+                              </div>
+                            ) : (
+                              <>
+                                <span className="font-semibold text-foreground">
+                                  {tier.config?.fuseFeePercent != null ? `${tier.config.fuseFeePercent}%` : 'Not set (uses global)'}
+                                </span>
+                                <button
+                                  onClick={() => handleStartEditingFuseFee(tier.plan.id, tier.config?.fuseFeePercent ?? null)}
+                                  className="p-1 text-muted-foreground hover:text-[#4FA59C] hover:bg-teal-50 dark:hover:bg-teal-900/30 rounded transition-colors"
+                                  title="Edit fuse fee"
+                                >
+                                  <Edit2 className="h-3 w-3" />
+                                </button>
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>

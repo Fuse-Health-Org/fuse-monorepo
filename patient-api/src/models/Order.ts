@@ -155,6 +155,15 @@ export default class Order extends Entity {
   })
   declare platformFeeAmount: number;
 
+  // Platform fee percentage used for this order (saved for historical record)
+  @Column({
+    type: DataType.DECIMAL(5, 2),
+    allowNull: true,
+    defaultValue: null,
+    comment: 'Platform fee percentage applied to this order (e.g., 5.0 for 5%, 17.0 for 17%)',
+  })
+  declare platformFeePercent: number | null;
+
   @Column({
     type: DataType.DECIMAL(10, 2),
     allowNull: false,

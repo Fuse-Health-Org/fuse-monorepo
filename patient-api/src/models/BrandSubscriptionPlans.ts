@@ -1,5 +1,6 @@
-import { Table, Column, DataType, HasMany } from 'sequelize-typescript';
+import { Table, Column, DataType, HasMany, HasOne } from 'sequelize-typescript';
 import Entity from './Entity';
+import TierConfiguration from './TierConfiguration';
 
 @Table({
   freezeTableName: true,
@@ -105,6 +106,9 @@ export default class BrandSubscriptionPlans extends Entity {
     defaultValue: 0,
   })
   declare sortOrder: number;
+
+  @HasOne(() => TierConfiguration, 'brandSubscriptionPlanId')
+  declare tierConfig?: TierConfiguration;
 
   // Static method to get all active plans
   static async getActivePlans() {

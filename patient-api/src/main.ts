@@ -152,6 +152,43 @@ async function getGlobalFees() {
   };
 }
 
+// Helper function to get platform fee percent for a clinic (tier-specific or global fallback)
+async function getPlatformFeePercent(clinicId: string): Promise<number> {
+  try {
+    // Fetch clinic with subscription plan and tier configuration
+    const clinic = await Clinic.findByPk(clinicId, {
+      include: [
+        {
+          model: BrandSubscriptionPlans,
+          as: 'brandSubscriptionPlan',
+          include: [
+            {
+              model: TierConfiguration,
+              as: 'tierConfig',
+            },
+          ],
+        },
+      ],
+    });
+
+    // If clinic has a tier with custom fuseFeePercent, use it
+    if (
+      clinic?.brandSubscriptionPlan?.tierConfig?.fuseFeePercent != null
+    ) {
+      return Number(clinic.brandSubscriptionPlan.tierConfig.fuseFeePercent);
+    }
+
+    // Otherwise, fall back to global fee
+    const globalFees = await getGlobalFees();
+    return globalFees.platformFeePercent;
+  } catch (error) {
+    console.error('Error fetching platform fee percent:', error);
+    // Fall back to global fee on error
+    const globalFees = await getGlobalFees();
+    return globalFees.platformFeePercent;
+  }
+}
+
 // Helper function to generate unique clinic slug
 async function generateUniqueSlug(
   clinicName: string,
@@ -6927,7 +6964,12 @@ app.post("/orders/create-payment-intent", authenticateJWT, async (req, res) => {
     // Calculate distribution: platform fee (% of total), stripe fee, doctor flat, pharmacy wholesale, brand residual
     // If Clinic has a Stripe Connect account, we transfer only the brand residual to the clinic
     const fees = await getGlobalFees();
-    const platformFeePercent = fees.platformFeePercent;
+    
+    // Get platform fee percent based on clinic's tier (or global fallback)
+    const platformFeePercent = treatment.clinicId 
+      ? await getPlatformFeePercent(treatment.clinicId)
+      : fees.platformFeePercent;
+    
     const stripeFeePercent = fees.stripeFeePercent;
     const doctorFlatUsd = fees.doctorFlatFeeUsd;
 
@@ -7006,6 +7048,7 @@ app.post("/orders/create-payment-intent", authenticateJWT, async (req, res) => {
     try {
       await order.update({
         platformFeeAmount: platformFeeUsd,
+        platformFeePercent: Number(platformFeePercent.toFixed(2)),
         stripeAmount: Number(stripeFeeUsd.toFixed(2)),
         doctorAmount: Number(doctorFlatUsd.toFixed(2)),
         pharmacyWholesaleAmount: Number(pharmacyWholesaleTotal.toFixed(2)),
@@ -7224,7 +7267,12 @@ app.post(
 
       // Calculate fee breakdown
       const fees = await getGlobalFees();
-      const platformFeePercent = fees.platformFeePercent;
+      
+      // Get platform fee percent based on clinic's tier (or global fallback)
+      const platformFeePercent = tenantProduct.clinicId 
+        ? await getPlatformFeePercent(tenantProduct.clinicId)
+        : fees.platformFeePercent;
+      
       const stripeFeePercent = fees.stripeFeePercent;
       const doctorFlatUsd = fees.doctorFlatFeeUsd;
       const totalPaid = Number(totalAmount) || 0;
@@ -7317,6 +7365,7 @@ app.post(
         stripePriceId: tenantProduct.stripePriceId,
         tenantProductId: tenantProduct.id,
         platformFeeAmount: Number(platformFeeUsd.toFixed(2)),
+        platformFeePercent: Number(platformFeePercent.toFixed(2)),
         stripeAmount: Number(stripeFeeUsd.toFixed(2)),
         doctorAmount: Number(doctorUsd.toFixed(2)),
         pharmacyWholesaleAmount: Number(pharmacyWholesaleUsd.toFixed(2)),
@@ -7635,7 +7684,12 @@ app.post("/payments/product/sub", async (req, res) => {
 
     // Calculate fee breakdown
     const fees = await getGlobalFees();
-    const platformFeePercent = fees.platformFeePercent;
+    
+    // Get platform fee percent based on clinic's tier (or global fallback)
+    const platformFeePercent = (tenantProduct as any).clinicId 
+      ? await getPlatformFeePercent((tenantProduct as any).clinicId)
+      : fees.platformFeePercent;
+    
     const stripeFeePercent = fees.stripeFeePercent;
     const doctorFlatUsd = fees.doctorFlatFeeUsd;
     const totalPaid = Number(totalAmount) || 0;
@@ -7762,6 +7816,7 @@ app.post("/payments/product/sub", async (req, res) => {
       stripePriceId: finalStripePriceId,
       tenantProductId: (tenantProduct as any).id,
       platformFeeAmount: Number(platformFeeUsd.toFixed(2)),
+      platformFeePercent: Number(platformFeePercent.toFixed(2)),
       stripeAmount: Number(stripeFeeUsd.toFixed(2)),
       doctorAmount: Number(doctorUsd.toFixed(2)),
       pharmacyWholesaleAmount: Number(pharmacyWholesaleUsd.toFixed(2)),
@@ -8098,7 +8153,13 @@ app.post("/payments/program/sub", async (req, res) => {
 
     // Calculate fee breakdown
     const fees = await getGlobalFees();
-    const platformFeePercent = fees.platformFeePercent;
+    
+    // Get platform fee percent based on clinic's tier (or global fallback)
+    const programClinicId = clinicId || program.clinicId;
+    const platformFeePercent = programClinicId 
+      ? await getPlatformFeePercent(programClinicId)
+      : fees.platformFeePercent;
+    
     const stripeFeePercent = fees.stripeFeePercent;
     const doctorFlatUsd = fees.doctorFlatFeeUsd;
     const platformFeeUsd = Math.max(0, (platformFeePercent / 100) * totalAmount);
@@ -8126,6 +8187,7 @@ app.post("/payments/program/sub", async (req, res) => {
       stripePriceId: stripePrice.id,
       programId: program.id,
       platformFeeAmount: Number(platformFeeUsd.toFixed(2)),
+      platformFeePercent: Number(platformFeePercent.toFixed(2)),
       stripeAmount: Number(stripeFeeUsd.toFixed(2)),
       doctorAmount: Number(doctorUsd.toFixed(2)),
       brandAmount: Number(brandAmountUsd.toFixed(2)),

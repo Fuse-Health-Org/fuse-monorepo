@@ -6,6 +6,7 @@ import TenantProduct from './TenantProduct';
 import Sale from './Sale';
 import CustomWebsite from './CustomWebsite';
 import User from './User';
+import BrandSubscriptionPlans from './BrandSubscriptionPlans';
 
 
 export enum PaymentStatus {
@@ -174,6 +175,17 @@ export default class Clinic extends Entity {
 
     @BelongsTo(() => User, 'referrerDoctorId')
     declare referrerDoctor?: User;
+
+    // Brand subscription plan (tier) for this clinic
+    @ForeignKey(() => BrandSubscriptionPlans)
+    @Column({
+        type: DataType.UUID,
+        allowNull: true,
+    })
+    declare brandSubscriptionPlanId?: string;
+
+    @BelongsTo(() => BrandSubscriptionPlans, 'brandSubscriptionPlanId')
+    declare brandSubscriptionPlan?: BrandSubscriptionPlans;
 
     @HasOne(() => Subscription)
     declare subscription?: Subscription;
