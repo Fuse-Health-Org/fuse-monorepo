@@ -138,6 +138,40 @@ export default function Programs() {
         router.push(`/programs/create?templateId=${templateId}`)
     }
 
+    const handleUseTemplate = async (templateId: string) => {
+        try {
+            const response = await fetch(`${API_URL}/programs`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    templateId: templateId
+                })
+            })
+
+            const data = await response.json()
+
+            if (response.ok && data.success) {
+                // Refresh programs list to show the new program
+                await fetchPrograms()
+                setError('✅ Program created from template successfully!')
+                setTimeout(() => setError(null), 3000)
+            } else {
+                setError(data.message || 'Failed to create program from template')
+            }
+        } catch (err) {
+            console.error('Error creating program from template:', err)
+            setError('Failed to create program from template')
+        }
+    }
+
+    // Filter out templates that the brand has already used
+    const unusedTemplates = templates.filter(template => 
+        template.isActive && !programs.some(program => program.templateId === template.id)
+    )
+
     const handleDeleteProgram = async (programId: string, programName: string) => {
         if (!confirm(`Are you sure you want to delete "${programName}"? This action cannot be undone.`)) {
             return
@@ -251,7 +285,7 @@ export default function Programs() {
                     {/* Programs List */}
                     {programs.length > 0 ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {programs.map((program) => (
+                                {programs.map((program) => (
                                 <div
                                     key={program.id}
                                     className="bg-card rounded-2xl shadow-sm border border-border p-6 hover:shadow-md transition-all cursor-pointer"
@@ -325,7 +359,7 @@ export default function Programs() {
                                 </div>
                             ))}
                         </div>
-                    ) : (
+                    ) : unusedTemplates.length === 0 ? (
                         <div className="bg-card rounded-lg border border-border p-16 text-center">
                             <div className="flex flex-col items-center gap-4">
                                 <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
@@ -344,6 +378,78 @@ export default function Programs() {
                                         Create Program
                                     </Button>
                                 </div>
+                            </div>
+                        </div>
+                    ) : null}
+
+                    {/* Template Suggestions */}
+                    {unusedTemplates.length > 0 && (
+                        <div className="mt-12">
+                            <div className="flex items-center justify-between mb-4">
+                                <div>
+                                    <h2 className="text-lg font-semibold">Suggested Program Templates</h2>
+                                    <p className="text-sm text-muted-foreground">Quick start with pre-configured program templates</p>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {unusedTemplates.map((template) => (
+                                    <div
+                                        key={template.id}
+                                        className="bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 rounded-2xl shadow-sm border-2 border-dashed border-purple-200 dark:border-purple-800 p-6 hover:shadow-md transition-all"
+                                    >
+                                        <div className="flex items-start justify-between mb-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-blue-500 rounded-xl flex items-center justify-center">
+                                                    <FileText className="h-5 w-5 text-white" />
+                                                </div>
+                                                <div>
+                                                    <div className="flex items-center gap-2">
+                                                        <h3 className="text-lg font-semibold">{template.name}</h3>
+                                                        <Badge variant="secondary" className="text-xs bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300">
+                                                            Template
+                                                        </Badge>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {template.description && (
+                                            <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
+                                                {template.description}
+                                            </p>
+                                        )}
+
+                                        {template.medicalTemplate && (
+                                            <div className="mb-4 p-3 bg-white/50 dark:bg-black/20 rounded-lg">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <FileText className="h-3 w-3 text-muted-foreground" />
+                                                    <span className="text-xs font-medium text-muted-foreground">Medical Template</span>
+                                                </div>
+                                                <p className="text-sm font-medium">{template.medicalTemplate.title}</p>
+                                            </div>
+                                        )}
+
+                                        <div className="flex items-center gap-2 pt-4 border-t border-purple-200 dark:border-purple-800">
+                                            <Button
+                                                size="sm"
+                                                onClick={() => handleUseTemplate(template.id)}
+                                                className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white"
+                                            >
+                                                <Plus className="h-3 w-3 mr-1" />
+                                                Use Template
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => handleCreateFromTemplate(template.id)}
+                                                className="border-purple-200 dark:border-purple-800"
+                                            >
+                                                <Edit className="h-3 w-3 mr-1" />
+                                                Customize
+                                            </Button>
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
                         </div>
                     )}
