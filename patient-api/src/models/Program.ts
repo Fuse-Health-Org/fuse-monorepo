@@ -24,12 +24,12 @@ export default class Program extends Entity {
     @ForeignKey(() => Clinic)
     @Column({
         type: DataType.UUID,
-        allowNull: false,
+        allowNull: true, // Allow null for templates (templates are not clinic-specific)
     })
-    declare clinicId: string;
+    declare clinicId?: string;
 
     @BelongsTo(() => Clinic)
-    declare clinic: Clinic;
+    declare clinic?: Clinic;
 
     @ForeignKey(() => Questionnaire)
     @Column({
@@ -186,4 +186,43 @@ export default class Program extends Entity {
         defaultValue: true,
     })
     declare isActive: boolean;
+
+    /**
+     * Template Flag
+     * 
+     * When true, this program is a TEMPLATE created by tenant managers.
+     * Templates cannot be modified by brands - they serve as blueprints.
+     * 
+     * Brands can create their own programs based on templates, but the template
+     * itself remains read-only to them.
+     */
+    @Column({
+        type: DataType.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+    })
+    declare isTemplate: boolean;
+
+    /**
+     * Template ID Reference
+     * 
+     * When a brand creates a program based on a template, this field
+     * references the original template program.
+     * 
+     * This allows:
+     * - Tracking which programs are derived from which templates
+     * - Potentially cascading updates from templates to derived programs
+     * - Filtering brand programs by template
+     * 
+     * If null, this program was created from scratch (not from a template).
+     */
+    @ForeignKey(() => Program)
+    @Column({
+        type: DataType.UUID,
+        allowNull: true,
+    })
+    declare templateId?: string;
+
+    @BelongsTo(() => Program, 'templateId')
+    declare template?: Program;
 }
