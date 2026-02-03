@@ -11,7 +11,8 @@ import {
     Edit,
     Trash2,
     FileText,
-    Crown
+    Crown,
+    X
 } from 'lucide-react'
 
 interface Program {
@@ -20,9 +21,31 @@ interface Program {
     description?: string
     clinicId: string
     medicalTemplateId?: string
+    templateId?: string
     isActive: boolean
+    isTemplate?: boolean
     createdAt: string
     updatedAt: string
+    medicalTemplate?: {
+        id: string
+        title: string
+        description?: string
+        formTemplateType: string
+    }
+    template?: {
+        id: string
+        name: string
+        description?: string
+    }
+}
+
+interface ProgramTemplate {
+    id: string
+    name: string
+    description?: string
+    medicalTemplateId?: string
+    isActive: boolean
+    createdAt: string
     medicalTemplate?: {
         id: string
         title: string
@@ -35,8 +58,11 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
 
 export default function Programs() {
     const [programs, setPrograms] = useState<Program[]>([])
+    const [templates, setTemplates] = useState<ProgramTemplate[]>([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
+    const [showTemplatesModal, setShowTemplatesModal] = useState(false)
+    const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null)
     const { token, user, subscription } = useAuth()
     const router = useRouter()
 
@@ -57,6 +83,7 @@ export default function Programs() {
     useEffect(() => {
         if (hasAccessToPrograms) {
             fetchPrograms()
+            fetchTemplates()
         }
     }, [token, hasAccessToPrograms])
 
@@ -85,6 +112,30 @@ export default function Programs() {
         } finally {
             setLoading(false)
         }
+    }
+
+    const fetchTemplates = async () => {
+        if (!token) return
+
+        try {
+            const response = await fetch(`${API_URL}/program-templates`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+
+            if (response.ok) {
+                const data = await response.json()
+                if (data.success) {
+                    setTemplates(data.data)
+                }
+            }
+        } catch (err) {
+            console.error('Error fetching program templates:', err)
+        }
+    }
+
+    const handleCreateFromTemplate = async (templateId: string) => {
+        // Navigate to create page with templateId query param
+        router.push(`/programs/create?templateId=${templateId}`)
     }
 
     const handleDeleteProgram = async (programId: string, programName: string) => {
@@ -164,13 +215,25 @@ export default function Programs() {
                             <h1 className="text-2xl font-semibold mb-1">Programs</h1>
                             <p className="text-sm text-muted-foreground">Manage your clinic programs and their medical templates</p>
                         </div>
-                        <Button
-                            onClick={() => router.push('/programs/create')}
-                            className="flex items-center gap-2"
-                        >
-                            <Plus className="h-4 w-4" />
-                            Create Program
-                        </Button>
+                        <div className="flex items-center gap-2">
+                            {templates.length > 0 && (
+                                <Button
+                                    onClick={() => setShowTemplatesModal(true)}
+                                    variant="outline"
+                                    className="flex items-center gap-2"
+                                >
+                                    <FileText className="h-4 w-4" />
+                                    Create from Template
+                                </Button>
+                            )}
+                            <Button
+                                onClick={() => router.push('/programs/create')}
+                                className="flex items-center gap-2"
+                            >
+                                <Plus className="h-4 w-4" />
+                                Create Program
+                            </Button>
+                        </div>
                     </div>
 
                     {/* Error/Success Messages */}
@@ -224,6 +287,16 @@ export default function Programs() {
                                         </div>
                                     )}
 
+                                    {program.template && (
+                                        <div className="mb-4 p-3 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <FileText className="h-3 w-3 text-purple-600 dark:text-purple-400" />
+                                                <span className="text-xs font-medium text-purple-600 dark:text-purple-400">Based on Template</span>
+                                            </div>
+                                            <p className="text-sm font-medium text-purple-900 dark:text-purple-100">{program.template.name}</p>
+                                        </div>
+                                    )}
+
                                     <div className="flex items-center gap-2 pt-4 border-t border-border">
                                         <Button
                                             size="sm"
@@ -269,6 +342,88 @@ export default function Programs() {
                                     >
                                         <Plus className="h-4 w-4" />
                                         Create Program
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Templates Modal */}
+                    {showTemplatesModal && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                            <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto bg-card rounded-2xl shadow-2xl">
+                                <div className="sticky top-0 bg-card border-b border-border p-6 z-10">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <h2 className="text-2xl font-semibold text-foreground">
+                                                Select a Program Template
+                                            </h2>
+                                            <p className="text-sm text-muted-foreground mt-1">
+                                                Start with a pre-configured template and customize it for your clinic
+                                            </p>
+                                        </div>
+                                        <button
+                                            onClick={() => setShowTemplatesModal(false)}
+                                            className="p-2 rounded-full hover:bg-muted transition-colors"
+                                        >
+                                            <X className="h-5 w-5 text-muted-foreground" />
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="p-6">
+                                    {templates.length > 0 ? (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            {templates.map((template) => (
+                                                <div
+                                                    key={template.id}
+                                                    className="bg-muted/50 rounded-xl border border-border p-5 hover:border-primary hover:shadow-md transition-all cursor-pointer"
+                                                    onClick={() => handleCreateFromTemplate(template.id)}
+                                                >
+                                                    <div className="flex items-start gap-4">
+                                                        <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center flex-shrink-0">
+                                                            <Stethoscope className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <h3 className="text-lg font-semibold text-foreground mb-1">
+                                                                {template.name}
+                                                            </h3>
+                                                            {template.description && (
+                                                                <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
+                                                                    {template.description}
+                                                                </p>
+                                                            )}
+                                                            {template.medicalTemplate && (
+                                                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                                                    <FileText className="h-3 w-3" />
+                                                                    <span>{template.medicalTemplate.title}</span>
+                                                                </div>
+                                                            )}
+                                                            <div className="mt-3">
+                                                                <Badge variant={template.isActive ? "default" : "secondary"} className="text-xs">
+                                                                    {template.isActive ? "Active" : "Inactive"}
+                                                                </Badge>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="text-center py-12 text-muted-foreground">
+                                            <Stethoscope className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                                            <p>No templates available</p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="sticky bottom-0 bg-card border-t border-border p-6">
+                                    <Button
+                                        onClick={() => setShowTemplatesModal(false)}
+                                        variant="outline"
+                                        className="w-full"
+                                    >
+                                        Cancel
                                     </Button>
                                 </div>
                             </div>
