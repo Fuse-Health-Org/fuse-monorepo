@@ -27,15 +27,15 @@ import {
 import Tutorial from "./ui/tutorial"
 
 const navigation = [
-  { name: "Overview", icon: BarChart3, current: true, href: "/" },
+  { name: "Overview", icon: BarChart3, current: true, href: "/", id: "tutorial-step-overview" },
   { name: "Customers", icon: Users, current: false, href: "/customers" },
   { name: "Plans", icon: Crown, current: false, href: "/plans" },
 ]
 
 const allOperations = [
-  { name: "Programs", icon: Stethoscope, current: false, href: "/programs" },
+  { name: "Programs", icon: Stethoscope, current: false, href: "/programs", id: "tutorial-step-programs" },
   // { name: "Offerings", icon: Gift, current: false, href: "/offerings" },
-  { name: "Products", icon: Package, current: false, href: "/products", id: "tutorial-step-3" },
+  { name: "Products", icon: Package, current: false, href: "/products" },
   { name: "Orders", icon: ShoppingCart, current: false, href: "/orders" },
   { name: "Payouts", icon: CreditCard, current: false, href: "/payouts" },
   { name: "Analytics", icon: TrendingUp, current: false, href: "/analytics" },
@@ -50,7 +50,7 @@ const allOperations = [
 // ]
 
 const configuration = [
-  { name: "Portal", icon: Globe, current: false, href: "/portal" },
+  { name: "Portal", icon: Globe, current: false, href: "/portal", id: "tutorial-step-portal" },
   { name: "Affiliates", icon: UserPlus, current: false, href: "/affiliates" },
   { name: "Settings", icon: Settings, current: false, href: "/settings" },
 ]
@@ -101,6 +101,7 @@ export function Sidebar() {
 
       if (response.ok) {
         const data = await response.json();
+        console.log("📍 Response data:", data);
         if (data.success) {
           console.log("data.data", data.data);
           const needsTutorial = data.data.tutorialFinished === false && data.data.status === "active" && data.data.stripeCustomerId !== null;
@@ -108,10 +109,12 @@ export function Sidebar() {
 
           // Set tutorial step from DB, default to 0 if not set
           const step = data.data.tutorialStep || 0;
+          console.log("📍 Tutorial step from DB:", step);
           setTutorialStep(step);
 
           // If tutorial needs to run and we're at step 0 or 1, redirect to settings page
           // because those steps' target elements are on the settings page
+          console.log("📍 Checking redirect condition:", { needsTutorial, step, pathname: router.pathname });
           if (needsTutorial && step <= 1 && router.pathname !== '/settings') {
             console.log("📍 Tutorial step", step, "requires settings page, redirecting...");
             router.push('/settings');
@@ -119,14 +122,20 @@ export function Sidebar() {
             return;
           }
 
+          console.log("📍 Passed redirect check, now checking if should run tutorial");
           // Add small delay to ensure page elements are rendered before starting tutorial
           if (needsTutorial) {
+            console.log("📍 Setting runTutorial to true in 500ms for step", step);
             setTimeout(() => {
+              console.log("📍 NOW setting runTutorial to TRUE");
               setRunTutorial(true);
             }, 500);
           } else {
+            console.log("📍 Setting runTutorial to false");
             setRunTutorial(false);
           }
+        } else {
+          console.log("📍 data.success is false");
         }
       }
     } catch (error) {
@@ -275,19 +284,39 @@ export function Sidebar() {
                 return;
               }
 
-              // If tutorial is running and Products tab is the current tutorial target (step 2),
-              // advance the tutorial instead of just navigating
-              // But don't auto-advance if we're navigating backwards
-              if (runTutorial && item.id === 'tutorial-step-3') {
-                const tutorialAdvance = (window as any).__tutorialAdvance;
-                const tutorialStep = (window as any).__tutorialCurrentStep;
-                const isNavigatingBackwards = (window as any).__tutorialNavigatingBackwards;
-                if (tutorialAdvance && tutorialStep === 2 && !isNavigatingBackwards) {
-                  e.preventDefault();
-                  console.log('📍 Tutorial active - advancing from Products click');
+              // Handle tutorial navigation for sidebar tabs
+              const tutorialAdvance = (window as any).__tutorialAdvance;
+              const tutorialStep = (window as any).__tutorialCurrentStep;
+              const isNavigatingBackwards = (window as any).__tutorialNavigatingBackwards;
+
+              // Programs tab (step 2 → 3)
+              if (runTutorial && item.id === 'tutorial-step-programs' && tutorialStep === 2 && !isNavigatingBackwards) {
+                console.log('📍 Tutorial active - navigating to Programs and advancing');
+                // Let the navigation happen, then advance tutorial
+                setTimeout(() => {
                   tutorialAdvance();
-                  return;
-                }
+                }, 300);
+                return;
+              }
+
+              // Portal tab (step 5 → 6)
+              if (runTutorial && item.id === 'tutorial-step-portal' && tutorialStep === 5 && !isNavigatingBackwards) {
+                console.log('📍 Tutorial active - navigating to Portal and advancing');
+                // Let the navigation happen, then advance tutorial
+                setTimeout(() => {
+                  tutorialAdvance();
+                }, 300);
+                return;
+              }
+
+              // Overview tab (step 7 → 8)
+              if (runTutorial && item.id === 'tutorial-step-overview' && tutorialStep === 7 && !isNavigatingBackwards) {
+                console.log('📍 Tutorial active - navigating to Overview and advancing');
+                // Let the navigation happen, then advance tutorial
+                setTimeout(() => {
+                  tutorialAdvance();
+                }, 300);
+                return;
               }
             }}
           >

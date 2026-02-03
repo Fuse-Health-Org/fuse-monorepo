@@ -31,7 +31,7 @@ export default function Dashboard() {
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header />
-        <main className="flex-1 overflow-y-auto p-6 space-y-6">
+        <main className="flex-1 overflow-y-auto p-6 space-y-6" id="overview-dashboard">
           {/* Header Section */}
           <div>
             <h1 className="text-3xl font-semibold text-foreground mb-2">

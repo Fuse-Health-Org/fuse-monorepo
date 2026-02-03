@@ -158,6 +158,16 @@ export default function Programs() {
                 await fetchPrograms()
                 setError('✅ Program created from template successfully!')
                 setTimeout(() => setError(null), 3000)
+
+                // If tutorial is running on step 3 (Use Template), advance the tutorial
+                const tutorialAdvance = (window as any).__tutorialAdvance;
+                const tutorialStep = (window as any).__tutorialCurrentStep;
+                if (tutorialAdvance && tutorialStep === 3) {
+                    console.log('📍 Tutorial active - advancing after program creation');
+                    setTimeout(() => {
+                        tutorialAdvance();
+                    }, 500);
+                }
             } else {
                 setError(data.message || 'Failed to create program from template')
             }
@@ -168,7 +178,7 @@ export default function Programs() {
     }
 
     // Filter out templates that the brand has already used
-    const unusedTemplates = templates.filter(template => 
+    const unusedTemplates = templates.filter(template =>
         template.isActive && !programs.some(program => program.templateId === template.id)
     )
 
@@ -285,9 +295,11 @@ export default function Programs() {
                     {/* Programs List */}
                     {programs.length > 0 ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                {programs.map((program) => (
+                            {programs.map((program, index) => (
                                 <div
                                     key={program.id}
+                                    id={index === 0 ? 'first-program-card' : undefined}
+                                    data-program-index={index}
                                     className="bg-card rounded-2xl shadow-sm border border-border p-6 hover:shadow-md transition-all cursor-pointer"
                                     onClick={() => router.push(`/programs/${program.id}`)}
                                 >
@@ -392,9 +404,10 @@ export default function Programs() {
                                 </div>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {unusedTemplates.map((template) => (
+                                {unusedTemplates.map((template, index) => (
                                     <div
                                         key={template.id}
+                                        id={index === 0 ? 'first-program-template' : undefined}
                                         className="bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 rounded-2xl shadow-sm border-2 border-dashed border-purple-200 dark:border-purple-800 p-6 hover:shadow-md transition-all"
                                     >
                                         <div className="flex items-start justify-between mb-4">
