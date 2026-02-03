@@ -5399,11 +5399,15 @@ app.post(
           );
         }
       } else {
-        // When Fuse is MOR, use statement_descriptor_suffix to show "FUSE *ClinicName"
+        // When Fuse is MOR, use statement_descriptor_suffix to show "FUSE *ClinicName Peptides"
         if (tenantProduct.clinic?.name) {
-          const statementClinicName = tenantProduct.clinic.name
-            .replace(/[^a-zA-Z0-9\s]/g, "") // Remove special characters
-            .substring(0, 22); // Stripe limit for statement_descriptor_suffix
+          const cleanName = tenantProduct.clinic.name
+            .replace(/[^a-zA-Z0-9\s]/g, ""); // Remove special characters
+          const peptidesSuffix = " Peptides";
+          const maxLength = 22; // Stripe limit for statement_descriptor_suffix
+          const maxNameLength = maxLength - peptidesSuffix.length;
+          const truncatedName = cleanName.substring(0, maxNameLength);
+          const statementClinicName = `${truncatedName}${peptidesSuffix}`;
           authPaymentIntentParams.statement_descriptor_suffix =
             statementClinicName;
           console.log(
@@ -5930,13 +5934,17 @@ app.post("/payments/product/sub", async (req, res) => {
         );
       }
     } else {
-      // When Fuse is MOR, use statement_descriptor_suffix to show "FUSE *ClinicName"
+      // When Fuse is MOR, use statement_descriptor_suffix to show "FUSE *ClinicName Peptides"
       if (clinicName || (tenantProduct as any).clinic?.name) {
-        const statementClinicName = (
+        const cleanName = (
           clinicName || (tenantProduct as any).clinic?.name
         )
-          .replace(/[^a-zA-Z0-9\s]/g, "") // Remove special characters
-          .substring(0, 22); // Stripe limit for statement_descriptor_suffix
+          .replace(/[^a-zA-Z0-9\s]/g, ""); // Remove special characters
+        const peptidesSuffix = " Peptides";
+        const maxLength = 22; // Stripe limit for statement_descriptor_suffix
+        const maxNameLength = maxLength - peptidesSuffix.length;
+        const truncatedName = cleanName.substring(0, maxNameLength);
+        const statementClinicName = `${truncatedName}${peptidesSuffix}`;
         paymentIntentParams.statement_descriptor_suffix = statementClinicName;
         console.log(
           `💳 Fuse is MOR - Using statement descriptor suffix: "FUSE *${statementClinicName}"`
@@ -6200,11 +6208,15 @@ app.post("/payments/program/sub", async (req, res) => {
       setup_future_usage: "off_session",
     };
 
-    // Add statement descriptor
+    // Add statement descriptor with Peptides suffix
     if (clinicName || clinic?.name) {
-      const statementClinicName = (clinicName || clinic?.name)
-        .replace(/[^a-zA-Z0-9\s]/g, "")
-        .substring(0, 22);
+      const cleanName = (clinicName || clinic?.name)
+        .replace(/[^a-zA-Z0-9\s]/g, "");
+      const peptidesSuffix = " Peptides";
+      const maxLength = 22; // Stripe limit for statement_descriptor_suffix
+      const maxNameLength = maxLength - peptidesSuffix.length;
+      const truncatedName = cleanName.substring(0, maxNameLength);
+      const statementClinicName = `${truncatedName}${peptidesSuffix}`;
       paymentIntentParams.statement_descriptor_suffix = statementClinicName;
     }
 
