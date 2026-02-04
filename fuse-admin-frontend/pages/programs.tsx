@@ -63,6 +63,7 @@ export default function Programs() {
     const [error, setError] = useState<string | null>(null)
     const [showTemplatesModal, setShowTemplatesModal] = useState(false)
     const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null)
+    const [tutorialStep, setTutorialStep] = useState<number | null>(null)
     const { token, user, subscription } = useAuth()
     const router = useRouter()
 
@@ -86,6 +87,22 @@ export default function Programs() {
             fetchTemplates()
         }
     }, [token, hasAccessToPrograms])
+
+    // Track tutorial step for disabling buttons
+    useEffect(() => {
+        const checkTutorialStep = () => {
+            const step = (window as any).__tutorialCurrentStep;
+            setTutorialStep(step ?? null);
+        };
+
+        // Check immediately
+        checkTutorialStep();
+
+        // Poll for changes
+        const interval = setInterval(checkTutorialStep, 200);
+
+        return () => clearInterval(interval);
+    }, [])
 
     const fetchPrograms = async () => {
         if (!token) return
@@ -295,81 +312,101 @@ export default function Programs() {
                     {/* Programs List */}
                     {programs.length > 0 ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {programs.map((program, index) => (
-                                <div
-                                    key={program.id}
-                                    id={index === 0 ? 'first-program-card' : undefined}
-                                    data-program-index={index}
-                                    className="bg-card rounded-2xl shadow-sm border border-border p-6 hover:shadow-md transition-all cursor-pointer"
-                                    onClick={() => router.push(`/programs/${program.id}`)}
-                                >
-                                    <div className="flex items-start justify-between mb-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
-                                                <Stethoscope className="h-5 w-5 text-blue-600" />
+                            {programs.map((program, index) => {
+                                const isFirstCardInTutorial = index === 0 && tutorialStep === 3;
+                                return (
+                                    <div
+                                        key={program.id}
+                                        id={index === 0 ? 'first-program-card' : undefined}
+                                        data-program-index={index}
+                                        className={`bg-card rounded-2xl shadow-sm border border-border p-6 transition-all ${isFirstCardInTutorial ? 'cursor-default' : 'hover:shadow-md cursor-pointer'
+                                            }`}
+                                        onClick={() => {
+                                            // Disable card click during tutorial step 3 on first program
+                                            if (isFirstCardInTutorial) {
+                                                return;
+                                            }
+                                            router.push(`/programs/${program.id}`)
+                                        }}
+                                    >
+                                        <div className="flex items-start justify-between mb-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+                                                    <Stethoscope className="h-5 w-5 text-blue-600" />
+                                                </div>
+                                                <div>
+                                                    <h3 className="text-lg font-semibold">{program.name}</h3>
+                                                    <Badge variant={program.isActive ? "default" : "secondary"} className="text-xs mt-1">
+                                                        {program.isActive ? "Active" : "Inactive"}
+                                                    </Badge>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <h3 className="text-lg font-semibold">{program.name}</h3>
-                                                <Badge variant={program.isActive ? "default" : "secondary"} className="text-xs mt-1">
-                                                    {program.isActive ? "Active" : "Inactive"}
-                                                </Badge>
+                                        </div>
+
+                                        {program.description && (
+                                            <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
+                                                {program.description}
+                                            </p>
+                                        )}
+
+                                        {program.medicalTemplate && (
+                                            <div className="mb-4 p-3 bg-muted rounded-lg">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <FileText className="h-3 w-3 text-muted-foreground" />
+                                                    <span className="text-xs font-medium text-muted-foreground">Medical Template</span>
+                                                </div>
+                                                <p className="text-sm font-medium">{program.medicalTemplate.title}</p>
                                             </div>
+                                        )}
+
+                                        {program.template && (
+                                            <div className="mb-4 p-3 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <FileText className="h-3 w-3 text-purple-600 dark:text-purple-400" />
+                                                    <span className="text-xs font-medium text-purple-600 dark:text-purple-400">Based on Template</span>
+                                                </div>
+                                                <p className="text-sm font-medium text-purple-900 dark:text-purple-100">{program.template.name}</p>
+                                            </div>
+                                        )}
+
+                                        <div className="flex items-center gap-2 pt-4 border-t border-border">
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    // Disable edit during tutorial step 3 on first program
+                                                    if (index === 0 && tutorialStep === 3) {
+                                                        return;
+                                                    }
+                                                    router.push(`/programs/${program.id}`)
+                                                }}
+                                                disabled={index === 0 && tutorialStep === 3}
+                                                className="flex-1"
+                                            >
+                                                <Edit className="h-3 w-3 mr-1" />
+                                                Edit
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    // Disable delete during tutorial step 3 on first program
+                                                    if (index === 0 && tutorialStep === 3) {
+                                                        return;
+                                                    }
+                                                    handleDeleteProgram(program.id, program.name)
+                                                }}
+                                                disabled={index === 0 && tutorialStep === 3}
+                                                className="border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300"
+                                            >
+                                                <Trash2 className="h-3 w-3" />
+                                            </Button>
                                         </div>
                                     </div>
-
-                                    {program.description && (
-                                        <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
-                                            {program.description}
-                                        </p>
-                                    )}
-
-                                    {program.medicalTemplate && (
-                                        <div className="mb-4 p-3 bg-muted rounded-lg">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <FileText className="h-3 w-3 text-muted-foreground" />
-                                                <span className="text-xs font-medium text-muted-foreground">Medical Template</span>
-                                            </div>
-                                            <p className="text-sm font-medium">{program.medicalTemplate.title}</p>
-                                        </div>
-                                    )}
-
-                                    {program.template && (
-                                        <div className="mb-4 p-3 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <FileText className="h-3 w-3 text-purple-600 dark:text-purple-400" />
-                                                <span className="text-xs font-medium text-purple-600 dark:text-purple-400">Based on Template</span>
-                                            </div>
-                                            <p className="text-sm font-medium text-purple-900 dark:text-purple-100">{program.template.name}</p>
-                                        </div>
-                                    )}
-
-                                    <div className="flex items-center gap-2 pt-4 border-t border-border">
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={(e) => {
-                                                e.stopPropagation()
-                                                router.push(`/programs/${program.id}`)
-                                            }}
-                                            className="flex-1"
-                                        >
-                                            <Edit className="h-3 w-3 mr-1" />
-                                            Edit
-                                        </Button>
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={(e) => {
-                                                e.stopPropagation()
-                                                handleDeleteProgram(program.id, program.name)
-                                            }}
-                                            className="border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300"
-                                        >
-                                            <Trash2 className="h-3 w-3" />
-                                        </Button>
-                                    </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     ) : unusedTemplates.length === 0 ? (
                         <div className="bg-card rounded-lg border border-border p-16 text-center">
