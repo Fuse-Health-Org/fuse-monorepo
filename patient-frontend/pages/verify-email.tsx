@@ -20,6 +20,7 @@ export default function VerifyEmail() {
   const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'invalid'>('loading')
   const [message, setMessage] = useState('')
   const [isLoggingIn, setIsLoggingIn] = useState(false)
+  const [requiresApproval, setRequiresApproval] = useState(false)
   const [clinic, setClinic] = useState<Clinic | null>(null)
   const [loadingClinic, setLoadingClinic] = useState(true)
   const router = useRouter()
@@ -75,8 +76,14 @@ export default function VerifyEmail() {
         setStatus('success')
         setMessage(data.message || 'Account activated successfully!')
 
-        // Store the JWT token for automatic login
-        if (data.token && data.user) {
+        // Check if this is a doctor who needs approval
+        if (data.requiresApproval) {
+          // Doctor verified email but needs approval - don't auto-login
+          setIsLoggingIn(false)
+          setRequiresApproval(true)
+          // Message is already set from backend
+        } else if (data.token && data.user) {
+          // Regular user - store token and auto-login
           localStorage.setItem('auth-token', data.token)
 
           setIsLoggingIn(true)
@@ -223,7 +230,17 @@ export default function VerifyEmail() {
                       </div>
                     )}
 
-                    {status === 'success' && !isLoggingIn && (
+                    {status === 'success' && !isLoggingIn && requiresApproval && (
+                      <Button
+                        onClick={() => router.push('/signin')}
+                        className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold"
+                        size="lg"
+                      >
+                        Return to Home
+                      </Button>
+                    )}
+
+                    {status === 'success' && !isLoggingIn && !requiresApproval && (
                       <Button
                         onClick={() => router.push('/')}
                         className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold"

@@ -97,33 +97,38 @@ router.get('/public/programs/by-clinic/:clinicSlug', async (req: Request, res: R
     });
 
     // Build simplified response for frontend with cheapest product price
+    // Only include programs that have at least one activated product (TenantProduct with isActive=true)
     const programsData = await Promise.all(programs.map(async (program) => {
       let cheapestPrice: number | null = null;
+      let hasActivatedProduct = false;
 
       // Get products from the program's medical template
       const medicalTemplate = program.medicalTemplate as any;
       if (medicalTemplate && medicalTemplate.formProducts) {
         const formProducts = medicalTemplate.formProducts as any[];
         
-        // Calculate cheapest price from tenant products
+        // Calculate cheapest price from ACTIVATED tenant products only
         for (const fp of formProducts) {
           if (!fp.product) continue;
           
-          // Try to get tenant-specific pricing
+          // Only consider products that have an ACTIVE TenantProduct for this clinic
           const tenantProduct = await TenantProduct.findOne({
             where: {
               productId: fp.product.id,
               clinicId: programClinicId,
+              isActive: true, // Must be explicitly activated
             },
             attributes: ['price', 'isActive'],
           });
 
-          const productPrice = tenantProduct && tenantProduct.isActive 
-            ? Number(tenantProduct.price) || 0 
-            : Number(fp.product.price) || 0;
+          // Only count this product if it has an active TenantProduct
+          if (tenantProduct && tenantProduct.isActive) {
+            hasActivatedProduct = true;
+            const productPrice = Number(tenantProduct.price) || Number(fp.product.price) || 0;
 
-          if (productPrice > 0 && (cheapestPrice === null || productPrice < cheapestPrice)) {
-            cheapestPrice = productPrice;
+            if (productPrice > 0 && (cheapestPrice === null || productPrice < cheapestPrice)) {
+              cheapestPrice = productPrice;
+            }
           }
         }
       }
@@ -147,14 +152,19 @@ router.get('/public/programs/by-clinic/:clinicSlug', async (req: Request, res: R
           imageUrl: (program.frontendDisplayProduct as any).imageUrl,
           slug: (program.frontendDisplayProduct as any).slug,
         } : null,
-        // Cheapest product price from the program
+        // Cheapest product price from the program (null if no activated products)
         fromPrice: cheapestPrice,
+        // Flag to indicate if program has any activated products
+        hasActivatedProducts: hasActivatedProduct,
       };
     }));
 
+    // Filter out programs that have no activated products
+    const filteredPrograms = programsData.filter(p => p.hasActivatedProducts);
+
     return res.json({
       success: true,
-      data: programsData,
+      data: filteredPrograms,
       isAffiliate,
     });
   } catch (error) {
@@ -387,6 +397,295 @@ router.get('/public/programs/:id', async (req: Request, res: Response) => {
 });
 
 /**
+ * Get all program templates (for tenant managers)
+ * These are programs with isTemplate=true
+ * GET /program-templates
+ */
+router.get('/program-templates', authenticateJWT, async (req: Request, res: Response) => {
+  try {
+    const currentUser = getCurrentUser(req);
+    if (!currentUser) {
+      return res.status(401).json({
+        success: false,
+        error: 'Authentication required',
+      });
+    }
+
+    // Only get templates (isTemplate=true)
+    const whereClause: any = { 
+      isTemplate: true,
+      parentProgramId: null, // Only parent templates
+    };
+
+    const templates = await Program.findAll({
+      where: whereClause,
+      include: [
+        {
+          model: Questionnaire,
+          as: 'medicalTemplate',
+          attributes: ['id', 'title', 'description', 'formTemplateType'],
+        },
+        {
+          model: Product,
+          as: 'individualProduct',
+          attributes: ['id', 'name', 'slug', 'imageUrl'],
+          required: false,
+        },
+      ],
+      order: [['createdAt', 'DESC']],
+    });
+
+    return res.json({
+      success: true,
+      data: templates,
+    });
+  } catch (error) {
+    console.error('❌ Error getting program templates:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to get program templates',
+    });
+  }
+});
+
+/**
+ * Create a program template (for tenant managers)
+ * POST /program-templates
+ */
+router.post('/program-templates', authenticateJWT, async (req: Request, res: Response) => {
+  try {
+    const currentUser = getCurrentUser(req);
+    if (!currentUser) {
+      return res.status(401).json({
+        success: false,
+        error: 'Authentication required',
+      });
+    }
+
+    const {
+      name,
+      description,
+      medicalTemplateId,
+      isActive,
+      // Non-medical services
+      hasPatientPortal,
+      patientPortalPrice,
+      hasBmiCalculator,
+      bmiCalculatorPrice,
+      hasProteinIntakeCalculator,
+      proteinIntakeCalculatorPrice,
+      hasCalorieDeficitCalculator,
+      calorieDeficitCalculatorPrice,
+      hasEasyShopping,
+      easyShoppingPrice,
+    } = req.body;
+
+    if (!name) {
+      return res.status(400).json({
+        success: false,
+        error: 'Program template name is required',
+      });
+    }
+
+    // Verify medical template exists if provided
+    if (medicalTemplateId) {
+      const template = await Questionnaire.findByPk(medicalTemplateId);
+      if (!template) {
+        return res.status(404).json({
+          success: false,
+          error: 'Medical template not found',
+        });
+      }
+    }
+
+    const program = await Program.create({
+      name,
+      description,
+      clinicId: null, // Templates are not clinic-specific
+      medicalTemplateId: medicalTemplateId || null,
+      isActive: isActive !== undefined ? isActive : true,
+      isTemplate: true, // Mark as template
+      // Non-medical services
+      hasPatientPortal: hasPatientPortal || false,
+      patientPortalPrice: patientPortalPrice || 0,
+      hasBmiCalculator: hasBmiCalculator || false,
+      bmiCalculatorPrice: bmiCalculatorPrice || 0,
+      hasProteinIntakeCalculator: hasProteinIntakeCalculator || false,
+      proteinIntakeCalculatorPrice: proteinIntakeCalculatorPrice || 0,
+      hasCalorieDeficitCalculator: hasCalorieDeficitCalculator || false,
+      calorieDeficitCalculatorPrice: calorieDeficitCalculatorPrice || 0,
+      hasEasyShopping: hasEasyShopping || false,
+      easyShoppingPrice: easyShoppingPrice || 0,
+    });
+
+    // Fetch with relationships
+    const programWithRelations = await Program.findByPk(program.id, {
+      include: [
+        {
+          model: Questionnaire,
+          as: 'medicalTemplate',
+          attributes: ['id', 'title', 'description', 'formTemplateType'],
+        },
+      ],
+    });
+
+    return res.json({
+      success: true,
+      data: programWithRelations,
+    });
+  } catch (error) {
+    console.error('❌ Error creating program template:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to create program template',
+    });
+  }
+});
+
+/**
+ * Update a program template (for tenant managers)
+ * PUT /program-templates/:id
+ */
+router.put('/program-templates/:id', authenticateJWT, async (req: Request, res: Response) => {
+  try {
+    const currentUser = getCurrentUser(req);
+    if (!currentUser) {
+      return res.status(401).json({
+        success: false,
+        error: 'Authentication required',
+      });
+    }
+
+    const { id } = req.params;
+    const {
+      name,
+      description,
+      medicalTemplateId,
+      isActive,
+      frontendDisplayProductId,
+      // Non-medical services
+      hasPatientPortal,
+      patientPortalPrice,
+      hasBmiCalculator,
+      bmiCalculatorPrice,
+      hasProteinIntakeCalculator,
+      proteinIntakeCalculatorPrice,
+      hasCalorieDeficitCalculator,
+      calorieDeficitCalculatorPrice,
+      hasEasyShopping,
+      easyShoppingPrice,
+    } = req.body;
+
+    const program = await Program.findOne({
+      where: { id, isTemplate: true },
+    });
+
+    if (!program) {
+      return res.status(404).json({
+        success: false,
+        error: 'Program template not found',
+      });
+    }
+
+    // Verify medical template exists if provided
+    if (medicalTemplateId) {
+      const template = await Questionnaire.findByPk(medicalTemplateId);
+      if (!template) {
+        return res.status(404).json({
+          success: false,
+          error: 'Medical template not found',
+        });
+      }
+    }
+
+    // Update fields
+    if (name !== undefined) program.name = name;
+    if (description !== undefined) program.description = description;
+    if (medicalTemplateId !== undefined) program.medicalTemplateId = medicalTemplateId;
+    if (isActive !== undefined) program.isActive = isActive;
+    if (frontendDisplayProductId !== undefined) program.frontendDisplayProductId = frontendDisplayProductId || null;
+
+    // Update non-medical services
+    if (hasPatientPortal !== undefined) program.hasPatientPortal = hasPatientPortal;
+    if (patientPortalPrice !== undefined) program.patientPortalPrice = patientPortalPrice;
+    if (hasBmiCalculator !== undefined) program.hasBmiCalculator = hasBmiCalculator;
+    if (bmiCalculatorPrice !== undefined) program.bmiCalculatorPrice = bmiCalculatorPrice;
+    if (hasProteinIntakeCalculator !== undefined) program.hasProteinIntakeCalculator = hasProteinIntakeCalculator;
+    if (proteinIntakeCalculatorPrice !== undefined) program.proteinIntakeCalculatorPrice = proteinIntakeCalculatorPrice;
+    if (hasCalorieDeficitCalculator !== undefined) program.hasCalorieDeficitCalculator = hasCalorieDeficitCalculator;
+    if (calorieDeficitCalculatorPrice !== undefined) program.calorieDeficitCalculatorPrice = calorieDeficitCalculatorPrice;
+    if (hasEasyShopping !== undefined) program.hasEasyShopping = hasEasyShopping;
+    if (easyShoppingPrice !== undefined) program.easyShoppingPrice = easyShoppingPrice;
+
+    await program.save();
+
+    // Fetch with relationships
+    const programWithRelations = await Program.findByPk(program.id, {
+      include: [
+        {
+          model: Questionnaire,
+          as: 'medicalTemplate',
+          attributes: ['id', 'title', 'description', 'formTemplateType'],
+        },
+      ],
+    });
+
+    return res.json({
+      success: true,
+      data: programWithRelations,
+    });
+  } catch (error) {
+    console.error('❌ Error updating program template:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to update program template',
+    });
+  }
+});
+
+/**
+ * Delete a program template (for tenant managers)
+ * DELETE /program-templates/:id
+ */
+router.delete('/program-templates/:id', authenticateJWT, async (req: Request, res: Response) => {
+  try {
+    const currentUser = getCurrentUser(req);
+    if (!currentUser) {
+      return res.status(401).json({
+        success: false,
+        error: 'Authentication required',
+      });
+    }
+
+    const { id } = req.params;
+
+    const program = await Program.findOne({
+      where: { id, isTemplate: true },
+    });
+
+    if (!program) {
+      return res.status(404).json({
+        success: false,
+        error: 'Program template not found',
+      });
+    }
+
+    await program.destroy();
+
+    return res.json({
+      success: true,
+      message: 'Program template deleted successfully',
+    });
+  } catch (error) {
+    console.error('❌ Error deleting program template:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to delete program template',
+    });
+  }
+});
+
+/**
  * Get all programs for the current clinic
  * GET /programs
  * Query params:
@@ -414,7 +713,8 @@ router.get('/programs', authenticateJWT, async (req: Request, res: Response) => 
 
     const { medicalTemplateId, parentProgramId, includeChildren } = req.query;
     
-    const whereClause: any = { clinicId };
+    // Only get non-template programs for the clinic
+    const whereClause: any = { clinicId, isTemplate: false };
     
     // Filter by medical template if provided
     if (medicalTemplateId && typeof medicalTemplateId === 'string') {
@@ -443,6 +743,12 @@ router.get('/programs', authenticateJWT, async (req: Request, res: Response) => 
           attributes: ['id', 'name', 'slug', 'imageUrl'],
           required: false,
         },
+        {
+          model: Program,
+          as: 'template',
+          attributes: ['id', 'name', 'description'],
+          required: false,
+        },
       ],
       order: [['createdAt', 'DESC']],
     });
@@ -456,6 +762,53 @@ router.get('/programs', authenticateJWT, async (req: Request, res: Response) => 
     return res.status(500).json({
       success: false,
       error: 'Failed to get programs',
+    });
+  }
+});
+
+/**
+ * Get a single program template by ID (for tenant managers)
+ * GET /program-templates/:id
+ */
+router.get('/program-templates/:id', authenticateJWT, async (req: Request, res: Response) => {
+  try {
+    const currentUser = getCurrentUser(req);
+    if (!currentUser) {
+      return res.status(401).json({
+        success: false,
+        error: 'Authentication required',
+      });
+    }
+
+    const { id } = req.params;
+
+    const program = await Program.findOne({
+      where: { id, isTemplate: true },
+      include: [
+        {
+          model: Questionnaire,
+          as: 'medicalTemplate',
+          attributes: ['id', 'title', 'description', 'formTemplateType'],
+        },
+      ],
+    });
+
+    if (!program) {
+      return res.status(404).json({
+        success: false,
+        error: 'Program template not found',
+      });
+    }
+
+    return res.json({
+      success: true,
+      data: program,
+    });
+  } catch (error) {
+    console.error('❌ Error getting program template:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to get program template',
     });
   }
 });
@@ -485,6 +838,12 @@ router.get('/programs/:id', authenticateJWT, async (req: Request, res: Response)
           as: 'medicalTemplate',
           attributes: ['id', 'title', 'description', 'formTemplateType'],
         },
+        {
+          model: Program,
+          as: 'template',
+          attributes: ['id', 'name', 'description'],
+          required: false,
+        },
       ],
     });
 
@@ -511,10 +870,13 @@ router.get('/programs/:id', authenticateJWT, async (req: Request, res: Response)
 /**
  * Create a new program
  * POST /programs
- * Body: { name, description?, medicalTemplateId?, individualProductId?, isActive?, hasPatientPortal?, patientPortalPrice?, ... }
+ * Body: { name, description?, medicalTemplateId?, individualProductId?, templateId?, isActive?, hasPatientPortal?, patientPortalPrice?, ... }
  * 
  * individualProductId: When set, this program is specific to one product from the form.
  * This allows different pricing/services for different products within the same medical template.
+ * 
+ * templateId: When set, this program is created from a template. The template values are
+ * used as defaults but can be customized by the brand.
  */
 router.post('/programs', authenticateJWT, async (req: Request, res: Response) => {
   try {
@@ -540,6 +902,7 @@ router.post('/programs', authenticateJWT, async (req: Request, res: Response) =>
       medicalTemplateId,
       individualProductId,
       parentProgramId,
+      templateId, // Reference to the program template
       isActive,
       // Non-medical services
       hasPatientPortal,
@@ -554,16 +917,49 @@ router.post('/programs', authenticateJWT, async (req: Request, res: Response) =>
       easyShoppingPrice,
     } = req.body;
 
-    if (!name) {
+    // If creating from template, get template defaults
+    let templateDefaults: any = {};
+    if (templateId) {
+      const templateProgram = await Program.findOne({
+        where: { id: templateId, isTemplate: true },
+      });
+      if (!templateProgram) {
+        return res.status(404).json({
+          success: false,
+          error: 'Program template not found',
+        });
+      }
+      templateDefaults = {
+        name: templateProgram.name,
+        description: templateProgram.description,
+        medicalTemplateId: templateProgram.medicalTemplateId,
+        hasPatientPortal: templateProgram.hasPatientPortal,
+        patientPortalPrice: templateProgram.patientPortalPrice,
+        hasBmiCalculator: templateProgram.hasBmiCalculator,
+        bmiCalculatorPrice: templateProgram.bmiCalculatorPrice,
+        hasProteinIntakeCalculator: templateProgram.hasProteinIntakeCalculator,
+        proteinIntakeCalculatorPrice: templateProgram.proteinIntakeCalculatorPrice,
+        hasCalorieDeficitCalculator: templateProgram.hasCalorieDeficitCalculator,
+        calorieDeficitCalculatorPrice: templateProgram.calorieDeficitCalculatorPrice,
+        hasEasyShopping: templateProgram.hasEasyShopping,
+        easyShoppingPrice: templateProgram.easyShoppingPrice,
+      };
+    }
+
+    // Use provided values or template defaults
+    const finalName = name || templateDefaults.name;
+    if (!finalName) {
       return res.status(400).json({
         success: false,
         error: 'Program name is required',
       });
     }
 
+    const finalMedicalTemplateId = medicalTemplateId || templateDefaults.medicalTemplateId;
+
     // Verify medical template exists if provided
-    if (medicalTemplateId) {
-      const template = await Questionnaire.findByPk(medicalTemplateId);
+    if (finalMedicalTemplateId) {
+      const template = await Questionnaire.findByPk(finalMedicalTemplateId);
       if (!template) {
         return res.status(404).json({
           success: false,
@@ -595,24 +991,26 @@ router.post('/programs', authenticateJWT, async (req: Request, res: Response) =>
     }
 
     const program = await Program.create({
-      name,
-      description,
+      name: finalName,
+      description: description !== undefined ? description : templateDefaults.description,
       clinicId,
-      medicalTemplateId: medicalTemplateId || null,
+      medicalTemplateId: finalMedicalTemplateId || null,
       individualProductId: individualProductId || null,
       parentProgramId: parentProgramId || null,
+      templateId: templateId || null, // Reference to template
+      isTemplate: false, // Brand programs are never templates
       isActive: isActive !== undefined ? isActive : true,
-      // Non-medical services
-      hasPatientPortal: hasPatientPortal || false,
-      patientPortalPrice: patientPortalPrice || 0,
-      hasBmiCalculator: hasBmiCalculator || false,
-      bmiCalculatorPrice: bmiCalculatorPrice || 0,
-      hasProteinIntakeCalculator: hasProteinIntakeCalculator || false,
-      proteinIntakeCalculatorPrice: proteinIntakeCalculatorPrice || 0,
-      hasCalorieDeficitCalculator: hasCalorieDeficitCalculator || false,
-      calorieDeficitCalculatorPrice: calorieDeficitCalculatorPrice || 0,
-      hasEasyShopping: hasEasyShopping || false,
-      easyShoppingPrice: easyShoppingPrice || 0,
+      // Non-medical services (use provided or template defaults)
+      hasPatientPortal: hasPatientPortal !== undefined ? hasPatientPortal : (templateDefaults.hasPatientPortal || false),
+      patientPortalPrice: patientPortalPrice !== undefined ? patientPortalPrice : (templateDefaults.patientPortalPrice || 0),
+      hasBmiCalculator: hasBmiCalculator !== undefined ? hasBmiCalculator : (templateDefaults.hasBmiCalculator || false),
+      bmiCalculatorPrice: bmiCalculatorPrice !== undefined ? bmiCalculatorPrice : (templateDefaults.bmiCalculatorPrice || 0),
+      hasProteinIntakeCalculator: hasProteinIntakeCalculator !== undefined ? hasProteinIntakeCalculator : (templateDefaults.hasProteinIntakeCalculator || false),
+      proteinIntakeCalculatorPrice: proteinIntakeCalculatorPrice !== undefined ? proteinIntakeCalculatorPrice : (templateDefaults.proteinIntakeCalculatorPrice || 0),
+      hasCalorieDeficitCalculator: hasCalorieDeficitCalculator !== undefined ? hasCalorieDeficitCalculator : (templateDefaults.hasCalorieDeficitCalculator || false),
+      calorieDeficitCalculatorPrice: calorieDeficitCalculatorPrice !== undefined ? calorieDeficitCalculatorPrice : (templateDefaults.calorieDeficitCalculatorPrice || 0),
+      hasEasyShopping: hasEasyShopping !== undefined ? hasEasyShopping : (templateDefaults.hasEasyShopping || false),
+      easyShoppingPrice: easyShoppingPrice !== undefined ? easyShoppingPrice : (templateDefaults.easyShoppingPrice || 0),
     });
 
     // Fetch with relationships
@@ -627,6 +1025,12 @@ router.post('/programs', authenticateJWT, async (req: Request, res: Response) =>
           model: Product,
           as: 'individualProduct',
           attributes: ['id', 'name', 'slug', 'imageUrl'],
+          required: false,
+        },
+        {
+          model: Program,
+          as: 'template',
+          attributes: ['id', 'name', 'description'],
           required: false,
         },
       ],
@@ -762,6 +1166,12 @@ router.put('/programs/:id', authenticateJWT, async (req: Request, res: Response)
           model: Product,
           as: 'individualProduct',
           attributes: ['id', 'name', 'slug', 'imageUrl'],
+          required: false,
+        },
+        {
+          model: Program,
+          as: 'template',
+          attributes: ['id', 'name', 'description'],
           required: false,
         },
       ],

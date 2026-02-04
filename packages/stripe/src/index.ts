@@ -157,14 +157,26 @@ class StripeService {
       const now = new Date();
       let nextBillingDate: Date;
 
+      // Helper function to safely add months without rolling over
+      const addMonthsSafe = (date: Date, months: number): Date => {
+        const result = new Date(date);
+        const originalDay = date.getDate();
+        result.setMonth(result.getMonth() + months);
+        
+        // If the day changed (e.g., Jan 31 -> Mar 3), set to last day of target month
+        if (result.getDate() !== originalDay) {
+          // Go back to last day of previous month (the actual target month)
+          result.setDate(0);
+        }
+        return result;
+      };
+
       switch (billingInterval) {
         case 'quarterly':
-          nextBillingDate = new Date(now);
-          nextBillingDate.setMonth(now.getMonth() + 3);
+          nextBillingDate = addMonthsSafe(now, 3);
           break;
         case 'biannual':
-          nextBillingDate = new Date(now);
-          nextBillingDate.setMonth(now.getMonth() + 6);
+          nextBillingDate = addMonthsSafe(now, 6);
           break;
         case 'annual':
           nextBillingDate = new Date(now);
@@ -172,15 +184,8 @@ class StripeService {
           break;
         case 'monthly':
         default:
-          nextBillingDate = new Date(now);
-          nextBillingDate.setMonth(now.getMonth() + 1);
+          nextBillingDate = addMonthsSafe(now, 1);
           break;
-      }
-
-      // Ensure we don't go past the end of the month for monthly billing
-      if (billingInterval === 'monthly' && nextBillingDate.getDate() !== now.getDate()) {
-        // Handle edge case for end-of-month dates (e.g., Jan 31 -> Feb 28)
-        nextBillingDate = new Date(nextBillingDate.getFullYear(), nextBillingDate.getMonth() + 1, 0);
       }
 
       const billingCycleAnchor = Math.floor(nextBillingDate.getTime() / 1000);

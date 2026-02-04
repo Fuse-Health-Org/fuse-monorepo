@@ -13,7 +13,7 @@ interface GetStartedButtonProps {
 export default function GetStartedButton({
   formId,
   slug,
-  primaryColor = "#004d4d",
+  primaryColor = "#374151",
   disabled = false,
   style = {},
   variant = "default",

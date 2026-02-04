@@ -11,13 +11,17 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
     const router = useRouter()
 
     useEffect(() => {
-        if (!isLoading && !user) {
+        // Wait for both router and auth to be ready before redirecting
+        if (!router.isReady) return
+        if (isLoading) return
+        
+        if (!user) {
             router.push('/signin')
-            return
         }
-    }, [user, isLoading, router])
+    }, [user, isLoading, router, router.isReady])
 
-    if (isLoading) {
+    // Show loading state while router or auth is initializing
+    if (!router.isReady || isLoading) {
         return (
             <div className="min-h-screen bg-background flex items-center justify-center">
                 <div className="text-center space-y-4">

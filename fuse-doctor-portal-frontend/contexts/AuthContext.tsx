@@ -10,6 +10,14 @@ interface User {
     firstName?: string
     lastName?: string
     phone?: string
+    userRoles?: {
+        patient?: boolean
+        doctor?: boolean
+        admin?: boolean
+        brand?: boolean
+        affiliate?: boolean
+        superAdmin?: boolean
+    }
 }
 
 interface MfaState {
@@ -127,6 +135,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'X-Portal-Context': 'doctor',
                 },
                 body: JSON.stringify({ email, password }),
             })
@@ -183,6 +192,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'X-Portal-Context': 'doctor',
                 },
                 body: JSON.stringify({ mfaToken: mfa.token, code }),
             })

@@ -215,6 +215,24 @@ export const handlePaymentIntentSucceeded = async (paymentIntent: Stripe.Payment
     if (payment.brandSubscriptionId) {
         console.log('🆕 Enable brand subscription from payment');
 
+        // Extract payment method ID from the payment intent and store it in metadata
+        // This is needed because the payment method is only known after the user confirms payment
+        const paymentMethodIdFromIntent = typeof paymentIntent.payment_method === 'string'
+            ? paymentIntent.payment_method
+            : paymentIntent.payment_method?.id;
+
+        if (paymentMethodIdFromIntent) {
+            // Update payment record with the payment method ID
+            const currentMetadata = payment.stripeMetadata || {};
+            await payment.update({
+                stripeMetadata: {
+                    ...currentMetadata,
+                    paymentMethodId: paymentMethodIdFromIntent
+                }
+            });
+            console.log('✅ Payment method ID saved to payment record:', paymentMethodIdFromIntent);
+        }
+
         const brandSubscriptionService = new BrandSubscriptionService();
         const result = await brandSubscriptionService.createFromPayment({
             paymentId: payment.id,

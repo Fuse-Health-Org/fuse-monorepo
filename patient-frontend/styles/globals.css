@@ -42,6 +42,14 @@ input[type="number"] {
   }
 }
 
+/* Brand portal footer: single column on mobile to prevent horizontal overflow */
+@media (max-width: 768px) {
+  .brand-portal-footer-grid {
+    grid-template-columns: 1fr !important;
+    gap: 2rem;
+  }
+}
+
 .smooth-scroll {
   -webkit-overflow-scrolling: touch;
   scroll-behavior: smooth;

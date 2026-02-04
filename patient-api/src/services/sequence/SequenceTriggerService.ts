@@ -1,6 +1,6 @@
 import Sequence from '../../models/Sequence';
 import SequenceRun from '../../models/SequenceRun';
-import { sequenceRunWorker } from '../../features/sequences/services/worker';
+import { sequenceRunWorker } from '@endpoints/sequences/services/worker';
 
 /**
  * Service to trigger sequences based on events

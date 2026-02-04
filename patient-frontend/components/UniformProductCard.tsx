@@ -42,20 +42,20 @@ const CONFIG = {
   crossedOutMultiplier: 1.3, // 30% higher for display
 };
 
-// Fixed badge configuration
+// Fixed badge configuration - neutral colors
 const BADGE_MAP: { [key: string]: { label: string; color: string } } = {
-  'weightloss': { label: 'Weight Loss', color: '#ef4444' },
-  'weight-loss': { label: 'Weight Loss', color: '#ef4444' },
-  'hairgrowth': { label: 'Hair Growth', color: '#8b5cf6' },
-  'hair-growth': { label: 'Hair Growth', color: '#8b5cf6' },
-  'performance': { label: 'Muscle Growth', color: '#3b82f6' },
-  'recovery': { label: 'Recovery', color: '#10b981' },
-  'flexibility': { label: 'Flexibility', color: '#a855f7' },
-  'sexual-health': { label: 'Sexual Health', color: '#ec4899' },
-  'skincare': { label: 'Better Skin', color: '#f59e0b' },
-  'wellness': { label: 'Wellness', color: '#06b6d4' },
-  'energy': { label: 'More Energy', color: '#eab308' },
-  'sleep': { label: 'Better Sleep', color: '#6366f1' },
+  'weightloss': { label: 'Weight Loss', color: '#525252' },
+  'weight-loss': { label: 'Weight Loss', color: '#525252' },
+  'hairgrowth': { label: 'Hair Growth', color: '#6b7280' },
+  'hair-growth': { label: 'Hair Growth', color: '#6b7280' },
+  'performance': { label: 'Muscle Growth', color: '#4b5563' },
+  'recovery': { label: 'Recovery', color: '#525252' },
+  'flexibility': { label: 'Flexibility', color: '#6b7280' },
+  'sexual-health': { label: 'Sexual Health', color: '#4b5563' },
+  'skincare': { label: 'Better Skin', color: '#525252' },
+  'wellness': { label: 'Wellness', color: '#6b7280' },
+  'energy': { label: 'More Energy', color: '#4b5563' },
+  'sleep': { label: 'Better Sleep', color: '#525252' },
 };
 
 export const UniformProductCard: React.FC<UniformProductCardProps> = ({
@@ -176,34 +176,46 @@ export const UniformProductCard: React.FC<UniformProductCardProps> = ({
         )}
       </div>
 
-      {/* Product Name */}
+      {/* Product Name - Fixed 2 lines max */}
       <h3 style={{
         fontFamily: CONFIG.fontFamily,
         fontSize: '1.25rem',
         marginBottom: '0.5rem',
         fontWeight: 400,
-        color: isHovered ? '#38bdf8' : 'inherit',
+        color: isHovered ? '#525252' : 'inherit',
         transition: 'color 0.3s ease',
+        height: '3rem', // Fixed height for 2 lines
+        lineHeight: '1.5rem',
+        overflow: 'hidden',
+        display: '-webkit-box',
+        WebkitLineClamp: 2,
+        WebkitBoxOrient: 'vertical' as const,
       }}>
         {product.name}
       </h3>
 
-      {/* Description - Fixed styling */}
+      {/* Description - Fixed 3 lines max */}
       <p style={{
         fontSize: '0.875rem',
         color: '#525252',
         marginBottom: '0.75rem',
-        minHeight: '2.5rem',
+        height: '3.75rem', // Fixed height for 3 lines
+        lineHeight: '1.25rem',
+        overflow: 'hidden',
+        display: '-webkit-box',
+        WebkitLineClamp: 3,
+        WebkitBoxOrient: 'vertical' as const,
       }}>
         {product.description || 'Premium health product'}
       </p>
 
-      {/* Price - Fixed styling */}
+      {/* Price - Fixed styling and height */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
         gap: '0.5rem',
         marginBottom: '0.75rem',
+        height: '1.5rem', // Fixed height
       }}>
         <span style={{ fontWeight: 600 }}>
           From ${product.price.toFixed(2)}/mo
@@ -217,12 +229,14 @@ export const UniformProductCard: React.FC<UniformProductCardProps> = ({
         </span>
       </div>
 
-      {/* Badges - Fixed styling */}
+      {/* Badges - Fixed styling and height */}
       <div style={{
         display: 'flex',
         gap: '0.5rem',
         flexWrap: 'wrap',
         marginBottom: '1rem',
+        height: '1.75rem', // Fixed height for single row of badges
+        overflow: 'hidden',
       }}>
         {badges.map((badge, idx) => (
           <span
@@ -261,7 +275,7 @@ function getBadges(product: Product): Array<{ label: string; color: string }> {
 
   // Default badge if none found
   if (badges.length === 0) {
-    badges.push({ label: 'Wellness', color: '#06b6d4' });
+    badges.push({ label: 'Wellness', color: '#6b7280' });
   }
 
   return badges;

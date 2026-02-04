@@ -174,7 +174,16 @@ export default function ProductEditor() {
 
   // Fetch product details and check for attached forms
   useEffect(() => {
-    if (!token || !productId || typeof productId !== 'string') return
+    if (!token || !productId || typeof productId !== 'string') {
+      // Don't leave in loading state if we can't fetch
+      if (productId && typeof productId === 'string') {
+        // Only keep loading if we're waiting for token
+        // Token will trigger re-run when it becomes available
+      } else {
+        setLoadingProduct(false)
+      }
+      return
+    }
 
     const fetchProduct = async () => {
       setLoadingProduct(true)
@@ -258,10 +267,16 @@ export default function ProductEditor() {
 
               if (createRes.ok) {
                 const createData = await createRes.json()
-                console.log('✅ Form created successfully:', createData.data.id)
-                setTemplateId(createData.data.id)
-                setSaveMessage("Form created automatically")
-                setTimeout(() => setSaveMessage(null), 3000)
+                const newFormId = createData?.data?.id
+                if (newFormId) {
+                  console.log('✅ Form created successfully:', newFormId)
+                  setTemplateId(newFormId)
+                  setSaveMessage("Form created automatically")
+                  setTimeout(() => setSaveMessage(null), 3000)
+                } else {
+                  console.error('❌ Form created but no ID returned:', createData)
+                  setError('Form was created but response was invalid')
+                }
               } else {
                 const errorData = await createRes.json().catch(() => ({}))
                 console.error('❌ Failed to auto-create form')
@@ -2136,9 +2151,9 @@ export default function ProductEditor() {
   }
 
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex h-screen bg-background overflow-hidden">
       <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col min-h-0">
         <Header />
         <main className="flex-1 overflow-y-auto p-8 space-y-6">
           {/* Back Button */}

@@ -947,7 +947,15 @@ export function registerClientManagementEndpoints(
         }
 
         const clinic = await Clinic.findByPk(targetUser.clinicId, {
-          attributes: ["id", "name", "slug", "patientPortalDashboardFormat"],
+          attributes: ["id", "name", "slug", "patientPortalDashboardFormat", "mainDoctorId"],
+          include: [
+            {
+              model: User,
+              as: "mainDoctor",
+              required: false,
+              attributes: ["id", "firstName", "lastName", "email"],
+            },
+          ],
         });
 
         if (!clinic) {
@@ -1183,6 +1191,113 @@ export function registerClientManagementEndpoints(
         res.status(500).json({
           success: false,
           message: "Failed to update patientPortalDashboardFormat",
+        });
+      }
+    }
+  );
+
+  // Update mainDoctorId for a clinic (only if patientPortalDashboardFormat is FUSE)
+  app.patch(
+    "/admin/users/:userId/clinic/main-doctor",
+    authenticateJWT,
+    async (req, res) => {
+      try {
+        const currentUser = getCurrentUser(req);
+        if (!currentUser) {
+          return res
+            .status(401)
+            .json({ success: false, message: "Not authenticated" });
+        }
+
+        const user = await User.findByPk(currentUser.id, {
+          include: [{ model: UserRoles, as: "userRoles", required: false }],
+        });
+        if (!user || !user.hasRoleSync("admin")) {
+          return res.status(403).json({ success: false, message: "Forbidden" });
+        }
+
+        const { userId } = req.params;
+        const { mainDoctorId } = req.body;
+
+        const targetUser = await User.findByPk(userId);
+
+        if (!targetUser || !targetUser.clinicId) {
+          return res.status(404).json({
+            success: false,
+            message: "User not found or does not have a clinic",
+          });
+        }
+
+        const clinic = await Clinic.findByPk(targetUser.clinicId);
+
+        if (!clinic) {
+          return res.status(404).json({
+            success: false,
+            message: "Clinic not found",
+          });
+        }
+
+        // Validate that patientPortalDashboardFormat is FUSE
+        if (clinic.patientPortalDashboardFormat !== PatientPortalDashboardFormat.FUSE) {
+          return res.status(400).json({
+            success: false,
+            message: "Cannot change main doctor. This feature is only available when patientPortalDashboardFormat is 'fuse'",
+          });
+        }
+
+        // If mainDoctorId is provided, validate it exists and has doctor role
+        if (mainDoctorId) {
+          const doctor = await User.findByPk(mainDoctorId, {
+            include: [{ model: UserRoles, as: "userRoles", required: false }],
+          });
+
+          if (!doctor) {
+            return res.status(404).json({
+              success: false,
+              message: "Doctor not found",
+            });
+          }
+
+          await doctor.getUserRoles();
+          if (!doctor.userRoles?.hasRole("doctor")) {
+            return res.status(400).json({
+              success: false,
+              message: "User is not a doctor",
+            });
+          }
+        }
+
+        // Update the clinic
+        await clinic.update({
+          mainDoctorId: mainDoctorId || null,
+        });
+
+        // Reload clinic with mainDoctor association
+        await clinic.reload({
+          include: [
+            {
+              model: User,
+              as: "mainDoctor",
+              required: false,
+              attributes: ["id", "firstName", "lastName", "email"],
+            },
+          ],
+        });
+
+        console.log(
+          `✅ [Client Mgmt] Updated mainDoctorId for clinic ${clinic.id} to ${mainDoctorId || "null"}`
+        );
+
+        res.status(200).json({
+          success: true,
+          message: "Main doctor updated successfully",
+          data: clinic.toJSON(),
+        });
+      } catch (error) {
+        console.error("❌ Error updating mainDoctorId:", error);
+        res.status(500).json({
+          success: false,
+          message: "Failed to update main doctor",
         });
       }
     }

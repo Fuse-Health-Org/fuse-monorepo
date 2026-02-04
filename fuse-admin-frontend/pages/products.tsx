@@ -992,7 +992,10 @@ export default function Products() {
                             <button
                                 id="my-products-btn"
                                 className={`pb-3 border-b-2 transition-colors text-sm font-medium ${activeTab === 'my' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
-                                onClick={() => setActiveTab('my')}
+                                onClick={() => {
+                                    // Switch to My Products tab
+                                    setActiveTab('my');
+                                }}
                             >
                                 My Products
                             </button>
@@ -1146,6 +1149,7 @@ export default function Products() {
                                     return (
                                         <div
                                             key={product.id}
+                                            id={index === 0 ? 'first-product-item' : undefined}
                                             className={`flex items-center justify-between px-6 py-4 hover:bg-accent transition-colors ${quickEditMode ? 'cursor-default' : 'cursor-pointer'} ${index !== 0 ? 'border-t border-border' : ''}`}
                                             onClick={() => !quickEditMode && router.push(product.brandId ? `/custom-products/${product.id}` : `/products/${product.id}`)}
                                         >
@@ -1297,6 +1301,8 @@ export default function Products() {
                                                             size="sm"
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
+
+                                                                // Activate the product
                                                                 handleEnableProduct(product.id);
                                                             }}
                                                             className="bg-green-600 hover:bg-green-700 text-white enable-product-btn"

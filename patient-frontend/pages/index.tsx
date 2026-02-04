@@ -51,6 +51,7 @@ interface ClinicInfo {
   parentClinicName?: string;
   parentClinicHeroImageUrl?: string;
   patientPortalDashboardFormat?: PatientPortalDashboardFormat;
+  defaultFormColor?: string;
 }
 
 interface Product {
@@ -369,7 +370,17 @@ export default function LandingPage() {
         console.log('📋 Programs data:', programsData);
 
         if (Array.isArray(programsData)) {
-          setPrograms(programsData);
+          // Filter out programs that have a medical template but no products attached
+          const filteredPrograms = programsData.filter((program: Program) => {
+            // If program has a medical template, it must have products (fromPrice will be set)
+            if (program.medicalTemplateId) {
+              // Only show if fromPrice exists (meaning template has products)
+              return program.fromPrice !== null && program.fromPrice !== undefined;
+            }
+            // Programs without templates can still show (though they might be disabled)
+            return true;
+          });
+          setPrograms(filteredPrograms);
         } else {
           console.error('❌ Programs data is not an array:', programsData);
           setPrograms([]);
@@ -522,6 +533,9 @@ export default function LandingPage() {
       }
     };
 
+    // Use clinic's default form color or fallback to neutral gray
+    const buttonColor = clinicInfo?.defaultFormColor || "#374151";
+
     return (
       <UniformProductCard
         key={product.id}
@@ -533,12 +547,12 @@ export default function LandingPage() {
         onHover={() => setHoveredCardIndex(cardId)}
         onLeave={() => setHoveredCardIndex(null)}
         onLikeClick={handleLikeClick}
-        primaryColor={primaryColor}
-        renderGetStartedButton={(formId, slug, color) => (
+        primaryColor={buttonColor}
+        renderGetStartedButton={(formId, slug) => (
           <GetStartedButton
             formId={formId}
             slug={slug}
-            primaryColor={color}
+            primaryColor={buttonColor}
           />
         )}
       />
@@ -553,9 +567,12 @@ export default function LandingPage() {
     const isHovered = hoveredCardIndex === cardId;
     const hasTemplate = !!program.medicalTemplateId;
 
-    // Program colors - purple-ish tones to differentiate from products
-    const programColors = ["#6366f1", "#8b5cf6", "#7c3aed", "#6d28d9"];
+    // Program colors - neutral tones
+    const programColors = ["#525252", "#4b5563", "#6b7280", "#374151"];
     const cardColor = programColors[index % 4];
+
+    // Use clinic's default form color or fallback to neutral gray
+    const buttonColor = clinicInfo?.defaultFormColor || "#374151";
 
     // Use the frontend display product image if available
     const displayImageUrl = program.frontendDisplayProduct?.imageUrl;
@@ -580,7 +597,7 @@ export default function LandingPage() {
           position: "absolute",
           top: "0.5rem",
           left: "0.5rem",
-          background: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
+          background: "#525252",
           color: "white",
           fontSize: "0.625rem",
           padding: "0.25rem 0.5rem",
@@ -681,28 +698,61 @@ export default function LandingPage() {
             </div>
           )}
         </div>
+        {/* Program Name - Fixed 2 lines max */}
         <h3 style={{
           fontFamily: "Georgia, serif",
           fontSize: "1.25rem",
           marginBottom: "0.5rem",
           fontWeight: 400,
-          color: isHovered ? "#6366f1" : "inherit",
+          color: isHovered ? "#525252" : "inherit",
           transition: "color 0.3s ease",
+          height: "3rem", // Fixed height for 2 lines
+          lineHeight: "1.5rem",
+          overflow: "hidden",
+          display: "-webkit-box",
+          WebkitLineClamp: 2,
+          WebkitBoxOrient: "vertical" as const,
         }}>
           {program.name}
         </h3>
-        <p style={{ fontSize: "0.875rem", color: "#525252", marginBottom: "0.75rem", minHeight: "2.5rem" }}>
+        {/* Description - Fixed 3 lines max */}
+        <p style={{
+          fontSize: "0.875rem",
+          color: "#525252",
+          marginBottom: "0.75rem",
+          height: "3.75rem", // Fixed height for 3 lines
+          lineHeight: "1.25rem",
+          overflow: "hidden",
+          display: "-webkit-box",
+          WebkitLineClamp: 3,
+          WebkitBoxOrient: "vertical" as const,
+        }}>
           {program.description || program.medicalTemplate?.title || "Comprehensive health program"}
         </p>
-        {program.fromPrice && program.fromPrice > 0 && (
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.75rem" }}>
+        {/* Price - Fixed height */}
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "0.5rem",
+          marginBottom: "0.75rem",
+          height: "1.5rem", // Fixed height
+        }}>
+          {program.fromPrice && program.fromPrice > 0 && (
             <span style={{ fontWeight: 600 }}>From ${program.fromPrice.toFixed(2)}/mo</span>
-          </div>
-        )}
-        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "1rem" }}>
+          )}
+        </div>
+        {/* Badges - Fixed height */}
+        <div style={{
+          display: "flex",
+          gap: "0.5rem",
+          flexWrap: "wrap",
+          marginBottom: "1rem",
+          height: "1.75rem", // Fixed height for single row of badges
+          overflow: "hidden",
+        }}>
           <span
             style={{
-              backgroundColor: "#6366f1",
+              backgroundColor: "#6b7280",
               color: "white",
               padding: "0.25rem 0.75rem",
               borderRadius: "1rem",
@@ -727,7 +777,7 @@ export default function LandingPage() {
               fontSize: "0.875rem",
               fontWeight: 600,
               textDecoration: "none",
-              backgroundColor: primaryColor,
+              backgroundColor: buttonColor,
               color: "white",
               cursor: "pointer",
               border: "none",
@@ -1109,8 +1159,9 @@ export default function LandingPage() {
       {/* Footer */}
       <footer style={{ backgroundColor: websiteData?.footerColor || "#0d3d3d", color: "white", padding: "4rem 0 2rem" }}>
         <div style={{ maxWidth: "1280px", margin: "0 auto", padding: "0 1.5rem" }}>
-          {/* Main Footer Grid: Left Sections | Middle Disclaimers | Right Sections */}
+          {/* Main Footer Grid: Left Sections | Middle Disclaimers | Right Sections. Single column on mobile via .brand-portal-footer-grid */}
           <div
+            className="brand-portal-footer-grid"
             style={{
               display: "grid",
               gridTemplateColumns: "1fr 2fr 1fr",

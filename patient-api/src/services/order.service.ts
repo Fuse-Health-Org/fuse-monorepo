@@ -85,7 +85,7 @@ class OrderService {
         };
       }
 
-      if (user.role !== "doctor" && user.role !== "brand") {
+      if (!user.hasAnyRoleSync(["doctor", "brand"])) {
         return {
           success: false,
           message: "Access denied",
@@ -300,6 +300,46 @@ class OrderService {
           message: "Order not found",
           error: "Order with the provided ID does not exist",
         };
+      }
+
+      // Validate doctor license for the order's state (if approvedByDoctorId is provided)
+      if (approvedByDoctorId) {
+        const orderState = order.shippingAddress?.state;
+        
+        if (orderState) {
+          // Get doctor user to check license states coverage
+          const doctor = await User.findByPk(approvedByDoctorId, {
+            attributes: ['id', 'doctorLicenseStatesCoverage'],
+          });
+
+          if (!doctor) {
+            return {
+              success: false,
+              message: `Doctor not found.`,
+              error: "Doctor user not found",
+            };
+          }
+
+          if (!doctor.doctorLicenseStatesCoverage || doctor.doctorLicenseStatesCoverage.length === 0) {
+            return {
+              success: false,
+              message: `Doctor license information not found. Please update your license coverage before approving orders.`,
+              error: "Doctor license states coverage not configured",
+            };
+          }
+
+          // Normalize state codes for comparison (uppercase)
+          const normalizedOrderState = orderState.toUpperCase();
+          const licensedStates = doctor.doctorLicenseStatesCoverage.map((state: string) => state.toUpperCase());
+
+          if (!licensedStates.includes(normalizedOrderState)) {
+            return {
+              success: false,
+              message: `Doctor is not licensed to approve prescriptions in ${orderState}. Licensed states: ${licensedStates.join(', ')}.`,
+              error: `Doctor not licensed in state: ${orderState}`,
+            };
+          }
+        }
       }
 
       // Mark order as approved by doctor (if not already set by auto-approval)

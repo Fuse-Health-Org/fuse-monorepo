@@ -26,7 +26,6 @@ import BrandSubscriptionPlans from "./models/BrandSubscriptionPlans";
 import TierConfiguration from "./models/TierConfiguration";
 import TenantCustomFeatures from "./models/TenantCustomFeatures";
 import Subscription from "./models/Subscription";
-// import TenantProduct from "./models/TenantProduct";
 import {
   createJWTToken,
   authenticateJWT,
@@ -51,7 +50,7 @@ import {
 import TreatmentService from "./services/treatment.service";
 import PaymentService from "./services/payment.service";
 import ClinicService from "./services/clinic.service";
-import { processStripeWebhook } from "./services/stripe/webhook";
+import { getDefaultCustomWebsiteValues, getDefaultFooterValues, getDefaultSocialMediaValues } from "./utils/customWebsiteDefaults";
 import TreatmentProducts from "./models/TreatmentProducts";
 import TreatmentPlan, { BillingInterval } from "./models/TreatmentPlan";
 import ShippingOrder from "./models/ShippingOrder";
@@ -68,12 +67,6 @@ import QuestionnaireStepService from "./services/questionnaireStep.service";
 import QuestionService from "./services/question.service";
 import { StripeService } from "@fuse/stripe";
 import {
-  signInSchema,
-  signUpSchema,
-  forgotPasswordSchema,
-  resetPasswordSchema,
-  resetPasswordWithCodeSchema,
-  updateProfileSchema,
   clinicUpdateSchema,
   productCreateSchema,
   productUpdateSchema,
@@ -99,7 +92,6 @@ import {
   patientUpdateSchema,
   brandTreatmentSchema,
   organizationUpdateSchema,
-  // updateTenantProductPriceSchema,
   listProductsSchema,
 } from "@fuse/validators";
 import TreatmentPlanService from "./services/treatmentPlan.service";
@@ -115,7 +107,6 @@ import TenantProduct from "./models/TenantProduct";
 import FormProducts from "./models/FormProducts";
 import GlobalFormStructure from "./models/GlobalFormStructure";
 import Program from "./models/Program";
-// import QuestionnaireStep twice causes duplicate identifier; keep single import below
 import Question from "./models/Question";
 import QuestionOption from "./models/QuestionOption";
 import { assignTemplatesSchema } from "./validators/formTemplates";
@@ -123,21 +114,20 @@ import BrandTreatment from "./models/BrandTreatment";
 import Questionnaire from "./models/Questionnaire";
 import QuestionnaireCustomization from "./models/QuestionnaireCustomization";
 import CustomWebsite from "./models/CustomWebsite";
-import AffiliateProductImage from "./models/AffiliateProductImage";
 import TenantProductService from "./services/tenantProduct.service";
 import QuestionnaireStep from "./models/QuestionnaireStep";
-import DashboardService from "./services/dashboard.service";
 import DoctorPatientChats from "./models/DoctorPatientChats";
-import WebSocketService from "./services/websocket.service";
 import SmsService from "./services/sms.service";
-import { sequenceRoutes, webhookRoutes } from "./features/sequences";
-import { templateRoutes } from "./features/templates";
-import { contactRoutes } from "./features/contacts";
-import { tagRoutes } from "./features/tags";
+import { sequenceRoutes, webhookRoutes as sequenceWebhookRoutes } from "@endpoints/sequences";
+import dashboardRoutes from "@endpoints/dashboard/routes/dashboard.routes";
+import { templateRoutes } from "@endpoints/templates";
+import { contactRoutes } from "@endpoints/contacts";
+import { tagRoutes } from "@endpoints/tags";
+import ordersRoutes from "@endpoints/orders/routes/orders.routes";
+import payoutsRoutes from "@endpoints/payouts/routes/payouts.routes";
+import { stripeRoutes, webhookRoutes as stripeWebhookRoutes } from "@endpoints/stripe";
 import { GlobalFees } from "./models/GlobalFees";
 import { WebsiteBuilderConfigs, DEFAULT_FOOTER_DISCLAIMER } from "./models/WebsiteBuilderConfigs";
-import SupportTicket from "./models/SupportTicket";
-import TicketMessage from "./models/TicketMessage";
 
 // Helper function to fetch global fees from database
 async function getGlobalFees() {
@@ -399,11 +389,15 @@ app.use((req, res, next) => {
 
 // Register refactored routes
 app.use("/", sequenceRoutes);
-app.use("/", webhookRoutes);
+app.use("/", sequenceWebhookRoutes);
 app.use("/", templateRoutes);
 app.use("/", contactRoutes);
 app.use("/", tagRoutes);
-
+app.use("/", ordersRoutes);
+app.use("/", dashboardRoutes);
+app.use("/", stripeRoutes);
+app.use("/", stripeWebhookRoutes);
+app.use("/", payoutsRoutes);
 // Clone 'doctor' steps from master_template into a target questionnaire (preserve order)
 app.post(
   "/questionnaires/clone-doctor-from-master",
@@ -783,1087 +777,9 @@ app.post(
 // Health check endpoint
 app.get("/healthz", (_req, res) => res.status(200).send("ok"));
 
-// Auth routes
-app.post("/auth/signup", async (req, res) => {
-  try {
-    const validation = signUpSchema.safeParse(req.body);
-    if (!validation.success) {
-      return res.status(400).json({
-        success: false,
-        message: "Validation failed",
-        errors: validation.error.errors,
-      });
-    }
 
-    const {
-      firstName,
-      lastName,
-      email,
-      password,
-      role,
-      dateOfBirth,
-      dob,
-      gender,
-      phoneNumber,
-      clinicName,
-      clinicId,
-      website,
-      businessType,
-      npiNumber,
-      patientPortalDashboardFormat,
-      invitationSlug,
-    } = validation.data;
 
-    // Handle brand invitation if provided
-    let brandInvitation: BrandInvitation | null = null;
-    let isFixedMDILink = false;
 
-    if (invitationSlug && role === "brand") {
-      // Fixed MDI link - no need to check database
-      if (invitationSlug === "mdi") {
-        isFixedMDILink = true;
-      } else {
-        // Doctor invitation - check database
-        brandInvitation = await BrandInvitation.findOne({
-          where: { invitationSlug },
-          include: [
-            {
-              model: Clinic,
-              as: "doctorClinic",
-              required: false,
-            },
-          ],
-        });
-
-        if (brandInvitation) {
-          // Validate invitation is active and not expired
-          if (!brandInvitation.isActive) {
-            return res.status(410).json({
-              success: false,
-              message: "This invitation link is no longer active",
-            });
-          }
-
-          if (brandInvitation.expiresAt && new Date() > brandInvitation.expiresAt) {
-            return res.status(410).json({
-              success: false,
-              message: "This invitation link has expired",
-            });
-          }
-        } else {
-          return res.status(404).json({
-            success: false,
-            message: "Invalid invitation link",
-          });
-        }
-      }
-    }
-
-    // Validate clinic name for providers/brands (both require clinics)
-    if ((role === "provider" || role === "brand") && !clinicName?.trim()) {
-      return res.status(400).json({
-        success: false,
-        message: "Clinic name is required for providers and brand users",
-      });
-    }
-
-    if (process.env.NODE_ENV === "development") {
-      console.log("🔍 Checking if user exists");
-    }
-    const existingUser = await User.findByEmail(email);
-    if (existingUser) {
-      if (process.env.NODE_ENV === "development") {
-        console.log("❌ User already exists");
-      }
-      return res.status(409).json({
-        success: false,
-        message: "User with this email already exists",
-      });
-    }
-    if (process.env.NODE_ENV === "development") {
-      console.log("✅ No existing user found, proceeding with registration");
-    }
-
-    // Handle clinic association
-    let clinic: any = null;
-    let finalClinicId = clinicId; // Use provided clinicId from request body
-
-    // Create clinic if user is a healthcare provider and no clinicId provided
-    if ((role === "provider" || role === "brand") && clinicName && !clinicId) {
-      if (process.env.NODE_ENV === "development") {
-        console.log("🏥 Creating clinic");
-      }
-
-      // Generate unique slug
-      const slug = await generateUniqueSlug(clinicName.trim());
-
-      // Determine dashboard format based on invitation or default
-      let dashboardFormat: PatientPortalDashboardFormat;
-      if (isFixedMDILink) {
-        // Fixed MDI link - always use MD_INTEGRATIONS
-        dashboardFormat = PatientPortalDashboardFormat.MD_INTEGRATIONS;
-      } else if (brandInvitation) {
-        // Use format from invitation (doctor invitation)
-        dashboardFormat = brandInvitation.patientPortalDashboardFormat;
-      } else {
-        // For brand signup, default to MD_INTEGRATIONS format
-        // (can be changed later in Tenant Management portal if needed)
-        dashboardFormat =
-          patientPortalDashboardFormat === 'fuse'
-            ? PatientPortalDashboardFormat.FUSE
-            : PatientPortalDashboardFormat.MD_INTEGRATIONS;
-      }
-
-      clinic = await Clinic.create({
-        name: clinicName.trim(),
-        slug: slug,
-        logo: "", // Default empty logo, can be updated later
-        businessType: businessType || null,
-        patientPortalDashboardFormat: dashboardFormat,
-        // If this is a brand invitation from a doctor, set referrer doctor (but not the clinic relationship)
-        referrerDoctorId: brandInvitation?.invitationType === InvitationType.DOCTOR
-          ? brandInvitation.doctorId
-          : undefined,
-      });
-
-      // Note: Global form structures are created at database initialization (ensureDefaultFormStructures)
-
-      finalClinicId = clinic.id;
-      if (process.env.NODE_ENV === "development") {
-        console.log("✅ Clinic created successfully with ID:", clinic.id);
-      }
-
-      // Create default CustomWebsite for the new clinic
-      try {
-        await CustomWebsite.create({
-          clinicId: clinic.id,
-          portalTitle: "Welcome to Our Portal",
-          portalDescription: "Your trusted healthcare partner. Browse our products and services below.",
-          primaryColor: "#000000",
-          fontFamily: "Playfair Display",
-          logo: "",
-          heroImageUrl: "https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=1920&q=80",
-          heroTitle: "Your Daily Health, Simplified",
-          heroSubtitle: "All-in-one nutritional support in one simple drink",
-          isActive: true,
-          footerColor: "#000000",
-          footerCategories: [
-            {
-              name: "NAVIGATION LINKS",
-              visible: true,
-              urls: [
-                { label: "Bundles", url: "/#bundles" },
-                { label: "Programs", url: "/#programs" },
-                { label: "Performance", url: "/#performance" },
-                { label: "Weight Loss", url: "/#weightloss" },
-                { label: "Wellness", url: "/#wellness" }
-              ]
-            },
-            { name: "Section 2", visible: false, urls: [] },
-            { name: "Section 3", visible: false, urls: [] },
-            { name: "Section 4", visible: false, urls: [] }
-          ],
-          section1: "NAVIGATION LINKS",
-          section2: null,
-          section3: null,
-          section4: null,
-          socialMediaSection: "SOCIAL MEDIA",
-          useDefaultDisclaimer: true,
-          footerDisclaimer: null,
-          socialMediaLinks: {
-            instagram: { enabled: true, url: "" },
-            facebook: { enabled: true, url: "" },
-            twitter: { enabled: true, url: "" },
-            tiktok: { enabled: true, url: "" },
-            youtube: { enabled: true, url: "" }
-          }
-        });
-        if (process.env.NODE_ENV === "development") {
-          console.log("✅ CustomWebsite created for clinic:", clinic.id);
-        }
-      } catch (customWebsiteError) {
-        // Log but don't fail signup if CustomWebsite creation fails
-        console.error("⚠️ Failed to create CustomWebsite for clinic:", clinic.id, customWebsiteError);
-      }
-
-      if (process.env.NODE_ENV === "development") {
-        console.log("🚀 Creating new user");
-      }
-    } else if (clinicId) {
-      if (process.env.NODE_ENV === "development") {
-        console.log("🔗 Associating user with existing clinic ID:", clinicId);
-      }
-    }
-
-    // Map frontend role to backend role
-    let mappedRole: "patient" | "doctor" | "admin" | "brand" = "patient"; // default
-    if (role === "provider" || role === "doctor") {
-      mappedRole = "doctor";
-    } else if (role === "admin") {
-      mappedRole = "admin";
-    } else if (role === "brand") {
-      mappedRole = "brand";
-    }
-
-    // Create new user in database
-    if (process.env.NODE_ENV === "development") {
-      console.log("🚀 Creating new user");
-    }
-
-    const user = await User.createUser({
-      firstName,
-      lastName,
-      email,
-      password,
-      role: mappedRole,
-      dob: dob || dateOfBirth, // Support both dob and dateOfBirth
-      gender: gender ? String(gender).toLowerCase() : undefined,
-      phoneNumber,
-      website,
-      businessType,
-    });
-
-    // Set NPI number for doctors if provided
-    if (npiNumber && mappedRole === "doctor") {
-      user.npiNumber = npiNumber;
-      await user.save();
-    }
-
-    const isDevelopment = process.env.NODE_ENV === "development";
-
-    if (isDevelopment) {
-      console.log("🧪 Development mode detected: auto-activating new user");
-      await user.update({
-        activated: true,
-        activationToken: null,
-        activationTokenExpiresAt: null,
-      });
-    }
-
-    // Associate user with clinic if one is provided
-    if (finalClinicId) {
-      user.clinicId = finalClinicId;
-      await user.save();
-      if (process.env.NODE_ENV === "development") {
-        console.log("🔗 User associated with clinic ID:", finalClinicId);
-      }
-    }
-
-    // Update invitation usage count if invitation was used (only for doctor invitations, not fixed MDI link)
-    if (brandInvitation && role === "brand" && !isFixedMDILink) {
-      brandInvitation.usageCount += 1;
-      await brandInvitation.save();
-      if (process.env.NODE_ENV === "development") {
-        console.log("✅ Brand invitation usage count updated:", brandInvitation.usageCount);
-      }
-    }
-
-    if (process.env.NODE_ENV === "development") {
-      console.log("✅ User created successfully with ID:", user.id);
-    }
-
-    // Generate activation token and send verification email
-    const activationToken = user.generateActivationToken();
-    await user.save();
-
-    if (process.env.NODE_ENV === "development") {
-      console.log("🔑 Generated activation token for user");
-    }
-
-    // Get the frontend origin from the request to send the verification link to the correct portal
-    const frontendOrigin =
-      req.get("origin") || req.get("referer")?.split("/").slice(0, 3).join("/");
-    if (process.env.NODE_ENV === "development") {
-      console.log("🌐 Frontend origin detected");
-    }
-
-    // Send different emails based on role
-    let emailSent = false;
-    if (mappedRole === "doctor") {
-      // Doctors get a "pending review" email instead of activation email
-      emailSent = await MailsSender.sendDoctorApplicationPendingEmail(
-        user.email,
-        user.firstName
-      );
-      if (emailSent) {
-        console.log("📧 Doctor application pending email sent successfully");
-      } else {
-        console.log("❌ Failed to send doctor application pending email, but user was created");
-      }
-    } else {
-      // Other roles get standard verification email
-      emailSent = await MailsSender.sendVerificationEmail(
-        user.email,
-        activationToken,
-        user.firstName,
-        frontendOrigin
-      );
-      if (emailSent) {
-        console.log("📧 Verification email sent successfully");
-      } else {
-        console.log("❌ Failed to send verification email, but user was created");
-      }
-    }
-
-    // HIPAA Audit: Log account creation
-    await AuditService.log({
-      userId: user.id,
-      userEmail: user.email,
-      action: AuditAction.CREATE,
-      resourceType: AuditResourceType.USER,
-      resourceId: user.id,
-      ipAddress: AuditService.getClientIp(req),
-      details: { role: mappedRole, clinicId: finalClinicId },
-      success: true,
-    });
-
-    res.status(201).json({
-      success: true,
-      message:
-        "User registered successfully. Please check your email to activate your account.",
-      user: user.toSafeJSON(), // Return safe user data
-      emailSent: emailSent,
-    });
-  } catch (error: any) {
-    // HIPAA Compliance: Don't log the actual error details that might contain PHI
-    if (process.env.NODE_ENV === "development") {
-      console.error("Registration error occurred:", error.name);
-    } else {
-      console.error("Registration error occurred");
-    }
-
-    // Handle specific database errors
-    if (error.name === "SequelizeUniqueConstraintError") {
-      return res.status(409).json({
-        success: false,
-        message: "User with this email already exists",
-      });
-    }
-
-    if (error.name === "SequelizeValidationError") {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid user data provided",
-      });
-    }
-
-    res.status(500).json({
-      success: false,
-      message: "Registration failed. Please try again.",
-    });
-  }
-});
-
-// Google OAuth - Initiate login
-app.get("/auth/google/login", (req, res) => {
-  const returnUrl = (req.query.returnUrl as string) || "http://localhost:3000";
-  const clinicId = (req.query.clinicId as string) || "";
-
-  // Store return URL and clinic ID in state parameter
-  const state = Buffer.from(JSON.stringify({ returnUrl, clinicId })).toString(
-    "base64"
-  );
-
-  const googleAuthUrl =
-    `https://accounts.google.com/o/oauth2/v2/auth?` +
-    `client_id=${process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID}` +
-    `&redirect_uri=${encodeURIComponent(process.env.GOOGLE_REDIRECT_URI || "http://localhost:3001/auth/google/callback")}` +
-    `&response_type=code` +
-    `&scope=email%20profile` +
-    `&state=${state}`;
-
-  console.log("🔐 Redirecting to Google OAuth:", googleAuthUrl);
-  res.redirect(googleAuthUrl);
-});
-
-// Google OAuth - Handle callback
-app.get("/auth/google/callback", async (req, res) => {
-  try {
-    const code = req.query.code as string;
-    const state = req.query.state as string;
-
-    if (!code) {
-      return res.status(400).send("Authorization code missing");
-    }
-
-    // Decode state to get return URL and clinic ID
-    const { returnUrl, clinicId } = JSON.parse(
-      Buffer.from(state, "base64").toString()
-    );
-
-    // Exchange code for access token
-    const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        code,
-        client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!,
-        client_secret: process.env.GOOGLE_CLIENT_SECRET!,
-        redirect_uri:
-          process.env.GOOGLE_REDIRECT_URI ||
-          "http://localhost:3001/auth/google/callback",
-        grant_type: "authorization_code",
-      }),
-    });
-
-    const tokenData = (await tokenResponse.json()) as {
-      access_token?: string;
-      error?: string;
-    };
-
-    if (!tokenData.access_token) {
-      throw new Error("Failed to get access token");
-    }
-
-    // Get user info from Google
-    const userInfoResponse = await fetch(
-      "https://www.googleapis.com/oauth2/v2/userinfo",
-      {
-        headers: { Authorization: `Bearer ${tokenData.access_token}` },
-      }
-    );
-
-    const googleUser = (await userInfoResponse.json()) as {
-      email?: string;
-      given_name?: string;
-      family_name?: string;
-    };
-
-    if (process.env.NODE_ENV === "development") {
-      console.log("👤 Google user info received");
-    }
-
-    const email = googleUser.email || "";
-    const firstName = googleUser.given_name || "";
-    const lastName = googleUser.family_name || "";
-
-    if (!email) {
-      throw new Error("Email not provided by Google");
-    }
-
-    // Check if user exists
-    let user = await User.findByEmail(email);
-
-    if (!user) {
-      if (process.env.NODE_ENV === "development") {
-        console.log("🆕 Creating new user via Google");
-      }
-
-      // Create new user with Google account
-      try {
-        // Generate a random password and hash it
-        const randomPassword = Math.random().toString(36).slice(-16) + "Aa1!";
-        const passwordHash = await User.hashPassword(randomPassword);
-
-        user = await User.create({
-          email: email.toLowerCase().trim(),
-          firstName,
-          lastName,
-          role: "patient",
-          activated: true, // Google accounts are pre-verified
-          passwordHash, // Pass the hashed password
-          clinicId: clinicId || null,
-        });
-
-        if (process.env.NODE_ENV === "development") {
-          console.log("✅ New user created via Google");
-        }
-      } catch (createError) {
-        if (process.env.NODE_ENV === "development") {
-          console.error("❌ Failed to create user:", createError);
-        } else {
-          console.error("❌ Failed to create user");
-        }
-        throw createError;
-      }
-    } else {
-      if (process.env.NODE_ENV === "development") {
-        console.log("👤 Existing user found");
-      }
-    }
-
-    // Load UserRoles for the user
-    await user.getUserRoles();
-
-    // SuperAdmin bypass: Skip MFA entirely for superAdmin users
-    if (user.userRoles?.superAdmin === true) {
-      // Update last login time
-      await user.updateLastLogin();
-
-      // Create JWT token
-      const token = createJWTToken(user);
-
-      console.log(
-        `🔓 SuperAdmin bypass (Google callback): MFA skipped for user ${user.id}`
-      );
-
-      // Redirect back to frontend with token
-      const redirectUrl = `${returnUrl}?googleAuth=success&skipAccount=true&token=${token}&user=${encodeURIComponent(JSON.stringify(user.toSafeJSON()))}`;
-      console.log("🔗 Redirecting to:", redirectUrl);
-      return res.redirect(redirectUrl);
-    }
-
-    // Google OAuth: Skip MFA - Google already provides strong authentication
-    // Update last login time
-    await user.updateLastLogin();
-
-    // Create JWT token
-    const token = createJWTToken(user);
-
-    if (process.env.NODE_ENV === "development") {
-      console.log(`🔓 Google OAuth: MFA skipped for user ${user.id}`);
-    }
-
-    // HIPAA Audit: Log successful Google OAuth login
-    await AuditService.logLogin(req, {
-      id: user.id,
-      email: user.email,
-      clinicId: user.clinicId,
-    });
-
-    // Redirect back to frontend with token
-    const redirectUrl = `${returnUrl}?googleAuth=success&skipAccount=true&token=${token}&user=${encodeURIComponent(JSON.stringify(user.toSafeJSON()))}`;
-    if (process.env.NODE_ENV === "development") {
-      console.log("🔗 Redirecting with token");
-    }
-    res.redirect(redirectUrl);
-  } catch (error) {
-    // HIPAA: Do not log detailed error information in production
-    if (process.env.NODE_ENV === "development") {
-      console.error("❌ Google OAuth callback error:", error);
-    } else {
-      console.error("❌ Google OAuth callback error occurred");
-    }
-    const returnUrl = req.query.state
-      ? JSON.parse(Buffer.from(req.query.state as string, "base64").toString())
-        .returnUrl
-      : "http://localhost:3000";
-    res.redirect(`${returnUrl}?googleAuth=error`);
-  }
-});
-
-// Google OAuth sign-in (kept for backward compatibility with frontend modal)
-app.post("/auth/google", async (req, res) => {
-  try {
-    const { credential, clinicId } = req.body;
-
-    if (!credential) {
-      return res.status(400).json({
-        success: false,
-        message: "Google credential is required",
-      });
-    }
-
-    // Verify Google token (you'll need to add google-auth-library)
-    // For now, decode the JWT to get user info
-    const base64Url = credential.split(".")[1];
-    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
-    const jsonPayload = decodeURIComponent(
-      Buffer.from(base64, "base64")
-        .toString()
-        .split("")
-        .map(function (c) {
-          return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
-        })
-        .join("")
-    );
-
-    const payload = JSON.parse(jsonPayload);
-    const email = payload.email;
-    const firstName = payload.given_name || "";
-    const lastName = payload.family_name || "";
-
-    // Check if user exists
-    let user = await User.findByEmail(email);
-
-    if (!user) {
-      // Create new user with Google account using createUser to automatically create UserRoles
-      user = await User.createUser({
-        email,
-        firstName,
-        lastName,
-        password: Math.random().toString(36).slice(-16) + "Aa1!", // Random password (won't be used)
-        role: "patient",
-      });
-
-      // Set additional fields
-      user.activated = true; // Google accounts are pre-verified
-      user.clinicId = clinicId || null;
-      await user.save();
-
-      if (process.env.NODE_ENV === "development") {
-        console.log("✅ New user created via Google");
-      }
-    }
-
-    // Load UserRoles for the user
-    await user.getUserRoles();
-
-    // SuperAdmin bypass: Skip MFA entirely for superAdmin users
-    if (user.userRoles?.superAdmin === true) {
-      // Update last login time
-      await user.updateLastLogin();
-
-      // Create JWT token directly
-      const token = createJWTToken(user);
-
-      if (process.env.NODE_ENV === "development") {
-        console.log(`🔓 SuperAdmin bypass: MFA skipped for user ${user.id}`);
-      }
-
-      return res.status(200).json({
-        success: true,
-        requiresMfa: false,
-        token: token,
-        user: user.toSafeJSON(),
-        message: "Authentication successful",
-      });
-    }
-
-    // Google OAuth: Skip MFA - Google already provides strong authentication
-    // Update last login time
-    await user.updateLastLogin();
-
-    // Create JWT token directly
-    const token = createJWTToken(user);
-
-    if (process.env.NODE_ENV === "development") {
-      console.log(`🔓 Google OAuth: MFA skipped for user ${user.id}`);
-    }
-
-    // HIPAA Audit: Log successful Google OAuth login
-    await AuditService.logLogin(req, {
-      id: user.id,
-      email: user.email,
-      clinicId: user.clinicId,
-    });
-
-    // Return success with token
-    res.status(200).json({
-      success: true,
-      requiresMfa: false,
-      token: token,
-      user: user.toSafeJSON(),
-      message: "Authentication successful",
-    });
-  } catch (error) {
-    // HIPAA: Do not log detailed errors in production
-    if (process.env.NODE_ENV === "development") {
-      console.error("❌ Google authentication error:", error);
-    } else {
-      console.error("❌ Google authentication error");
-    }
-    res.status(500).json({
-      success: false,
-      message: "Google authentication failed. Please try again.",
-    });
-  }
-});
-
-app.post("/auth/signin", async (req, res) => {
-  try {
-    // Validate request body
-    const validation = signInSchema.safeParse(req.body);
-
-    if (!validation.success) {
-      return res.status(400).json({
-        success: false,
-        message: "Validation failed",
-        errors: validation.error.format(),
-      });
-    }
-
-    const { email, password } = validation.data;
-
-    // Find user by email
-    const user = await User.findByEmail(email);
-    if (!user) {
-      // HIPAA Audit: Log failed login attempt (user not found)
-      await AuditService.logLoginFailed(req, email, "User not found");
-      return res.status(401).json({
-        success: false,
-        message: "Invalid email or password",
-      });
-    }
-
-    // Load UserRoles for the user
-    await user.getUserRoles();
-
-    // Validate password (permanent or temporary)
-    const isValidPassword = await user.validateAnyPassword(password);
-    if (!isValidPassword) {
-      // HIPAA Audit: Log failed login attempt (wrong password)
-      await AuditService.logLoginFailed(req, email, "Invalid password");
-      return res.status(401).json({
-        success: false,
-        message: "Invalid email or password",
-      });
-    }
-
-    // Check if user account is activated
-    if (!user.activated) {
-      // HIPAA Audit: Log failed login attempt (not activated)
-      await AuditService.logLoginFailed(req, email, "Account not activated");
-      return res.status(401).json({
-        success: false,
-        message:
-          "Please check your email and activate your account before signing in.",
-        needsActivation: true,
-      });
-    }
-
-    // Check if doctor is approved
-    if (user.role === "doctor" && !user.isApprovedDoctor) {
-      // HIPAA Audit: Log failed login attempt (doctor not approved)
-      await AuditService.logLoginFailed(req, email, "Doctor account pending approval");
-      return res.status(403).json({
-        success: false,
-        message:
-          "Your doctor application is currently under review. You will receive an email once your account is approved and you can access the Doctor Portal.",
-        pendingApproval: true,
-      });
-    }
-
-    // SuperAdmin bypass: Skip MFA entirely for superAdmin users
-    if (user.userRoles?.superAdmin === true) {
-      // Update last login time
-      await user.updateLastLogin();
-
-      // Create JWT token directly
-      const token = createJWTToken(user);
-
-      if (process.env.NODE_ENV === "development") {
-        console.log(`🔓 SuperAdmin bypass: MFA skipped for user ${user.id}`);
-      }
-
-      return res.status(200).json({
-        success: true,
-        requiresMfa: false,
-        token: token,
-        user: user.toSafeJSON(),
-        message: "Signed in successfully",
-      });
-    }
-
-    // HIPAA MFA: Generate OTP code and require verification
-    const otpCode = MfaToken.generateCode();
-    const mfaSessionToken = MfaToken.generateMfaToken();
-    const expiresAt = MfaToken.getExpirationTime();
-
-    // Delete any existing MFA tokens for this user (cleanup)
-    await MfaToken.destroy({ where: { userId: user.id } });
-
-    // Create new MFA token record
-    await MfaToken.create({
-      userId: user.id,
-      code: otpCode,
-      mfaToken: mfaSessionToken,
-      expiresAt,
-      email: user.email,
-      verified: false,
-      resendCount: 0,
-      failedAttempts: 0,
-    });
-
-    // Send OTP email
-    const emailSent = await MailsSender.sendMfaCode(
-      user.email,
-      otpCode,
-      user.firstName
-    );
-
-    if (!emailSent) {
-      console.error("❌ Failed to send MFA code email");
-      return res.status(500).json({
-        success: false,
-        message: "Failed to send verification code. Please try again.",
-      });
-    }
-
-    // HIPAA Audit: Log MFA code sent
-    await AuditService.log({
-      action: AuditAction.MFA_CODE_SENT,
-      resourceType: AuditResourceType.USER,
-      resourceId: user.id,
-      userId: user.id,
-      clinicId: user.clinicId,
-      details: { email: user.email },
-      ipAddress: req.ip || req.connection?.remoteAddress,
-      userAgent: req.headers["user-agent"],
-    });
-
-    if (process.env.NODE_ENV === "development") {
-      console.log("🔐 MFA code sent");
-    }
-
-    // Return MFA required response (don't give JWT yet)
-    res.status(200).json({
-      success: true,
-      requiresMfa: true,
-      mfaToken: mfaSessionToken,
-      message: "Verification code sent to your email",
-    });
-  } catch (error: any) {
-    // Temporarily log detailed error for debugging
-    console.error("❌ Authentication error occurred:", {
-      message: error?.message,
-      name: error?.name,
-      stack: error?.stack?.split('\n').slice(0, 5).join('\n'),
-    });
-    res.status(500).json({
-      success: false,
-      message: "Authentication failed. Please try again.",
-    });
-  }
-});
-
-// MFA Verify endpoint - verify OTP code and issue JWT token
-app.post("/auth/mfa/verify", async (req, res) => {
-  try {
-    const { mfaToken, code } = req.body;
-
-    if (!mfaToken || !code) {
-      return res.status(400).json({
-        success: false,
-        message: "MFA token and verification code are required",
-      });
-    }
-
-    // Find the MFA token record
-    const mfaRecord = await MfaToken.findOne({
-      where: { mfaToken },
-      include: [{ model: User, as: "user" }],
-    });
-
-    if (!mfaRecord) {
-      return res.status(401).json({
-        success: false,
-        message:
-          "Invalid or expired verification session. Please sign in again.",
-      });
-    }
-
-    // Check if expired
-    if (mfaRecord.isExpired()) {
-      await mfaRecord.destroy();
-      return res.status(401).json({
-        success: false,
-        message: "Verification code has expired. Please sign in again.",
-        expired: true,
-      });
-    }
-
-    // Check if rate limited
-    if (mfaRecord.isRateLimited()) {
-      // HIPAA Audit: Log rate limit
-      await AuditService.log({
-        action: AuditAction.MFA_FAILED,
-        resourceType: AuditResourceType.USER,
-        resourceId: mfaRecord.userId,
-        userId: mfaRecord.userId,
-        details: { reason: "rate_limited", email: mfaRecord.email },
-        ipAddress: req.ip || req.connection?.remoteAddress,
-        userAgent: req.headers["user-agent"],
-        success: false,
-      });
-
-      return res.status(429).json({
-        success: false,
-        message: "Too many failed attempts. Please sign in again.",
-        rateLimited: true,
-      });
-    }
-
-    // Verify the code
-    if (mfaRecord.code !== code.trim()) {
-      // Increment failed attempts
-      mfaRecord.failedAttempts += 1;
-      await mfaRecord.save();
-
-      // HIPAA Audit: Log failed MFA attempt
-      await AuditService.log({
-        action: AuditAction.MFA_FAILED,
-        resourceType: AuditResourceType.USER,
-        resourceId: mfaRecord.userId,
-        userId: mfaRecord.userId,
-        details: {
-          reason: "invalid_code",
-          email: mfaRecord.email,
-          attempts: mfaRecord.failedAttempts,
-        },
-        ipAddress: req.ip || req.connection?.remoteAddress,
-        userAgent: req.headers["user-agent"],
-        success: false,
-      });
-
-      return res.status(401).json({
-        success: false,
-        message: "Invalid verification code. Please try again.",
-        attemptsRemaining: 5 - mfaRecord.failedAttempts,
-      });
-    }
-
-    // Code is valid - get the user
-    const user = mfaRecord.user || (await User.findByPk(mfaRecord.userId));
-    if (!user) {
-      await mfaRecord.destroy();
-      return res.status(401).json({
-        success: false,
-        message: "User not found. Please sign in again.",
-      });
-    }
-
-    // Load UserRoles
-    await user.getUserRoles();
-
-    // Mark MFA as verified and delete the record
-    await mfaRecord.destroy();
-
-    // Update last login time
-    await user.updateLastLogin();
-
-    // Create JWT token
-    const token = createJWTToken(user);
-
-    // HIPAA Audit: Log successful MFA verification
-    await AuditService.log({
-      action: AuditAction.MFA_VERIFIED,
-      resourceType: AuditResourceType.USER,
-      resourceId: user.id,
-      userId: user.id,
-      clinicId: user.clinicId,
-      details: { email: user.email },
-      ipAddress: req.ip || req.connection?.remoteAddress,
-      userAgent: req.headers["user-agent"],
-    });
-
-    // HIPAA Audit: Log successful login (after MFA)
-    await AuditService.logLogin(req, {
-      id: user.id,
-      email: user.email,
-      clinicId: user.clinicId,
-    });
-
-    if (process.env.NODE_ENV === "development") {
-      console.log("✅ MFA verified for user:", user.id);
-    }
-
-    res.status(200).json({
-      success: true,
-      message: "Authentication successful",
-      token: token,
-      user: user.toSafeJSON(),
-    });
-  } catch (error) {
-    // HIPAA: Do not log detailed errors in production
-    if (process.env.NODE_ENV === "development") {
-      console.error("❌ MFA verification error:", error);
-    } else {
-      console.error("❌ MFA verification error");
-    }
-    res.status(500).json({
-      success: false,
-      message: "Verification failed. Please try again.",
-    });
-  }
-});
-
-// MFA Resend endpoint - resend OTP code
-app.post("/auth/mfa/resend", async (req, res) => {
-  try {
-    const { mfaToken } = req.body;
-
-    if (!mfaToken) {
-      return res.status(400).json({
-        success: false,
-        message: "MFA token is required",
-      });
-    }
-
-    // Find the MFA token record
-    const mfaRecord = await MfaToken.findOne({
-      where: { mfaToken },
-      include: [{ model: User, as: "user" }],
-    });
-
-    if (!mfaRecord) {
-      return res.status(401).json({
-        success: false,
-        message:
-          "Invalid or expired verification session. Please sign in again.",
-      });
-    }
-
-    // Check if can resend (max 3 resends)
-    if (!mfaRecord.canResend()) {
-      return res.status(429).json({
-        success: false,
-        message: "Maximum resend attempts reached. Please sign in again.",
-        maxResends: true,
-      });
-    }
-
-    // Generate new code and extend expiration
-    const newCode = MfaToken.generateCode();
-    mfaRecord.code = newCode;
-    mfaRecord.expiresAt = MfaToken.getExpirationTime();
-    mfaRecord.resendCount += 1;
-    mfaRecord.failedAttempts = 0; // Reset failed attempts on resend
-    await mfaRecord.save();
-
-    // Send new OTP email
-    const user = mfaRecord.user || (await User.findByPk(mfaRecord.userId));
-    const emailSent = await MailsSender.sendMfaCode(
-      mfaRecord.email,
-      newCode,
-      user?.firstName
-    );
-
-    if (!emailSent) {
-      console.error("❌ Failed to resend MFA code to:", mfaRecord.email);
-      return res.status(500).json({
-        success: false,
-        message: "Failed to send verification code. Please try again.",
-      });
-    }
-
-    // HIPAA Audit: Log MFA code resend
-    await AuditService.log({
-      action: AuditAction.MFA_RESEND,
-      resourceType: AuditResourceType.USER,
-      resourceId: mfaRecord.userId,
-      userId: mfaRecord.userId,
-      details: { email: mfaRecord.email, resendCount: mfaRecord.resendCount },
-      ipAddress: req.ip || req.connection?.remoteAddress,
-      userAgent: req.headers["user-agent"],
-    });
-
-    if (process.env.NODE_ENV === "development") {
-      console.log(
-        "🔐 MFA code resent (attempt",
-        mfaRecord.resendCount,
-        "of 3)"
-      );
-    }
-
-    res.status(200).json({
-      success: true,
-      message: "New verification code sent to your email",
-      resendsRemaining: 3 - mfaRecord.resendCount,
-    });
-  } catch (error) {
-    // HIPAA: Do not log detailed errors in production
-    if (process.env.NODE_ENV === "development") {
-      console.error("❌ MFA resend error:", error);
-    } else {
-      console.error("❌ MFA resend error");
-    }
-    res.status(500).json({
-      success: false,
-      message: "Failed to resend code. Please try again.",
-    });
-  }
-});
 
 // ========================================
 // Doctor Applications Management Endpoints
@@ -2032,6 +948,7 @@ app.get("/admin/doctor-applications", authenticateJWT, async (req, res) => {
         "email",
         "phoneNumber",
         "npiNumber",
+        "doctorLicenseStatesCoverage",
         "createdAt",
         "activated",
         "website",
@@ -2062,6 +979,86 @@ app.get("/admin/doctor-applications", authenticateJWT, async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to fetch doctor applications",
+    });
+  }
+});
+
+// Get all approved doctors
+app.get("/admin/approved-doctors", authenticateJWT, async (req, res) => {
+  try {
+    const currentUser = (req as any).user;
+
+    if (!currentUser) {
+      return res.status(401).json({
+        success: false,
+        message: "Not authenticated",
+      });
+    }
+
+    // Load full user with roles
+    const user = await User.findByPk(currentUser.userId, {
+      include: [{ model: UserRoles, as: "userRoles" }],
+    });
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Only admin, superAdmin, or brand can access approved doctors
+    if (!user.hasAnyRoleSync(["admin", "superAdmin", "brand"])) {
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized: Only admins or brand users can view approved doctors",
+      });
+    }
+
+    // Get all users with doctor role who are approved
+    const approvedDoctors = await User.findAll({
+      where: {
+        role: "doctor",
+        isApprovedDoctor: true,
+      },
+      attributes: [
+        "id",
+        "firstName",
+        "lastName",
+        "email",
+        "phoneNumber",
+        "npiNumber",
+        "doctorLicenseStatesCoverage",
+        "createdAt",
+        "activated",
+        "website",
+        "businessType",
+        "city",
+        "state",
+        "isApprovedDoctor",
+      ],
+      order: [["createdAt", "DESC"]],
+    });
+
+    if (process.env.NODE_ENV === "development") {
+      console.log(`✅ Found ${approvedDoctors.length} approved doctors`);
+    }
+
+    res.status(200).json({
+      success: true,
+      data: approvedDoctors,
+      count: approvedDoctors.length,
+    });
+  } catch (error) {
+    // HIPAA: Do not log detailed errors in production
+    if (process.env.NODE_ENV === "development") {
+      console.error("❌ Error fetching approved doctors:", error);
+    } else {
+      console.error("❌ Error fetching approved doctors");
+    }
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch approved doctors",
     });
   }
 });
@@ -2223,773 +1220,6 @@ setInterval(
   5 * 60 * 1000
 );
 
-// Send verification code to email
-app.post("/auth/send-verification-code", async (req, res) => {
-  try {
-    const { email } = req.body;
-
-    if (!email || typeof email !== "string") {
-      return res.status(400).json({
-        success: false,
-        message: "Email is required",
-      });
-    }
-
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid email format",
-      });
-    }
-
-    // Generate 6-digit code
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-
-    // Store code with 10-minute expiration
-    const expiresAt = Date.now() + 10 * 60 * 1000;
-
-    // Check if user exists to personalize email
-    let firstName: string | undefined;
-    try {
-      const existingUser = await User.findByEmail(email);
-      if (existingUser) {
-        firstName = existingUser.firstName;
-      }
-    } catch (error) {
-      // Continue even if user lookup fails
-      if (process.env.NODE_ENV === "development") {
-        console.error("❌ User lookup failed, sending generic email:", error);
-      } else {
-        console.error("❌ User lookup failed, sending generic email");
-      }
-    }
-
-    verificationCodes.set(email.toLowerCase(), { code, expiresAt, firstName });
-
-    // Send email with code
-    const emailSent = await MailsSender.sendVerificationCode(
-      email,
-      code,
-      firstName
-    );
-
-    if (!emailSent) {
-      return res.status(500).json({
-        success: false,
-        message: "Failed to send verification code. Please try again.",
-      });
-    }
-
-    if (process.env.NODE_ENV === "development") {
-      console.log("✅ Verification code sent");
-    }
-
-    res.status(200).json({
-      success: true,
-      message: "Verification code sent to your email",
-    });
-  } catch (error) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("❌ Send verification code error:", error);
-    } else {
-      console.error("❌ Send verification code error");
-    }
-    res.status(500).json({
-      success: false,
-      message: "Failed to send verification code. Please try again.",
-    });
-  }
-});
-
-// Verify code and sign in
-app.post("/auth/verify-code", async (req, res) => {
-  try {
-    const { email, code } = req.body;
-
-    if (!email || !code) {
-      return res.status(400).json({
-        success: false,
-        message: "Email and code are required",
-      });
-    }
-
-    // Get stored code
-    const storedData = verificationCodes.get(email.toLowerCase());
-
-    if (!storedData) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid or expired verification code",
-      });
-    }
-
-    // Check if code is expired
-    if (storedData.expiresAt < Date.now()) {
-      verificationCodes.delete(email.toLowerCase());
-      return res.status(401).json({
-        success: false,
-        message: "Verification code has expired. Please request a new one.",
-      });
-    }
-
-    // Verify code
-    if (storedData.code !== code.trim()) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid verification code",
-      });
-    }
-
-    // Code is valid - delete it
-    verificationCodes.delete(email.toLowerCase());
-
-    // Check if user exists
-    const user = await User.findByEmail(email);
-
-    if (user) {
-      // User exists - sign them in
-
-      // Check if user account is activated
-      if (!user.activated) {
-        return res.status(401).json({
-          success: false,
-          message:
-            "Please check your email and activate your account before signing in.",
-          needsActivation: true,
-        });
-      }
-
-      // Update last login time
-      await user.updateLastLogin();
-
-      // Create JWT token
-      const token = createJWTToken(user);
-
-      if (process.env.NODE_ENV === "development") {
-        console.log("✅ User signed in via verification code");
-      }
-
-      return res.status(200).json({
-        success: true,
-        message: "Signed in successfully",
-        token: token,
-        user: user.toSafeJSON(),
-        isExistingUser: true,
-      });
-    } else {
-      if (process.env.NODE_ENV === "development") {
-        console.log("✅ Verification successful for new user");
-      }
-
-      return res.status(200).json({
-        success: true,
-        message: "Email verified successfully",
-        email: email,
-        isExistingUser: false,
-      });
-    }
-  } catch (error) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("❌ Verify code error:", error);
-    } else {
-      console.error("❌ Verify code error");
-    }
-
-    res.status(500).json({
-      success: false,
-      message: "Verification failed. Please try again.",
-    });
-  }
-});
-
-// Forgot password - send reset code
-app.post("/auth/forgot-password", async (req, res) => {
-  try {
-    const validation = forgotPasswordSchema.safeParse(req.body);
-
-    if (!validation.success) {
-      return res.status(400).json({
-        success: false,
-        message: "Validation failed",
-        errors: validation.error.format(),
-      });
-    }
-
-    const { email } = validation.data;
-
-    // Find user by email
-    const user = await User.findByEmail(email);
-
-    // For security, don't reveal if user exists or not
-    // Always return success message, but only send email if user exists
-    if (user) {
-      // Check if user is activated
-      if (!user.activated) {
-        return res.status(200).json({
-          success: true,
-          message: "If an account exists with this email, a reset code has been sent.",
-        });
-      }
-
-      // Generate 6-digit code
-      const code = Math.floor(100000 + Math.random() * 900000).toString();
-
-      // Store code with 10-minute expiration
-      const expiresAt = Date.now() + 10 * 60 * 1000;
-
-      passwordResetCodes.set(email.toLowerCase(), {
-        code,
-        expiresAt,
-        firstName: user.firstName,
-        verified: false,
-      });
-
-      // Send email with code
-      const emailSent = await MailsSender.sendPasswordResetCode(
-        email,
-        code,
-        user.firstName
-      );
-
-      if (!emailSent) {
-        return res.status(500).json({
-          success: false,
-          message: "Failed to send reset code. Please try again.",
-        });
-      }
-
-      // HIPAA Audit: Log password reset request
-      await AuditService.log({
-        userId: user.id,
-        userEmail: user.email,
-        action: AuditAction.PASSWORD_RESET,
-        resourceType: AuditResourceType.USER,
-        resourceId: user.id,
-        ipAddress: AuditService.getClientIp(req),
-        userAgent: req.headers["user-agent"],
-        details: { email: user.email },
-      });
-
-      if (process.env.NODE_ENV === "development") {
-        console.log("✅ Password reset code sent");
-      }
-    }
-
-    // Always return success for security (don't reveal if user exists)
-    res.status(200).json({
-      success: true,
-      message: "If an account exists with this email, a reset code has been sent.",
-    });
-  } catch (error) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("❌ Forgot password error:", error);
-    } else {
-      console.error("❌ Forgot password error");
-    }
-    res.status(500).json({
-      success: false,
-      message: "Failed to process password reset request. Please try again.",
-    });
-  }
-});
-
-// Verify reset code
-app.post("/auth/verify-reset-code", async (req, res) => {
-  try {
-    const { email, code } = req.body;
-
-    if (!email || !code) {
-      return res.status(400).json({
-        success: false,
-        message: "Email and code are required",
-      });
-    }
-
-    // Get stored code
-    const storedData = passwordResetCodes.get(email.toLowerCase());
-
-    if (!storedData) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid or expired reset code",
-      });
-    }
-
-    // Check if code is expired
-    if (storedData.expiresAt < Date.now()) {
-      passwordResetCodes.delete(email.toLowerCase());
-      return res.status(401).json({
-        success: false,
-        message: "Reset code has expired. Please request a new one.",
-      });
-    }
-
-    // Verify code
-    if (storedData.code !== code.trim()) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid reset code",
-      });
-    }
-
-    // Mark code as verified
-    storedData.verified = true;
-    passwordResetCodes.set(email.toLowerCase(), storedData);
-
-    if (process.env.NODE_ENV === "development") {
-      console.log("✅ Password reset code verified");
-    }
-
-    res.status(200).json({
-      success: true,
-      message: "Code verified successfully",
-    });
-  } catch (error) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("❌ Verify reset code error:", error);
-    } else {
-      console.error("❌ Verify reset code error");
-    }
-    res.status(500).json({
-      success: false,
-      message: "Verification failed. Please try again.",
-    });
-  }
-});
-
-// Reset password with verified code
-app.post("/auth/reset-password", async (req, res) => {
-  try {
-    const validation = resetPasswordWithCodeSchema.safeParse(req.body);
-
-    if (!validation.success) {
-      return res.status(400).json({
-        success: false,
-        message: "Validation failed",
-        errors: validation.error.format(),
-      });
-    }
-
-    const { email, code, password } = validation.data;
-
-    // Get stored code
-    const storedData = passwordResetCodes.get(email.toLowerCase());
-
-    if (!storedData) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid or expired reset code",
-      });
-    }
-
-    // Check if code is expired
-    if (storedData.expiresAt < Date.now()) {
-      passwordResetCodes.delete(email.toLowerCase());
-      return res.status(401).json({
-        success: false,
-        message: "Reset code has expired. Please request a new one.",
-      });
-    }
-
-    // Verify code matches
-    if (storedData.code !== code.trim()) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid reset code",
-      });
-    }
-
-    // Check if code was verified
-    if (!storedData.verified) {
-      return res.status(401).json({
-        success: false,
-        message: "Code must be verified first",
-      });
-    }
-
-    // Find user
-    const user = await User.findByEmail(email);
-    if (!user) {
-      // For security, don't reveal if user exists
-      passwordResetCodes.delete(email.toLowerCase());
-      return res.status(401).json({
-        success: false,
-        message: "Invalid or expired reset code",
-      });
-    }
-
-    // Hash new password
-    const passwordHash = await User.hashPassword(password);
-
-    // Update user password
-    await user.update({
-      passwordHash,
-      temporaryPasswordHash: null, // Clear temporary password if exists
-    });
-
-    // Delete used code
-    passwordResetCodes.delete(email.toLowerCase());
-
-    // HIPAA Audit: Log password reset completion
-    await AuditService.log({
-      userId: user.id,
-      userEmail: user.email,
-      action: AuditAction.PASSWORD_RESET,
-      resourceType: AuditResourceType.USER,
-      resourceId: user.id,
-      ipAddress: AuditService.getClientIp(req),
-      userAgent: req.headers["user-agent"],
-      details: { email: user.email, passwordReset: true },
-    });
-
-    if (process.env.NODE_ENV === "development") {
-      console.log("✅ Password reset successfully");
-    }
-
-    res.status(200).json({
-      success: true,
-      message: "Password reset successfully",
-    });
-  } catch (error) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("❌ Reset password error:", error);
-    } else {
-      console.error("❌ Reset password error");
-    }
-    res.status(500).json({
-      success: false,
-      message: "Failed to reset password. Please try again.",
-    });
-  }
-});
-
-// Email verification endpoint
-app.get("/auth/verify-email", async (req, res) => {
-  try {
-    const { token } = req.query;
-
-    if (!token || typeof token !== "string") {
-      return res.status(400).json({
-        success: false,
-        message: "Verification token is required",
-      });
-    }
-
-    // Find user with this activation token
-    const user = await User.findOne({
-      where: {
-        activationToken: token,
-      },
-    });
-
-    if (!user) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid verification token",
-      });
-    }
-
-    // Check if token is valid and not expired
-    if (!user.isActivationTokenValid(token)) {
-      return res.status(400).json({
-        success: false,
-        message: "Verification token has expired. Please request a new one.",
-      });
-    }
-
-    // Check if user is already activated
-    if (user.activated) {
-      if (process.env.NODE_ENV === "development") {
-        console.log("✅ User already activated, logging them in");
-      }
-
-      // Create JWT token for automatic login
-      const authToken = createJWTToken(user);
-
-      return res.status(200).json({
-        success: true,
-        message: "Account is already activated! You are now logged in.",
-        token: authToken,
-        user: user.toSafeJSON(),
-      });
-    }
-
-    // Activate the user
-    await user.activate();
-    if (process.env.NODE_ENV === "development") {
-      console.log("✅ User activated successfully");
-    }
-
-    // Get the frontend origin from the request (same logic as verification email)
-    const frontendOrigin =
-      req.get("origin") || req.get("referer")?.split("/").slice(0, 3).join("/");
-    if (process.env.NODE_ENV === "development") {
-      console.log("🌐 Frontend origin detected for welcome email");
-    }
-
-    // Send welcome email
-    await MailsSender.sendWelcomeEmail(
-      user.email,
-      user.firstName,
-      frontendOrigin
-    );
-
-    // Create JWT token for automatic login
-    const authToken = createJWTToken(user);
-
-    // HIPAA Audit: Log email verification and auto-login
-    await AuditService.logLogin(req, {
-      id: user.id,
-      email: user.email,
-      clinicId: user.clinicId,
-    });
-
-    res.status(200).json({
-      success: true,
-      message: "Account activated successfully! You are now logged in.",
-      token: authToken,
-      user: user.toSafeJSON(),
-    });
-  } catch (error) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("Email verification error occurred:", error);
-    } else {
-      console.error("Email verification error occurred");
-    }
-    res.status(500).json({
-      success: false,
-      message: "Verification failed. Please try again.",
-    });
-  }
-});
-
-app.post("/auth/signout", authenticateJWT, async (req, res) => {
-  try {
-    // HIPAA Audit: Log logout
-    await AuditService.logLogout(req);
-
-    // With JWT, signout is handled client-side by removing the token
-    // No server-side session to destroy
-    res.status(200).json({
-      success: true,
-      message: "Signed out successfully",
-    });
-  } catch (error) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("❌ Sign out error occurred:", error);
-    } else {
-      console.error("❌ Sign out error occurred");
-    }
-    res.status(500).json({
-      success: false,
-      message: "Sign out failed",
-    });
-  }
-});
-
-app.get("/auth/me", authenticateJWT, async (req, res) => {
-  try {
-    // Get user data from JWT
-    const currentUser = getCurrentUser(req);
-
-    // Fetch fresh user data from database with UserRoles
-    const user = await User.findByPk(currentUser?.id, {
-      include: [{ model: UserRoles, as: 'userRoles', required: false }],
-    });
-    if (!user) {
-      // User was deleted from database but JWT token still exists
-      return res.status(401).json({
-        success: false,
-        message: "User not found",
-      });
-    }
-
-    // Include impersonation fields from JWT if present
-    const userData = user.toSafeJSON();
-    if (currentUser?.impersonating) {
-      userData.impersonating = true;
-      userData.impersonatedBy = currentUser.impersonatedBy;
-    }
-
-    // Include clinic details for affiliates to check if onboarding is needed
-    if (user.clinicId && user.userRoles?.affiliate) {
-      const clinic = await Clinic.findByPk(user.clinicId, {
-        attributes: ['id', 'name', 'slug', 'isActive', 'affiliateOwnerClinicId'],
-      });
-      if (clinic) {
-        userData.clinic = {
-          id: clinic.id,
-          name: clinic.name,
-          slug: clinic.slug,
-          isActive: clinic.isActive,
-        };
-
-        // Include parent clinic slug and custom domain for affiliates
-        if (clinic.affiliateOwnerClinicId) {
-          const parentClinic = await Clinic.findByPk(clinic.affiliateOwnerClinicId, {
-            attributes: ['id', 'slug', 'customDomain', 'isCustomDomain'],
-          });
-          if (parentClinic) {
-            userData.clinic.parentClinicSlug = parentClinic.slug;
-            if (parentClinic.isCustomDomain && parentClinic.customDomain) {
-              userData.clinic.parentClinicCustomDomain = parentClinic.customDomain;
-            }
-          }
-        }
-      }
-    }
-
-    res.status(200).json({
-      success: true,
-      user: userData,
-    });
-  } catch (error) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("❌ Auth check error occurred:", error);
-    } else {
-      console.error("❌ Auth check error occurred");
-    }
-    res.status(500).json({
-      success: false,
-      message: "Auth check failed",
-    });
-  }
-});
-
-// User profile update endpoint
-app.put("/auth/profile", authenticateJWT, async (req, res) => {
-  try {
-    const currentUser = getCurrentUser(req);
-    if (!currentUser) {
-      return res.status(401).json({
-        success: false,
-        message: "Not authenticated",
-      });
-    }
-
-    // Validate request body using updateProfileSchema
-    const validation = updateProfileSchema.safeParse(req.body);
-    if (!validation.success) {
-      return res.status(400).json({
-        success: false,
-        message: "Validation failed",
-        errors: validation.error.errors,
-      });
-    }
-
-    const {
-      firstName,
-      lastName,
-      phoneNumber,
-      dob,
-      address,
-      city,
-      state,
-      zipCode,
-      selectedPlanCategory,
-      selectedPlanType,
-      selectedPlanName,
-      selectedPlanPrice,
-      selectedDownpaymentType,
-      selectedDownpaymentName,
-      selectedDownpaymentPrice,
-      planSelectionTimestamp,
-    } = validation.data;
-
-    // Check if this is a plan selection request (doesn't require firstName/lastName)
-    const isPlanSelection = selectedPlanCategory && selectedPlanType;
-
-    // HIPAA Compliance: Validate required fields for profile updates
-    if (!isPlanSelection && (!firstName || !lastName)) {
-      return res.status(400).json({
-        success: false,
-        message: "First name and last name are required for profile updates",
-      });
-    }
-
-    // Find user in database
-    const user = await User.findByPk(currentUser.id, {
-      include: [Clinic],
-    });
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
-      });
-    }
-
-    // Prepare update data based on what's being updated
-    const updateData: any = {};
-
-    // Update profile fields if provided
-    if (firstName && lastName) {
-      updateData.firstName = firstName.trim();
-      updateData.lastName = lastName.trim();
-    }
-
-    if (phoneNumber !== undefined)
-      updateData.phoneNumber = phoneNumber?.trim() || null;
-    if (dob !== undefined) updateData.dob = dob?.trim() || null;
-    if (address !== undefined) updateData.address = address?.trim() || null;
-    if (city !== undefined) updateData.city = city?.trim() || null;
-    if (state !== undefined) updateData.state = state?.trim() || null;
-    if (zipCode !== undefined) updateData.zipCode = zipCode?.trim() || null;
-
-    // Update plan selection fields if provided
-    if (selectedPlanCategory !== undefined)
-      updateData.selectedPlanCategory = selectedPlanCategory?.trim() || null;
-    if (selectedPlanType !== undefined)
-      updateData.selectedPlanType = selectedPlanType?.trim() || null;
-    if (selectedPlanName !== undefined)
-      updateData.selectedPlanName = selectedPlanName?.trim() || null;
-    if (selectedPlanPrice !== undefined)
-      updateData.selectedPlanPrice = selectedPlanPrice || null;
-    if (selectedDownpaymentType !== undefined)
-      updateData.selectedDownpaymentType =
-        selectedDownpaymentType?.trim() || null;
-    if (selectedDownpaymentName !== undefined)
-      updateData.selectedDownpaymentName =
-        selectedDownpaymentName?.trim() || null;
-    if (selectedDownpaymentPrice !== undefined)
-      updateData.selectedDownpaymentPrice = selectedDownpaymentPrice || null;
-    if (planSelectionTimestamp !== undefined)
-      updateData.planSelectionTimestamp = planSelectionTimestamp
-        ? new Date(planSelectionTimestamp)
-        : null;
-
-    // Update user with the prepared data
-    await user.update(updateData);
-
-    // HIPAA Audit: Log profile update (PHI modification)
-    await AuditService.logPatientUpdate(
-      req,
-      currentUser.id,
-      Object.keys(updateData)
-    );
-
-    if (process.env.NODE_ENV === "development") {
-      console.log("Profile updated for user:", user.id);
-    }
-
-    res.status(200).json({
-      success: true,
-      message: "Profile updated successfully",
-      user: user.toSafeJSON(),
-    });
-  } catch (error) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("❌ Profile update error occurred:", error);
-    } else {
-      console.error("❌ Profile update error occurred");
-    }
-    res.status(500).json({
-      success: false,
-      message: "Failed to update profile",
-    });
-  }
-});
 
 // Clinic routes
 // Public endpoint to get clinic by slug (for subdomain routing)
@@ -3099,7 +1329,23 @@ app.get("/clinic/allow-custom-domain", async (req, res) => {
         const withoutPlatform = baseDomain.slice(0, -platformDomain.length);
         const parts = withoutPlatform.split('.');
 
-        // Only allow exactly 2-part subdomains: <affiliate>.<brand> or admin.<brand>
+        // Handle single-part subdomain: <brand>.fusehealth.com
+        if (parts.length === 1) {
+          const brandSlug = parts[0];
+
+          // Check if clinic exists with this slug
+          const brandClinic = await Clinic.findOne({
+            where: { slug: brandSlug },
+            attributes: ["id"],
+          });
+
+          if (brandClinic) {
+            console.log(`✅ [allow-custom-domain] Allowing brand subdomain: ${baseDomain}`);
+            return res.status(200).send("ok");
+          }
+        }
+
+        // Handle 2-part subdomains: <affiliate>.<brand> or admin.<brand>
         if (parts.length === 2) {
           const [firstPart, brandSlug] = parts;
 
@@ -3663,7 +1909,7 @@ app.post("/custom-website/toggle-active", authenticateJWT, async (req, res) => {
     } else {
       // Create a new custom website with default values and the specified isActive state
       customWebsite = await CustomWebsite.create({
-        clinicId: user.clinicId,
+        ...getDefaultCustomWebsiteValues(user.clinicId),
         isActive
       });
     }
@@ -3680,6 +1926,126 @@ app.post("/custom-website/toggle-active", authenticateJWT, async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to toggle portal status"
+    });
+  }
+});
+
+// Reset footer section to defaults
+app.post("/custom-website/reset-footer", authenticateJWT, async (req, res) => {
+  try {
+    const currentUser = getCurrentUser(req);
+    if (!currentUser) {
+      return res.status(401).json({
+        success: false,
+        message: "Not authenticated"
+      });
+    }
+
+    const user = await User.findByPk(currentUser.id, {
+      include: [{ model: UserRoles, as: 'userRoles', required: false }]
+    });
+    if (!user || !user.clinicId) {
+      return res.status(404).json({
+        success: false,
+        message: "User or clinic not found"
+      });
+    }
+
+    // Only allow brand users to modify portal settings
+    if (!user.hasAnyRoleSync(['brand', 'doctor', 'admin', 'superAdmin'])) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied"
+      });
+    }
+
+    const customWebsite = await CustomWebsite.findOne({
+      where: { clinicId: user.clinicId }
+    });
+
+    if (!customWebsite) {
+      return res.status(404).json({
+        success: false,
+        message: "Custom website not found"
+      });
+    }
+
+    // Reset footer section to defaults
+    const defaultFooterValues = getDefaultFooterValues();
+    await customWebsite.update(defaultFooterValues);
+
+    console.log('🔄 Footer section reset to defaults for clinic:', user.clinicId);
+
+    res.status(200).json({
+      success: true,
+      message: "Footer section reset to defaults successfully",
+      data: customWebsite
+    });
+  } catch (error) {
+    console.error('Error resetting footer section:', error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to reset footer section"
+    });
+  }
+});
+
+// Reset social media section to defaults
+app.post("/custom-website/reset-social-media", authenticateJWT, async (req, res) => {
+  try {
+    const currentUser = getCurrentUser(req);
+    if (!currentUser) {
+      return res.status(401).json({
+        success: false,
+        message: "Not authenticated"
+      });
+    }
+
+    const user = await User.findByPk(currentUser.id, {
+      include: [{ model: UserRoles, as: 'userRoles', required: false }]
+    });
+    if (!user || !user.clinicId) {
+      return res.status(404).json({
+        success: false,
+        message: "User or clinic not found"
+      });
+    }
+
+    // Only allow brand users to modify portal settings
+    if (!user.hasAnyRoleSync(['brand', 'doctor', 'admin', 'superAdmin'])) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied"
+      });
+    }
+
+    const customWebsite = await CustomWebsite.findOne({
+      where: { clinicId: user.clinicId }
+    });
+
+    if (!customWebsite) {
+      return res.status(404).json({
+        success: false,
+        message: "Custom website not found"
+      });
+    }
+
+    // Reset social media section to defaults
+    const defaultSocialMediaValues = getDefaultSocialMediaValues();
+    await customWebsite.update(defaultSocialMediaValues);
+
+    console.log('🔄 Social media section reset to defaults for clinic:', user.clinicId);
+
+    res.status(200).json({
+      success: true,
+      message: "Social media section reset to defaults successfully",
+      data: customWebsite
+    });
+  } catch (error) {
+    console.error('Error resetting social media section:', error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to reset social media section"
     });
   }
 });
@@ -3954,6 +2320,7 @@ app.get("/custom-website/by-slug/:slug", async (req, res) => {
         parentClinicName,
         parentClinicHeroImageUrl,
         patientPortalDashboardFormat: clinic.patientPortalDashboardFormat,
+        defaultFormColor: clinic.defaultFormColor,
       }
     });
   } catch (error) {
@@ -6800,369 +5167,6 @@ app.delete("/treatment-plans", authenticateJWT, async (req, res) => {
   }
 });
 
-// Payment routes
-// Create order and payment intent
-app.post("/orders/create-payment-intent", authenticateJWT, async (req, res) => {
-  try {
-    const currentUser = getCurrentUser(req);
-
-    if (!currentUser) {
-      return res.status(401).json({
-        success: false,
-        message: "Not authenticated",
-      });
-    }
-
-    // Validate request body using createPaymentIntentSchema
-    const validation = createPaymentIntentSchema.safeParse(req.body);
-    if (!validation.success) {
-      return res.status(400).json({
-        success: false,
-        message: "Validation failed",
-        errors: validation.error.errors,
-      });
-    }
-
-    const {
-      amount,
-      currency,
-      treatmentId,
-      selectedProducts,
-      selectedPlan,
-      shippingInfo,
-      questionnaireAnswers,
-      affiliateId, // Optional: affiliate ID if order came from affiliate link
-    } = validation.data;
-
-    // Get treatment with products to validate order
-    const treatment = await Treatment.findByPk(treatmentId, {
-      include: [
-        {
-          model: Product,
-          as: "products",
-          through: {
-            attributes: ["placeholderSig", "numberOfDoses", "nextDose"],
-          },
-        },
-      ],
-    });
-
-    if (!treatment) {
-      return res.status(404).json({
-        success: false,
-        message: "Treatment not found",
-      });
-    }
-
-    // Validate affiliateId if provided, or detect from hostname
-    let validAffiliateId: string | undefined = undefined;
-
-    // First, try to get affiliateId from request body
-    if (affiliateId) {
-      const affiliate = await User.findByPk(affiliateId, {
-        include: [{ model: UserRoles, as: "userRoles", required: false }],
-      });
-      if (affiliate) {
-        await affiliate.getUserRoles();
-        if (affiliate.userRoles?.hasRole("affiliate")) {
-          validAffiliateId = affiliateId;
-        }
-      }
-    }
-
-    // If no affiliateId in body, try to detect from hostname
-    if (!validAffiliateId) {
-      const hostname = req.get("host") || req.hostname;
-      if (hostname) {
-        const parts = hostname.split(".");
-        // Check for pattern: affiliateslug.brandslug.domain.extension
-        // e.g., checktwo.limitless.fusehealth.com
-        if (parts.length >= 4) {
-          const affiliateSlug = parts[0];
-          console.log("🔍 Detecting affiliate from hostname:", { hostname, affiliateSlug });
-
-          // Find affiliate by website (slug) field
-          const affiliateBySlug = await User.findOne({
-            where: {
-              website: affiliateSlug,
-            },
-            include: [
-              {
-                model: UserRoles,
-                as: "userRoles",
-                required: true,
-              },
-            ],
-          });
-
-          if (affiliateBySlug) {
-            await affiliateBySlug.getUserRoles();
-            if (affiliateBySlug.userRoles?.hasRole("affiliate")) {
-              validAffiliateId = affiliateBySlug.id;
-              console.log("✅ Found affiliate from hostname:", { affiliateId: validAffiliateId, slug: affiliateSlug });
-            }
-          }
-        }
-      }
-    }
-
-    // Create order
-    const orderNumber = await Order.generateOrderNumber();
-    const order = await Order.create({
-      orderNumber,
-      userId: currentUser.id,
-      treatmentId,
-      questionnaireId: null, // Will be updated if questionnaire is available
-      status: "pending",
-      billingPlan: selectedPlan,
-      subtotalAmount: amount,
-      discountAmount: 0,
-      taxAmount: 0,
-      shippingAmount: 0,
-      totalAmount: amount,
-      questionnaireAnswers,
-      ...(validAffiliateId && { affiliateId: validAffiliateId }),
-    });
-
-    // Create order items
-    const orderItems: any[] = [];
-    for (const [productId, quantity] of Object.entries(selectedProducts)) {
-      if (quantity && Number(quantity) > 0) {
-        const product = treatment.products?.find((p) => p.id === productId);
-        if (product) {
-          const orderItem = await OrderItem.create({
-            orderId: order.id,
-            productId: product.id,
-            quantity: Number(quantity),
-            unitPrice: product.price,
-            totalPrice: product.price * Number(quantity),
-            placeholderSig: product.placeholderSig,
-          });
-          orderItems.push(orderItem);
-        }
-      }
-    }
-
-    // Create shipping address if provided
-    if (
-      shippingInfo.address &&
-      shippingInfo.city &&
-      shippingInfo.state &&
-      shippingInfo.zipCode
-    ) {
-      await ShippingAddress.create({
-        orderId: order.id,
-        address: shippingInfo.address,
-        apartment: shippingInfo.apartment || null,
-        city: shippingInfo.city,
-        state: shippingInfo.state,
-        zipCode: shippingInfo.zipCode,
-        country: shippingInfo.country || "US",
-      });
-    }
-
-    // Calculate distribution: platform fee (% of total), stripe fee, doctor flat, pharmacy wholesale, brand residual
-    // If Clinic has a Stripe Connect account, we transfer only the brand residual to the clinic
-    const fees = await getGlobalFees();
-    
-    // Get platform fee percent based on clinic's tier (or global fallback)
-    const platformFeePercent = treatment.clinicId 
-      ? await getPlatformFeePercent(treatment.clinicId)
-      : fees.platformFeePercent;
-    
-    const stripeFeePercent = fees.stripeFeePercent;
-    const doctorFlatUsd = fees.doctorFlatFeeUsd;
-
-    let brandAmountUsd = 0;
-    let pharmacyWholesaleTotal = 0;
-    let platformFeeUsd = 0;
-    let stripeFeeUsd = 0;
-    try {
-      // Sum wholesale cost from treatment products aligned with selectedProducts
-      if (treatment.products && selectedProducts) {
-        for (const [productId, qty] of Object.entries(
-          selectedProducts as Record<string, any>
-        )) {
-          const product = treatment.products.find(
-            (p: any) => p.id === productId
-          );
-          if (!product) continue;
-          const quantity = Number(qty) || 0;
-          const wholesale = Number((product as any).pharmacyWholesaleCost || 0);
-          pharmacyWholesaleTotal += wholesale * quantity;
-        }
-      }
-      const totalPaid = Number(amount) || 0;
-      platformFeeUsd = Math.max(0, (platformFeePercent / 100) * totalPaid);
-      stripeFeeUsd = Math.max(0, (stripeFeePercent / 100) * totalPaid);
-      const doctorUsd = Math.max(0, doctorFlatUsd);
-      brandAmountUsd = Math.max(
-        0,
-        totalPaid -
-        platformFeeUsd -
-        stripeFeeUsd -
-        doctorUsd -
-        pharmacyWholesaleTotal
-      );
-    } catch (e) {
-      if (process.env.NODE_ENV === "development") {
-        console.warn(
-          "⚠️ Failed to compute brandAmountUsd, defaulting to 0:",
-          e
-        );
-      } else {
-        console.warn("⚠️ Failed to compute brandAmountUsd, defaulting to 0:");
-      }
-
-      brandAmountUsd = 0;
-    }
-
-    // Resolve clinic's Stripe account (via treatment.clinicId if present)
-    let transferData: any = undefined;
-    try {
-      const treatmentWithClinic = await Treatment.findByPk(treatmentId, {
-        include: [{ model: Clinic, as: "clinic" }] as any,
-      });
-      const clinicStripeAccountId = (treatmentWithClinic as any)?.clinic
-        ?.stripeAccountId;
-      if (clinicStripeAccountId && brandAmountUsd > 0) {
-        transferData = {
-          destination: clinicStripeAccountId,
-          amount: Math.round(brandAmountUsd * 100), // cents
-        };
-      }
-    } catch (e) {
-      if (process.env.NODE_ENV === "development") {
-        console.warn(
-          "⚠️ Could not resolve clinic Stripe account for transfer_data:",
-          e
-        );
-      } else {
-        console.warn(
-          "⚠️ Could not resolve clinic Stripe account for transfer_data:"
-        );
-      }
-    }
-
-    // Persist payout breakdown on Order
-    try {
-      await order.update({
-        platformFeeAmount: platformFeeUsd,
-        platformFeePercent: Number(platformFeePercent.toFixed(2)),
-        stripeAmount: Number(stripeFeeUsd.toFixed(2)),
-        doctorAmount: Number(doctorFlatUsd.toFixed(2)),
-        pharmacyWholesaleAmount: Number(pharmacyWholesaleTotal.toFixed(2)),
-        brandAmount: Number(brandAmountUsd.toFixed(2)),
-      });
-    } catch (e) {
-      if (process.env.NODE_ENV === "development") {
-        console.warn("⚠️ Failed to persist payout breakdown on Order:", e);
-      } else {
-        console.warn("⚠️ Failed to persist payout breakdown on Order:");
-      }
-    }
-
-    // Create payment intent with optional transfer_data to send clinic margin
-    let paymentIntent;
-    try {
-      paymentIntent = await stripe.paymentIntents.create({
-        amount: Math.round(amount * 100), // Convert to cents
-        currency,
-        metadata: {
-          userId: currentUser.id,
-          treatmentId,
-          orderId: order.id,
-          orderNumber: orderNumber,
-          selectedProducts: JSON.stringify(selectedProducts),
-          selectedPlan,
-          orderType: "treatment_order",
-          brandAmountUsd: brandAmountUsd.toFixed(2),
-          platformFeePercent: String(platformFeePercent),
-          platformFeeUsd: platformFeeUsd.toFixed(2),
-          doctorFlatUsd: doctorFlatUsd.toFixed(2),
-          pharmacyWholesaleTotalUsd: pharmacyWholesaleTotal.toFixed(2),
-        },
-        description: `Order ${orderNumber} - ${treatment.name}`,
-        ...(transferData ? { transfer_data: transferData } : {}),
-      });
-    } catch (stripeError: any) {
-      if (process.env.NODE_ENV === "development") {
-        console.error("❌ Stripe payment intent creation failed:", stripeError);
-      } else {
-        console.error("❌ Stripe payment intent creation failed:");
-      }
-
-      // Mark order as failed
-      await order.update({ status: "failed" });
-
-      return res.status(500).json({
-        error: "stripe_payment_intent_failed",
-        message:
-          stripeError.message || "Failed to create payment intent with Stripe",
-        details: stripeError.type || "unknown_error",
-      });
-    }
-
-    // Create payment record
-    await Payment.create({
-      orderId: order.id,
-      stripePaymentIntentId: paymentIntent.id,
-      status: "pending",
-      paymentMethod: "card",
-      amount,
-      currency: currency.toUpperCase(),
-    });
-
-    console.log("💳 Order and payment intent created:", {
-      orderId: order.id,
-      orderNumber: orderNumber,
-      paymentIntentId: paymentIntent.id,
-      amount: paymentIntent.amount,
-      userId: currentUser.id,
-    });
-
-    res.status(200).json({
-      success: true,
-      data: {
-        clientSecret: paymentIntent.client_secret,
-        paymentIntentId: paymentIntent.id,
-        orderId: order.id,
-        orderNumber: orderNumber,
-      },
-    });
-  } catch (error) {
-    // HIPAA: Do not log detailed errors in production
-    if (process.env.NODE_ENV === "development") {
-      console.error("❌ Error creating order and payment intent:", error);
-    } else {
-      console.error("❌ Error creating order and payment intent");
-    }
-
-    // Log specific error details for debugging
-    if (error instanceof Error) {
-      console.error("Error message:", error.message);
-      console.error("Error stack:", error.stack);
-    }
-
-    // Check if it's a Stripe error
-    if (error && typeof error === "object" && "type" in error) {
-      console.error("Stripe error type:", (error as any).type);
-      console.error("Stripe error code:", (error as any).code);
-    }
-
-    res.status(500).json({
-      success: false,
-      message: "Failed to create order and payment intent",
-      error:
-        process.env.NODE_ENV === "development"
-          ? error instanceof Error
-            ? error.message
-            : String(error)
-          : undefined,
-    });
-  }
-});
-
 // Confirm payment completion
 app.post("/confirm-payment", authenticateJWT, async (req, res) => {
   try {
@@ -7438,11 +5442,15 @@ app.post(
           );
         }
       } else {
-        // When Fuse is MOR, use statement_descriptor_suffix to show "FUSE *ClinicName"
+        // When Fuse is MOR, use statement_descriptor_suffix to show "FUSE *ClinicName Peptides"
         if (tenantProduct.clinic?.name) {
-          const statementClinicName = tenantProduct.clinic.name
-            .replace(/[^a-zA-Z0-9\s]/g, "") // Remove special characters
-            .substring(0, 22); // Stripe limit for statement_descriptor_suffix
+          const cleanName = tenantProduct.clinic.name
+            .replace(/[^a-zA-Z0-9\s]/g, ""); // Remove special characters
+          const peptidesSuffix = " Peptides";
+          const maxLength = 22; // Stripe limit for statement_descriptor_suffix
+          const maxNameLength = maxLength - peptidesSuffix.length;
+          const truncatedName = cleanName.substring(0, maxNameLength);
+          const statementClinicName = `${truncatedName}${peptidesSuffix}`;
           authPaymentIntentParams.statement_descriptor_suffix =
             statementClinicName;
           console.log(
@@ -7975,13 +5983,17 @@ app.post("/payments/product/sub", async (req, res) => {
         );
       }
     } else {
-      // When Fuse is MOR, use statement_descriptor_suffix to show "FUSE *ClinicName"
+      // When Fuse is MOR, use statement_descriptor_suffix to show "FUSE *ClinicName Peptides"
       if (clinicName || (tenantProduct as any).clinic?.name) {
-        const statementClinicName = (
+        const cleanName = (
           clinicName || (tenantProduct as any).clinic?.name
         )
-          .replace(/[^a-zA-Z0-9\s]/g, "") // Remove special characters
-          .substring(0, 22); // Stripe limit for statement_descriptor_suffix
+          .replace(/[^a-zA-Z0-9\s]/g, ""); // Remove special characters
+        const peptidesSuffix = " Peptides";
+        const maxLength = 22; // Stripe limit for statement_descriptor_suffix
+        const maxNameLength = maxLength - peptidesSuffix.length;
+        const truncatedName = cleanName.substring(0, maxNameLength);
+        const statementClinicName = `${truncatedName}${peptidesSuffix}`;
         paymentIntentParams.statement_descriptor_suffix = statementClinicName;
         console.log(
           `💳 Fuse is MOR - Using statement descriptor suffix: "FUSE *${statementClinicName}"`
@@ -8124,7 +6136,7 @@ app.post("/payments/program/sub", async (req, res) => {
       name: `${program.name} Subscription`,
       metadata: {
         programId: program.id,
-        clinicId: program.clinicId,
+        clinicId: program.clinicId || '',
         selectedProductIds: selectedProductIds.join(","),
       },
     });
@@ -8139,7 +6151,7 @@ app.post("/payments/program/sub", async (req, res) => {
       },
       metadata: {
         programId: program.id,
-        clinicId: program.clinicId,
+        clinicId: program.clinicId || '',
         productsTotal: String(productsTotal),
         nonMedicalServicesFee: String(nonMedicalServicesFee),
       },
@@ -8252,11 +6264,15 @@ app.post("/payments/program/sub", async (req, res) => {
       setup_future_usage: "off_session",
     };
 
-    // Add statement descriptor
+    // Add statement descriptor with Peptides suffix
     if (clinicName || clinic?.name) {
-      const statementClinicName = (clinicName || clinic?.name)
-        .replace(/[^a-zA-Z0-9\s]/g, "")
-        .substring(0, 22);
+      const cleanName = (clinicName || clinic?.name)
+        .replace(/[^a-zA-Z0-9\s]/g, "");
+      const peptidesSuffix = " Peptides";
+      const maxLength = 22; // Stripe limit for statement_descriptor_suffix
+      const maxNameLength = maxLength - peptidesSuffix.length;
+      const truncatedName = cleanName.substring(0, maxNameLength);
+      const statementClinicName = `${truncatedName}${peptidesSuffix}`;
       paymentIntentParams.statement_descriptor_suffix = statementClinicName;
     }
 
@@ -8455,264 +6471,156 @@ app.post("/payments/clinic/sub", authenticateJWT, async (req, res) => {
   }
 });
 
-// ========== Stripe Connect Endpoints ==========
+// app.post("/stripe/connect/session", authenticateJWT, async (req, res) => {
+//   try {
+//     const currentUser = getCurrentUser(req);
 
-// Import Stripe Connect Service
-import StripeConnectService from "./services/stripe/connect.service";
+//     if (!currentUser) {
+//       return res.status(401).json({
+//         success: false,
+//         message: "Not authenticated",
+//       });
+//     }
 
-// Create Account Session for Stripe Connect embedded components
-app.post("/stripe/connect/session", authenticateJWT, async (req, res) => {
-  try {
-    const currentUser = getCurrentUser(req);
+//     const userWithClinic: any = currentUser;
+//     const clinicId = userWithClinic?.clinicId;
 
-    if (!currentUser) {
-      return res.status(401).json({
-        success: false,
-        message: "Not authenticated",
-      });
-    }
+//     if (!clinicId) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "No clinic associated with user",
+//       });
+//     }
 
-    const userWithClinic: any = currentUser;
-    const clinicId = userWithClinic?.clinicId;
+//     // Get merchant model from request body (defaults to 'platform')
+//     const { merchantModel } = req.body;
+//     const validMerchantModel =
+//       merchantModel === "direct" ? "direct" : "platform";
 
-    if (!clinicId) {
-      return res.status(400).json({
-        success: false,
-        message: "No clinic associated with user",
-      });
-    }
+//     console.log(
+//       `🔄 Creating Stripe Connect session for clinic: ${clinicId} (${validMerchantModel} model)`
+//     );
 
-    // Get merchant model from request body (defaults to 'platform')
-    const { merchantModel } = req.body;
-    const validMerchantModel =
-      merchantModel === "direct" ? "direct" : "platform";
+//     // Create account session with merchant model
+//     const clientSecret = await StripeConnectService.createAccountSession(
+//       clinicId,
+//       validMerchantModel
+//     );
 
-    console.log(
-      `🔄 Creating Stripe Connect session for clinic: ${clinicId} (${validMerchantModel} model)`
-    );
+//     if (!clientSecret) {
+//       throw new Error("Client secret was not generated");
+//     }
 
-    // Create account session with merchant model
-    const clientSecret = await StripeConnectService.createAccountSession(
-      clinicId,
-      validMerchantModel
-    );
-
-    if (!clientSecret) {
-      throw new Error("Client secret was not generated");
-    }
-
-    res.status(200).json({
-      success: true,
-      data: {
-        client_secret: clientSecret,
-      },
-    });
-  } catch (error: any) {
-    console.error("❌ Error creating Stripe Connect session:", error);
-    if (error.type === 'StripeInvalidRequestError') {
-      console.error("❌ Stripe error details:", JSON.stringify(error.raw, null, 2));
-    }
-    res.status(500).json({
-      success: false,
-      message: error.message || "Failed to create Connect session",
-      error: process.env.NODE_ENV === "development" ? error.stack : undefined,
-    });
-  }
-});
-
-// Get Stripe Connect account status
-app.get("/stripe/connect/status", authenticateJWT, async (req, res) => {
-  try {
-    const currentUser = getCurrentUser(req);
-
-    if (!currentUser) {
-      return res.status(401).json({
-        success: false,
-        message: "Not authenticated",
-      });
-    }
-
-    const userWithClinic: any = currentUser;
-    const clinicId = userWithClinic?.clinicId;
-
-    if (!clinicId) {
-      return res.status(400).json({
-        success: false,
-        message: "No clinic associated with user",
-      });
-    }
-
-    console.log(`🔍 Fetching Stripe Connect status for clinic: ${clinicId}`);
-
-    // Get account status
-    const status = await StripeConnectService.getAccountStatus(clinicId);
-
-    res.status(200).json({
-      success: true,
-      data: status,
-    });
-  } catch (error: any) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("❌ Error fetching Stripe Connect status:", error);
-    } else {
-      console.error("❌ Error fetching Stripe Connect status");
-    }
-    res.status(500).json({
-      success: false,
-      message: error.message || "Failed to fetch Connect status",
-    });
-  }
-});
-
-// Create account link for onboarding (alternative to embedded components)
-app.post("/stripe/connect/account-link", authenticateJWT, async (req, res) => {
-  try {
-    const currentUser = getCurrentUser(req);
-
-    if (!currentUser) {
-      return res.status(401).json({
-        success: false,
-        message: "Not authenticated",
-      });
-    }
-
-    const userWithClinic: any = currentUser;
-    const clinicId = userWithClinic?.clinicId;
-
-    if (!clinicId) {
-      return res.status(400).json({
-        success: false,
-        message: "No clinic associated with user",
-      });
-    }
-
-    const { refreshUrl, returnUrl } = req.body;
-
-    if (!refreshUrl || !returnUrl) {
-      return res.status(400).json({
-        success: false,
-        message: "refreshUrl and returnUrl are required",
-      });
-    }
-
-    console.log(`🔄 Creating Stripe account link for clinic: ${clinicId}`);
-
-    const accountLinkUrl = await StripeConnectService.createAccountLink(
-      clinicId,
-      refreshUrl,
-      returnUrl
-    );
-
-    res.status(200).json({
-      success: true,
-      data: {
-        url: accountLinkUrl,
-      },
-    });
-  } catch (error: any) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("❌ Error creating account link:", error);
-    } else {
-      console.error("❌ Error creating account link");
-    }
-    res.status(500).json({
-      success: false,
-      message: error.message || "Failed to create account link",
-    });
-  }
-});
+//     res.status(200).json({
+//       success: true,
+//       data: {
+//         client_secret: clientSecret,
+//       },
+//     });
+//   } catch (error: any) {
+//     console.error("❌ Error creating Stripe Connect session:", error);
+//     if (error.type === 'StripeInvalidRequestError') {
+//       console.error("❌ Stripe error details:", JSON.stringify(error.raw, null, 2));
+//     }
+//     res.status(500).json({
+//       success: false,
+//       message: error.message || "Failed to create Connect session",
+//       error: process.env.NODE_ENV === "development" ? error.stack : undefined,
+//     });
+//   }
+// });
 
 // Webhook deduplication cache (in production, use Redis or database)
-const processedWebhooks = new Set<string>();
+// const processedWebhooks = new Set<string>();
 
 // Stripe webhook endpoint
-app.post(
-  "/webhook/stripe",
-  express.raw({ type: "application/json" }),
-  async (req, res) => {
-    const sig = req.headers["stripe-signature"];
-    const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
+// app.post(
+//   "/webhook/stripe",
+//   express.raw({ type: "application/json" }),
+//   async (req, res) => {
+//     const sig = req.headers["stripe-signature"];
+//     const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
-    // HIPAA: Do not log webhook body or secrets in production
-    if (process.env.NODE_ENV === "development") {
-      console.log("🔍 Webhook received - Body length:", req.body?.length);
-    }
+//     // HIPAA: Do not log webhook body or secrets in production
+//     if (process.env.NODE_ENV === "development") {
+//       console.log("🔍 Webhook received - Body length:", req.body?.length);
+//     }
 
-    // Extract timestamp from signature for deduplication
-    const sigString = Array.isArray(sig) ? sig[0] : sig;
-    const timestampMatch = sigString?.match(/t=(\d+)/);
-    const webhookTimestamp = timestampMatch ? timestampMatch[1] : null;
-    if (process.env.NODE_ENV === "development") {
-      console.log("🔍 Webhook timestamp:", webhookTimestamp);
-    }
+//     // Extract timestamp from signature for deduplication
+//     const sigString = Array.isArray(sig) ? sig[0] : sig;
+//     const timestampMatch = sigString?.match(/t=(\d+)/);
+//     const webhookTimestamp = timestampMatch ? timestampMatch[1] : null;
+//     if (process.env.NODE_ENV === "development") {
+//       console.log("🔍 Webhook timestamp:", webhookTimestamp);
+//     }
 
-    if (!endpointSecret) {
-      console.error("❌ STRIPE_WEBHOOK_SECRET not configured");
-      return res.status(400).send("Webhook secret not configured");
-    }
+//     if (!endpointSecret) {
+//       console.error("❌ STRIPE_WEBHOOK_SECRET not configured");
+//       return res.status(400).send("Webhook secret not configured");
+//     }
 
-    let event;
+//     let event;
 
-    try {
-      const signature = Array.isArray(sig) ? sig[0] : sig;
-      if (!signature) {
-        throw new Error("No signature provided");
-      }
-      event = stripe.webhooks.constructEvent(
-        req.body,
-        signature,
-        endpointSecret
-      );
-    } catch (err: any) {
-      // SECURITY: Generic error message - don't reveal internal details
-      console.error("❌ Webhook signature verification failed");
-      // SECURITY: Log details internally but don't expose to caller
-      if (process.env.NODE_ENV === "development") {
-        console.error("Debug - Error:", err.message);
-      }
-      return res.status(400).send("Invalid request");
-    }
+//     try {
+//       const signature = Array.isArray(sig) ? sig[0] : sig;
+//       if (!signature) {
+//         throw new Error("No signature provided");
+//       }
+//       event = stripe.webhooks.constructEvent(
+//         req.body,
+//         signature,
+//         endpointSecret
+//       );
+//     } catch (err: any) {
+//       // SECURITY: Generic error message - don't reveal internal details
+//       console.error("❌ Webhook signature verification failed");
+//       // SECURITY: Log details internally but don't expose to caller
+//       if (process.env.NODE_ENV === "development") {
+//         console.error("Debug - Error:", err.message);
+//       }
+//       return res.status(400).send("Invalid request");
+//     }
 
-    // Check for duplicate webhook events
-    const eventId = event.id;
-    if (processedWebhooks.has(eventId)) {
-      console.log("⚠️ Duplicate webhook event detected, skipping:", eventId);
-      return res.status(200).json({ received: true, duplicate: true });
-    }
+//     // Check for duplicate webhook events
+//     const eventId = event.id;
+//     if (processedWebhooks.has(eventId)) {
+//       console.log("⚠️ Duplicate webhook event detected, skipping:", eventId);
+//       return res.status(200).json({ received: true, duplicate: true });
+//     }
 
-    // Add to processed webhooks (keep only last 1000 to prevent memory leaks)
-    processedWebhooks.add(eventId);
-    if (processedWebhooks.size > 1000) {
-      const firstEvent = processedWebhooks.values().next().value;
-      if (firstEvent) {
-        processedWebhooks.delete(firstEvent);
-      }
-    }
+//     // Add to processed webhooks (keep only last 1000 to prevent memory leaks)
+//     processedWebhooks.add(eventId);
+//     if (processedWebhooks.size > 1000) {
+//       const firstEvent = processedWebhooks.values().next().value;
+//       if (firstEvent) {
+//         processedWebhooks.delete(firstEvent);
+//       }
+//     }
 
-    console.log(
-      "🎣 Stripe webhook event received:",
-      event.type,
-      "ID:",
-      eventId
-    );
+//     console.log(
+//       "🎣 Stripe webhook event received:",
+//       event.type,
+//       "ID:",
+//       eventId
+//     );
 
-    try {
-      // Process the event using the webhook service
-      await processStripeWebhook(event);
+//     try {
+//       // Process the event using the webhook service
+//       await processStripeWebhook(event);
 
-      // Return a 200 response to acknowledge receipt of the event
-      res.status(200).json({ received: true });
-    } catch (error) {
-      // HIPAA: Do not log detailed errors in production
-      if (process.env.NODE_ENV === "development") {
-        console.error("❌ Error processing webhook:", error);
-      } else {
-        console.error("❌ Error processing webhook");
-      }
-      res.status(500).json({ error: "Webhook processing failed" });
-    }
-  }
-);
+//       // Return a 200 response to acknowledge receipt of the event
+//       res.status(200).json({ received: true });
+//     } catch (error) {
+//       // HIPAA: Do not log detailed errors in production
+//       if (process.env.NODE_ENV === "development") {
+//         console.error("❌ Error processing webhook:", error);
+//       } else {
+//         console.error("❌ Error processing webhook");
+//       }
+//       res.status(500).json({ error: "Webhook processing failed" });
+//     }
+//   }
+// );
 
 // Get customers/users for a clinic
 app.get("/users/by-clinic/:clinicId", authenticateJWT, async (req, res) => {
@@ -8952,258 +6860,6 @@ app.get("/orders", authenticateJWT, async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to fetch orders",
-    });
-  }
-});
-
-// Get single order
-app.get("/orders/:id", authenticateJWT, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const currentUser = getCurrentUser(req);
-    // HIPAA: Wrap all order logging in development check
-    if (process.env.NODE_ENV === "development") {
-      console.log("🔍 [ORDERS/:ID] Request received");
-      console.log("🔍 [ORDERS/:ID] Order ID:", id);
-    }
-
-    if (!currentUser) {
-      console.log("❌ [ORDERS/:ID] No current user found");
-      return res.status(401).json({
-        success: false,
-        message: "Not authenticated",
-      });
-    }
-
-    // Fetch full user data from database to get clinicId
-    console.log("🔍 [ORDERS/:ID] Fetching user from database...");
-    const user = await User.findByPk(currentUser.id, {
-      include: [{ model: UserRoles, as: "userRoles", required: false }],
-    });
-
-    if (!user) {
-      console.log("❌ [ORDERS/:ID] User not found in database");
-      return res.status(401).json({
-        success: false,
-        message: "User not found",
-      });
-    }
-
-    // SECURITY: Never log PHI (email is PHI under HIPAA)
-    console.log("🔍 [ORDERS/:ID] User found:", {
-      id: user.id,
-      role: user.role,
-      clinicId: user.clinicId,
-      // email removed - PHI must not be logged
-    });
-
-    let whereClause: any = { id };
-    let accessType = "unknown";
-
-    // If user is a patient, only allow access to their own orders
-    if (user.hasRoleSync("patient")) {
-      whereClause.userId = currentUser.id;
-      accessType = "patient_own_orders";
-      console.log("🔍 [ORDERS/:ID] Patient access - restricting to own orders");
-    } else if (user.hasAnyRoleSync(["doctor", "brand"])) {
-      const activeRoles = user.userRoles?.getActiveRoles() || [user.role];
-      accessType = "clinic_access";
-      console.log(
-        `🔍 [ORDERS/:ID] ${activeRoles.join("/").toUpperCase()} access - checking order belongs to clinic`
-      );
-
-      // For doctors and brand users, find the order and check if it belongs to their clinic
-      console.log("🔍 [ORDERS/:ID] Finding order by ID...");
-      const order = await Order.findByPk(id);
-
-      if (!order) {
-        console.log("❌ [ORDERS/:ID] Order not found by ID:", id);
-        return res.status(404).json({
-          success: false,
-          message: "Order not found",
-        });
-      }
-
-      console.log("🔍 [ORDERS/:ID] Order found:", {
-        id: order.id,
-        userId: order.userId,
-        treatmentId: order.treatmentId,
-        status: order.status,
-      });
-
-      // Get the treatment to find the clinic
-      console.log("🔍 [ORDERS/:ID] Finding treatment for order...");
-      const treatment = await Treatment.findByPk(order.treatmentId);
-
-      if (!treatment) {
-        console.log(
-          "❌ [ORDERS/:ID] Treatment not found for order:",
-          order.treatmentId
-        );
-        return res.status(404).json({
-          success: false,
-          message: "Treatment not found",
-        });
-      }
-
-      console.log("🔍 [ORDERS/:ID] Treatment found:", {
-        id: treatment.id,
-        name: treatment.name,
-        clinicId: treatment.clinicId,
-      });
-
-      // Check if the treatment belongs to the user's clinic
-      console.log("🔍 [ORDERS/:ID] Checking clinic access...");
-      console.log("🔍 [ORDERS/:ID] User clinicId:", user.clinicId);
-      console.log("🔍 [ORDERS/:ID] Treatment clinicId:", treatment.clinicId);
-
-      if (treatment.clinicId !== user.clinicId) {
-        console.log("❌ [ORDERS/:ID] Access denied - clinic mismatch");
-        return res.status(403).json({
-          success: false,
-          message: "Access denied",
-        });
-      }
-
-      console.log(
-        `✅ [ORDERS/:ID] ${user.role.toUpperCase()} clinic access granted`
-      );
-    } else {
-      console.log(`❌ [ORDERS/:ID] Unsupported role: ${user.role}`);
-      return res.status(403).json({
-        success: false,
-        message: `Access denied for role: ${user.role}. Only patients, doctors, and brands can access orders.`,
-      });
-    }
-
-    console.log(
-      "🔍 [ORDERS/:ID] Executing final query with whereClause:",
-      whereClause
-    );
-    console.log("🔍 [ORDERS/:ID] Access type:", accessType);
-
-    const order = await Order.findOne({
-      where: whereClause,
-      include: [
-        {
-          model: OrderItem,
-          as: "orderItems",
-          include: [{ model: Product, as: "product" }],
-        },
-        {
-          model: Payment,
-          as: "payment",
-        },
-        {
-          model: ShippingAddress,
-          as: "shippingAddress",
-        },
-        {
-          model: Treatment,
-          as: "treatment",
-        },
-        {
-          model: ShippingOrder,
-          as: "shippingOrders",
-        },
-        {
-          model: User,
-          as: "user",
-        },
-      ],
-    });
-
-    if (!order) {
-      console.log("❌ [ORDERS/:ID] Order not found after final query");
-      return res.status(404).json({
-        success: false,
-        message: "Order not found",
-      });
-    }
-
-    // Log order clinicId for redirect debugging
-    if (process.env.NODE_ENV === 'development') {
-      const orderJson = order.toJSON();
-      console.log('[ORDERS/:ID] Order retrieved for redirect:', {
-        orderId: order.id,
-        orderNumber: (order as any).orderNumber,
-        clinicId: (order as any).clinicId || orderJson.clinicId,
-        userId: order.userId,
-      });
-    }
-
-    // Fetch prescriptions for this order (created around the same time)
-    const prescriptions = await Prescription.findAll({
-      where: {
-        patientId: order.userId,
-        name: {
-          [Op.like]: `%${order.orderNumber}%`,
-        },
-      },
-      include: [
-        {
-          model: PrescriptionProducts,
-          as: "prescriptionProducts",
-          include: [
-            {
-              model: Product,
-              as: "product",
-            },
-          ],
-        },
-        {
-          model: User,
-          as: "doctor",
-          attributes: ["id", "firstName", "lastName"],
-        },
-        {
-          model: PrescriptionExtension,
-          as: "extensions",
-          required: false,
-        },
-      ],
-    });
-
-    // HIPAA Audit: Log PHI access (order contains patient name, address, medications)
-    await AuditService.logOrderView(req, order.id);
-
-    console.log("✅ [ORDERS/:ID] Order successfully retrieved and returned");
-    res.status(200).json({
-      success: true,
-      data: {
-        ...order.toJSON(),
-        prescriptions,
-      },
-    });
-  } catch (error) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("❌ [ORDERS/:ID] Exception occurred:", error);
-      console.error(
-        "❌ [ORDERS/:ID] Error type:",
-        error instanceof Error ? error.constructor.name : "Unknown"
-      );
-      console.error(
-        "❌ [ORDERS/:ID] Error message:",
-        error instanceof Error ? error.message : String(error)
-      );
-      console.error(
-        "❌ [ORDERS/:ID] Error stack:",
-        error instanceof Error ? error.stack : "No stack trace"
-      );
-    } else {
-      console.error("❌ [ORDERS/:ID] Exception occurred:");
-      console.error("❌ [ORDERS/:ID] Error type:");
-      console.error("❌ [ORDERS/:ID] Error message:");
-      console.error("❌ [ORDERS/:ID] Error stack:");
-    }
-
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch order",
-      error:
-        process.env.NODE_ENV === "development" && error instanceof Error
-          ? error.message
-          : undefined,
     });
   }
 });
@@ -13314,953 +10970,6 @@ app.put("/patient", authenticateJWT, async (req, res) => {
   }
 });
 
-// Order endpoints
-app.get("/orders/by-clinic/:clinicId", authenticateJWT, async (req, res) => {
-  try {
-    const { clinicId } = req.params;
-    const { page, limit } = req.query;
-    const currentUser = getCurrentUser(req);
-
-    if (!currentUser) {
-      return res.status(401).json({
-        success: false,
-        message: "Not authenticated",
-      });
-    }
-
-    const paginationParams = {
-      page: page ? parseInt(page as string) : undefined,
-      limit: limit ? parseInt(limit as string) : undefined,
-    };
-
-    const result = await orderService.listOrdersByClinic(
-      clinicId,
-      currentUser.id,
-      paginationParams
-    );
-
-    if (result.success) {
-      // HIPAA Audit: Log bulk PHI access (viewing all orders for a clinic)
-      await AuditService.logFromRequest(req, {
-        action: AuditAction.VIEW,
-        resourceType: AuditResourceType.ORDER,
-        details: { bulkAccess: true, clinicId },
-      });
-      res.status(200).json(result);
-    } else {
-      if (result.message === "Forbidden") {
-        res.status(403).json(result);
-      } else {
-        res.status(400).json(result);
-      }
-    }
-  } catch (error) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("❌ Error listing orders by clinic:", error);
-    } else {
-      console.error("❌ Error listing orders by clinic");
-    }
-    res.status(500).json({
-      success: false,
-      message: "Internal server error",
-    });
-  }
-});
-
-// Payouts endpoints
-// Get all payouts tracking (for tenant management portal)
-app.get("/payouts/tenant", authenticateJWT, async (req, res) => {
-  try {
-    const currentUser = getCurrentUser(req);
-    if (!currentUser) {
-      return res.status(401).json({
-        success: false,
-        message: "Not authenticated",
-      });
-    }
-
-    // Only tenant managers should access this endpoint
-    // Check if user has tenant management role
-    const user = await User.findByPk(currentUser.id, {
-      include: [{ model: UserRoles, as: "userRoles" }],
-    });
-
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: "User not found",
-      });
-    }
-
-    // For now, allow access to any authenticated user
-    // TODO: Add proper tenant management role check
-
-    const { dateFrom, dateTo, page = "1", limit = "50" } = req.query;
-
-    const whereClause: any = {
-      status: {
-        [Op.in]: ["paid", "processing", "shipped", "delivered"],
-      },
-    };
-
-    if (dateFrom) {
-      whereClause.createdAt = {
-        ...whereClause.createdAt,
-        [Op.gte]: new Date(dateFrom as string),
-      };
-    }
-
-    if (dateTo) {
-      whereClause.createdAt = {
-        ...whereClause.createdAt,
-        [Op.lte]: new Date(dateTo as string),
-      };
-    }
-
-    const pageNum = parseInt(page as string) || 1;
-    const limitNum = parseInt(limit as string) || 50;
-    const offset = (pageNum - 1) * limitNum;
-
-    // Get count separately to avoid issues with multiple User associations
-    const total = await Order.count({
-      where: whereClause,
-      distinct: true,
-      col: "id",
-    });
-
-    const orders = await Order.findAll({
-      where: whereClause,
-      attributes: [
-        "id",
-        "orderNumber",
-        "status",
-        "totalAmount",
-        "platformFeeAmount",
-        "doctorAmount",
-        "pharmacyWholesaleAmount",
-        "brandAmount",
-        "stripeAmount",
-        "createdAt",
-        "clinicId",
-        "physicianId",
-        "affiliateId",
-        "approvedByDoctorId",
-      ],
-      include: [
-        {
-          model: Clinic,
-          as: "clinic",
-          attributes: ["id", "name", "slug"],
-          required: false,
-        },
-        {
-          model: Physician,
-          as: "physician",
-          attributes: ["id", "firstName", "lastName", "email"],
-          required: false,
-        },
-        {
-          model: User,
-          as: "affiliate",
-          attributes: ["id", "firstName", "lastName", "email"],
-          required: false,
-        },
-        {
-          model: User,
-          as: "approvedByDoctorUser",
-          attributes: ["id", "firstName", "lastName", "email"],
-          required: false,
-        },
-        {
-          model: Payment,
-          as: "payment",
-          attributes: ["status", "paidAt"],
-          required: false,
-        },
-      ],
-      order: [["createdAt", "DESC"]],
-      limit: limitNum,
-      offset,
-    });
-
-    // Aggregate payouts by recipient type
-    const payouts = {
-      brands: {} as Record<string, any>,
-      doctors: {} as Record<string, any>,
-      pharmacies: {} as Record<string, any>,
-      affiliates: {} as Record<string, any>,
-      totals: {
-        totalBrandAmount: 0,
-        totalDoctorAmount: 0,
-        totalPharmacyAmount: 0,
-        totalAffiliateAmount: 0,
-        totalPlatformFee: 0,
-      },
-    };
-
-    orders.forEach((order: any) => {
-      const orderData = order.toJSON();
-
-      // Brand payouts
-      if (orderData.brandAmount > 0 && orderData.clinicId) {
-        const clinicKey = orderData.clinicId;
-        if (!payouts.brands[clinicKey]) {
-          payouts.brands[clinicKey] = {
-            clinicId: clinicKey,
-            clinicName: orderData.clinic?.name || "Unknown",
-            clinicSlug: orderData.clinic?.slug || "",
-            totalAmount: 0,
-            orderCount: 0,
-            orders: [],
-          };
-        }
-        payouts.brands[clinicKey].totalAmount += parseFloat(orderData.brandAmount) || 0;
-        payouts.brands[clinicKey].orderCount += 1;
-        payouts.brands[clinicKey].orders.push({
-          orderId: orderData.id,
-          orderNumber: orderData.orderNumber,
-          amount: parseFloat(orderData.brandAmount) || 0,
-          date: orderData.createdAt,
-          status: orderData.status,
-          paymentStatus: orderData.payment?.status,
-        });
-        payouts.totals.totalBrandAmount += parseFloat(orderData.brandAmount) || 0;
-      }
-
-      // Doctor payouts - use approvedByDoctorId if available, otherwise fallback to physicianId
-      if (orderData.doctorAmount > 0) {
-        // Prioritize approvedByDoctorId over physicianId
-        const doctorId = orderData.approvedByDoctorId || orderData.physicianId;
-        if (doctorId) {
-          const doctorKey = doctorId;
-          if (!payouts.doctors[doctorKey]) {
-            // Use approvedByDoctorUser user data if available, otherwise use physician data
-            const doctorUser = orderData.approvedByDoctorUser;
-            const doctorPhysician = orderData.physician;
-            payouts.doctors[doctorKey] = {
-              doctorId: doctorKey,
-              doctorName: doctorUser
-                ? `${doctorUser.firstName || ""} ${doctorUser.lastName || ""}`.trim()
-                : doctorPhysician
-                  ? `${doctorPhysician.firstName || ""} ${doctorPhysician.lastName || ""}`.trim()
-                  : "Unknown",
-              doctorEmail: doctorUser?.email || doctorPhysician?.email || "",
-              totalAmount: 0,
-              orderCount: 0,
-              orders: [],
-            };
-          }
-          payouts.doctors[doctorKey].totalAmount += parseFloat(orderData.doctorAmount) || 0;
-          payouts.doctors[doctorKey].orderCount += 1;
-          payouts.doctors[doctorKey].orders.push({
-            orderId: orderData.id,
-            orderNumber: orderData.orderNumber,
-            amount: parseFloat(orderData.doctorAmount) || 0,
-            date: orderData.createdAt,
-            status: orderData.status,
-            paymentStatus: orderData.payment?.status,
-          });
-          payouts.totals.totalDoctorAmount += parseFloat(orderData.doctorAmount) || 0;
-        }
-      }
-
-      // Pharmacy payouts
-      if (orderData.pharmacyWholesaleAmount > 0) {
-        const pharmacyKey = "pharmacy"; // Since we don't have pharmacyId in Order
-        if (!payouts.pharmacies[pharmacyKey]) {
-          payouts.pharmacies[pharmacyKey] = {
-            pharmacyId: pharmacyKey,
-            pharmacyName: "Pharmacy",
-            totalAmount: 0,
-            orderCount: 0,
-            orders: [],
-          };
-        }
-        payouts.pharmacies[pharmacyKey].totalAmount += parseFloat(orderData.pharmacyWholesaleAmount) || 0;
-        payouts.pharmacies[pharmacyKey].orderCount += 1;
-        payouts.pharmacies[pharmacyKey].orders.push({
-          orderId: orderData.id,
-          orderNumber: orderData.orderNumber,
-          amount: parseFloat(orderData.pharmacyWholesaleAmount) || 0,
-          date: orderData.createdAt,
-          status: orderData.status,
-          paymentStatus: orderData.payment?.status,
-        });
-        payouts.totals.totalPharmacyAmount += parseFloat(orderData.pharmacyWholesaleAmount) || 0;
-      }
-
-      // Affiliate payouts
-      if (orderData.affiliateId) {
-        // Calculate affiliate commission using AFFILIATE_REVENUE_PERCENTAGE
-        const affiliateRevenuePercentage = parseFloat(
-          process.env.AFFILIATE_REVENUE_PERCENTAGE || process.env["AFFILIATE-REVENUE-PERCENTAJE"] || "1"
-        ) / 100;
-        const orderTotal = parseFloat(orderData.totalAmount) || 0;
-        const affiliateAmount = orderTotal * affiliateRevenuePercentage;
-
-        const affiliateKey = orderData.affiliateId;
-        if (!payouts.affiliates[affiliateKey]) {
-          payouts.affiliates[affiliateKey] = {
-            affiliateId: affiliateKey,
-            affiliateName: orderData.affiliate
-              ? `${orderData.affiliate.firstName || ""} ${orderData.affiliate.lastName || ""}`.trim()
-              : "Unknown",
-            affiliateEmail: orderData.affiliate?.email || "",
-            totalAmount: 0,
-            orderCount: 0,
-            orders: [],
-          };
-        }
-        payouts.affiliates[affiliateKey].totalAmount += Math.round(affiliateAmount * 100) / 100; // Round to 2 decimal places
-        payouts.affiliates[affiliateKey].orderCount += 1;
-        payouts.affiliates[affiliateKey].orders.push({
-          orderId: orderData.id,
-          orderNumber: orderData.orderNumber,
-          amount: Math.round(affiliateAmount * 100) / 100,
-          date: orderData.createdAt,
-          status: orderData.status,
-          paymentStatus: orderData.payment?.status,
-        });
-        payouts.totals.totalAffiliateAmount += Math.round(affiliateAmount * 100) / 100;
-      }
-
-      payouts.totals.totalPlatformFee += parseFloat(orderData.platformFeeAmount) || 0;
-    });
-
-    // Convert objects to arrays
-    const result = {
-      brands: Object.values(payouts.brands),
-      doctors: Object.values(payouts.doctors),
-      pharmacies: Object.values(payouts.pharmacies),
-      affiliates: Object.values(payouts.affiliates),
-      totals: payouts.totals,
-      pagination: {
-        page: pageNum,
-        limit: limitNum,
-        total,
-        totalPages: Math.ceil(total / limitNum),
-      },
-    };
-
-    res.status(200).json({
-      success: true,
-      data: result,
-    });
-  } catch (error) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("❌ Error fetching tenant payouts:", error);
-    } else {
-      console.error("❌ Error fetching tenant payouts");
-    }
-    res.status(500).json({
-      success: false,
-      message: "Internal server error",
-    });
-  }
-});
-
-// Get payouts for a specific brand (for brand portal)
-app.get("/payouts/brand", authenticateJWT, async (req, res) => {
-  try {
-    const currentUser = getCurrentUser(req);
-    if (!currentUser) {
-      return res.status(401).json({
-        success: false,
-        message: "Not authenticated",
-      });
-    }
-
-    const user = await User.findByPk(currentUser.id);
-    if (!user || !user.clinicId) {
-      return res.status(403).json({
-        success: false,
-        message: "User does not have a clinic associated",
-      });
-    }
-
-    const { dateFrom, dateTo, page = "1", limit = "50" } = req.query;
-
-    const whereClause: any = {
-      paymentGoesTo: PaymentGoesTo.BRAND,
-      status: {
-        [Op.in]: ["succeeded", "processing"],
-      },
-    };
-
-    if (dateFrom) {
-      whereClause.createdAt = {
-        ...whereClause.createdAt,
-        [Op.gte]: new Date(dateFrom as string),
-      };
-    }
-
-    if (dateTo) {
-      whereClause.createdAt = {
-        ...whereClause.createdAt,
-        [Op.lte]: new Date(dateTo as string),
-      };
-    }
-
-    const pageNum = parseInt(page as string) || 1;
-    const limitNum = parseInt(limit as string) || 50;
-    const offset = (pageNum - 1) * limitNum;
-
-    // Get payments that go to this brand
-    // Filter by clinic's stripeAccountId in metadata or by order's clinicId
-    const { rows: payments, count: total } = await Payment.findAndCountAll({
-      where: whereClause,
-      include: [
-        {
-          model: Order,
-          as: "order",
-          where: {
-            clinicId: user.clinicId,
-          },
-          required: false,
-          attributes: [
-            "id",
-            "orderNumber",
-            "status",
-            "totalAmount",
-            "brandAmount",
-            "createdAt",
-          ],
-          include: [
-            {
-              model: User,
-              as: "user",
-              attributes: ["id", "firstName", "lastName", "email"],
-            },
-          ],
-        },
-      ],
-      order: [["createdAt", "DESC"]],
-      limit: limitNum,
-      offset,
-      distinct: true,
-    });
-
-    // Filter payments that are associated with this brand's clinic
-    // Either through order.clinicId or through metadata.destination matching clinic's stripeAccountId
-    const clinic = await Clinic.findByPk(user.clinicId);
-    const payouts = payments
-      .filter((payment: any) => {
-        const paymentData = payment.toJSON();
-        // If payment has an order with matching clinicId
-        if (paymentData.order && paymentData.order.clinicId === user.clinicId) {
-          return true;
-        }
-        // If payment metadata has destination matching clinic's stripeAccountId
-        if (
-          clinic?.stripeAccountId &&
-          paymentData.stripeMetadata?.destination === clinic.stripeAccountId
-        ) {
-          return true;
-        }
-        return false;
-      })
-      .map((payment: any) => {
-        const paymentData = payment.toJSON();
-        const order = paymentData.order;
-        return {
-          paymentId: paymentData.id,
-          orderId: order?.id || null,
-          orderNumber: order?.orderNumber || null,
-          amount: parseFloat(paymentData.amount) || 0,
-          totalAmount: order ? parseFloat(order.totalAmount) || 0 : parseFloat(paymentData.amount) || 0,
-          date: paymentData.createdAt,
-          status: paymentData.status,
-          paidAt: paymentData.paidAt,
-          stripePaymentIntentId: paymentData.stripePaymentIntentId,
-          customer: order?.user
-            ? {
-              name: `${order.user.firstName || ""} ${order.user.lastName || ""}`.trim(),
-              email: order.user.email,
-            }
-            : null,
-        };
-      });
-
-    const totalAmount = payouts.reduce((sum, p) => sum + p.amount, 0);
-
-    res.status(200).json({
-      success: true,
-      data: {
-        payouts,
-        summary: {
-          totalAmount,
-          totalOrders: payouts.length,
-        },
-        pagination: {
-          page: pageNum,
-          limit: limitNum,
-          total,
-          totalPages: Math.ceil(total / limitNum),
-        },
-      },
-    });
-  } catch (error) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("❌ Error fetching brand payouts:", error);
-    } else {
-      console.error("❌ Error fetching brand payouts");
-    }
-    res.status(500).json({
-      success: false,
-      message: "Internal server error",
-    });
-  }
-});
-
-// Get payouts for a specific affiliate (for affiliate portal)
-app.get("/payouts/affiliate", authenticateJWT, async (req, res) => {
-  try {
-    const currentUser = getCurrentUser(req);
-    if (!currentUser) {
-      return res.status(401).json({
-        success: false,
-        message: "Not authenticated",
-      });
-    }
-
-    const { dateFrom, dateTo, page = "1", limit = "50" } = req.query;
-
-    const whereClause: any = {
-      affiliateId: currentUser.id,
-      status: {
-        [Op.in]: ["paid", "processing", "shipped", "delivered"],
-      },
-    };
-
-    if (dateFrom) {
-      whereClause.createdAt = {
-        ...whereClause.createdAt,
-        [Op.gte]: new Date(dateFrom as string),
-      };
-    }
-
-    if (dateTo) {
-      whereClause.createdAt = {
-        ...whereClause.createdAt,
-        [Op.lte]: new Date(dateTo as string),
-      };
-    }
-
-    const pageNum = parseInt(page as string) || 1;
-    const limitNum = parseInt(limit as string) || 50;
-    const offset = (pageNum - 1) * limitNum;
-
-    const { rows: orders, count: total } = await Order.findAndCountAll({
-      where: whereClause,
-      attributes: [
-        "id",
-        "orderNumber",
-        "status",
-        "totalAmount",
-        "createdAt",
-      ],
-      include: [
-        {
-          model: Payment,
-          as: "payment",
-          attributes: ["status", "paidAt"],
-        },
-        {
-          model: Clinic,
-          as: "clinic",
-          attributes: ["id", "name", "slug"],
-        },
-        {
-          model: User,
-          as: "user",
-          attributes: ["id", "firstName", "lastName", "email"],
-        },
-      ],
-      order: [["createdAt", "DESC"]],
-      limit: limitNum,
-      offset,
-      distinct: true,
-    });
-
-    // Calculate affiliate commission using AFFILIATE_REVENUE_PERCENTAGE
-    const affiliateRevenuePercentage = parseFloat(
-      process.env.AFFILIATE_REVENUE_PERCENTAGE || process.env["AFFILIATE-REVENUE-PERCENTAJE"] || "1"
-    ) / 100;
-
-    const payouts = orders.map((order: any) => {
-      const orderData = order.toJSON();
-      // Calculate affiliate commission as percentage of order total
-      const orderTotal = parseFloat(orderData.totalAmount) || 0;
-      const affiliateAmount = orderTotal * affiliateRevenuePercentage;
-
-      return {
-        orderId: orderData.id,
-        orderNumber: orderData.orderNumber,
-        amount: Math.round(affiliateAmount * 100) / 100, // Round to 2 decimal places
-        totalAmount: orderTotal,
-        date: orderData.createdAt,
-        status: orderData.status,
-        paymentStatus: orderData.payment?.status,
-        paidAt: orderData.payment?.paidAt,
-        brand: orderData.clinic
-          ? {
-            name: orderData.clinic.name,
-            slug: orderData.clinic.slug,
-          }
-          : null,
-        customer: orderData.user
-          ? {
-            name: `${orderData.user.firstName || ""} ${orderData.user.lastName || ""}`.trim(),
-            email: orderData.user.email,
-          }
-          : null,
-      };
-    });
-
-    const totalAmount = payouts.reduce((sum, p) => sum + p.amount, 0);
-
-    res.status(200).json({
-      success: true,
-      data: {
-        payouts,
-        summary: {
-          totalAmount,
-          totalOrders: payouts.length,
-        },
-        pagination: {
-          page: pageNum,
-          limit: limitNum,
-          total,
-          totalPages: Math.ceil(total / limitNum),
-        },
-      },
-    });
-  } catch (error) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("❌ Error fetching affiliate payouts:", error);
-    } else {
-      console.error("❌ Error fetching affiliate payouts");
-    }
-    res.status(500).json({
-      success: false,
-      message: "Internal server error",
-    });
-  }
-});
-
-// Get payouts for a specific doctor (for doctor portal)
-app.get("/payouts/doctor", authenticateJWT, async (req, res) => {
-  try {
-    const currentUser = getCurrentUser(req);
-    if (!currentUser) {
-      return res.status(401).json({
-        success: false,
-        message: "Not authenticated",
-      });
-    }
-
-    const user = await User.findByPk(currentUser.id);
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: "User not found",
-      });
-    }
-
-    // Only allow doctors to access their payouts
-    if (user.role !== "doctor") {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied. Doctor role required.",
-      });
-    }
-
-    const { dateFrom, dateTo, page = "1", limit = "50" } = req.query;
-
-    // Debug log in development
-    if (process.env.NODE_ENV === "development") {
-      console.log(`[PAYOUTS/DOCTOR] Fetching payouts for doctor:`, {
-        doctorId: user.id,
-        doctorEmail: user.email,
-        role: user.role,
-      });
-    }
-
-    const whereClause: any = {
-      paymentGoesTo: PaymentGoesTo.DOCTOR,
-      status: {
-        [Op.in]: ["succeeded", "processing"],
-      },
-    };
-
-    if (dateFrom) {
-      whereClause.createdAt = {
-        ...whereClause.createdAt,
-        [Op.gte]: new Date(dateFrom as string),
-      };
-    }
-
-    if (dateTo) {
-      whereClause.createdAt = {
-        ...whereClause.createdAt,
-        [Op.lte]: new Date(dateTo as string),
-      };
-    }
-
-    const pageNum = parseInt(page as string) || 1;
-    const limitNum = parseInt(limit as string) || 50;
-    const offset = (pageNum - 1) * limitNum;
-
-    // Get payments that go to this doctor
-    // Filter by order's approvedByDoctorId matching this doctor
-    const { rows: payments, count: total } = await Payment.findAndCountAll({
-      where: whereClause,
-      include: [
-        {
-          model: Order,
-          as: "order",
-          where: {
-            approvedByDoctorId: user.id,
-          },
-          required: false,
-          attributes: [
-            "id",
-            "orderNumber",
-            "status",
-            "totalAmount",
-            "doctorAmount",
-            "createdAt",
-            "approvedByDoctorId",
-          ],
-          include: [
-            {
-              model: Clinic,
-              as: "clinic",
-              attributes: ["id", "name", "slug"],
-              required: false,
-            },
-            {
-              model: User,
-              as: "user",
-              attributes: ["id", "firstName", "lastName", "email"],
-            },
-          ],
-        },
-      ],
-      order: [["createdAt", "DESC"]],
-      limit: limitNum,
-      offset,
-      distinct: true,
-    });
-
-    // Filter payments that are associated with this doctor
-    // Either through order.approvedByDoctorId or through metadata.doctorId
-    const payouts = payments
-      .filter((payment: any) => {
-        const paymentData = payment.toJSON();
-        // If payment has an order with matching approvedByDoctorId
-        if (paymentData.order && paymentData.order.approvedByDoctorId === user.id) {
-          return true;
-        }
-        // If payment metadata has doctorId matching this doctor
-        if (paymentData.stripeMetadata?.doctorId === user.id) {
-          return true;
-        }
-        return false;
-      })
-      .map((payment: any) => {
-        const paymentData = payment.toJSON();
-        const order = paymentData.order;
-        return {
-          paymentId: paymentData.id,
-          orderId: order?.id || null,
-          orderNumber: order?.orderNumber || null,
-          amount: parseFloat(paymentData.amount) || 0,
-          totalAmount: order ? parseFloat(order.totalAmount) || 0 : parseFloat(paymentData.amount) || 0,
-          date: paymentData.createdAt,
-          status: paymentData.status,
-          paidAt: paymentData.paidAt,
-          stripePaymentIntentId: paymentData.stripePaymentIntentId,
-          brand: order?.clinic
-            ? {
-              name: order.clinic.name,
-              slug: order.clinic.slug,
-            }
-            : null,
-          customer: order?.user
-            ? {
-              name: `${order.user.firstName || ""} ${order.user.lastName || ""}`.trim(),
-              email: order.user.email,
-            }
-            : null,
-        };
-      });
-
-    const totalAmount = payouts.reduce((sum, p) => sum + p.amount, 0);
-
-    res.status(200).json({
-      success: true,
-      data: {
-        payouts,
-        summary: {
-          totalAmount,
-          totalOrders: payouts.length,
-        },
-        pagination: {
-          page: pageNum,
-          limit: limitNum,
-          total,
-          totalPages: Math.ceil(total / limitNum),
-        },
-      },
-    });
-  } catch (error) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("❌ Error fetching doctor payouts:", error);
-    } else {
-      console.error("❌ Error fetching doctor payouts");
-    }
-    res.status(500).json({
-      success: false,
-      message: "Internal server error",
-    });
-  }
-});
-
-// Get payouts for pharmacy
-app.get("/payouts/pharmacy", authenticateJWT, async (req, res) => {
-  try {
-    const currentUser = getCurrentUser(req);
-    if (!currentUser) {
-      return res.status(401).json({
-        success: false,
-        message: "Not authenticated",
-      });
-    }
-
-    const { dateFrom, dateTo, page = "1", limit = "50" } = req.query;
-
-    const whereClause: any = {
-      paymentGoesTo: PaymentGoesTo.PHARMACY,
-      status: {
-        [Op.in]: ["succeeded", "processing"],
-      },
-    };
-
-    if (dateFrom) {
-      whereClause.createdAt = {
-        ...whereClause.createdAt,
-        [Op.gte]: new Date(dateFrom as string),
-      };
-    }
-
-    if (dateTo) {
-      whereClause.createdAt = {
-        ...whereClause.createdAt,
-        [Op.lte]: new Date(dateTo as string),
-      };
-    }
-
-    const pageNum = parseInt(page as string) || 1;
-    const limitNum = parseInt(limit as string) || 50;
-    const offset = (pageNum - 1) * limitNum;
-
-    // Get payments that go to pharmacy
-    const { rows: payments, count: total } = await Payment.findAndCountAll({
-      where: whereClause,
-      include: [
-        {
-          model: Order,
-          as: "order",
-          required: false,
-          attributes: [
-            "id",
-            "orderNumber",
-            "status",
-            "totalAmount",
-            "pharmacyWholesaleAmount",
-            "createdAt",
-          ],
-          include: [
-            {
-              model: Clinic,
-              as: "clinic",
-              attributes: ["id", "name", "slug"],
-              required: false,
-            },
-            {
-              model: User,
-              as: "user",
-              attributes: ["id", "firstName", "lastName", "email"],
-            },
-          ],
-        },
-      ],
-      order: [["createdAt", "DESC"]],
-      limit: limitNum,
-      offset,
-      distinct: true,
-    });
-
-    const payouts = payments.map((payment: any) => {
-      const paymentData = payment.toJSON();
-      const order = paymentData.order;
-      return {
-        paymentId: paymentData.id,
-        orderId: order?.id || null,
-        orderNumber: order?.orderNumber || null,
-        amount: parseFloat(paymentData.amount) || 0,
-        totalAmount: order ? parseFloat(order.totalAmount) || 0 : parseFloat(paymentData.amount) || 0,
-        date: paymentData.createdAt,
-        status: paymentData.status,
-        paidAt: paymentData.paidAt,
-        stripePaymentIntentId: paymentData.stripePaymentIntentId,
-        brand: order?.clinic
-          ? {
-            name: order.clinic.name,
-            slug: order.clinic.slug,
-          }
-          : null,
-        customer: order?.user
-          ? {
-            name: `${order.user.firstName || ""} ${order.user.lastName || ""}`.trim(),
-            email: order.user.email,
-          }
-          : null,
-      };
-    });
-
-    const totalAmount = payouts.reduce((sum, p) => sum + p.amount, 0);
-
-    res.status(200).json({
-      success: true,
-      data: {
-        payouts,
-        summary: {
-          totalAmount,
-          totalOrders: payouts.length,
-        },
-        pagination: {
-          page: pageNum,
-          limit: limitNum,
-          total,
-          totalPages: Math.ceil(total / limitNum),
-        },
-      },
-    });
-  } catch (error) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("❌ Error fetching pharmacy payouts:", error);
-    } else {
-      console.error("❌ Error fetching pharmacy payouts");
-    }
-    res.status(500).json({
-      success: false,
-      message: "Internal server error",
-    });
-  }
-});
-
 app.post("/webhook/orders", async (req, res) => {
   try {
     // Validate webhook signature using HMAC SHA256
@@ -14736,21 +11445,31 @@ app.put("/organization/update", authenticateJWT, async (req, res) => {
 
         if (isCustomDomain !== undefined) {
           updateData.isCustomDomain = isCustomDomain;
+
+          // If switching to subdomain (isCustomDomain = false), clear customDomain
+          if (isCustomDomain === false) {
+            updateData.customDomain = null;
+          }
         }
 
         if (customDomain !== undefined) {
-          // Normalize custom domain to bare hostname (lowercase, no protocol/path/trailing dot)
-          try {
-            const candidate = customDomain.trim();
-            const url = new URL(
-              candidate.startsWith("http") ? candidate : `https://${candidate}`
-            );
-            let host = url.hostname.toLowerCase();
-            if (host.endsWith(".")) host = host.slice(0, -1);
-            updateData.customDomain = host;
-          } catch {
-            // Fallback to raw value (will be validated elsewhere if needed)
-            updateData.customDomain = customDomain;
+          // Convert empty string to null to avoid unique constraint violations
+          if (!customDomain || customDomain.trim() === '') {
+            updateData.customDomain = null;
+          } else {
+            // Normalize custom domain to bare hostname (lowercase, no protocol/path/trailing dot)
+            try {
+              const candidate = customDomain.trim();
+              const url = new URL(
+                candidate.startsWith("http") ? candidate : `https://${candidate}`
+              );
+              let host = url.hostname.toLowerCase();
+              if (host.endsWith(".")) host = host.slice(0, -1);
+              updateData.customDomain = host;
+            } catch {
+              // Fallback to raw value (will be validated elsewhere if needed)
+              updateData.customDomain = customDomain;
+            }
           }
         }
 
@@ -14806,13 +11525,43 @@ app.put("/organization/update", authenticateJWT, async (req, res) => {
           : null,
       },
     });
-  } catch (error) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("❌ Error updating organization:", error);
-    } else {
-      console.error("❌ Error updating organization");
+  } catch (error: any) {
+    console.error("❌ Error updating organization:", error?.message || error);
+    if (error?.errors) {
+      console.error("❌ Sequelize errors:", JSON.stringify(error.errors, null, 2));
     }
-    res.status(500).json({ success: false, message: "Internal server error" });
+
+    // Handle Sequelize unique constraint violations
+    if (error?.name === 'SequelizeUniqueConstraintError') {
+      const field = error?.errors?.[0]?.path;
+      const value = error?.errors?.[0]?.value;
+
+      if (field === 'customDomain') {
+        return res.status(400).json({
+          success: false,
+          message: `The custom domain "${value}" is already in use by another organization. Please choose a different domain.`
+        });
+      }
+
+      return res.status(400).json({
+        success: false,
+        message: `This ${field} is already in use. Please choose a different value.`
+      });
+    }
+
+    // Handle other validation errors
+    if (error?.name === 'SequelizeValidationError') {
+      const messages = error?.errors?.map((e: any) => e.message).join(', ');
+      return res.status(400).json({
+        success: false,
+        message: messages || 'Validation error occurred'
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: error?.message || "Internal server error"
+    });
   }
 });
 
@@ -15246,268 +11995,6 @@ app.put("/users/profile", authenticateJWT, async (req, res) => {
   }
 });
 
-// ========================================
-// Dashboard Analytics Endpoints
-// ========================================
-
-// Get dashboard metrics
-app.get("/dashboard/metrics", authenticateJWT, async (req, res) => {
-  try {
-    const currentUser = getCurrentUser(req);
-    if (!currentUser) {
-      return res
-        .status(401)
-        .json({ success: false, message: "Not authenticated" });
-    }
-
-    const { startDate, endDate, clinicId } = req.query;
-
-    if (!clinicId || typeof clinicId !== "string") {
-      return res
-        .status(400)
-        .json({ success: false, message: "clinicId is required" });
-    }
-
-    // Verify user has access to this clinic
-    const user = await User.findByPk(currentUser.id);
-    if (!user || user.clinicId !== clinicId) {
-      return res
-        .status(403)
-        .json({ success: false, message: "Access denied to this clinic" });
-    }
-
-    const start = startDate
-      ? new Date(startDate as string)
-      : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const end = endDate ? new Date(endDate as string) : new Date();
-
-    const dashboardService = new DashboardService();
-    const metrics = await dashboardService.getDashboardMetrics(clinicId, {
-      start,
-      end,
-    });
-
-    res.json({ success: true, data: metrics });
-  } catch (error) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("❌ Error fetching dashboard metrics:", error);
-    } else {
-      console.error("❌ Error fetching dashboard metrics");
-    }
-    res
-      .status(500)
-      .json({ success: false, message: "Failed to fetch dashboard metrics" });
-  }
-});
-
-// Get revenue chart data
-app.get("/dashboard/revenue-chart", authenticateJWT, async (req, res) => {
-  try {
-    const currentUser = getCurrentUser(req);
-    if (!currentUser) {
-      return res
-        .status(401)
-        .json({ success: false, message: "Not authenticated" });
-    }
-
-    const { startDate, endDate, interval, clinicId } = req.query;
-
-    if (!clinicId || typeof clinicId !== "string") {
-      return res
-        .status(400)
-        .json({ success: false, message: "clinicId is required" });
-    }
-
-    // Verify user has access to this clinic
-    const user = await User.findByPk(currentUser.id);
-    if (!user || user.clinicId !== clinicId) {
-      return res
-        .status(403)
-        .json({ success: false, message: "Access denied to this clinic" });
-    }
-
-    const start = startDate
-      ? new Date(startDate as string)
-      : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const end = endDate ? new Date(endDate as string) : new Date();
-    const chartInterval =
-      interval === "daily" || interval === "weekly" ? interval : "daily";
-
-    const dashboardService = new DashboardService();
-    const chartData = await dashboardService.getRevenueOverTime(
-      clinicId,
-      { start, end },
-      chartInterval
-    );
-
-    res.json({ success: true, data: chartData });
-  } catch (error) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("❌ Error fetching revenue chart:", error);
-    } else {
-      console.error("❌ Error fetching revenue chart");
-    }
-    res
-      .status(500)
-      .json({ success: false, message: "Failed to fetch revenue chart" });
-  }
-});
-
-// Get earnings report
-app.get("/dashboard/earnings-report", authenticateJWT, async (req, res) => {
-  try {
-    const currentUser = getCurrentUser(req);
-    if (!currentUser) {
-      return res
-        .status(401)
-        .json({ success: false, message: "Not authenticated" });
-    }
-
-    const { startDate, endDate, clinicId } = req.query;
-
-    if (!clinicId || typeof clinicId !== "string") {
-      return res
-        .status(400)
-        .json({ success: false, message: "clinicId is required" });
-    }
-
-    // Verify user has access to this clinic
-    const user = await User.findByPk(currentUser.id);
-    if (!user || user.clinicId !== clinicId) {
-      return res
-        .status(403)
-        .json({ success: false, message: "Access denied to this clinic" });
-    }
-
-    const start = startDate
-      ? new Date(startDate as string)
-      : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const end = endDate ? new Date(endDate as string) : new Date();
-
-    const dashboardService = new DashboardService();
-    const earningsReport = await dashboardService.getEarningsReport(clinicId, {
-      start,
-      end,
-    });
-
-    res.json({ success: true, data: earningsReport });
-  } catch (error) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("❌ Error fetching earnings report:", error);
-    } else {
-      console.error("❌ Error fetching earnings report");
-    }
-    res
-      .status(500)
-      .json({ success: false, message: "Failed to fetch earnings report" });
-  }
-});
-
-// Get recent activity
-app.get("/dashboard/recent-activity", authenticateJWT, async (req, res) => {
-  try {
-    const currentUser = getCurrentUser(req);
-    if (!currentUser) {
-      return res
-        .status(401)
-        .json({ success: false, message: "Not authenticated" });
-    }
-
-    const { limit, clinicId } = req.query;
-
-    if (!clinicId || typeof clinicId !== "string") {
-      return res
-        .status(400)
-        .json({ success: false, message: "clinicId is required" });
-    }
-
-    // Verify user has access to this clinic
-    const user = await User.findByPk(currentUser.id);
-    if (!user || user.clinicId !== clinicId) {
-      return res
-        .status(403)
-        .json({ success: false, message: "Access denied to this clinic" });
-    }
-
-    const activityLimit = limit ? parseInt(limit as string) : 10;
-
-    const dashboardService = new DashboardService();
-    const recentActivity = await dashboardService.getRecentActivity(
-      clinicId,
-      activityLimit
-    );
-
-    res.json({ success: true, data: recentActivity });
-  } catch (error) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("❌ Error fetching recent activity:", error);
-    } else {
-      console.error("❌ Error fetching recent activity");
-    }
-    res
-      .status(500)
-      .json({ success: false, message: "Failed to fetch recent activity" });
-  }
-});
-
-// Get projected recurring revenue (for remaining days of month)
-app.get("/dashboard/projected-revenue", authenticateJWT, async (req, res) => {
-  try {
-    const currentUser = getCurrentUser(req);
-    if (!currentUser) {
-      return res
-        .status(401)
-        .json({ success: false, message: "Not authenticated" });
-    }
-
-    const { endDate, daysToProject, clinicId } = req.query;
-
-    if (!clinicId || typeof clinicId !== "string") {
-      return res
-        .status(400)
-        .json({ success: false, message: "clinicId is required" });
-    }
-
-    if (!daysToProject) {
-      return res
-        .status(400)
-        .json({ success: false, message: "daysToProject is required" });
-    }
-
-    // Verify user has access to this clinic
-    const user = await User.findByPk(currentUser.id);
-    if (!user || user.clinicId !== clinicId) {
-      return res
-        .status(403)
-        .json({ success: false, message: "Access denied to this clinic" });
-    }
-
-    const projectionEndDate = endDate
-      ? new Date(endDate as string)
-      : new Date();
-    const days = parseInt(daysToProject as string);
-
-    const dashboardService = new DashboardService();
-    const projectedRevenue =
-      await dashboardService.getProjectedRecurringRevenue(
-        clinicId,
-        projectionEndDate,
-        days
-      );
-
-    res.json({ success: true, data: projectedRevenue });
-  } catch (error) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("❌ Error fetching projected revenue:", error);
-    } else {
-      console.error("❌ Error fetching projected revenue");
-    }
-    res
-      .status(500)
-      .json({ success: false, message: "Failed to fetch projected revenue" });
-  }
-});
-
 const PORT = process.env.PORT || 3001;
 
 // Initialize database connection and start server
@@ -15668,6 +12155,10 @@ async function startServer() {
   // ============= PUBLIC ENDPOINTS (No Auth Required) =============
   const { registerPublicEndpoints } = await import("./endpoints/public");
   registerPublicEndpoints(app);
+
+  // ============= AUTH ENDPOINTS =============
+  const { registerAuthEndpoints } = await import("./endpoints/auth");
+  registerAuthEndpoints(app, authenticateJWT, verificationCodes, passwordResetCodes, generateUniqueSlug, getDefaultCustomWebsiteValues);
 
   // ============= DOCTOR PORTAL ENDPOINTS =============
   const { registerDoctorEndpoints } = await import("./endpoints/doctor");
@@ -18383,4 +14874,3 @@ app.delete("/tenant-products/:id", authenticateJWT, async (req, res) => {
 // ✅ MESSAGE TEMPLATES & WEBHOOKS MOVED TO: src/features/
 // - Templates: features/templates/
 // - Webhooks: features/sequences/webhooks/
-

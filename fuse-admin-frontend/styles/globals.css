@@ -80,51 +80,18 @@
     @apply border-border;
   }
 
+  html,
+  body {
+    @apply h-full overflow-hidden;
+  }
+
   body {
     @apply bg-background text-foreground;
   }
-}
 
-/* Tutorial (Joyride) styles - Change red colors to dark green */
-[class*="__react-joyride"] button[class*="button"] {
-  background-color: #166534 !important;
-  border-color: #166534 !important;
-}
-
-[class*="__react-joyride"] button[class*="button"]:hover {
-  background-color: #15803d !important;
-  border-color: #15803d !important;
-}
-
-[class*="__react-joyride"] button[class*="primary"] {
-  background-color: #166534 !important;
-  color: #fff !important;
-}
-
-[class*="__react-joyride"] button[class*="primary"]:hover {
-  background-color: #15803d !important;
-}
-
-[class*="__react-joyride"] [class*="badge"] {
-  background-color: #166534 !important;
-}
-
-[class*="__react-joyride"] [class*="progress"] {
-  accent-color: #166534 !important;
-}
-
-[class*="__react-joyride"] [class*="tooltip"] button {
-  background-color: #166534 !important;
-  color: #fff !important;
-}
-
-[class*="__react-joyride"] [class*="tooltip"] button:hover {
-  background-color: #15803d !important;
-}
-
-/* Override any red colors in tutorial */
-[class*="__react-joyride"] * {
-  --joyride-color-primary: #166534 !important;
+  #__next {
+    @apply h-full overflow-hidden;
+  }
 }
 
 /* Sidebar scrollbar styles */
