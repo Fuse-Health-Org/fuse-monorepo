@@ -1,0 +1,18 @@
+---
+alwaysApply: true
+---
+
+patient-api
+Express TypeScript backend API that serves as the central service for the entire FUSE Health Platform. Manages all business logic, database operations with PostgreSQL, authentication with JWT, and integrations with Stripe for payments, Pharmacy API for prescriptions, MD Integrations for telehealth, SendGrid for emails, and AWS S3 for file storage. Implements HIPAA-compliant data handling for protected health information.
+patient-frontend
+Patient-facing Next.js application where customers can browse and purchase healthcare treatments and products, complete medical questionnaires, manage their treatment subscriptions, schedule telehealth appointments through MD Integrations, track orders, and communicate with healthcare providers in real-time.
+fuse-admin-frontend
+Super admin dashboard built with Next.js for platform administrators to manage the entire system. Provides tools to oversee customers, orders, products, treatments, programs, questionnaires, analytics, payouts, and platform-wide settings. Includes advanced editors for building products, treatments, and forms with tier-based pricing.
+fuse-tenant-portal-frontend
+Next.js portal for clinics and healthcare organizations to manage their operations. Allows tenants to manage their patients, review doctor applications, customize their product catalog, build custom forms and questionnaires, configure pricing tiers and fees, create branded websites, track audit logs, and manage payouts.
+fuse-doctor-portal-frontend
+Next.js application for healthcare providers to manage their patients, review and approve treatment requests, create and edit medical questionnaires and assessment forms, communicate with patients in real-time, accept brand invitations to join organizations, and track their compensation payouts.
+fuse-affiliate-portal-frontend
+Next.js dashboard for marketing partners and affiliates to track their referral performance, monitor revenue and commissions, promote available treatments and products, customize their branding materials, manage their affiliate payouts, and complete the onboarding process.
+packages
+Shared monorepo libraries including TypeScript enums for common constants, Zod schema validators for API validation, Stripe integration utilities, and shared TypeScript configurations used across all applications in the platform.
