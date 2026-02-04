@@ -39,9 +39,12 @@ const allOperations = [
   { name: "Orders", icon: ShoppingCart, current: false, href: "/orders" },
   { name: "Payouts", icon: CreditCard, current: false, href: "/payouts" },
   { name: "Analytics", icon: TrendingUp, current: false, href: "/analytics" },
+]
+
+const crmItems = [
+  { name: "Contacts", icon: UserCircle, current: false, href: "/contacts" },
   { name: "Sequences", icon: Workflow, current: false, href: "/sequences" },
   { name: "Templates", icon: FileText, current: false, href: "/templates" },
-  { name: "Contacts", icon: UserCircle, current: false, href: "/contacts" },
   { name: "Tags", icon: Tag, current: false, href: "/tags" },
 ]
 
@@ -64,14 +67,22 @@ export function Sidebar() {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [runTutorial, setRunTutorial] = useState(false)
   const [tutorialStep, setTutorialStep] = useState<number>(0)
+  const [clinicName, setClinicName] = useState<string>('')
+  const [clinicLogo, setClinicLogo] = useState<string>('')
+  
+  // Check if any CRM route is active
+  const isCrmActive = crmItems.some(item => router.pathname === item.href)
+  const [isCrmOpen, setIsCrmOpen] = useState(isCrmActive)
 
-  // Filter out Sequences, Templates, Contacts, and Tags in production
-  const operations = allOperations.filter(item => {
-    if (process.env.NODE_ENV === 'production') {
-      return !['Sequences', 'Templates', 'Contacts', 'Tags'].includes(item.name)
+  // Auto-expand CRM when on a CRM page
+  useEffect(() => {
+    if (isCrmActive) {
+      setIsCrmOpen(true)
     }
-    return true
-  })
+  }, [isCrmActive])
+
+  // Operations array (no longer contains CRM items)
+  const operations = allOperations
 
   // Check if user has access to analytics based on tier or custom features
   const hasAccessToAnalytics =
@@ -146,6 +157,28 @@ export function Sidebar() {
   useEffect(() => {
     fetchSubscriptionBasicInfo()
   }, [router.pathname])
+
+  // Fetch clinic/organization information for branding
+  useEffect(() => {
+    const fetchClinicInfo = async () => {
+      try {
+        const response = await authenticatedFetch(`${API_URL}/organization`, {
+          method: "GET",
+          skipLogoutOn401: true,
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setClinicName(data.clinicName || data.businessName || 'Fuse Health');
+          setClinicLogo(data.logo || '');
+        }
+      } catch (error) {
+        console.error('Error fetching clinic info:', error);
+      }
+    };
+
+    fetchClinicInfo();
+  }, [authenticatedFetch])
 
   const handleRefreshSubscription = async () => {
     if (isRefreshing) return
@@ -273,10 +306,10 @@ export function Sidebar() {
           <Link
             href={item.href || "#"}
             className={cn(
-              "group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors",
+              "group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-smooth",
               isActive
-                ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-apple"
+                : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
             )}
             onClick={(e) => {
               if (disabled) {
@@ -321,8 +354,11 @@ export function Sidebar() {
             }}
           >
             <div className="flex items-center">
-              <item.icon className="mr-3 h-4 w-4" />
-              {item.name}
+              <item.icon className={cn(
+                "mr-3 h-5 w-5 transition-smooth",
+                isActive ? "text-sidebar-accent-foreground" : "text-sidebar-foreground/60"
+              )} />
+              <span className="font-medium">{item.name}</span>
             </div>
             {item.hasSubmenu && <ChevronDown className="ml-auto h-4 w-4" />}
           </Link>
@@ -347,9 +383,30 @@ export function Sidebar() {
   return (
     <div className="w-64 h-full bg-sidebar border-r border-sidebar-border flex flex-col overflow-hidden">
       <Tutorial runTutorial={runTutorial} setRunTutorial={setRunTutorial} initialStep={tutorialStep} />
-      {/* Logo */}
+      {/* Logo with Brand Icon */}
       <div className="p-6 flex-shrink-0">
-        <h1 className="text-xl font-bold text-sidebar-foreground">Fuse</h1>
+        <div className="flex items-center gap-3">
+          {clinicLogo ? (
+            <div className="w-10 h-10 rounded-xl overflow-hidden shadow-apple-md flex-shrink-0">
+              <img 
+                src={clinicLogo} 
+                alt={clinicName || 'Brand'} 
+                className="w-full h-full object-cover"
+              />
+            </div>
+          ) : (
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-apple-md flex-shrink-0" style={{ background: 'linear-gradient(135deg, hsl(270, 80%, 65%) 0%, hsl(280, 75%, 72%) 100%)' }}>
+              <span className="text-white font-bold text-lg">
+                {(clinicName || user?.name || 'F').charAt(0).toUpperCase()}
+              </span>
+            </div>
+          )}
+          <div className="flex-1 min-w-0">
+            <h1 className="text-base font-semibold text-sidebar-foreground truncate">
+              {clinicName || user?.name || 'Fuse Health'}
+            </h1>
+          </div>
+        </div>
       </div>
 
       {/* Navigation */}
@@ -363,21 +420,44 @@ export function Sidebar() {
 
         {/* Operations Section */}
         <div className="pt-6">
-          <h3 className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Operations</h3>
-          {process.env.NODE_ENV !== 'production' && (
-            <div className="px-3 mb-2 p-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md">
-              <p className="text-xs text-amber-800 dark:text-amber-200 font-medium">
-                ⚠️ Testing Mode
-              </p>
-              <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
-                Sequences, Templates, Contacts, and Tags are being tested and won't be available in production.
-              </p>
-            </div>
-          )}
+          <h3 className="px-3 text-xs font-semibold text-muted-foreground/60 uppercase tracking-wide mb-3">Operations</h3>
           <div className="space-y-1">
             {operations.map((item) => renderSidebarItem(item, 'operations'))}
           </div>
         </div>
+
+        {/* CRM Section */}
+        {process.env.NODE_ENV !== 'production' && (
+          <div className="pt-6">
+            <button
+              onClick={() => setIsCrmOpen(!isCrmOpen)}
+              className={cn(
+                "w-full group flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-smooth",
+                isCrmActive || isCrmOpen
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                  : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
+              )}
+            >
+              <div className="flex items-center gap-3">
+                <Users className={cn(
+                  "h-5 w-5 transition-smooth",
+                  isCrmActive || isCrmOpen ? "text-sidebar-accent-foreground" : "text-sidebar-foreground/60"
+                )} />
+                <span className="font-medium">CRM</span>
+              </div>
+              <ChevronDown className={cn(
+                "h-4 w-4 transition-transform",
+                isCrmOpen ? "rotate-180" : ""
+              )} />
+            </button>
+
+            {isCrmOpen && (
+              <div className="mt-1 ml-4 space-y-1 border-l-2 border-sidebar-border pl-3">
+                {crmItems.map((item) => renderSidebarItem(item, 'crm'))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Services Section */}
         {/* <div className="pt-6">
@@ -389,7 +469,7 @@ export function Sidebar() {
 
         {/* Configuration Section */}
         <div className="pt-6">
-          <h3 className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+          <h3 className="px-3 text-xs font-semibold text-muted-foreground/60 uppercase tracking-wide mb-3">
             Configuration
           </h3>
           <div className="space-y-1">
@@ -402,24 +482,24 @@ export function Sidebar() {
       <div className="p-4 border-t border-sidebar-border flex-shrink-0">
         <div className="flex items-center justify-between space-x-3">
           <div className="flex items-center space-x-3 flex-1 min-w-0">
-            <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
-              <span className="text-sm font-medium text-white">
+            <div className="w-9 h-9 rounded-full flex items-center justify-center shadow-apple" style={{ background: 'linear-gradient(135deg, hsl(270, 80%, 65%) 0%, hsl(280, 75%, 72%) 100%)' }}>
+              <span className="text-sm font-semibold text-white">
                 {user?.name?.charAt(0).toUpperCase() || 'A'}
               </span>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-sidebar-foreground truncate">
-                {user?.name || 'Admin User'}
+              <p className="text-sm font-semibold text-sidebar-foreground truncate">
+                {user?.name || 'Admin'}
               </p>
-              <p className="text-xs text-muted-foreground truncate">
-                {user?.email || 'admin@example.com'}
+              <p className="text-xs text-muted-foreground/70 truncate">
+                Admin
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             <button
               onClick={handleRefreshSubscription}
-              className="p-1 text-muted-foreground hover:text-foreground hover:bg-sidebar-accent rounded"
+              className="p-1.5 text-muted-foreground/60 hover:text-foreground hover:bg-sidebar-accent/50 rounded-lg transition-smooth"
               title="Refresh subscription status"
               aria-label="Refresh subscription status"
             >
@@ -427,7 +507,7 @@ export function Sidebar() {
             </button>
             <button
               onClick={() => logout()}
-              className="p-1 text-muted-foreground hover:text-foreground hover:bg-sidebar-accent rounded"
+              className="p-1.5 text-muted-foreground/60 hover:text-foreground hover:bg-sidebar-accent/50 rounded-lg transition-smooth"
               title="Logout"
               aria-label="Logout"
             >

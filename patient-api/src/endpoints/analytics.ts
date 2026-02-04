@@ -34,6 +34,10 @@ router.post("/analytics/track", async (req: Request, res: Response) => {
       sourceType = 'brand', // Default to 'brand' if not specified
     } = req.body;
 
+    // Capture IP address for anonymous user tracking
+    const ipAddress = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'Unknown';
+    const userAgent = req.headers['user-agent'] || '';
+
     if (!userId || !productId || !formId || !eventType) {
       if (process.env.NODE_ENV === "development") {
         console.log("❌ [Analytics API] Missing required fields");
@@ -130,7 +134,11 @@ router.post("/analytics/track", async (req: Request, res: Response) => {
       sessionId,
       dropOffStage: eventType === "dropoff" ? dropOffStage : null,
       sourceType: sourceType || 'brand',
-      metadata,
+      metadata: {
+        ...metadata,
+        ipAddress: typeof ipAddress === 'string' ? ipAddress.split(',')[0].trim() : ipAddress,
+        userAgent,
+      },
     });
 
     console.log("✅ [Analytics API] Analytics event created successfully:", {
@@ -1413,5 +1421,320 @@ router.get(
     }
   }
 );
+
+// Get list of forms for a clinic
+router.get("/analytics/forms", authenticateJWT, async (req: Request, res: Response) => {
+  try {
+    const currentUser = getCurrentUser(req);
+    if (!currentUser) {
+      return res.status(401).json({
+        success: false,
+        message: "Not authenticated",
+      });
+    }
+
+    // Get user's clinic
+    const user = await User.findByPk(currentUser.id);
+    if (!user || !user.clinicId) {
+      return res.status(400).json({
+        success: false,
+        message: "No clinic associated with user",
+      });
+    }
+
+    // Fetch all forms for the clinic
+    const forms = await TenantProductForm.findAll({
+      where: {
+        clinicId: user.clinicId,
+      },
+      include: [
+        {
+          model: Product,
+          as: "product",
+        },
+      ],
+      order: [["createdAt", "DESC"]],
+    });
+
+    const formList = forms.map((form: any) => ({
+      id: form.id,
+      name: form.product?.name || `Form ${form.id.substring(0, 8)}`,
+      productName: form.product?.name,
+      publishedUrl: form.publishedUrl,
+      createdAt: form.createdAt,
+    }));
+
+    return res.json({
+      success: true,
+      data: formList,
+    });
+  } catch (error) {
+    console.error("Error fetching forms list:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch forms",
+    });
+  }
+});
+
+// Get detailed session analytics for a specific form with dynamic stage tracking
+router.get("/analytics/forms/:formId/sessions", authenticateJWT, async (req: Request, res: Response) => {
+  try {
+    const currentUser = getCurrentUser(req);
+    if (!currentUser) {
+      return res.status(401).json({
+        success: false,
+        message: "Not authenticated",
+      });
+    }
+
+    const { formId } = req.params;
+
+    // Get user's clinic
+    const user = await User.findByPk(currentUser.id);
+    if (!user || !user.clinicId) {
+      return res.status(400).json({
+        success: false,
+        message: "No clinic associated with user",
+      });
+    }
+
+    // Verify form belongs to this clinic and get form structure
+    const form = await TenantProductForm.findOne({
+      where: {
+        id: formId,
+        clinicId: user.clinicId,
+      },
+      include: [
+        {
+          model: Product,
+          as: "product",
+        },
+        {
+          model: GlobalFormStructure,
+          as: "globalFormStructure",
+        },
+      ],
+    });
+
+    if (!form) {
+      return res.status(404).json({
+        success: false,
+        message: "Form not found",
+      });
+    }
+
+    // Get form steps from GlobalFormStructure
+    const formStructure = (form as any).globalFormStructure;
+    const formSteps = formStructure?.steps || [];
+    
+    // If no structure, use default stages
+    const defaultStages = [
+      { stepNumber: 1, questionText: 'Product Selection', questionId: 'product' },
+      { stepNumber: 2, questionText: 'Medical Questions', questionId: 'medical' },
+      { stepNumber: 3, questionText: 'Checkout', questionId: 'checkout' },
+      { stepNumber: 4, questionText: 'Account Creation', questionId: 'account' },
+    ];
+
+    const stages = formSteps.length > 0
+      ? formSteps.map((step: any, index: number) => ({
+          stepNumber: index + 1,
+          questionText: step.question || step.label || `Step ${index + 1}`,
+          questionId: step.id || `step-${index + 1}`,
+          questionType: step.type || 'question'
+        }))
+      : defaultStages;
+
+    // Get all analytics events for this form
+    const events = await TenantAnalyticsEvents.findAll({
+      where: {
+        formId: formId,
+      },
+      include: [
+        {
+          model: User,
+          as: "user",
+          attributes: ["id", "firstName", "lastName", "email", "phoneNumber"],
+        },
+      ],
+      order: [["createdAt", "DESC"]],
+    });
+
+    // Group events by sessionId
+    const sessionMap = new Map<string, any>();
+    
+    events.forEach((event: any) => {
+      const sessionId = event.sessionId || event.userId;
+      
+      if (!sessionMap.has(sessionId)) {
+        sessionMap.set(sessionId, {
+          sessionId,
+          userId: event.userId,
+          firstName: event.user?.firstName || "Unknown",
+          lastName: event.user?.lastName || "User",
+          email: event.user?.email || "",
+          phoneNumber: event.user?.phoneNumber || null,
+          converted: false,
+          firstView: event.createdAt,
+          lastView: event.createdAt,
+          lastStepReached: 0,
+          stagesCompleted: [],
+          metadata: event.metadata || {},
+        });
+      }
+
+      const session = sessionMap.get(sessionId);
+
+      if (event.eventType === "view") {
+        if (new Date(event.createdAt) < new Date(session.firstView)) {
+          session.firstView = event.createdAt;
+        }
+        if (new Date(event.createdAt) > new Date(session.lastView)) {
+          session.lastView = event.createdAt;
+        }
+        
+        // Track step progress from metadata
+        if (event.metadata?.stepNumber) {
+          session.lastStepReached = Math.max(session.lastStepReached, event.metadata.stepNumber);
+        }
+      }
+
+      if (event.eventType === "conversion") {
+        session.converted = true;
+        session.lastStepReached = stages.length;
+      }
+
+      if (event.eventType === "dropoff") {
+        if (event.metadata?.stepNumber) {
+          session.lastStepReached = event.metadata.stepNumber;
+        }
+      }
+    });
+
+    // Calculate stage metrics
+    const stageMetrics = stages.map((stage: any) => {
+      const reached = Array.from(sessionMap.values()).filter(
+        (s) => s.lastStepReached >= stage.stepNumber
+      ).length;
+      
+      const completed = Array.from(sessionMap.values()).filter(
+        (s) => s.lastStepReached > stage.stepNumber || (s.lastStepReached === stage.stepNumber && s.converted && stage.stepNumber === stages.length)
+      ).length;
+      
+      const dropoffs = reached - completed;
+      const dropoffRate = reached > 0 ? Math.round((dropoffs / reached) * 100) : 0;
+
+      return {
+        stepNumber: stage.stepNumber,
+        questionText: stage.questionText,
+        reached,
+        completed,
+        dropoffs,
+        dropoffRate,
+      };
+    });
+
+    // Calculate session details (limit to last 10 sessions for table display)
+    const allSessions = Array.from(sessionMap.values()).map((session) => {
+      const duration = Math.max(
+        0,
+        Math.floor(
+          (new Date(session.lastView).getTime() - new Date(session.firstView).getTime()) / 1000
+        )
+      );
+
+      const completionRate = session.lastStepReached > 0
+        ? Math.round((session.lastStepReached / stages.length) * 100)
+        : 0;
+
+      const currentStageIndex = Math.min(session.lastStepReached, stages.length - 1);
+      const currentStage = session.converted 
+        ? 'Completed' 
+        : (stages[currentStageIndex]?.questionText || 'Not Started');
+
+      // Handle anonymous users (no firstName/lastName yet)
+      const isAnonymous = !session.firstName || session.firstName === 'Unknown';
+      const ipAddress = session.metadata?.ipAddress || 'Unknown IP';
+      const location = session.metadata?.location || 'Unknown Location';
+
+      return {
+        sessionId: session.sessionId,
+        userId: session.userId,
+        firstName: isAnonymous ? 'Anonymous' : session.firstName,
+        lastName: isAnonymous ? 'User' : session.lastName,
+        email: isAnonymous ? `${ipAddress} • ${location}` : session.email,
+        phoneNumber: session.phoneNumber,
+        viewDuration: duration,
+        currentStage,
+        lastStepReached: session.lastStepReached,
+        totalSteps: stages.length,
+        completionRate,
+        lastViewed: session.lastView,
+        converted: session.converted,
+      };
+    });
+
+    // Sort by lastViewed (most recent first) and take top 10 for sessions array
+    const sessions = allSessions
+      .sort((a, b) => new Date(b.lastViewed).getTime() - new Date(a.lastViewed).getTime())
+      .slice(0, 10);
+
+    // Calculate summary metrics
+    const totalSessions = sessions.length;
+    const conversions = sessions.filter((s) => s.converted).length;
+    const completionRate = totalSessions > 0 ? Math.round((conversions / totalSessions) * 100) : 0;
+    const averageDuration = totalSessions > 0
+      ? Math.round(sessions.reduce((sum, s) => sum + s.viewDuration, 0) / totalSessions)
+      : 0;
+
+    // Calculate daily stats for chart (last 14 days)
+    const dailyStats: Array<{ date: string; started: number; completed: number }> = [];
+
+    for (let i = 13; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      const dateStr = date.toISOString().split("T")[0];
+
+      const dayStarted = events.filter((event: any) => {
+        const eventDate = new Date(event.createdAt).toISOString().split("T")[0];
+        return eventDate === dateStr && event.eventType === "view";
+      }).length;
+
+      const dayCompleted = events.filter((event: any) => {
+        const eventDate = new Date(event.createdAt).toISOString().split("T")[0];
+        return eventDate === dateStr && event.eventType === "conversion";
+      }).length;
+
+      dailyStats.push({
+        date: `${date.toLocaleDateString("en-US", { month: "short" })} ${date.getDate()}`,
+        started: dayStarted,
+        completed: dayCompleted,
+      });
+    }
+
+    const formName = (form as any).product?.name || "Intake Form";
+
+    return res.json({
+      success: true,
+      data: {
+        formId,
+        formName,
+        totalSessions,
+        completionRate,
+        averageDuration,
+        formSteps: stages,
+        stageMetrics,
+        sessions,
+        dailyStats,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching form sessions:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch form session analytics",
+    });
+  }
+});
 
 export default router;

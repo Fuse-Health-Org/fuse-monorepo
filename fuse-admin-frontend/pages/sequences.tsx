@@ -2251,12 +2251,111 @@ export default function Flows() {
                                             </div>
                                         )
                                     })() : (
-                                        <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-center p-6 bg-muted/30 rounded-lg border-2 border-dashed border-border">
-                                            <Smartphone className="h-12 w-12 text-muted-foreground mb-4" />
-                                            <h3 className="font-semibold text-lg mb-2">Select a Step</h3>
-                                            <p className="text-sm text-muted-foreground max-w-xs">
-                                                Click on any step from the builder to see how the message will appear to your patients
-                                            </p>
+                                        <div className="space-y-4">
+                                            {/* Header */}
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2">
+                                                    <Smartphone className="h-5 w-5 text-primary" />
+                                                    <h3 className="font-semibold">Message Preview</h3>
+                                                </div>
+                                                <Badge variant="outline" className="gap-1">
+                                                    <Clock className="h-3 w-3" />
+                                                    DELAY
+                                                </Badge>
+                                            </div>
+
+                                            {/* Phone Mockup with Example */}
+                                            <div className="flex justify-center">
+                                                <div className="w-full max-w-[340px]">
+                                                    <div className="relative border-[12px] border-gray-800 rounded-[2rem] shadow-2xl bg-white overflow-hidden" style={{ aspectRatio: '9/19.5' }}>
+                                                        {/* Phone Notch */}
+                                                        <div className="absolute top-0 inset-x-0 h-5 bg-gray-800 rounded-b-3xl mx-auto w-32 z-10"></div>
+
+                                                        {/* Phone Content */}
+                                                        <div className="h-full overflow-y-auto bg-gradient-to-b from-gray-50 to-white">
+                                                            <div className="p-6 flex items-center justify-center h-full text-center">
+                                                                <div className="space-y-4">
+                                                                    <div className="w-16 h-16 rounded-full mx-auto flex items-center justify-center" style={{ background: 'linear-gradient(135deg, hsl(270, 80%, 65%) 0%, hsl(280, 75%, 72%) 100%)' }}>
+                                                                        <Clock className="h-8 w-8 text-white" />
+                                                                    </div>
+                                                                    <div>
+                                                                        <h4 className="font-semibold text-base mb-2">Delay Step</h4>
+                                                                        <p className="text-sm text-muted-foreground leading-relaxed">
+                                                                            Wait 1 hour before the next step is executed.
+                                                                        </p>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Example Step Card */}
+                                            <div className="bg-gradient-to-br from-purple-50 to-purple-100/50 dark:from-purple-950/20 dark:to-purple-900/10 rounded-xl p-4 border-2 border-purple-200 dark:border-purple-800">
+                                                <div className="space-y-3">
+                                                    <div className="flex items-start gap-3">
+                                                        <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'linear-gradient(135deg, hsl(270, 80%, 65%) 0%, hsl(280, 75%, 72%) 100%)' }}>
+                                                            <span className="text-white font-bold text-lg">1</span>
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center justify-between mb-1">
+                                                                <h4 className="font-semibold text-foreground flex items-center gap-2">
+                                                                    <Clock className="h-4 w-4" />
+                                                                    Delay
+                                                                </h4>
+                                                                <Badge variant="outline" className="text-xs">
+                                                                    <Clock className="h-3 w-3 mr-1" />
+                                                                    DELAY
+                                                                </Badge>
+                                                            </div>
+                                                            <p className="text-sm text-muted-foreground">
+                                                                Wait before the next step
+                                                            </p>
+                                                            <div className="mt-3 p-3 bg-white/60 dark:bg-gray-900/20 rounded-lg border border-purple-200/50 dark:border-purple-800/50">
+                                                                <div className="grid grid-cols-4 gap-2 text-center">
+                                                                    <div>
+                                                                        <p className="text-xs text-muted-foreground mb-1">Days</p>
+                                                                        <p className="font-semibold">0</p>
+                                                                    </div>
+                                                                    <div>
+                                                                        <p className="text-xs text-muted-foreground mb-1">Hours</p>
+                                                                        <p className="font-semibold">1</p>
+                                                                    </div>
+                                                                    <div>
+                                                                        <p className="text-xs text-muted-foreground mb-1">Minutes</p>
+                                                                        <p className="font-semibold">0</p>
+                                                                    </div>
+                                                                    <div>
+                                                                        <p className="text-xs text-muted-foreground mb-1">Seconds</p>
+                                                                        <p className="font-semibold">0</p>
+                                                                    </div>
+                                                                </div>
+                                                                <div className="mt-2 pt-2 border-t border-purple-200/50 dark:border-purple-800/50">
+                                                                    <p className="text-xs text-muted-foreground">
+                                                                        Total delay: <span className="font-medium text-foreground">1 hour</span>
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Instruction Card */}
+                                            <div className="bg-muted/50 rounded-lg p-4 border border-border">
+                                                <div className="flex items-start gap-3">
+                                                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                                        <Smartphone className="h-4 w-4 text-primary" />
+                                                    </div>
+                                                    <div className="flex-1">
+                                                        <h4 className="font-semibold text-sm mb-1">Select a Step to Preview</h4>
+                                                        <p className="text-xs text-muted-foreground leading-relaxed">
+                                                            Click on any step from the sequence builder on the left to see how the message will appear to your patients. You'll be able to preview SMS messages, emails, and delay steps.
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
                                     )}
                                 </div>
