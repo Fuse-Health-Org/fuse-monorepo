@@ -128,56 +128,7 @@ import payoutsRoutes from "@endpoints/payouts/routes/payouts.routes";
 import { stripeRoutes, webhookRoutes as stripeWebhookRoutes } from "@endpoints/stripe";
 import { GlobalFees } from "./models/GlobalFees";
 import { WebsiteBuilderConfigs, DEFAULT_FOOTER_DISCLAIMER } from "./models/WebsiteBuilderConfigs";
-
-// Helper function to fetch global fees from database
-async function getGlobalFees() {
-  const globalFees = await GlobalFees.findOne();
-  if (!globalFees) {
-    throw new Error("Global fees configuration not found in database");
-  }
-  return {
-    platformFeePercent: Number(globalFees.fuseTransactionFeePercent),
-    stripeFeePercent: Number(globalFees.stripeTransactionFeePercent),
-    doctorFlatFeeUsd: Number(globalFees.fuseTransactionDoctorFeeUsd),
-  };
-}
-
-// Helper function to get platform fee percent for a clinic (tier-specific or global fallback)
-async function getPlatformFeePercent(clinicId: string): Promise<number> {
-  try {
-    // Fetch clinic with subscription plan and tier configuration
-    const clinic = await Clinic.findByPk(clinicId, {
-      include: [
-        {
-          model: BrandSubscriptionPlans,
-          as: 'brandSubscriptionPlan',
-          include: [
-            {
-              model: TierConfiguration,
-              as: 'tierConfig',
-            },
-          ],
-        },
-      ],
-    });
-
-    // If clinic has a tier with custom fuseFeePercent, use it
-    if (
-      clinic?.brandSubscriptionPlan?.tierConfig?.fuseFeePercent != null
-    ) {
-      return Number(clinic.brandSubscriptionPlan.tierConfig.fuseFeePercent);
-    }
-
-    // Otherwise, fall back to global fee
-    const globalFees = await getGlobalFees();
-    return globalFees.platformFeePercent;
-  } catch (error) {
-    console.error('Error fetching platform fee percent:', error);
-    // Fall back to global fee on error
-    const globalFees = await getGlobalFees();
-    return globalFees.platformFeePercent;
-  }
-}
+import { useGlobalFees, getPlatformFeePercent } from "./utils/useGlobalFees";
 
 // Helper function to generate unique clinic slug
 async function generateUniqueSlug(
@@ -5270,7 +5221,7 @@ app.post(
       });
 
       // Calculate fee breakdown
-      const fees = await getGlobalFees();
+      const fees = await useGlobalFees();
       
       // Get platform fee percent based on clinic's tier (or global fallback)
       const platformFeePercent = tenantProduct.clinicId 
@@ -5691,7 +5642,7 @@ app.post("/payments/product/sub", async (req, res) => {
     });
 
     // Calculate fee breakdown
-    const fees = await getGlobalFees();
+    const fees = await useGlobalFees();
     
     // Get platform fee percent based on clinic's tier (or global fallback)
     const platformFeePercent = (tenantProduct as any).clinicId 
@@ -6164,7 +6115,7 @@ app.post("/payments/program/sub", async (req, res) => {
     });
 
     // Calculate fee breakdown
-    const fees = await getGlobalFees();
+    const fees = await useGlobalFees();
     
     // Get platform fee percent based on clinic's tier (or global fallback)
     const programClinicId = clinicId || program.clinicId;
