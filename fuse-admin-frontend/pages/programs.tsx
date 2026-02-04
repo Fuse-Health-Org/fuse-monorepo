@@ -313,7 +313,7 @@ export default function Programs() {
                     {programs.length > 0 ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {programs.map((program, index) => {
-                                const isFirstCardInTutorial = index === 0 && tutorialStep === 3;
+                                const isFirstCardInTutorial = index === 0 && (tutorialStep === 3 || tutorialStep === 4);
                                 return (
                                     <div
                                         key={program.id}
@@ -322,7 +322,7 @@ export default function Programs() {
                                         className={`bg-card rounded-2xl shadow-sm border border-border p-6 transition-all ${isFirstCardInTutorial ? 'cursor-default' : 'hover:shadow-md cursor-pointer'
                                             }`}
                                         onClick={() => {
-                                            // Disable card click during tutorial step 3 on first program
+                                            // Disable card click during tutorial steps 3 & 4 on first program
                                             if (isFirstCardInTutorial) {
                                                 return;
                                             }
@@ -375,13 +375,13 @@ export default function Programs() {
                                                 variant="outline"
                                                 onClick={(e) => {
                                                     e.stopPropagation()
-                                                    // Disable edit during tutorial step 3 on first program
-                                                    if (index === 0 && tutorialStep === 3) {
+                                                    // Disable edit during tutorial steps 3 & 4 on first program
+                                                    if (index === 0 && (tutorialStep === 3 || tutorialStep === 4)) {
                                                         return;
                                                     }
                                                     router.push(`/programs/${program.id}`)
                                                 }}
-                                                disabled={index === 0 && tutorialStep === 3}
+                                                disabled={index === 0 && (tutorialStep === 3 || tutorialStep === 4)}
                                                 className="flex-1"
                                             >
                                                 <Edit className="h-3 w-3 mr-1" />
@@ -392,13 +392,13 @@ export default function Programs() {
                                                 variant="outline"
                                                 onClick={(e) => {
                                                     e.stopPropagation()
-                                                    // Disable delete during tutorial step 3 on first program
-                                                    if (index === 0 && tutorialStep === 3) {
+                                                    // Disable delete during tutorial steps 3 & 4 on first program
+                                                    if (index === 0 && (tutorialStep === 3 || tutorialStep === 4)) {
                                                         return;
                                                     }
                                                     handleDeleteProgram(program.id, program.name)
                                                 }}
-                                                disabled={index === 0 && tutorialStep === 3}
+                                                disabled={index === 0 && (tutorialStep === 3 || tutorialStep === 4)}
                                                 className="border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300"
                                             >
                                                 <Trash2 className="h-3 w-3" />
