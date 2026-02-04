@@ -712,7 +712,7 @@ const Tutorial: React.FC<TutorialProps> = ({
               onClick={handleSkip}
               className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
             >
-              Skip
+              Skip Tutorial
             </button>
 
             <div className="flex items-center gap-2">
@@ -739,15 +739,6 @@ const Tutorial: React.FC<TutorialProps> = ({
 
                 return (
                   <>
-                    {currentStep > 0 && showNextButton && (
-                      <button
-                        onClick={handleBack}
-                        className="px-3 py-1.5 text-sm text-green-700 hover:text-green-800 transition-colors"
-                      >
-                        Back
-                      </button>
-                    )}
-
                     {showNextButton && (
                       <button
                         onClick={handleNext}
