@@ -491,7 +491,15 @@ export default function Programs() {
                                             <Button
                                                 size="sm"
                                                 variant="outline"
-                                                onClick={() => handleCreateFromTemplate(template.id)}
+                                                onClick={(e) => {
+                                                    // Disable customize during tutorial step 3 on first template
+                                                    if (index === 0 && tutorialStep === 3) {
+                                                        e.stopPropagation();
+                                                        return;
+                                                    }
+                                                    handleCreateFromTemplate(template.id);
+                                                }}
+                                                disabled={index === 0 && tutorialStep === 3}
                                                 className="border-purple-200 dark:border-purple-800"
                                             >
                                                 <Edit className="h-3 w-3 mr-1" />
