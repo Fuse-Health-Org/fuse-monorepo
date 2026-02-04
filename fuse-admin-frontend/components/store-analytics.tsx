@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { ChevronDown } from "lucide-react"
-import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from "recharts"
+import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from "recharts"
 import { useAuth } from '@/contexts/AuthContext';
 
 interface StoreAnalyticsProps {
@@ -272,22 +272,17 @@ export function StoreAnalytics({ startDate, endDate }: StoreAnalyticsProps) {
   const yAxisConfig = calculateYAxisDomain();
 
   return (
-    <Card className="bg-card border-border">
-      <CardHeader className="flex flex-row items-center justify-between">
+    <Card className="bg-card border-border shadow-apple-md">
+      <CardHeader className="flex flex-row items-center justify-between pb-2">
         <div>
-          <CardTitle className="text-lg font-semibold text-foreground">Store Analytics</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Track your store's performance over time ({isFullCalendarMonth ? 'Monthly View' : (interval === 'daily' ? 'Daily' : 'Weekly')}) • Hover to see daily data
-            {viewMode === 'revenue' && isThisMonth && daysRemainingInMonth > 0 && (
-              <span className="ml-1">• <span className="text-blue-600">Solid</span> = actual, <span className="text-gray-600">Dashed</span> = expected from subscriptions</span>
-            )}
-          </p>
+          <CardTitle className="text-xl font-semibold text-foreground">Store Analytics</CardTitle>
         </div>
         <div className="flex gap-2">
           <Button 
             variant={viewMode === 'revenue' ? 'default' : 'outline'} 
             size="sm"
             onClick={() => setViewMode('revenue')}
+            className="transition-smooth"
           >
             Revenue
           </Button>
@@ -295,6 +290,7 @@ export function StoreAnalytics({ startDate, endDate }: StoreAnalyticsProps) {
             variant={viewMode === 'orders' ? 'default' : 'outline'} 
             size="sm"
             onClick={() => setViewMode('orders')}
+            className="transition-smooth"
           >
             Orders
           </Button>
@@ -314,72 +310,94 @@ export function StoreAnalytics({ startDate, endDate }: StoreAnalyticsProps) {
             <div className="text-muted-foreground">No data available for this period</div>
           </div>
         ) : (
-          <div className="h-80">
+          <div className="h-96">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={formattedData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <AreaChart data={formattedData}>
+                <defs>
+                  <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(270, 80%, 65%)" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="hsl(280, 75%, 72%)" stopOpacity={0.1}/>
+                  </linearGradient>
+                  <linearGradient id="colorProjected" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(0, 0%, 60%)" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="hsl(0, 0%, 60%)" stopOpacity={0.05}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid 
+                  strokeDasharray="3 3" 
+                  stroke="hsl(var(--border))" 
+                  vertical={false}
+                  strokeOpacity={0.3}
+                />
                 <XAxis
                   dataKey="name"
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }}
+                  tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))", opacity: 0.7 }}
                   ticks={customTicks}
                   angle={0}
-                  height={60}
+                  height={40}
+                  dy={10}
                 />
                 <YAxis
                   domain={[0, yAxisConfig.max]}
                   ticks={yAxisConfig.ticks}
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }}
+                  tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))", opacity: 0.7 }}
                   tickFormatter={viewMode === 'revenue' ? formatCurrency : (value) => value.toString()}
+                  dx={-10}
                 />
                 <Tooltip 
                   contentStyle={{ 
                     backgroundColor: 'hsl(var(--card))',
                     border: '1px solid hsl(var(--border))',
-                    borderRadius: '6px'
+                    borderRadius: '12px',
+                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+                    padding: '12px'
                   }}
                   formatter={(value: number, name: string) => {
                     if (name === 'projectedValue') {
                       return [
                         formatCurrency(value),
-                        'Expected (Subscriptions)'
+                        'Expected'
                       ];
                     }
                     return [
                       viewMode === 'revenue' ? formatCurrency(value) : value,
-                      viewMode === 'revenue' ? 'Actual Revenue' : 'Orders'
+                      viewMode === 'revenue' ? 'Revenue' : 'Orders'
                     ];
                   }}
+                  labelStyle={{ fontWeight: 600, marginBottom: '4px' }}
                 />
-                {/* Historical Data Line (solid blue, no dots) */}
-                <Line
+                {/* Historical Data Area */}
+                <Area
                   type="monotone"
                   dataKey="historicalValue"
-                  stroke="hsl(var(--primary))"
-                  strokeWidth={2}
+                  stroke="hsl(270, 80%, 65%)"
+                  strokeWidth={3}
+                  fill="url(#colorRevenue)"
                   dot={false}
-                  activeDot={{ r: 6, fill: "hsl(var(--primary))", stroke: "white", strokeWidth: 2 }}
+                  activeDot={{ r: 5, fill: "hsl(270, 80%, 65%)", stroke: "white", strokeWidth: 2 }}
                   connectNulls={false}
                   name="historicalValue"
                 />
-                {/* Projected Revenue Line (dashed grey, no dots, only in revenue mode for "This Month") */}
+                {/* Projected Revenue Area (only in revenue mode for "This Month") */}
                 {viewMode === 'revenue' && isThisMonth && daysRemainingInMonth > 0 && (
-                  <Line
+                  <Area
                     type="monotone"
                     dataKey="projectedValue"
-                    stroke="#6b7280"
+                    stroke="hsl(0, 0%, 50%)"
                     strokeWidth={2}
                     strokeDasharray="5 5"
+                    fill="url(#colorProjected)"
                     dot={false}
-                    activeDot={{ r: 6, fill: "#6b7280", stroke: "white", strokeWidth: 2 }}
+                    activeDot={{ r: 4, fill: "hsl(0, 0%, 50%)", stroke: "white", strokeWidth: 2 }}
                     connectNulls={false}
                     name="projectedValue"
                   />
                 )}
-              </LineChart>
+              </AreaChart>
             </ResponsiveContainer>
           </div>
         )}

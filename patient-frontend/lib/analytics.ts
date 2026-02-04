@@ -16,6 +16,29 @@ const recentEvents = new Map<string, number>();
 const DEDUP_WINDOW_MS = 5000; // 5 seconds
 
 /**
+ * Get approximate location from IP (client-side fallback)
+ */
+const getApproximateLocation = async (): Promise<string> => {
+  try {
+    // Try to get location from ipapi.co (free tier)
+    const response = await fetch('https://ipapi.co/json/', { timeout: 2000 } as any);
+    if (response.ok) {
+      const data = await response.json();
+      return `${data.city}, ${data.region_code}`;
+    }
+  } catch {
+    // Fallback to browser timezone
+    try {
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      return timezone.split('/')[1] || 'Unknown';
+    } catch {
+      return 'Unknown';
+    }
+  }
+  return 'Unknown';
+};
+
+/**
  * Track a form view event
  */
 export const trackFormView = async (params: {
@@ -27,9 +50,13 @@ export const trackFormView = async (params: {
   productName?: string;
   sourceType?: 'brand' | 'affiliate';
   affiliateSlug?: string;
+  stepNumber?: number;
+  stepTitle?: string;
+  sectionType?: string;
+  isAnonymous?: boolean;
 }): Promise<void> => {
   try {
-    const eventKey = `${params.userId}:${params.productId}:${params.formId}:view`;
+    const eventKey = `${params.userId}:${params.productId}:${params.formId}:view:${params.stepNumber || 'initial'}`;
     const now = Date.now();
     const lastTracked = recentEvents.get(eventKey);
 
@@ -44,7 +71,15 @@ export const trackFormView = async (params: {
       console.log("📊 [Analytics] Tracking form view", {
         sourceType: params.sourceType || 'brand',
         affiliateSlug: params.affiliateSlug,
+        stepNumber: params.stepNumber,
+        stepTitle: params.stepTitle,
       });
+    }
+
+    // Get location if anonymous
+    let location = undefined;
+    if (params.isAnonymous) {
+      location = await getApproximateLocation();
     }
 
     const payload = {
@@ -59,6 +94,11 @@ export const trackFormView = async (params: {
         clinicName: params.clinicName,
         productName: params.productName || "Unknown Product",
         ...(params.affiliateSlug && { affiliateSlug: params.affiliateSlug }),
+        ...(params.stepNumber && { stepNumber: params.stepNumber }),
+        ...(params.stepTitle && { stepTitle: params.stepTitle }),
+        ...(params.sectionType && { sectionType: params.sectionType }),
+        ...(params.isAnonymous && { isAnonymous: true }),
+        ...(location && { location }),
         timestamp: new Date().toISOString(),
       },
     };
@@ -152,8 +192,11 @@ export const trackFormDropOff = async (params: {
   clinicName?: string;
   productName?: string;
   useBeacon?: boolean;
-  sourceType?: 'brand' | 'affiliate'; // Added
-  affiliateSlug?: string; // Added
+  sourceType?: 'brand' | 'affiliate';
+  affiliateSlug?: string;
+  stepNumber?: number;
+  stepTitle?: string;
+  sectionType?: string;
 }): Promise<void> => {
   try {
     const eventKey = `${params.userId}:${params.productId}:${params.formId}:dropoff:${params.dropOffStage}`;
@@ -169,12 +212,15 @@ export const trackFormDropOff = async (params: {
       eventType: "dropoff" as const,
       dropOffStage: params.dropOffStage,
       sessionId: generateSessionId(),
-      sourceType: params.affiliateSlug ? 'affiliate' : (params.sourceType || 'brand'), // Set sourceType
+      sourceType: params.affiliateSlug ? 'affiliate' : (params.sourceType || 'brand'),
       metadata: {
         clinicId: params.clinicId,
         clinicName: params.clinicName,
         productName: params.productName || "Unknown Product",
-        affiliateSlug: params.affiliateSlug, // Added
+        affiliateSlug: params.affiliateSlug,
+        ...(params.stepNumber && { stepNumber: params.stepNumber }),
+        ...(params.stepTitle && { stepTitle: params.stepTitle }),
+        ...(params.sectionType && { sectionType: params.sectionType }),
         timestamp: new Date().toISOString(),
       },
     };
