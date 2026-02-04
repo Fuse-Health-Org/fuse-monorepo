@@ -299,6 +299,27 @@ const Tutorial: React.FC<TutorialProps> = ({
       setAdaptiveStepOverride(null);
     }
 
+    // Step 5: Scroll sidebar to show Portal section (it might be hidden on small screens)
+    if (stepIndex === 5) {
+      console.log('📍 Step 5 - scrolling sidebar to show Portal section');
+      // Find the sidebar nav element and scroll to show the Portal item
+      const sidebarNav = document.querySelector('nav.overflow-y-auto');
+      const portalElement = document.getElementById('tutorial-step-portal');
+
+      if (sidebarNav && portalElement) {
+        // Scroll the sidebar to make the Portal element visible
+        portalElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Alternative: scroll the sidebar nav container directly
+        // sidebarNav.scrollTo({ top: sidebarNav.scrollHeight, behavior: 'smooth' });
+      } else if (sidebarNav) {
+        // If portal element not found yet, scroll sidebar to bottom to ensure it's visible
+        sidebarNav.scrollTo({ top: sidebarNav.scrollHeight, behavior: 'smooth' });
+      }
+
+      // Wait a bit for the scroll animation to complete
+      await new Promise<void>((resolve) => setTimeout(resolve, 300));
+    }
+
     // Step 6: Navigate to portal page (or wait for element if already there)
     if (stepIndex === 6) {
       if (router.pathname !== '/portal') {
