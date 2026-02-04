@@ -2,17 +2,164 @@
 alwaysApply: true
 ---
 
-patient-api
-Express TypeScript backend API that serves as the central service for the entire FUSE Health Platform. Manages all business logic, database operations with PostgreSQL, authentication with JWT, and integrations with Stripe for payments, Pharmacy API for prescriptions, MD Integrations for telehealth, SendGrid for emails, and AWS S3 for file storage. Implements HIPAA-compliant data handling for protected health information.
-patient-frontend
-Patient-facing Next.js application where customers can browse and purchase healthcare treatments and products, complete medical questionnaires, manage their treatment subscriptions, schedule telehealth appointments through MD Integrations, track orders, and communicate with healthcare providers in real-time.
-fuse-admin-frontend
-Super admin dashboard built with Next.js for platform administrators to manage the entire system. Provides tools to oversee customers, orders, products, treatments, programs, questionnaires, analytics, payouts, and platform-wide settings. Includes advanced editors for building products, treatments, and forms with tier-based pricing.
-fuse-tenant-portal-frontend
-Next.js portal for clinics and healthcare organizations to manage their operations. Allows tenants to manage their patients, review doctor applications, customize their product catalog, build custom forms and questionnaires, configure pricing tiers and fees, create branded websites, track audit logs, and manage payouts.
-fuse-doctor-portal-frontend
-Next.js application for healthcare providers to manage their patients, review and approve treatment requests, create and edit medical questionnaires and assessment forms, communicate with patients in real-time, accept brand invitations to join organizations, and track their compensation payouts.
-fuse-affiliate-portal-frontend
-Next.js dashboard for marketing partners and affiliates to track their referral performance, monitor revenue and commissions, promote available treatments and products, customize their branding materials, manage their affiliate payouts, and complete the onboarding process.
-packages
-Shared monorepo libraries including TypeScript enums for common constants, Zod schema validators for API validation, Stripe integration utilities, and shared TypeScript configurations used across all applications in the platform.
+# FUSE Health Platform Architecture
+
+**FUSE Health** is a white-label telehealth platform that enables healthcare brands (e.g., Limitless Health) to launch and operate their own telehealth services.
+
+---
+
+## Backend
+
+### `patient-api`
+
+**Tech**: Express + TypeScript + PostgreSQL
+
+**Purpose**: Central backend API for the entire platform
+
+**Key Responsibilities**:
+
+- Business logic and data management
+- Authentication (JWT) and authorization
+- Database operations (PostgreSQL with Sequelize ORM)
+- HIPAA-compliant data handling
+
+**Integrations**:
+
+- **Stripe**: Payment processing and subscriptions
+- **Pharmacy API**: Prescription fulfillment
+- **MD Integrations**: Telehealth video appointments
+- **SendGrid**: Email communications
+- **AWS S3**: File and image storage
+
+---
+
+## Frontend Applications
+
+### `fuse-admin-frontend`
+
+**Tech**: Next.js
+
+**Users**: Healthcare brands (e.g., Limitless Health, wellness clinics)
+
+**Purpose**: Brand management portal where organizations manage their telehealth operations
+
+**Key Features**:
+
+- Product and treatment catalog management
+- Program creation and configuration
+- Custom portal branding and customization
+- Analytics and reporting
+- Patient and order oversight
+- Questionnaire builder
+- Payout management
+- Tier-based pricing configuration
+
+---
+
+### `patient-frontend`
+
+**Tech**: Next.js
+
+**Users**: End-user patients/customers of each brand
+
+**Purpose**: Consumer-facing application with two main sections:
+
+1. **Landing Page**: Where brand products are advertised and marketed to prospective patients
+2. **Patient Dashboard**: Authenticated area for patients to manage their care
+
+**Key Features**:
+
+**Landing Page**:
+
+- Product and treatment showcase
+- Brand-specific marketing content
+- Sign up and purchase flows
+
+**Patient Dashboard**:
+
+- View and track prescriptions
+- Real-time chat with doctors
+- Complete medical questionnaires
+- Manage treatment subscriptions
+- Schedule telehealth appointments (MD Integrations)
+- Track orders and shipments
+- Manage treatment plans
+
+---
+
+### `fuse-tenant-portal-frontend`
+
+**Tech**: Next.js
+
+**Users**: Tenant Managers (system-level administrators)
+
+**Purpose**: Master control panel for overseeing all brands and the entire FUSE Health system
+
+**Key Features**:
+
+- Oversee all brands across the platform
+- Patient management across organizations
+- Review and approve doctor applications
+- Customize product catalogs for brands
+- Build custom forms and questionnaires
+- Configure pricing tiers and fees for brands
+- Create branded websites
+- Audit logs and compliance tracking
+- Payout management across brands
+
+---
+
+### `fuse-doctor-portal-frontend`
+
+**Tech**: Next.js
+
+**Users**: Healthcare providers (doctors, nurse practitioners)
+
+**Purpose**: Provider workspace for reviewing and approving patient prescription requests
+
+**Key Features**:
+
+- Review prescription requests (Orders) from patients
+- Approve or deny orders based on medical assessment
+- Create medical questionnaire templates
+- Edit and manage questionnaire forms
+- Patient management and chart review
+- Real-time patient communication and chat
+- Accept brand invitations to join organizations
+- Track compensation and payouts
+
+---
+
+### `fuse-affiliate-portal-frontend`
+
+**Tech**: Next.js
+
+**Users**: Marketing partners and affiliates associated with specific brands
+
+**Purpose**: Affiliate dashboard for tracking sales and managing custom affiliate portals
+
+**Key Features**:
+
+- Track sales and referral performance by brand
+- Revenue and commission tracking
+- View referral performance metrics
+- Custom portal for each specific affiliate
+- Treatment and product promotion tools
+- Custom branding materials
+- Payout management
+- Onboarding workflow
+
+---
+
+## Shared Libraries
+
+### `packages/`
+
+**Purpose**: Monorepo shared code across all applications
+
+**Contains**:
+
+- **TypeScript enums**: Common constants and types
+- **Zod validators**: API request/response validation schemas
+- **Stripe utilities**: Payment integration helpers
+- **Shared configs**: TypeScript configurations
