@@ -89,6 +89,10 @@ catalog:
   "@types/jsonwebtoken": ^9.0.10
   jsonwebtoken: ^9.0.2
 
+  # Rate Limiting
+  express-rate-limit: ^7.5.0
+  lru-cache: ^11.0.2
+
   # Turbo
   "@turbo/gen": ^2.5.4
   turbo: ^2.5.4

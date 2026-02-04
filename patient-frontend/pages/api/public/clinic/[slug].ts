@@ -1,8 +1,16 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
+import { applyRateLimit, rateLimitPresets } from '../../../../lib/rateLimiter'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+    // Apply rate limiting for public endpoints
+    try {
+        await applyRateLimit(req, res, rateLimitPresets.public);
+    } catch {
+        return; // Rate limit response already sent
+    }
+
     try {
         const { slug } = req.query
 

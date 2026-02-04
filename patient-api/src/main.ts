@@ -39,6 +39,12 @@ import {
   isValidImageFile,
   isValidFileSize,
 } from "./config/s3";
+import {
+  authLimiter,
+  publicLimiter,
+  apiLimiter,
+  webhookLimiter,
+} from "./middleware/rateLimiter";
 import Stripe from "stripe";
 import OrderService from "./services/order.service";
 import UserService from "./services/user.service";
@@ -337,6 +343,32 @@ app.use(helmet.frameguard({ action: "deny" }));
 app.use(helmet.referrerPolicy({ policy: "no-referrer" }));
 
 app.disable("x-powered-by");
+
+// Apply rate limiting to public endpoints (100 req/15min)
+app.use("/public", publicLimiter);
+
+// Apply rate limiting to webhook endpoints (1000 req/15min)
+app.use("/webhook", webhookLimiter);
+app.use("/md/webhooks", webhookLimiter);
+
+// Apply general API rate limiting to authenticated endpoints (150 req/15min)
+// This applies to all routes except those with specific limiters (auth, public, webhooks)
+app.use((req, res, next) => {
+  // Skip rate limiting for:
+  // - Public endpoints (already limited)
+  // - Webhooks (already limited)
+  // - Auth endpoints (have stricter limits)
+  if (
+    req.path.startsWith("/public") ||
+    req.path.startsWith("/webhook") ||
+    req.path.startsWith("/md/webhooks") ||
+    req.path.startsWith("/auth/")
+  ) {
+    return next();
+  }
+  // Apply API limiter to all other routes
+  return apiLimiter(req, res, next);
+});
 
 // Conditional JSON parsing - exclude webhook paths that need raw body
 app.use((req, res, next) => {
@@ -10914,7 +10946,7 @@ app.put("/patient", authenticateJWT, async (req, res) => {
   }
 });
 
-app.post("/webhook/orders", async (req, res) => {
+app.post("/webhook/orders", webhookLimiter, async (req, res) => {
   try {
     // Validate webhook signature using HMAC SHA256
     const providedSignature = req.headers["signature"];
@@ -10969,7 +11001,7 @@ app.post("/webhook/orders", async (req, res) => {
 });
 
 // Pharmacy webhook endpoint
-app.post("/webhook/pharmacy", async (req, res) => {
+app.post("/webhook/pharmacy", webhookLimiter, async (req, res) => {
   try {
     // Validate Authorization header with Bearer token
     const authHeader = req.headers.authorization;
@@ -12102,7 +12134,7 @@ async function startServer() {
 
   // ============= AUTH ENDPOINTS =============
   const { registerAuthEndpoints } = await import("./endpoints/auth");
-  registerAuthEndpoints(app, authenticateJWT, verificationCodes, passwordResetCodes, generateUniqueSlug, getDefaultCustomWebsiteValues);
+  registerAuthEndpoints(app, authenticateJWT, verificationCodes, passwordResetCodes, generateUniqueSlug, getDefaultCustomWebsiteValues, authLimiter);
 
   // ============= DOCTOR PORTAL ENDPOINTS =============
   const { registerDoctorEndpoints } = await import("./endpoints/doctor");

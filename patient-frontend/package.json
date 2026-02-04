@@ -24,6 +24,7 @@
     "@stripe/react-stripe-js": "^2.8.1",
     "@stripe/stripe-js": "^4.10.0",
     "framer-motion": "^12.23.12",
+    "lru-cache": "catalog:",
     "next": "catalog:next14",
     "react": "catalog:react18",
     "react-dom": "catalog:react18",
