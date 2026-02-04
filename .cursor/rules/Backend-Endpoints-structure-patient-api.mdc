@@ -2,11 +2,81 @@
 alwaysApply: true
 ---
 
-Backend – Endpoints structure (patient-api)
-When implementing new backend functionality in patient-api, always check first if the related entity folder already exists under patient-api/src/endpoints/.
-If the entity folder exists: implement the new logic inside that existing endpoint slice, following the current structure and conventions (keep routes/controllers/services/validators organized the same way as the existing endpoint).
-If the entity folder does not exist yet: create a new endpoint folder for that entity under patient-api/src/endpoints/<entity>/ and add at minimum:
-a controller file (e.g. controllers/<entity>.controller.ts)
-a route file (e.g. routes/<entity>.routes.ts)
-any additional supporting files/folders needed (services, validators, utils) while keeping the overall backend structure consistent.
-Avoid creating duplicate endpoints or new folders when an existing entity endpoint can be extended.
+# Backend – Endpoints Structure (patient-api)
+
+## CRITICAL: Keep main.ts Minimal
+
+**NEVER add any of the following to `patient-api/src/main.ts`:**
+
+- ❌ Route handlers (app.get, app.post, app.put, app.delete, app.patch)
+- ❌ Controller logic or business logic
+- ❌ Database queries or model operations
+- ❌ Validation schemas or middleware definitions
+- ❌ Service instantiations or complex logic
+
+**main.ts should ONLY contain:**
+
+- ✅ Import statements
+- ✅ Express app initialization
+- ✅ Global middleware setup (cors, helmet, body-parser, etc.)
+- ✅ Endpoint module registration (app.use() with imported routers)
+- ✅ Error handling middleware
+- ✅ Server startup (app.listen)
+- ✅ Database initialization
+
+**Example of proper endpoint registration in main.ts:**
+
+```typescript
+// ✅ CORRECT: Import and register modular endpoints
+const ordersRouter = (await import("./endpoints/orders")).default;
+app.use("/orders", ordersRouter);
+
+// ✅ CORRECT: Register function-based endpoints
+const { registerAuthEndpoints } = await import("./endpoints/auth");
+registerAuthEndpoints(app, authenticateJWT, getCurrentUser);
+
+// ❌ WRONG: Never define routes directly in main.ts
+app.get("/orders/:id", authenticateJWT, async (req, res) => { ... });
+```
+
+## Endpoint Organization
+
+When implementing new backend functionality:
+
+1. **Check if entity endpoint exists** under `patient-api/src/endpoints/`
+   - If yes: Add your logic to the existing endpoint module
+   - If no: Create a new endpoint module
+
+2. **For existing endpoints**: Follow the current structure
+   - Keep routes/controllers/services/validators organized consistently
+   - Match the existing patterns (Router export vs registration function)
+
+3. **For new endpoints**: Create under `patient-api/src/endpoints/<entity>/`
+
+   ```
+   endpoints/
+     <entity>/
+       controllers/<entity>.controller.ts
+       routes/<entity>.routes.ts
+       services/<entity>.service.ts (if needed)
+       validators/<entity>.validator.ts (if needed)
+       index.ts (exports router or registration function)
+   ```
+
+4. **Then register in main.ts** using one of these patterns:
+
+   ```typescript
+   // Pattern 1: Router export
+   const entityRouter = (await import("./endpoints/entity")).default;
+   app.use("/entity", entityRouter);
+
+   // Pattern 2: Registration function
+   const { registerEntityEndpoints } = await import("./endpoints/entity");
+   registerEntityEndpoints(app, authenticateJWT, getCurrentUser);
+   ```
+
+## Summary
+
+- ALL routes and logic belong in `/endpoints/` modules
+- main.ts is ONLY for app initialization and module registration
+- Avoid duplicate endpoints or folders when extending existing entities
