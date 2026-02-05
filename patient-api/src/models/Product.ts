@@ -176,6 +176,13 @@ export default class Product extends Entity {
     })
     declare mdOfferingName?: string;
 
+    // Beluga Product ID - links this product to a Beluga product for telehealth integration
+    @Column({
+        type: DataType.STRING,
+        allowNull: true,
+    })
+    declare belugaProductId?: string;
+
     @ForeignKey(() => User)
     @Column({
         type: DataType.UUID,

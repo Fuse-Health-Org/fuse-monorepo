@@ -2179,6 +2179,57 @@ export default function ProductEditor() {
             />
           )}
 
+          {/* Beluga Integration - Coming Soon */}
+          {product && (
+            <div className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden mb-4">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h2 className="text-lg font-semibold text-foreground">Beluga Integration</h2>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Link this product to a Beluga product for telehealth integration
+                    </p>
+                  </div>
+                  <span className="px-3 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-700 border border-amber-200">
+                    Coming Soon
+                  </span>
+                </div>
+
+                <div className="bg-muted rounded-xl p-6 border border-dashed border-border">
+                  <div className="text-center space-y-3">
+                    <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-blue-500 rounded-xl flex items-center justify-center mx-auto">
+                      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-foreground mb-1">Beluga Integration Coming Soon</h3>
+                      <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                        Beluga telehealth integration will allow you to link products for seamless case management and prescription fulfillment.
+                      </p>
+                    </div>
+                    
+                    {/* Placeholder field - will be functional when Beluga integration is ready */}
+                    <div className="mt-4 pt-4 border-t border-border">
+                      <label className="block text-sm font-medium text-muted-foreground mb-2 text-left">
+                        Beluga Product ID (Placeholder)
+                      </label>
+                      <input
+                        type="text"
+                        disabled
+                        placeholder="Will be available when integration is ready..."
+                        className="w-full px-4 py-2.5 rounded-xl border border-input bg-muted text-muted-foreground cursor-not-allowed"
+                      />
+                      <p className="text-xs text-muted-foreground mt-2 text-left">
+                        This field will be enabled once Beluga integration is completed.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Pharmacy & State Coverage */}
           {product && (
             <div className="mb-4">
