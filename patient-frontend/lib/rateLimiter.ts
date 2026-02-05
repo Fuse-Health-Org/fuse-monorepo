@@ -6,7 +6,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
  * Based on Vercel's official example
  * 
  * Uses in-memory LRU cache to track request counts per IP address.
- * Suitable for serverless/edge environments.
+ * Works in both traditional Node.js deployments and serverless/edge environments.
  */
 
 interface RateLimitOptions {
