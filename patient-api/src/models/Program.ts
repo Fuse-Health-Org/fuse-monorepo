@@ -1,6 +1,6 @@
 import { Table, Column, DataType, ForeignKey, BelongsTo } from 'sequelize-typescript';
 import Entity from './Entity';
-import Clinic from './Clinic';
+import Clinic, { PatientPortalDashboardFormat } from './Clinic';
 import Questionnaire from './Questionnaire';
 import Product from './Product';
 
@@ -225,4 +225,23 @@ export default class Program extends Entity {
 
     @BelongsTo(() => Program, 'templateId')
     declare template?: Program;
+
+    /**
+     * Medical Company Source
+     * 
+     * Specifies which medical company/platform provides the medical services for this program.
+     * This determines which dashboard format the program should use and which API integrations
+     * are needed.
+     * 
+     * Options:
+     * - 'md-integrations': MD Integrations platform (default)
+     * - 'fuse': Fuse Health platform
+     * - 'beluga': Beluga Health platform
+     */
+    @Column({
+        type: DataType.ENUM('fuse', 'md-integrations', 'beluga'),
+        allowNull: false,
+        defaultValue: 'md-integrations',
+    })
+    declare medicalCompanySource: PatientPortalDashboardFormat;
 }
