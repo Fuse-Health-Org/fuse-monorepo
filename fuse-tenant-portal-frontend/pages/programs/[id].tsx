@@ -13,14 +13,33 @@ import {
     Search,
     DollarSign,
     Loader2,
-    Save
+    Save,
+    Package
 } from 'lucide-react'
+
+interface Product {
+    id: string
+    name: string
+    description?: string
+    imageUrl?: string
+    price?: number
+    wholesalePrice?: number
+}
+
+interface FormProduct {
+    id: string
+    formId: string
+    productId: string
+    product: Product
+}
 
 interface MedicalTemplate {
     id: string
     title: string
     description?: string
     formTemplateType: string
+    medicalCompanySource?: 'fuse' | 'md-integrations' | 'beluga'
+    formProducts?: FormProduct[]
 }
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
@@ -386,13 +405,27 @@ export default function ProgramTemplateEditor() {
                                                             : 'border-border hover:border-muted-foreground/50'
                                                     }`}
                                                 >
-                                                    <div className="flex items-center justify-between">
+                                                    <div className="flex items-center justify-between mb-3">
                                                         <div className="flex items-center gap-3">
                                                             <FileText className="h-5 w-5 text-muted-foreground" />
-                                                            <div>
-                                                                <p className="text-sm font-medium text-foreground">
-                                                                    {template.title}
-                                                                </p>
+                                                            <div className="flex-1">
+                                                                <div className="flex items-center gap-2">
+                                                                    <p className="text-sm font-medium text-foreground">
+                                                                        {template.title}
+                                                                    </p>
+                                                                    {/* Medical Company Source Badge */}
+                                                                    {template.medicalCompanySource && (
+                                                                        <span className={`px-2 py-0.5 text-[10px] font-medium rounded ${
+                                                                            template.medicalCompanySource === 'fuse' 
+                                                                                ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
+                                                                                : template.medicalCompanySource === 'md-integrations'
+                                                                                ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400'
+                                                                                : 'bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400'
+                                                                        }`}>
+                                                                            {template.medicalCompanySource === 'md-integrations' ? 'MDI' : template.medicalCompanySource === 'beluga' ? 'Beluga' : 'Fuse'}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
                                                                 {template.description && (
                                                                     <p className="text-xs text-muted-foreground mt-0.5">
                                                                         {template.description}
@@ -404,6 +437,53 @@ export default function ProgramTemplateEditor() {
                                                             <Check className="h-5 w-5 text-[#4FA59C]" />
                                                         )}
                                                     </div>
+
+                                                    {/* Associated Products */}
+                                                    {template.formProducts && template.formProducts.length > 0 && (
+                                                        <div className="mt-3 pt-3 border-t border-border/50">
+                                                            <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1.5">
+                                                                <Package className="h-3 w-3" />
+                                                                Associated Products ({template.formProducts.length})
+                                                            </p>
+                                                            <div className="space-y-2">
+                                                                {template.formProducts.map((formProduct) => (
+                                                                    <div
+                                                                        key={formProduct.id}
+                                                                        className="flex items-center gap-2 p-2 rounded-lg bg-background/50"
+                                                                    >
+                                                                        {formProduct.product.imageUrl ? (
+                                                                            <img
+                                                                                src={formProduct.product.imageUrl}
+                                                                                alt={formProduct.product.name}
+                                                                                className="w-10 h-10 rounded object-cover flex-shrink-0"
+                                                                            />
+                                                                        ) : (
+                                                                            <div className="w-10 h-10 rounded bg-muted flex items-center justify-center flex-shrink-0">
+                                                                                <Package className="h-5 w-5 text-muted-foreground" />
+                                                                            </div>
+                                                                        )}
+                                                                        <div className="flex-1 min-w-0">
+                                                                            <p className="text-xs font-medium text-foreground truncate">
+                                                                                {formProduct.product.name}
+                                                                            </p>
+                                                                            <div className="flex items-center gap-2 mt-0.5">
+                                                                                {formProduct.product.price && (
+                                                                                    <span className="text-xs text-muted-foreground">
+                                                                                        ${formProduct.product.price.toFixed(2)}
+                                                                                    </span>
+                                                                                )}
+                                                                                {formProduct.product.wholesalePrice && (
+                                                                                    <span className="text-xs text-[#4FA59C]">
+                                                                                        ${formProduct.product.wholesalePrice.toFixed(2)} wholesale
+                                                                                    </span>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             ))
                                         )}

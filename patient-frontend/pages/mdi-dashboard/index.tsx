@@ -7,6 +7,7 @@ import { ProtectedRoute } from "../../components/ProtectedRoute";
 import { useAuth } from "../../contexts/AuthContext";
 import { getAvatarEmoji } from "../../lib/avatarUtils";
 import { apiCall } from "../../lib/api";
+import { DashboardSelector } from "../../components/DashboardSelector";
 
 /**
  * MDI Dashboard - MD Integrations Portal
@@ -2169,6 +2170,8 @@ function MDIDashboardPage() {
               {activeTab === "dashboard" ? "Dashboard" : navItems.find(n => n.id === activeTab)?.label || activeTab}
             </div>
             <div className="flex items-center gap-4">
+              {/* Dashboard Selector - Switch between Fuse and MDI dashboards */}
+              <DashboardSelector />
               <Dropdown>
                 <DropdownTrigger>
                   <Button variant="light" className="gap-2">

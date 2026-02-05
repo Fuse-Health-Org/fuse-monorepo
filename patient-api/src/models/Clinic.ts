@@ -24,6 +24,7 @@ export enum MerchantOfRecord {
 export enum PatientPortalDashboardFormat {
     FUSE = 'fuse',
     MD_INTEGRATIONS = 'md-integrations',
+    BELUGA = 'beluga',
 }
 
 @Table({

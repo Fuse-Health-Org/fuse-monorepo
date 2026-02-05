@@ -9098,7 +9098,7 @@ app.put("/questionnaires/templates/:id", authenticateJWT, async (req, res) => {
     }
 
     const { id } = req.params;
-    const { name, description, schema, status, productId } = req.body;
+    const { name, description, schema, status, productId, medicalCompanySource } = req.body;
 
     if (!id) {
       return res
@@ -9111,6 +9111,7 @@ app.put("/questionnaires/templates/:id", authenticateJWT, async (req, res) => {
       description,
       status,
       productId,
+      medicalCompanySource,
     });
 
     // Audit: Log template update

@@ -6,6 +6,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { getAvatarEmoji } from "../lib/avatarUtils";
 import { getPrimaryRole, hasRole } from "../lib/auth";
 import { apiCall } from "../lib/api";
+import { DashboardSelector } from "./DashboardSelector";
 
 interface Patient {
   id: string;
@@ -179,6 +180,8 @@ export const Header: React.FC = () => {
         )}
 
         <div className="flex items-center gap-4">
+          {/* Dashboard Selector - Switch between Fuse and MDI dashboards */}
+          <DashboardSelector />
           {/* User Profile Dropdown */}
           <Dropdown placement="bottom-end">
             <DropdownTrigger>
