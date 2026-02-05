@@ -151,11 +151,21 @@ export default function TemplateEditor() {
     const assignedProducts = products.filter(p => assignedProductIds.includes(p.id))
     
     return assignedProducts.filter(product => {
-      if (medicalCompanySource === 'md-integrations' && !product.mdOfferingId) {
-        return true // Incompatible: MDI selected but product has no MDI ID
-      }
-      if (medicalCompanySource === 'beluga' && !product.belugaProductId) {
-        return true // Incompatible: Beluga selected but product has no Beluga ID
+      if (medicalCompanySource === 'fuse') {
+        // Fuse products should NOT have mdOfferingId or belugaProductId
+        if (product.mdOfferingId || product.belugaProductId) {
+          return true // Incompatible: Fuse selected but product has platform-specific ID
+        }
+      } else if (medicalCompanySource === 'md-integrations') {
+        // MDI products MUST have mdOfferingId
+        if (!product.mdOfferingId) {
+          return true // Incompatible: MDI selected but product has no MDI ID
+        }
+      } else if (medicalCompanySource === 'beluga') {
+        // Beluga products MUST have belugaProductId
+        if (!product.belugaProductId) {
+          return true // Incompatible: Beluga selected but product has no Beluga ID
+        }
       }
       return false
     })
@@ -168,31 +178,57 @@ export default function TemplateEditor() {
     const assignedProductIds = getAssignedProducts(template.id)
     const assignedProducts = products.filter(p => assignedProductIds.includes(p.id))
     
-    return assignedProducts.filter(product => {
-      if (newPlatform === 'md-integrations' && !product.mdOfferingId) {
-        return true
-      }
-      if (newPlatform === 'beluga' && !product.belugaProductId) {
-        return true
+    console.log('🔍 Checking incompatible products for platform:', newPlatform)
+    console.log('📦 Assigned products:', assignedProducts.map(p => ({ name: p.name, mdOfferingId: p.mdOfferingId, belugaProductId: p.belugaProductId })))
+    
+    const incompatible = assignedProducts.filter(product => {
+      if (newPlatform === 'fuse') {
+        // Fuse products should NOT have mdOfferingId or belugaProductId
+        // If they do, they're specific to another platform
+        if (product.mdOfferingId || product.belugaProductId) {
+          console.log('❌ Product incompatible with Fuse:', product.name, 'has platform-specific ID')
+          return true
+        }
+      } else if (newPlatform === 'md-integrations') {
+        // MDI products MUST have mdOfferingId
+        if (!product.mdOfferingId) {
+          console.log('❌ Product incompatible with MDI:', product.name, 'mdOfferingId:', product.mdOfferingId)
+          return true
+        }
+      } else if (newPlatform === 'beluga') {
+        // Beluga products MUST have belugaProductId
+        if (!product.belugaProductId) {
+          console.log('❌ Product incompatible with Beluga:', product.name, 'belugaProductId:', product.belugaProductId)
+          return true
+        }
       }
       return false
     })
+    
+    console.log('🚨 Total incompatible products:', incompatible.length)
+    return incompatible
   }
 
   // Handle medical platform change with confirmation if needed
   const handlePlatformChange = async (newPlatform: 'fuse' | 'md-integrations' | 'beluga') => {
+    console.log('🔄 Attempting to change platform to:', newPlatform, 'from:', medicalCompanySource)
     if (newPlatform === medicalCompanySource) return
     
     const wouldBeIncompatible = getIncompatibleProductsForPlatform(newPlatform)
     const hasAssignedProducts = template?.id && getAssignedProducts(template.id).length > 0
     
+    console.log('✅ Has assigned products:', hasAssignedProducts)
+    console.log('⚠️ Would be incompatible count:', wouldBeIncompatible.length)
+    
     // If there are products that would become incompatible, show confirmation
     if (hasAssignedProducts && wouldBeIncompatible.length > 0) {
+      console.log('🚨 Showing confirmation modal')
       setPendingPlatformChange(newPlatform)
       setShowPlatformChangeModal(true)
       return
     }
     
+    console.log('✅ No incompatible products, changing platform directly')
     // Otherwise, directly change the platform
     await updateMedicalPlatform(newPlatform)
   }
@@ -202,6 +238,19 @@ export default function TemplateEditor() {
     if (!token || !templateId || typeof templateId !== 'string') return
     
     try {
+      // First, remove incompatible products
+      const wouldBeIncompatible = getIncompatibleProductsForPlatform(newSource)
+      if (wouldBeIncompatible.length > 0 && template?.id) {
+        const currentAssignedIds = getAssignedProducts(template.id)
+        const compatibleProductIds = currentAssignedIds.filter(
+          id => !wouldBeIncompatible.find(p => p.id === id)
+        )
+        
+        // Update products to remove incompatible ones
+        await assignProductsToForm(template.id, compatibleProductIds, template.productOfferType || 'single_choice')
+      }
+      
+      // Then update the medical platform
       const res = await fetch(`${baseUrl}/questionnaires/templates/${templateId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -209,7 +258,9 @@ export default function TemplateEditor() {
       })
       if (res.ok) {
         setMedicalCompanySource(newSource)
-        setSaveMessage("✅ Medical platform updated!")
+        setSaveMessage(wouldBeIncompatible.length > 0 
+          ? `✅ Medical platform updated and ${wouldBeIncompatible.length} incompatible ${wouldBeIncompatible.length === 1 ? 'product' : 'products'} removed!`
+          : "✅ Medical platform updated!")
         setTimeout(() => setSaveMessage(null), 3000)
         
         // Close modal if open
@@ -4172,7 +4223,7 @@ export default function TemplateEditor() {
                     </div>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    You'll need to manually remove these products after changing the platform, or they may cause issues.
+                    These products will be automatically removed when you change the platform.
                   </p>
                 </>
               )}

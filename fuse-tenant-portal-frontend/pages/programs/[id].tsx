@@ -38,6 +38,7 @@ interface MedicalTemplate {
     title: string
     description?: string
     formTemplateType: string
+    medicalCompanySource?: 'fuse' | 'md-integrations' | 'beluga'
     formProducts?: FormProduct[]
 }
 
@@ -407,10 +408,24 @@ export default function ProgramTemplateEditor() {
                                                     <div className="flex items-center justify-between mb-3">
                                                         <div className="flex items-center gap-3">
                                                             <FileText className="h-5 w-5 text-muted-foreground" />
-                                                            <div>
-                                                                <p className="text-sm font-medium text-foreground">
-                                                                    {template.title}
-                                                                </p>
+                                                            <div className="flex-1">
+                                                                <div className="flex items-center gap-2">
+                                                                    <p className="text-sm font-medium text-foreground">
+                                                                        {template.title}
+                                                                    </p>
+                                                                    {/* Medical Company Source Badge */}
+                                                                    {template.medicalCompanySource && (
+                                                                        <span className={`px-2 py-0.5 text-[10px] font-medium rounded ${
+                                                                            template.medicalCompanySource === 'fuse' 
+                                                                                ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
+                                                                                : template.medicalCompanySource === 'md-integrations'
+                                                                                ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400'
+                                                                                : 'bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400'
+                                                                        }`}>
+                                                                            {template.medicalCompanySource === 'md-integrations' ? 'MDI' : template.medicalCompanySource === 'beluga' ? 'Beluga' : 'Fuse'}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
                                                                 {template.description && (
                                                                     <p className="text-xs text-muted-foreground mt-0.5">
                                                                         {template.description}

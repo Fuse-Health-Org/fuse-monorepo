@@ -88,15 +88,22 @@ export function ProductAssignmentModal({
             if (isInactive && !isSelected) return false
             
             // Filter by medical company source - only show products with the corresponding ID
-            if (medicalCompanySource === 'md-integrations' && !product.mdOfferingId) {
+            if (medicalCompanySource === 'fuse') {
+                // For Fuse, only show products that DON'T have platform-specific IDs
+                if (product.mdOfferingId || product.belugaProductId) {
+                    return false
+                }
+            } else if (medicalCompanySource === 'md-integrations') {
                 // For MDI, only show products that have an MDI offering linked
-                return false
-            }
-            if (medicalCompanySource === 'beluga' && !product.belugaProductId) {
+                if (!product.mdOfferingId) {
+                    return false
+                }
+            } else if (medicalCompanySource === 'beluga') {
                 // For Beluga, only show products that have a Beluga product ID
-                return false
+                if (!product.belugaProductId) {
+                    return false
+                }
             }
-            // For Fuse, show all products (or products without MDI/Beluga IDs if you want to be strict)
             
             // Apply search filter
             if (!searchQuery) return true
