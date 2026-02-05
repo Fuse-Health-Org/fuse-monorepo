@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import jwt from 'jsonwebtoken'
+import { applyRateLimit, rateLimitPresets } from '../../../lib/rateLimiter'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
 
@@ -7,6 +8,13 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
+  // Apply rate limiting for auth endpoints (5 attempts per 15 minutes)
+  try {
+    await applyRateLimit(req, res, rateLimitPresets.auth);
+  } catch {
+    return; // Rate limit response already sent
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({ success: false, message: 'Method not allowed' })
   }

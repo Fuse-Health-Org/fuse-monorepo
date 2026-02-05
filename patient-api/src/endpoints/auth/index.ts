@@ -29,11 +29,12 @@ export function registerAuthEndpoints(
     verificationCodes: Map<string, { code: string; expiresAt: number; firstName?: string }>,
     passwordResetCodes: Map<string, { code: string; expiresAt: number; firstName?: string; verified: boolean }>,
     generateUniqueSlug: (clinicName: string, excludeId?: string) => Promise<string>,
-    getDefaultCustomWebsiteValues: (clinicId: string) => any
+    getDefaultCustomWebsiteValues: (clinicId: string) => any,
+    authLimiter?: any
 ) {
 
     // MFA Verify endpoint - verify OTP code and issue JWT token
-    app.post("/auth/mfa/verify", async (req, res) => {
+    app.post("/auth/mfa/verify", authLimiter, async (req, res) => {
         try {
             const { mfaToken, code } = req.body;
 
@@ -198,7 +199,7 @@ export function registerAuthEndpoints(
     });
 
     // MFA Resend endpoint - resend OTP code
-    app.post("/auth/mfa/resend", async (req, res) => {
+    app.post("/auth/mfa/resend", authLimiter, async (req, res) => {
         try {
             const { mfaToken } = req.body;
 
@@ -476,7 +477,7 @@ export function registerAuthEndpoints(
     });
 
     // Forgot password - send reset code
-    app.post("/auth/forgot-password", async (req, res) => {
+    app.post("/auth/forgot-password", authLimiter, async (req, res) => {
         try {
             const validation = forgotPasswordSchema.safeParse(req.body);
 
@@ -567,7 +568,7 @@ export function registerAuthEndpoints(
     });
 
     // Verify reset code
-    app.post("/auth/verify-reset-code", async (req, res) => {
+    app.post("/auth/verify-reset-code", authLimiter, async (req, res) => {
         try {
             const { email, code } = req.body;
 
@@ -631,7 +632,7 @@ export function registerAuthEndpoints(
     });
 
     // Reset password with verified code
-    app.post("/auth/reset-password", async (req, res) => {
+    app.post("/auth/reset-password", authLimiter, async (req, res) => {
         try {
             const validation = resetPasswordWithCodeSchema.safeParse(req.body);
 
@@ -1155,7 +1156,7 @@ export function registerAuthEndpoints(
     });
 
     // Auth routes
-    app.post("/auth/signup", async (req, res) => {
+    app.post("/auth/signup", authLimiter, async (req, res) => {
         try {
             const validation = signUpSchema.safeParse(req.body);
             if (!validation.success) {
@@ -1726,7 +1727,7 @@ export function registerAuthEndpoints(
     });
 
     // Google OAuth sign-in (kept for backward compatibility with frontend modal)
-    app.post("/auth/google", async (req, res) => {
+    app.post("/auth/google", authLimiter, async (req, res) => {
         try {
             const { credential, clinicId } = req.body;
 
@@ -1843,7 +1844,7 @@ export function registerAuthEndpoints(
         }
     });
 
-    app.post("/auth/signin", async (req, res) => {
+    app.post("/auth/signin", authLimiter, async (req, res) => {
         try {
             // Validate request body
             const validation = signInSchema.safeParse(req.body);
