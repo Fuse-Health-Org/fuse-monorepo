@@ -132,12 +132,94 @@ export default function TemplateEditor() {
   const [showNoProductsWarning, setShowNoProductsWarning] = useState(false)
   const [pendingSave, setPendingSave] = useState(false)
 
+  // Medical platform change confirmation
+  const [showPlatformChangeModal, setShowPlatformChangeModal] = useState(false)
+  const [pendingPlatformChange, setPendingPlatformChange] = useState<'fuse' | 'md-integrations' | 'beluga' | null>(null)
+
   // Use products hook
   const {
     products,
     assignProductsToForm,
     getAssignedProducts,
   } = useProducts(baseUrl)
+
+  // Check if assigned products match the medical company source
+  const incompatibleProducts = useMemo(() => {
+    if (!template?.id) return []
+    
+    const assignedProductIds = getAssignedProducts(template.id)
+    const assignedProducts = products.filter(p => assignedProductIds.includes(p.id))
+    
+    return assignedProducts.filter(product => {
+      if (medicalCompanySource === 'md-integrations' && !product.mdOfferingId) {
+        return true // Incompatible: MDI selected but product has no MDI ID
+      }
+      if (medicalCompanySource === 'beluga' && !product.belugaProductId) {
+        return true // Incompatible: Beluga selected but product has no Beluga ID
+      }
+      return false
+    })
+  }, [template?.id, products, getAssignedProducts, medicalCompanySource])
+
+  // Check if changing to a new platform would create incompatibilities
+  const getIncompatibleProductsForPlatform = (newPlatform: 'fuse' | 'md-integrations' | 'beluga') => {
+    if (!template?.id) return []
+    
+    const assignedProductIds = getAssignedProducts(template.id)
+    const assignedProducts = products.filter(p => assignedProductIds.includes(p.id))
+    
+    return assignedProducts.filter(product => {
+      if (newPlatform === 'md-integrations' && !product.mdOfferingId) {
+        return true
+      }
+      if (newPlatform === 'beluga' && !product.belugaProductId) {
+        return true
+      }
+      return false
+    })
+  }
+
+  // Handle medical platform change with confirmation if needed
+  const handlePlatformChange = async (newPlatform: 'fuse' | 'md-integrations' | 'beluga') => {
+    if (newPlatform === medicalCompanySource) return
+    
+    const wouldBeIncompatible = getIncompatibleProductsForPlatform(newPlatform)
+    const hasAssignedProducts = template?.id && getAssignedProducts(template.id).length > 0
+    
+    // If there are products that would become incompatible, show confirmation
+    if (hasAssignedProducts && wouldBeIncompatible.length > 0) {
+      setPendingPlatformChange(newPlatform)
+      setShowPlatformChangeModal(true)
+      return
+    }
+    
+    // Otherwise, directly change the platform
+    await updateMedicalPlatform(newPlatform)
+  }
+
+  // Actually update the medical platform
+  const updateMedicalPlatform = async (newSource: 'fuse' | 'md-integrations' | 'beluga') => {
+    if (!token || !templateId || typeof templateId !== 'string') return
+    
+    try {
+      const res = await fetch(`${baseUrl}/questionnaires/templates/${templateId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ medicalCompanySource: newSource })
+      })
+      if (res.ok) {
+        setMedicalCompanySource(newSource)
+        setSaveMessage("✅ Medical platform updated!")
+        setTimeout(() => setSaveMessage(null), 3000)
+        
+        // Close modal if open
+        setShowPlatformChangeModal(false)
+        setPendingPlatformChange(null)
+      }
+    } catch (e: any) {
+      console.error('Failed to update medical platform:', e)
+    }
+  }
 
   useEffect(() => {
     if (!token) return
@@ -2072,24 +2154,7 @@ export default function TemplateEditor() {
                     <div className="flex items-center gap-2 mt-1">
                       <button
                         type="button"
-                        onClick={async () => {
-                          if (!token || !templateId || typeof templateId !== 'string') return
-                          const newSource = 'fuse'
-                          try {
-                            const res = await fetch(`${baseUrl}/questionnaires/templates/${templateId}`, {
-                              method: 'PUT',
-                              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                              body: JSON.stringify({ medicalCompanySource: newSource })
-                            })
-                            if (res.ok) {
-                              setMedicalCompanySource(newSource)
-                              setSaveMessage("✅ Medical platform updated!")
-                              setTimeout(() => setSaveMessage(null), 3000)
-                            }
-                          } catch (e: any) {
-                            console.error('Failed to update medical platform:', e)
-                          }
-                        }}
+                        onClick={() => handlePlatformChange('fuse')}
                         className={`flex-1 p-2 rounded-lg border-2 transition-all ${
                           medicalCompanySource === 'fuse'
                             ? 'border-[#4FA59C] bg-[#4FA59C]/10'
@@ -2109,24 +2174,7 @@ export default function TemplateEditor() {
 
                       <button
                         type="button"
-                        onClick={async () => {
-                          if (!token || !templateId || typeof templateId !== 'string') return
-                          const newSource = 'md-integrations'
-                          try {
-                            const res = await fetch(`${baseUrl}/questionnaires/templates/${templateId}`, {
-                              method: 'PUT',
-                              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                              body: JSON.stringify({ medicalCompanySource: newSource })
-                            })
-                            if (res.ok) {
-                              setMedicalCompanySource(newSource)
-                              setSaveMessage("✅ Medical platform updated!")
-                              setTimeout(() => setSaveMessage(null), 3000)
-                            }
-                          } catch (e: any) {
-                            console.error('Failed to update medical platform:', e)
-                          }
-                        }}
+                        onClick={() => handlePlatformChange('md-integrations')}
                         className={`flex-1 p-2 rounded-lg border-2 transition-all ${
                           medicalCompanySource === 'md-integrations'
                             ? 'border-[#4FA59C] bg-[#4FA59C]/10'
@@ -2146,24 +2194,7 @@ export default function TemplateEditor() {
 
                       <button
                         type="button"
-                        onClick={async () => {
-                          if (!token || !templateId || typeof templateId !== 'string') return
-                          const newSource = 'beluga'
-                          try {
-                            const res = await fetch(`${baseUrl}/questionnaires/templates/${templateId}`, {
-                              method: 'PUT',
-                              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                              body: JSON.stringify({ medicalCompanySource: newSource })
-                            })
-                            if (res.ok) {
-                              setMedicalCompanySource(newSource)
-                              setSaveMessage("✅ Medical platform updated!")
-                              setTimeout(() => setSaveMessage(null), 3000)
-                            }
-                          } catch (e: any) {
-                            console.error('Failed to update medical platform:', e)
-                          }
-                        }}
+                        onClick={() => handlePlatformChange('beluga')}
                         className={`flex-1 p-2 rounded-lg border-2 transition-all ${
                           medicalCompanySource === 'beluga'
                             ? 'border-[#4FA59C] bg-[#4FA59C]/10'
@@ -2238,6 +2269,36 @@ export default function TemplateEditor() {
                     </Button>
                   </div>
                 </div>
+
+                {/* Incompatible Products Warning */}
+                {incompatibleProducts.length > 0 && (
+                  <div className="p-4 bg-red-50 dark:bg-red-900/20 border-2 border-red-300 dark:border-red-700 rounded-2xl">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 rounded-lg bg-red-100 dark:bg-red-900/40">
+                        <Package className="h-5 w-5 text-red-600 dark:text-red-400" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="text-base font-semibold text-red-800 dark:text-red-200 mb-1">
+                          ⚠️ Incompatible Products Detected
+                        </h3>
+                        <p className="text-sm text-red-700 dark:text-red-300 mb-3">
+                          {incompatibleProducts.length} {incompatibleProducts.length === 1 ? 'product is' : 'products are'} not configured for{' '}
+                          <strong>
+                            {medicalCompanySource === 'md-integrations' ? 'MDI' : medicalCompanySource === 'beluga' ? 'Beluga' : 'Fuse'}
+                          </strong>. 
+                          Please remove {incompatibleProducts.length === 1 ? 'it' : 'them'} or select a different medical platform.
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {incompatibleProducts.map(p => (
+                            <span key={p.id} className="text-sm px-3 py-1.5 bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-200 rounded-lg font-medium">
+                              {p.name}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Template Import UI - for product forms */}
                 {template?.formTemplateType === 'normal' && (
@@ -4062,6 +4123,86 @@ export default function TemplateEditor() {
             setTemplate((prev: any) => ({ ...prev, productOfferType }))
           }}
         />
+      )}
+
+      {/* Medical Platform Change Confirmation Modal */}
+      {showPlatformChangeModal && pendingPlatformChange && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-lg bg-card rounded-2xl shadow-2xl border border-border">
+            {/* Header */}
+            <div className="bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800 p-6 rounded-t-2xl">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-xl bg-amber-100 dark:bg-amber-900/40">
+                  <svg className="h-6 w-6 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+                <div>
+                  <h2 className="text-xl font-semibold text-amber-900 dark:text-amber-100">
+                    Change Medical Platform?
+                  </h2>
+                  <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                    This will affect assigned products
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="p-6">
+              <p className="text-muted-foreground leading-relaxed mb-4">
+                You are about to change the medical platform to{' '}
+                <strong className="text-foreground">
+                  {pendingPlatformChange === 'md-integrations' ? 'MDI' : pendingPlatformChange === 'beluga' ? 'Beluga' : 'Fuse'}
+                </strong>.
+              </p>
+              
+              {getIncompatibleProductsForPlatform(pendingPlatformChange).length > 0 && (
+                <>
+                  <p className="text-muted-foreground leading-relaxed mb-3">
+                    The following {getIncompatibleProductsForPlatform(pendingPlatformChange).length === 1 ? 'product is' : 'products are'} not configured for this platform and should be removed:
+                  </p>
+                  <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg mb-4">
+                    <div className="flex flex-wrap gap-2">
+                      {getIncompatibleProductsForPlatform(pendingPlatformChange).map(p => (
+                        <span key={p.id} className="text-sm px-3 py-1.5 bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-200 rounded-lg font-medium">
+                          {p.name}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    You'll need to manually remove these products after changing the platform, or they may cause issues.
+                  </p>
+                </>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="bg-muted/30 p-6 rounded-b-2xl flex gap-3">
+              <Button
+                onClick={() => {
+                  setShowPlatformChangeModal(false)
+                  setPendingPlatformChange(null)
+                }}
+                variant="outline"
+                className="flex-1 rounded-full"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  if (pendingPlatformChange) {
+                    updateMedicalPlatform(pendingPlatformChange)
+                  }
+                }}
+                className="flex-1 rounded-full bg-amber-600 hover:bg-amber-700 text-white"
+              >
+                Change Platform
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* No Products Warning Modal */}

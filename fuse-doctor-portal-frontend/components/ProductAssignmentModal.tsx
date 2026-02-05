@@ -289,7 +289,7 @@ export function ProductAssignmentModal({
                                             )}
                                             {/* Medical Platform Badges */}
                                             <div className="flex items-center gap-1.5 mt-2">
-                                                <span className="text-[10px] text-muted-foreground font-medium">Platforms:</span>
+                                                <span className="text-[10px] text-muted-foreground font-medium">Medical Company:</span>
                                                 {!product.mdOfferingId && !product.belugaProductId && (
                                                     <span className="px-1.5 py-0.5 text-[10px] font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded">
                                                         Fuse
