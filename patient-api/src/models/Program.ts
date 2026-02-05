@@ -8,6 +8,7 @@ import Product from './Product';
     freezeTableName: true,
     tableName: 'Program',
 })
+//
 export default class Program extends Entity {
     @Column({
         type: DataType.STRING,
