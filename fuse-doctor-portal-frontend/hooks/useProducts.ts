@@ -9,6 +9,8 @@ export interface Product {
     categories?: string[]
     imageUrl?: string | null
     isActive?: boolean
+    mdOfferingId?: string | null
+    belugaProductId?: string | null
     createdAt?: string
     updatedAt?: string
 }
@@ -67,6 +69,8 @@ export function useProducts(baseUrl: string) {
                 categories: Array.isArray(p.categories) ? p.categories : [],
                 imageUrl: p.imageUrl || null,
                 isActive: p.isActive !== false,
+                mdOfferingId: p.mdOfferingId || null,
+                belugaProductId: p.belugaProductId || null,
                 createdAt: p.createdAt,
                 updatedAt: p.updatedAt,
             })))

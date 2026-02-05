@@ -93,6 +93,7 @@ export default function TemplateEditor() {
   const stepRefs = useRef<Map<string, HTMLDivElement>>(new Map())
   const [editingTemplateName, setEditingTemplateName] = useState(false)
   const [tempTemplateName, setTempTemplateName] = useState("")
+  const [medicalCompanySource, setMedicalCompanySource] = useState<'fuse' | 'md-integrations' | 'beluga'>('md-integrations')
   const [selectedQuestionForConditional, setSelectedQuestionForConditional] = useState<{
     stepId: string
     questionId: string
@@ -164,6 +165,8 @@ export default function TemplateEditor() {
         setTemplate(data.data)
         // Set form status from template data
         setFormStatus(data.data?.status || 'in_progress')
+        // Set medical company source from template data
+        setMedicalCompanySource(data.data?.medicalCompanySource || 'md-integrations')
         // Normalize backend steps/questions/options into local editor shape
         const loadedSteps = (data.data?.steps || []).map((s: any, index: number) => ({
           id: String(s.id),
@@ -1962,7 +1965,7 @@ export default function TemplateEditor() {
               {/* Middle/Right: Metadata and Actions */}
               <div className="lg:col-span-8 space-y-4">
                 {/* Metadata Cards */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                   <div className="bg-card rounded-2xl p-5 shadow-md border border-border/40 hover:shadow-lg transition-shadow">
                     <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">Template Name</p>
                     {editingTemplateName ? (
@@ -2062,6 +2065,122 @@ export default function TemplateEditor() {
                         formStatus === 'ready_for_review' ? 'Ready for Review' :
                           'Ready'}
                     </Badge>
+                  </div>
+                  
+                  <div className="bg-card rounded-2xl p-5 shadow-md border border-border/40 hover:shadow-lg transition-shadow">
+                    <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">Medical Platform</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!token || !templateId || typeof templateId !== 'string') return
+                          const newSource = 'fuse'
+                          try {
+                            const res = await fetch(`${baseUrl}/questionnaires/templates/${templateId}`, {
+                              method: 'PUT',
+                              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                              body: JSON.stringify({ medicalCompanySource: newSource })
+                            })
+                            if (res.ok) {
+                              setMedicalCompanySource(newSource)
+                              setSaveMessage("✅ Medical platform updated!")
+                              setTimeout(() => setSaveMessage(null), 3000)
+                            }
+                          } catch (e: any) {
+                            console.error('Failed to update medical platform:', e)
+                          }
+                        }}
+                        className={`flex-1 p-2 rounded-lg border-2 transition-all ${
+                          medicalCompanySource === 'fuse'
+                            ? 'border-[#4FA59C] bg-[#4FA59C]/10'
+                            : 'border-border hover:border-muted-foreground/50'
+                        }`}
+                        title="Fuse Health Platform"
+                      >
+                        <div className="flex flex-col items-center gap-1">
+                          <svg className={`w-4 h-4 ${medicalCompanySource === 'fuse' ? 'text-[#4FA59C]' : 'text-muted-foreground'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                          </svg>
+                          <span className={`text-[10px] font-medium ${medicalCompanySource === 'fuse' ? 'text-[#4FA59C]' : 'text-muted-foreground'}`}>
+                            Fuse
+                          </span>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!token || !templateId || typeof templateId !== 'string') return
+                          const newSource = 'md-integrations'
+                          try {
+                            const res = await fetch(`${baseUrl}/questionnaires/templates/${templateId}`, {
+                              method: 'PUT',
+                              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                              body: JSON.stringify({ medicalCompanySource: newSource })
+                            })
+                            if (res.ok) {
+                              setMedicalCompanySource(newSource)
+                              setSaveMessage("✅ Medical platform updated!")
+                              setTimeout(() => setSaveMessage(null), 3000)
+                            }
+                          } catch (e: any) {
+                            console.error('Failed to update medical platform:', e)
+                          }
+                        }}
+                        className={`flex-1 p-2 rounded-lg border-2 transition-all ${
+                          medicalCompanySource === 'md-integrations'
+                            ? 'border-[#4FA59C] bg-[#4FA59C]/10'
+                            : 'border-border hover:border-muted-foreground/50'
+                        }`}
+                        title="MD Integrations Platform"
+                      >
+                        <div className="flex flex-col items-center gap-1">
+                          <svg className={`w-4 h-4 ${medicalCompanySource === 'md-integrations' ? 'text-[#4FA59C]' : 'text-muted-foreground'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3M8 15v1a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6v-4M20 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" />
+                          </svg>
+                          <span className={`text-[10px] font-medium ${medicalCompanySource === 'md-integrations' ? 'text-[#4FA59C]' : 'text-muted-foreground'}`}>
+                            MDI
+                          </span>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!token || !templateId || typeof templateId !== 'string') return
+                          const newSource = 'beluga'
+                          try {
+                            const res = await fetch(`${baseUrl}/questionnaires/templates/${templateId}`, {
+                              method: 'PUT',
+                              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                              body: JSON.stringify({ medicalCompanySource: newSource })
+                            })
+                            if (res.ok) {
+                              setMedicalCompanySource(newSource)
+                              setSaveMessage("✅ Medical platform updated!")
+                              setTimeout(() => setSaveMessage(null), 3000)
+                            }
+                          } catch (e: any) {
+                            console.error('Failed to update medical platform:', e)
+                          }
+                        }}
+                        className={`flex-1 p-2 rounded-lg border-2 transition-all ${
+                          medicalCompanySource === 'beluga'
+                            ? 'border-[#4FA59C] bg-[#4FA59C]/10'
+                            : 'border-border hover:border-muted-foreground/50'
+                        }`}
+                        title="Beluga Health Platform"
+                      >
+                        <div className="flex flex-col items-center gap-1">
+                          <svg className={`w-4 h-4 ${medicalCompanySource === 'beluga' ? 'text-[#4FA59C]' : 'text-muted-foreground'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                          </svg>
+                          <span className={`text-[10px] font-medium ${medicalCompanySource === 'beluga' ? 'text-[#4FA59C]' : 'text-muted-foreground'}`}>
+                            Beluga
+                          </span>
+                        </div>
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -3936,6 +4055,7 @@ export default function TemplateEditor() {
           products={products}
           assignedProductIds={getAssignedProducts(template.id)}
           initialProductOfferType={template.productOfferType || 'single_choice'}
+          medicalCompanySource={medicalCompanySource}
           onSave={async (productIds, productOfferType) => {
             await assignProductsToForm(template.id, productIds, productOfferType)
             // Update the template's productOfferType in local state

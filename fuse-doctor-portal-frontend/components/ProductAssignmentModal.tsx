@@ -8,6 +8,8 @@ interface Product {
     category?: string | null
     imageUrl?: string | null
     isActive?: boolean
+    mdOfferingId?: string | null
+    belugaProductId?: string | null
 }
 
 type ProductOfferType = 'single_choice' | 'multiple_choice'
@@ -20,6 +22,7 @@ interface ProductAssignmentModalProps {
     products: Product[]
     assignedProductIds: string[]
     initialProductOfferType?: ProductOfferType
+    medicalCompanySource?: 'fuse' | 'md-integrations' | 'beluga'
     onSave: (productIds: string[], productOfferType: ProductOfferType) => Promise<void>
 }
 
@@ -31,6 +34,7 @@ export function ProductAssignmentModal({
     products,
     assignedProductIds,
     initialProductOfferType = 'single_choice',
+    medicalCompanySource = 'md-integrations',
     onSave,
 }: ProductAssignmentModalProps) {
     const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set(assignedProductIds))
@@ -82,6 +86,17 @@ export function ProductAssignmentModal({
             const isInactive = product.isActive === false
             const isSelected = selectedProductIds.has(product.id)
             if (isInactive && !isSelected) return false
+            
+            // Filter by medical company source - only show products with the corresponding ID
+            if (medicalCompanySource === 'md-integrations' && !product.mdOfferingId) {
+                // For MDI, only show products that have an MDI offering linked
+                return false
+            }
+            if (medicalCompanySource === 'beluga' && !product.belugaProductId) {
+                // For Beluga, only show products that have a Beluga product ID
+                return false
+            }
+            // For Fuse, show all products (or products without MDI/Beluga IDs if you want to be strict)
             
             // Apply search filter
             if (!searchQuery) return true
@@ -272,6 +287,25 @@ export function ProductAssignmentModal({
                                                     {product.description}
                                                 </p>
                                             )}
+                                            {/* Medical Platform Badges */}
+                                            <div className="flex items-center gap-1.5 mt-2">
+                                                <span className="text-[10px] text-muted-foreground font-medium">Platforms:</span>
+                                                {!product.mdOfferingId && !product.belugaProductId && (
+                                                    <span className="px-1.5 py-0.5 text-[10px] font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded">
+                                                        Fuse
+                                                    </span>
+                                                )}
+                                                {product.mdOfferingId && (
+                                                    <span className="px-1.5 py-0.5 text-[10px] font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 rounded">
+                                                        MDI
+                                                    </span>
+                                                )}
+                                                {product.belugaProductId && (
+                                                    <span className="px-1.5 py-0.5 text-[10px] font-medium bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400 rounded">
+                                                        Beluga
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                     </button>
                                 )
