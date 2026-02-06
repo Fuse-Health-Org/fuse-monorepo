@@ -1,7 +1,8 @@
 import { useRouter } from 'next/router';
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { extractClinicSlugFromDomain, getDashboardPrefix, PatientPortalDashboardFormat } from '../lib/clinic-utils';
+import { extractClinicSlugFromDomain, getDashboardPrefix } from '../lib/clinic-utils';
 import { apiCall } from '../lib/api';
+import { PatientPortalDashboardFormat } from '@fuse/enums';
 import ScrollingFeaturesBar from '../components/ScrollingFeaturesBar';
 import GetStartedButton from '../components/GetStartedButton';
 import TrendingProtocols from '../components/TrendingProtocols';

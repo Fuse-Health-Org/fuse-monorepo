@@ -6,7 +6,8 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { authApi, apiCall } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
-import { extractClinicSlugFromDomain, getDashboardPrefix, PatientPortalDashboardFormat } from "../lib/clinic-utils";
+import { extractClinicSlugFromDomain, getDashboardPrefix } from "../lib/clinic-utils";
+import { PatientPortalDashboardFormat } from "@fuse/enums";
 
 interface Clinic {
   id: string;
