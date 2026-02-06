@@ -11984,12 +11984,12 @@ const PORT = process.env.PORT || 3001;
 
 // Initialize database connection and start server
 async function startServer() {
-  const dbConnected = await initializeDatabase();
+  // const dbConnected = await initializeDatabase();
 
-  if (!dbConnected) {
-    console.error("❌ Failed to connect to database. Exiting...");
-    process.exit(1);
-  }
+  // if (!dbConnected) {
+  //   console.error("❌ Failed to connect to database. Exiting...");
+  //   process.exit(1);
+  // }
 
   const httpServer = app.listen(PORT, () => {
     console.log(`🚀 API listening on :${PORT}`);

@@ -7,9 +7,11 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Input } from "@/components/ui/input"
-import { Loader2, ArrowLeft, Save, Plus, Trash2, GripVertical, MessageSquare, Info, Edit, X, Code2, ChevronDown, ChevronUp, RefreshCw, GitBranch, Eye, StopCircle, Link2, Unlink, FileText, Calculator } from "lucide-react"
+import { Loader2, ArrowLeft, Save, Plus, Trash2, GripVertical, MessageSquare, Info, Edit, X, Code2, ChevronDown, ChevronUp, RefreshCw, GitBranch, Eye, StopCircle, Link2, Unlink, FileText, Calculator, Package } from "lucide-react"
 import { useAuth } from "@/contexts/AuthContext"
 import { QuestionEditor } from "../QuestionEditor"
+import { useProducts } from "@/hooks/useProducts"
+import { ProductAssignmentModal } from "@/components/ProductAssignmentModal"
 
 interface Step {
   id: string
@@ -91,6 +93,7 @@ export default function TemplateEditor() {
   const stepRefs = useRef<Map<string, HTMLDivElement>>(new Map())
   const [editingTemplateName, setEditingTemplateName] = useState(false)
   const [tempTemplateName, setTempTemplateName] = useState("")
+  const [medicalCompanySource, setMedicalCompanySource] = useState<'fuse' | 'md-integrations' | 'beluga'>('md-integrations')
   const [selectedQuestionForConditional, setSelectedQuestionForConditional] = useState<{
     stepId: string
     questionId: string
@@ -124,6 +127,151 @@ export default function TemplateEditor() {
     rules: []
   })
 
+  // Product assignment modal state
+  const [showProductModal, setShowProductModal] = useState(false)
+  const [showNoProductsWarning, setShowNoProductsWarning] = useState(false)
+  const [pendingSave, setPendingSave] = useState(false)
+
+  // Medical platform change confirmation
+  const [showPlatformChangeModal, setShowPlatformChangeModal] = useState(false)
+  const [pendingPlatformChange, setPendingPlatformChange] = useState<'fuse' | 'md-integrations' | 'beluga' | null>(null)
+
+  // Use products hook
+  const {
+    products,
+    assignProductsToForm,
+    getAssignedProducts,
+  } = useProducts(baseUrl)
+
+  // Check if assigned products match the medical company source
+  const incompatibleProducts = useMemo(() => {
+    if (!template?.id) return []
+    
+    const assignedProductIds = getAssignedProducts(template.id)
+    const assignedProducts = products.filter(p => assignedProductIds.includes(p.id))
+    
+    return assignedProducts.filter(product => {
+      if (medicalCompanySource === 'fuse') {
+        // Fuse products should NOT have mdOfferingId or belugaProductId
+        if (product.mdOfferingId || product.belugaProductId) {
+          return true // Incompatible: Fuse selected but product has platform-specific ID
+        }
+      } else if (medicalCompanySource === 'md-integrations') {
+        // MDI products MUST have mdOfferingId
+        if (!product.mdOfferingId) {
+          return true // Incompatible: MDI selected but product has no MDI ID
+        }
+      } else if (medicalCompanySource === 'beluga') {
+        // Beluga products MUST have belugaProductId
+        if (!product.belugaProductId) {
+          return true // Incompatible: Beluga selected but product has no Beluga ID
+        }
+      }
+      return false
+    })
+  }, [template?.id, products, getAssignedProducts, medicalCompanySource])
+
+  // Check if changing to a new platform would create incompatibilities
+  const getIncompatibleProductsForPlatform = (newPlatform: 'fuse' | 'md-integrations' | 'beluga') => {
+    if (!template?.id) return []
+    
+    const assignedProductIds = getAssignedProducts(template.id)
+    const assignedProducts = products.filter(p => assignedProductIds.includes(p.id))
+    
+    console.log('🔍 Checking incompatible products for platform:', newPlatform)
+    console.log('📦 Assigned products:', assignedProducts.map(p => ({ name: p.name, mdOfferingId: p.mdOfferingId, belugaProductId: p.belugaProductId })))
+    
+    const incompatible = assignedProducts.filter(product => {
+      if (newPlatform === 'fuse') {
+        // Fuse products should NOT have mdOfferingId or belugaProductId
+        // If they do, they're specific to another platform
+        if (product.mdOfferingId || product.belugaProductId) {
+          console.log('❌ Product incompatible with Fuse:', product.name, 'has platform-specific ID')
+          return true
+        }
+      } else if (newPlatform === 'md-integrations') {
+        // MDI products MUST have mdOfferingId
+        if (!product.mdOfferingId) {
+          console.log('❌ Product incompatible with MDI:', product.name, 'mdOfferingId:', product.mdOfferingId)
+          return true
+        }
+      } else if (newPlatform === 'beluga') {
+        // Beluga products MUST have belugaProductId
+        if (!product.belugaProductId) {
+          console.log('❌ Product incompatible with Beluga:', product.name, 'belugaProductId:', product.belugaProductId)
+          return true
+        }
+      }
+      return false
+    })
+    
+    console.log('🚨 Total incompatible products:', incompatible.length)
+    return incompatible
+  }
+
+  // Handle medical platform change with confirmation if needed
+  const handlePlatformChange = async (newPlatform: 'fuse' | 'md-integrations' | 'beluga') => {
+    console.log('🔄 Attempting to change platform to:', newPlatform, 'from:', medicalCompanySource)
+    if (newPlatform === medicalCompanySource) return
+    
+    const wouldBeIncompatible = getIncompatibleProductsForPlatform(newPlatform)
+    const hasAssignedProducts = template?.id && getAssignedProducts(template.id).length > 0
+    
+    console.log('✅ Has assigned products:', hasAssignedProducts)
+    console.log('⚠️ Would be incompatible count:', wouldBeIncompatible.length)
+    
+    // If there are products that would become incompatible, show confirmation
+    if (hasAssignedProducts && wouldBeIncompatible.length > 0) {
+      console.log('🚨 Showing confirmation modal')
+      setPendingPlatformChange(newPlatform)
+      setShowPlatformChangeModal(true)
+      return
+    }
+    
+    console.log('✅ No incompatible products, changing platform directly')
+    // Otherwise, directly change the platform
+    await updateMedicalPlatform(newPlatform)
+  }
+
+  // Actually update the medical platform
+  const updateMedicalPlatform = async (newSource: 'fuse' | 'md-integrations' | 'beluga') => {
+    if (!token || !templateId || typeof templateId !== 'string') return
+    
+    try {
+      // First, remove incompatible products
+      const wouldBeIncompatible = getIncompatibleProductsForPlatform(newSource)
+      if (wouldBeIncompatible.length > 0 && template?.id) {
+        const currentAssignedIds = getAssignedProducts(template.id)
+        const compatibleProductIds = currentAssignedIds.filter(
+          id => !wouldBeIncompatible.find(p => p.id === id)
+        )
+        
+        // Update products to remove incompatible ones
+        await assignProductsToForm(template.id, compatibleProductIds, template.productOfferType || 'single_choice')
+      }
+      
+      // Then update the medical platform
+      const res = await fetch(`${baseUrl}/questionnaires/templates/${templateId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ medicalCompanySource: newSource })
+      })
+      if (res.ok) {
+        setMedicalCompanySource(newSource)
+        setSaveMessage(wouldBeIncompatible.length > 0 
+          ? `✅ Medical platform updated and ${wouldBeIncompatible.length} incompatible ${wouldBeIncompatible.length === 1 ? 'product' : 'products'} removed!`
+          : "✅ Medical platform updated!")
+        setTimeout(() => setSaveMessage(null), 3000)
+        
+        // Close modal if open
+        setShowPlatformChangeModal(false)
+        setPendingPlatformChange(null)
+      }
+    } catch (e: any) {
+      console.error('Failed to update medical platform:', e)
+    }
+  }
+
   useEffect(() => {
     if (!token) return
     if (typeof templateId !== 'string' || !templateId) return
@@ -150,6 +298,8 @@ export default function TemplateEditor() {
         setTemplate(data.data)
         // Set form status from template data
         setFormStatus(data.data?.status || 'in_progress')
+        // Set medical company source from template data
+        setMedicalCompanySource(data.data?.medicalCompanySource || 'md-integrations')
         // Normalize backend steps/questions/options into local editor shape
         const loadedSteps = (data.data?.steps || []).map((s: any, index: number) => ({
           id: String(s.id),
@@ -290,7 +440,7 @@ export default function TemplateEditor() {
   }, [token, template, baseUrl])
 
   const handleBack = () => {
-    router.push("/forms?tab=templates")
+    router.push("/teleforms")
   }
 
   const handleActivateProduct = async () => {
@@ -456,7 +606,7 @@ export default function TemplateEditor() {
 
   const handleCreateNewForm = () => {
     // Navigate to the forms templates tab to create a new template
-    router.push("/forms?tab=templates")
+    router.push("/teleforms")
   }
 
   const handleAttachToProduct = async () => {
@@ -1785,7 +1935,7 @@ export default function TemplateEditor() {
     }
   }
 
-  const handleSave = async () => {
+  const performSave = async () => {
     if (!template || saving) return
 
     setSaving(true)
@@ -1825,7 +1975,32 @@ export default function TemplateEditor() {
       setSaveMessage(`❌ ${err.message || "Failed to save template"}`)
     } finally {
       setSaving(false)
+      setPendingSave(false)
     }
+  }
+
+  const handleSave = async () => {
+    if (!template || saving) return
+
+    // Check if products are assigned
+    const assignedProducts = getAssignedProducts(template.id)
+    if (assignedProducts.length === 0) {
+      setShowNoProductsWarning(true)
+      setPendingSave(true)
+      return
+    }
+
+    await performSave()
+  }
+
+  const handleConfirmSaveWithoutProducts = async () => {
+    setShowNoProductsWarning(false)
+    await performSave()
+  }
+
+  const handleCancelSave = () => {
+    setShowNoProductsWarning(false)
+    setPendingSave(false)
   }
 
   if (loading) {
@@ -1871,9 +2046,9 @@ export default function TemplateEditor() {
   }
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
+    <div className="flex h-screen bg-background">
       <Sidebar />
-      <div className="flex-1 flex flex-col min-h-0">
+      <div className="flex-1 flex flex-col overflow-hidden">
         <Header />
         <main className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* Back Button */}
@@ -1923,7 +2098,7 @@ export default function TemplateEditor() {
               {/* Middle/Right: Metadata and Actions */}
               <div className="lg:col-span-8 space-y-4">
                 {/* Metadata Cards */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                   <div className="bg-card rounded-2xl p-5 shadow-md border border-border/40 hover:shadow-lg transition-shadow">
                     <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">Template Name</p>
                     {editingTemplateName ? (
@@ -1995,7 +2170,7 @@ export default function TemplateEditor() {
                       </div>
                     ) : (
                       <div className="flex items-center justify-between group">
-                    <p className="font-semibold text-foreground text-base">{template.title}</p>
+                        <p className="font-semibold text-foreground text-base">{template.title}</p>
                         <button
                           onClick={() => {
                             setTempTemplateName(template.title)
@@ -2024,7 +2199,157 @@ export default function TemplateEditor() {
                           'Ready'}
                     </Badge>
                   </div>
+                  
+                  <div className="bg-card rounded-2xl p-5 shadow-md border border-border/40 hover:shadow-lg transition-shadow">
+                    <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">Medical Platform</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <button
+                        type="button"
+                        onClick={() => handlePlatformChange('fuse')}
+                        className={`flex-1 p-2 rounded-lg border-2 transition-all ${
+                          medicalCompanySource === 'fuse'
+                            ? 'border-[#4FA59C] bg-[#4FA59C]/10'
+                            : 'border-border hover:border-muted-foreground/50'
+                        }`}
+                        title="Fuse Health Platform"
+                      >
+                        <div className="flex flex-col items-center gap-1">
+                          <svg className={`w-4 h-4 ${medicalCompanySource === 'fuse' ? 'text-[#4FA59C]' : 'text-muted-foreground'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                          </svg>
+                          <span className={`text-[10px] font-medium ${medicalCompanySource === 'fuse' ? 'text-[#4FA59C]' : 'text-muted-foreground'}`}>
+                            Fuse
+                          </span>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handlePlatformChange('md-integrations')}
+                        className={`flex-1 p-2 rounded-lg border-2 transition-all ${
+                          medicalCompanySource === 'md-integrations'
+                            ? 'border-[#4FA59C] bg-[#4FA59C]/10'
+                            : 'border-border hover:border-muted-foreground/50'
+                        }`}
+                        title="MD Integrations Platform"
+                      >
+                        <div className="flex flex-col items-center gap-1">
+                          <svg className={`w-4 h-4 ${medicalCompanySource === 'md-integrations' ? 'text-[#4FA59C]' : 'text-muted-foreground'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3M8 15v1a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6v-4M20 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" />
+                          </svg>
+                          <span className={`text-[10px] font-medium ${medicalCompanySource === 'md-integrations' ? 'text-[#4FA59C]' : 'text-muted-foreground'}`}>
+                            MDI
+                          </span>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handlePlatformChange('beluga')}
+                        className={`flex-1 p-2 rounded-lg border-2 transition-all ${
+                          medicalCompanySource === 'beluga'
+                            ? 'border-[#4FA59C] bg-[#4FA59C]/10'
+                            : 'border-border hover:border-muted-foreground/50'
+                        }`}
+                        title="Beluga Health Platform"
+                      >
+                        <div className="flex flex-col items-center gap-1">
+                          <svg className={`w-4 h-4 ${medicalCompanySource === 'beluga' ? 'text-[#4FA59C]' : 'text-muted-foreground'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                          </svg>
+                          <span className={`text-[10px] font-medium ${medicalCompanySource === 'beluga' ? 'text-[#4FA59C]' : 'text-muted-foreground'}`}>
+                            Beluga
+                          </span>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
                 </div>
+
+                {/* Products Assignment Section - Prominent */}
+                <div 
+                  className={`rounded-2xl p-6 shadow-lg border-2 transition-all ${
+                    getAssignedProducts(template.id).length === 0
+                      ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-300 dark:border-amber-700 hover:shadow-xl'
+                      : 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-300 dark:border-emerald-700 hover:shadow-xl'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-start gap-4">
+                      <div className={`p-3 rounded-xl ${
+                        getAssignedProducts(template.id).length === 0
+                          ? 'bg-amber-100 dark:bg-amber-900/40'
+                          : 'bg-emerald-100 dark:bg-emerald-900/40'
+                      }`}>
+                        <Package className={`h-6 w-6 ${
+                          getAssignedProducts(template.id).length === 0
+                            ? 'text-amber-600 dark:text-amber-400'
+                            : 'text-emerald-600 dark:text-emerald-400'
+                        }`} />
+                      </div>
+                      <div>
+                        <h3 className={`text-lg font-semibold mb-1 ${
+                          getAssignedProducts(template.id).length === 0
+                            ? 'text-amber-900 dark:text-amber-100'
+                            : 'text-emerald-900 dark:text-emerald-100'
+                        }`}>
+                          {getAssignedProducts(template.id).length === 0 ? 'Assign Products to Template' : 'Products Assigned'}
+                        </h3>
+                        <p className={`text-sm ${
+                          getAssignedProducts(template.id).length === 0
+                            ? 'text-amber-700 dark:text-amber-300'
+                            : 'text-emerald-700 dark:text-emerald-300'
+                        }`}>
+                          {getAssignedProducts(template.id).length === 0
+                            ? 'This template needs products assigned before brands can use it to build programs'
+                            : `${getAssignedProducts(template.id).length} ${getAssignedProducts(template.id).length === 1 ? 'product' : 'products'} currently assigned to this template`
+                          }
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      onClick={() => setShowProductModal(true)}
+                      className={`px-6 py-2.5 rounded-full font-semibold shadow-md hover:shadow-lg transition-all ${
+                        getAssignedProducts(template.id).length === 0
+                          ? 'bg-amber-600 hover:bg-amber-700 text-white'
+                          : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                      }`}
+                    >
+                      <Package className="h-4 w-4 mr-2" />
+                      {getAssignedProducts(template.id).length === 0 ? 'Assign Products' : 'Manage Products'}
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Incompatible Products Warning */}
+                {incompatibleProducts.length > 0 && (
+                  <div className="p-4 bg-red-50 dark:bg-red-900/20 border-2 border-red-300 dark:border-red-700 rounded-2xl">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 rounded-lg bg-red-100 dark:bg-red-900/40">
+                        <Package className="h-5 w-5 text-red-600 dark:text-red-400" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="text-base font-semibold text-red-800 dark:text-red-200 mb-1">
+                          ⚠️ Incompatible Products Detected
+                        </h3>
+                        <p className="text-sm text-red-700 dark:text-red-300 mb-3">
+                          {incompatibleProducts.length} {incompatibleProducts.length === 1 ? 'product is' : 'products are'} not configured for{' '}
+                          <strong>
+                            {medicalCompanySource === 'md-integrations' ? 'MDI' : medicalCompanySource === 'beluga' ? 'Beluga' : 'Fuse'}
+                          </strong>. 
+                          Please remove {incompatibleProducts.length === 1 ? 'it' : 'them'} or select a different medical platform.
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {incompatibleProducts.map(p => (
+                            <span key={p.id} className="text-sm px-3 py-1.5 bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-200 rounded-lg font-medium">
+                              {p.name}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Template Import UI - for product forms */}
                 {template?.formTemplateType === 'normal' && (
@@ -3651,7 +3976,7 @@ export default function TemplateEditor() {
                                       </div>
                                       <div className="space-y-1">
                                         <label className="block text-[10px] font-medium text-muted-foreground">
-                                          Value <span className="opacity-70" title="Used to identify this option in conditional logic rules">(Used in conditional rules)</span>
+                                          Value <span className="opacity-70">(for logic)</span>
                                         </label>
                                         <input
                                           type="text"
@@ -3831,6 +4156,167 @@ export default function TemplateEditor() {
           </div>
         )
       })()}
+
+      {/* Product Assignment Modal */}
+      {template && (
+        <ProductAssignmentModal
+          isOpen={showProductModal}
+          onClose={() => setShowProductModal(false)}
+          formTitle={template.title}
+          formId={template.id}
+          products={products}
+          assignedProductIds={getAssignedProducts(template.id)}
+          initialProductOfferType={template.productOfferType || 'single_choice'}
+          medicalCompanySource={medicalCompanySource}
+          onSave={async (productIds, productOfferType) => {
+            await assignProductsToForm(template.id, productIds, productOfferType)
+            // Update the template's productOfferType in local state
+            setTemplate((prev: any) => ({ ...prev, productOfferType }))
+          }}
+        />
+      )}
+
+      {/* Medical Platform Change Confirmation Modal */}
+      {showPlatformChangeModal && pendingPlatformChange && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-lg bg-card rounded-2xl shadow-2xl border border-border">
+            {/* Header */}
+            <div className="bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800 p-6 rounded-t-2xl">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-xl bg-amber-100 dark:bg-amber-900/40">
+                  <svg className="h-6 w-6 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+                <div>
+                  <h2 className="text-xl font-semibold text-amber-900 dark:text-amber-100">
+                    Change Medical Platform?
+                  </h2>
+                  <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                    This will affect assigned products
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="p-6">
+              <p className="text-muted-foreground leading-relaxed mb-4">
+                You are about to change the medical platform to{' '}
+                <strong className="text-foreground">
+                  {pendingPlatformChange === 'md-integrations' ? 'MDI' : pendingPlatformChange === 'beluga' ? 'Beluga' : 'Fuse'}
+                </strong>.
+              </p>
+              
+              {getIncompatibleProductsForPlatform(pendingPlatformChange).length > 0 && (
+                <>
+                  <p className="text-muted-foreground leading-relaxed mb-3">
+                    The following {getIncompatibleProductsForPlatform(pendingPlatformChange).length === 1 ? 'product is' : 'products are'} not configured for this platform and should be removed:
+                  </p>
+                  <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg mb-4">
+                    <div className="flex flex-wrap gap-2">
+                      {getIncompatibleProductsForPlatform(pendingPlatformChange).map(p => (
+                        <span key={p.id} className="text-sm px-3 py-1.5 bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-200 rounded-lg font-medium">
+                          {p.name}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    These products will be automatically removed when you change the platform.
+                  </p>
+                </>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="bg-muted/30 p-6 rounded-b-2xl flex gap-3">
+              <Button
+                onClick={() => {
+                  setShowPlatformChangeModal(false)
+                  setPendingPlatformChange(null)
+                }}
+                variant="outline"
+                className="flex-1 rounded-full"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  if (pendingPlatformChange) {
+                    updateMedicalPlatform(pendingPlatformChange)
+                  }
+                }}
+                className="flex-1 rounded-full bg-amber-600 hover:bg-amber-700 text-white"
+              >
+                Change Platform
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* No Products Warning Modal */}
+      {showNoProductsWarning && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-lg bg-card rounded-2xl shadow-2xl border border-border">
+            {/* Header */}
+            <div className="bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800 p-6 rounded-t-2xl">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-xl bg-amber-100 dark:bg-amber-900/40">
+                  <Package className="h-6 w-6 text-amber-600 dark:text-amber-400" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-semibold text-amber-900 dark:text-amber-100">
+                    No Products Assigned
+                  </h2>
+                  <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                    This template won't be usable by brands
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="p-6">
+              <p className="text-muted-foreground leading-relaxed mb-4">
+                You are saving the template without any products assigned. This means <strong className="text-foreground">brands won't be able to use this template</strong> to build programs.
+              </p>
+              <p className="text-muted-foreground leading-relaxed">
+                If you want brands to use this template, please assign some products before saving.
+              </p>
+            </div>
+
+            {/* Footer */}
+            <div className="bg-muted/30 p-6 rounded-b-2xl flex gap-3">
+              <Button
+                onClick={handleCancelSave}
+                variant="outline"
+                className="flex-1 rounded-full"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  setShowNoProductsWarning(false)
+                  setShowProductModal(true)
+                }}
+                className="flex-1 rounded-full bg-[#4FA59C] hover:bg-[#478F87] text-white"
+              >
+                <Package className="h-4 w-4 mr-2" />
+                Assign Products
+              </Button>
+              <Button
+                onClick={handleConfirmSaveWithoutProducts}
+                variant="outline"
+                className="flex-1 rounded-full border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400 dark:hover:bg-amber-900/20"
+              >
+                Save Anyway
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
