@@ -97,6 +97,8 @@ class QuestionnaireService {
         "userId",
         "productOfferType",
         "medicalCompanySource",
+        "medicalTemplateApprovedByFuseAdmin",
+        "status",
         "createdAt",
         "updatedAt",
       ],

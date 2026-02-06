@@ -189,4 +189,11 @@ export default class Questionnaire extends Entity {
         defaultValue: PatientPortalDashboardFormat.MD_INTEGRATIONS,
     })
     declare medicalCompanySource: PatientPortalDashboardFormat;
+
+    @Column({
+        type: DataType.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+    })
+    declare medicalTemplateApprovedByFuseAdmin: boolean;
 }

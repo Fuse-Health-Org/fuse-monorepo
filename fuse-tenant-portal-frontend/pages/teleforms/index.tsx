@@ -1,10 +1,21 @@
-import { useEffect, useMemo, useState, useRef } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/router"
 import { Sidebar } from "@/components/sidebar"
 import { Header } from "@/components/header"
-import { Loader2, RefreshCcw, Search, Edit3, Plus, Trash2 } from "lucide-react"
+import { Loader2, RefreshCcw, Search, Edit3, Plus, Trash2, CheckCircle2, List } from "lucide-react"
 import { useAuth } from "@/contexts/AuthContext"
 import { SORT_OPTIONS } from "@fuse/enums"
+
+interface TemplateItem {
+  id: string
+  title: string
+  description: string
+  createdAt: string
+  status: string
+  medicalCompanySource: string | null
+  medicalTemplateApprovedByFuseAdmin: boolean
+  user?: { id: string; email: string; firstName?: string; lastName?: string } | null
+}
 
 export default function Teleforms() {
   const router = useRouter()
@@ -15,7 +26,8 @@ export default function Teleforms() {
   const [selectedSort, setSelectedSort] = useState("name_asc")
   const [creating, setCreating] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [productFormTemplates, setProductFormTemplates] = useState<Array<{ id: string; title: string; description: string }>>([])
+  const [productFormTemplates, setProductFormTemplates] = useState<TemplateItem[]>([])
+  const [activeTab, setActiveTab] = useState<"approved" | "all">("approved")
 
   // Fetch product form templates
   const fetchProductFormTemplates = async () => {
@@ -32,7 +44,12 @@ export default function Teleforms() {
         setProductFormTemplates(forms.map((f: any) => ({
           id: f.id,
           title: f.title || 'Untitled Form',
-          description: f.description || ''
+          description: f.description || '',
+          createdAt: f.createdAt || '',
+          status: f.status || 'in_progress',
+          medicalCompanySource: f.medicalCompanySource || null,
+          medicalTemplateApprovedByFuseAdmin: f.medicalTemplateApprovedByFuseAdmin === true,
+          user: f.user || null,
         })))
       }
     } catch (error) {
@@ -45,6 +62,43 @@ export default function Teleforms() {
   useEffect(() => {
     fetchProductFormTemplates()
   }, [token, baseUrl])
+
+  // Filter by search, then by tab
+  const filteredTemplates = useMemo(() => {
+    let filtered = productFormTemplates.filter((q) => {
+      const matchesSearch = !searchQuery ||
+        q.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        q.description?.toLowerCase().includes(searchQuery.toLowerCase())
+      return matchesSearch
+    })
+
+    if (activeTab === "approved") {
+      filtered = filtered.filter(t => t.medicalTemplateApprovedByFuseAdmin === true)
+    }
+
+    // Sort
+    filtered.sort((a, b) => {
+      const titleA = a.title || ""
+      const titleB = b.title || ""
+      switch (selectedSort) {
+        case "name_asc":
+          return titleA.localeCompare(titleB)
+        case "name_desc":
+          return titleB.localeCompare(titleA)
+        case "updated_desc":
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        case "updated_asc":
+          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        default:
+          return 0
+      }
+    })
+
+    return filtered
+  }, [productFormTemplates, searchQuery, activeTab, selectedSort])
+
+  const approvedCount = productFormTemplates.filter(t => t.medicalTemplateApprovedByFuseAdmin === true).length
+  const allCount = productFormTemplates.length
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
@@ -65,6 +119,46 @@ export default function Teleforms() {
               className="rounded-full px-6 py-2.5 border border-border text-foreground hover:bg-muted transition-all text-sm font-medium flex items-center gap-2 disabled:opacity-50"
             >
               <RefreshCcw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Refresh
+            </button>
+          </div>
+
+          {/* Tabs */}
+          <div className="flex items-center gap-1 bg-muted/50 rounded-xl p-1 w-fit border border-border/60">
+            <button
+              onClick={() => setActiveTab("approved")}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                activeTab === "approved"
+                  ? "bg-[#4FA59C] text-white shadow-sm"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              }`}
+            >
+              <CheckCircle2 className="h-4 w-4" />
+              Approved Teleforms
+              <span className={`ml-1 px-2 py-0.5 rounded-full text-xs font-semibold ${
+                activeTab === "approved"
+                  ? "bg-white/20 text-white"
+                  : "bg-muted text-muted-foreground"
+              }`}>
+                {approvedCount}
+              </span>
+            </button>
+            <button
+              onClick={() => setActiveTab("all")}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                activeTab === "all"
+                  ? "bg-[#4FA59C] text-white shadow-sm"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              }`}
+            >
+              <List className="h-4 w-4" />
+              All Teleforms
+              <span className={`ml-1 px-2 py-0.5 rounded-full text-xs font-semibold ${
+                activeTab === "all"
+                  ? "bg-white/20 text-white"
+                  : "bg-muted text-muted-foreground"
+              }`}>
+                {allCount}
+              </span>
             </button>
           </div>
 
@@ -112,28 +206,18 @@ export default function Teleforms() {
           {/* Results Summary and Create Button */}
           <div className="flex items-center justify-between text-sm text-muted-foreground">
             <span>
-              Showing {(() => {
-                const filtered = productFormTemplates.filter((q: any) => {
-                  const matchesSearch = !searchQuery ||
-                    q.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                    q.description?.toLowerCase().includes(searchQuery.toLowerCase())
-                  return matchesSearch
-                })
-                return filtered.length
-              })()} of {productFormTemplates.length} templates
+              Showing {filteredTemplates.length} of {activeTab === "approved" ? approvedCount : allCount} templates
             </span>
             <div className="flex items-center gap-3">
               {searchQuery && (
                 <button
-                  onClick={() => {
-                    setSearchQuery("")
-                  }}
+                  onClick={() => setSearchQuery("")}
                   className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted rounded-xl transition-all"
                 >
                   Clear Filters
                 </button>
               )}
-                <button 
+              <button 
                 onClick={async () => {
                   if (!token) return
                   setCreating(true)
@@ -172,7 +256,7 @@ export default function Teleforms() {
               >
                 <Plus className="h-5 w-5" />
                 {creating ? 'Creating...' : 'Create New Template'}
-                </button>
+              </button>
             </div>
           </div>
 
@@ -182,86 +266,129 @@ export default function Teleforms() {
               <Loader2 className="mr-3 h-6 w-6 animate-spin text-[#4FA59C]" />
               <span className="text-base">Loading templates...</span>
             </div>
-          ) : (() => {
-            const filtered = productFormTemplates.filter((q: any) => {
-              const matchesSearch = !searchQuery ||
-                q.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                q.description?.toLowerCase().includes(searchQuery.toLowerCase())
-              return matchesSearch
-            }).sort((a: any, b: any) => {
-              const titleA = a.title || ""
-              const titleB = b.title || ""
-              switch (selectedSort) {
-                case "name_asc":
-                  return titleA.localeCompare(titleB)
-                case "name_desc":
-                  return titleB.localeCompare(titleA)
-                default:
-                  return 0
-              }
-            })
-
-            return filtered.length === 0 ? (
+          ) : filteredTemplates.length === 0 ? (
             <div className="bg-card rounded-2xl shadow-sm border border-border p-16">
               <div className="flex flex-col items-center justify-center text-muted-foreground">
                 <div className="bg-muted rounded-full p-6 mb-4">
-                  <Search className="h-12 w-12 text-muted-foreground" />
+                  {activeTab === "approved" ? (
+                    <CheckCircle2 className="h-12 w-12 text-muted-foreground" />
+                  ) : (
+                    <Search className="h-12 w-12 text-muted-foreground" />
+                  )}
                 </div>
-                  <p className="text-lg text-foreground">No templates found matching your filters.</p>
+                <p className="text-lg text-foreground">
+                  {activeTab === "approved"
+                    ? "No approved teleforms yet."
+                    : "No templates found matching your filters."}
+                </p>
+                {activeTab === "approved" && (
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Switch to "All Teleforms" to see all templates and approve them.
+                  </p>
+                )}
               </div>
             </div>
           ) : (
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                {filtered.map((template: any) => (
-                  <div key={template.id} className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden hover:shadow-md hover:border-[#4FA59C] transition-all">
-                    <div className="p-6 pb-4 border-b border-border">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
+              {filteredTemplates.map((template) => (
+                <div key={template.id} className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden hover:shadow-md hover:border-[#4FA59C] transition-all">
+                  <div className="p-6 pb-4 border-b border-border">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
                           <h3 className="text-lg font-semibold text-foreground">{template.title || "Untitled Template"}</h3>
-                          {template.description && !template.description.startsWith('Questionnaire for') && (
-                            <p className="text-sm text-muted-foreground mt-2">{template.description}</p>
-                            )}
+                          {template.medicalTemplateApprovedByFuseAdmin && (
+                            <CheckCircle2 className="h-4 w-4 text-emerald-500 flex-shrink-0" />
+                          )}
                         </div>
+                        {template.description && !template.description.startsWith('Questionnaire for') && (
+                          <p className="text-sm text-muted-foreground mt-2">{template.description}</p>
+                        )}
                       </div>
                     </div>
-                    <div className="p-6 space-y-4">
-                      {/* Actions */}
-                      <div className="flex gap-2 pt-2">
-                        <button
-                          className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-full text-sm font-medium shadow-sm transition-all bg-[#4FA59C] hover:bg-[#478F87] text-white"
-                          onClick={() => router.push(`/teleforms/editor/${template.id}`)}
-                        >
-                          <Edit3 className="h-4 w-4" />
-                          Edit Template
-                        </button>
-                          <button
-                          className="px-4 py-2.5 rounded-full border border-border text-destructive hover:bg-destructive/10 text-sm font-medium transition-all"
-                          onClick={async () => {
-                            if (!token) return
-                            if (!confirm('Delete this template? This cannot be undone.')) return
-                            try {
-                              const res = await fetch(`${baseUrl}/questionnaires/${template.id}`, {
-                                method: 'DELETE',
-                                headers: { Authorization: `Bearer ${token}` },
-                              })
-                              const data = await res.json().catch(() => ({}))
-                              if (!res.ok) throw new Error(data?.message || 'Failed to delete template')
-                              // Refetch templates after deletion
-                              await fetchProductFormTemplates()
-                            } catch (e: any) {
-                              alert(e?.message || 'Failed to delete template')
-                            }
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                          </button>
-                      </div>
+                    {/* Status & Platform badges */}
+                    <div className="flex items-center gap-2 mt-3 flex-wrap">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        template.status === 'ready'
+                          ? 'bg-green-50 text-green-700 border border-green-200 dark:bg-green-900/20 dark:text-green-400'
+                          : template.status === 'ready_for_review'
+                            ? 'bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-900/20 dark:text-blue-400'
+                            : 'bg-yellow-50 text-yellow-700 border border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-400'
+                      }`}>
+                        {template.status === 'ready' ? 'Ready' : template.status === 'ready_for_review' ? 'Ready for Review' : 'In Progress'}
+                      </span>
+                      {template.medicalCompanySource && (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground border border-border">
+                          {template.medicalCompanySource === 'md-integrations' ? 'MDI' : template.medicalCompanySource === 'beluga' ? 'Beluga' : 'Fuse'}
+                        </span>
+                      )}
                     </div>
                   </div>
-                ))}
+                  <div className="p-6 space-y-4">
+                    {/* Creator info */}
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      {template.user ? (
+                        <>
+                          <div className="w-5 h-5 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
+                            <span className="text-[10px] font-medium text-white">
+                              {template.user.firstName?.charAt(0).toUpperCase() || template.user.email?.charAt(0).toUpperCase() || 'D'}
+                            </span>
+                          </div>
+                          <span className="truncate">
+                            Created by {template.user.firstName && template.user.lastName
+                              ? `${template.user.firstName} ${template.user.lastName}`
+                              : template.user.email}
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <div className="w-5 h-5 bg-gray-400 rounded-full flex items-center justify-center flex-shrink-0">
+                            <span className="text-[10px] font-medium text-white">S</span>
+                          </div>
+                          <span>System template</span>
+                        </>
+                      )}
+                      {template.createdAt && (
+                        <span className="text-muted-foreground/60">
+                          • {new Date(template.createdAt).toLocaleDateString()}
+                        </span>
+                      )}
+                    </div>
+                    {/* Actions */}
+                    <div className="flex gap-2 pt-2">
+                      <button
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-full text-sm font-medium shadow-sm transition-all bg-[#4FA59C] hover:bg-[#478F87] text-white"
+                        onClick={() => router.push(`/teleforms/editor/${template.id}`)}
+                      >
+                        <Edit3 className="h-4 w-4" />
+                        Edit Template
+                      </button>
+                      <button
+                        className="px-4 py-2.5 rounded-full border border-border text-destructive hover:bg-destructive/10 text-sm font-medium transition-all"
+                        onClick={async () => {
+                          if (!token) return
+                          if (!confirm('Delete this template? This cannot be undone.')) return
+                          try {
+                            const res = await fetch(`${baseUrl}/questionnaires/${template.id}`, {
+                              method: 'DELETE',
+                              headers: { Authorization: `Bearer ${token}` },
+                            })
+                            const data = await res.json().catch(() => ({}))
+                            if (!res.ok) throw new Error(data?.message || 'Failed to delete template')
+                            await fetchProductFormTemplates()
+                          } catch (e: any) {
+                            alert(e?.message || 'Failed to delete template')
+                          }
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
-            )
-          })()}
+          )}
         </main>
       </div>
     </div>
