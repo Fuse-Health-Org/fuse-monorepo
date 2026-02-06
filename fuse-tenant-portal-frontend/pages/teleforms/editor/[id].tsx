@@ -217,21 +217,21 @@ export default function TemplateEditor() {
     console.log('🔄 Attempting to change platform to:', newPlatform, 'from:', medicalCompanySource)
     if (newPlatform === medicalCompanySource) return
     
-    const wouldBeIncompatible = getIncompatibleProductsForPlatform(newPlatform)
-    const hasAssignedProducts = template?.id && getAssignedProducts(template.id).length > 0
+    const assignedProductIds = template?.id ? getAssignedProducts(template.id) : []
+    const hasAssignedProducts = assignedProductIds.length > 0
     
-    console.log('✅ Has assigned products:', hasAssignedProducts)
-    console.log('⚠️ Would be incompatible count:', wouldBeIncompatible.length)
+    console.log('✅ Has assigned products:', hasAssignedProducts, 'count:', assignedProductIds.length)
     
-    // If there are products that would become incompatible, show confirmation
-    if (hasAssignedProducts && wouldBeIncompatible.length > 0) {
-      console.log('🚨 Showing confirmation modal')
+    // If there are ANY assigned products, always show confirmation when changing platform
+    // (products may not be resolved in the local products array, so we can't reliably check compatibility)
+    if (hasAssignedProducts) {
+      console.log('🚨 Showing confirmation modal — products are assigned')
       setPendingPlatformChange(newPlatform)
       setShowPlatformChangeModal(true)
       return
     }
     
-    console.log('✅ No incompatible products, changing platform directly')
+    console.log('✅ No assigned products, changing platform directly')
     // Otherwise, directly change the platform
     await updateMedicalPlatform(newPlatform)
   }
@@ -242,18 +242,54 @@ export default function TemplateEditor() {
     
     try {
       // First, remove incompatible products
-      const wouldBeIncompatible = getIncompatibleProductsForPlatform(newSource)
-      if (wouldBeIncompatible.length > 0 && template?.id) {
+      if (template?.id) {
         const currentAssignedIds = getAssignedProducts(template.id)
-        const compatibleProductIds = currentAssignedIds.filter(
-          id => !wouldBeIncompatible.find(p => p.id === id)
-        )
         
-        // Update products to remove incompatible ones
-        await assignProductsToForm(template.id, compatibleProductIds, template.productOfferType || 'single_choice')
+        if (currentAssignedIds.length > 0) {
+          // Keep only products that are confirmed compatible with the new platform
+          // If a product can't be found in the products array, assume it's incompatible (safe default)
+          const compatibleProductIds = currentAssignedIds.filter(id => {
+            const product = products.find(p => p.id === id)
+            if (!product) return false // Can't verify → remove to be safe
+            
+            if (newSource === 'fuse') {
+              return !product.mdOfferingId && !product.belugaProductId
+            } else if (newSource === 'md-integrations') {
+              return !!product.mdOfferingId
+            } else if (newSource === 'beluga') {
+              return !!product.belugaProductId
+            }
+            return false
+          })
+          
+          const removedCount = currentAssignedIds.length - compatibleProductIds.length
+          
+          if (removedCount > 0) {
+            await assignProductsToForm(template.id, compatibleProductIds, template.productOfferType || 'single_choice')
+          }
+          
+          // Then update the medical platform
+          const res = await fetch(`${baseUrl}/questionnaires/templates/${templateId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ medicalCompanySource: newSource })
+          })
+          if (res.ok) {
+            setMedicalCompanySource(newSource)
+            setSaveMessage(removedCount > 0
+              ? `✅ Medical platform updated and ${removedCount} incompatible ${removedCount === 1 ? 'product' : 'products'} removed!`
+              : "✅ Medical platform updated!")
+            setTimeout(() => setSaveMessage(null), 3000)
+            
+            // Close modal if open
+            setShowPlatformChangeModal(false)
+            setPendingPlatformChange(null)
+          }
+          return
+        }
       }
       
-      // Then update the medical platform
+      // No assigned products — just update the platform
       const res = await fetch(`${baseUrl}/questionnaires/templates/${templateId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -261,9 +297,7 @@ export default function TemplateEditor() {
       })
       if (res.ok) {
         setMedicalCompanySource(newSource)
-        setSaveMessage(wouldBeIncompatible.length > 0 
-          ? `✅ Medical platform updated and ${wouldBeIncompatible.length} incompatible ${wouldBeIncompatible.length === 1 ? 'product' : 'products'} removed!`
-          : "✅ Medical platform updated!")
+        setSaveMessage("✅ Medical platform updated!")
         setTimeout(() => setSaveMessage(null), 3000)
         
         // Close modal if open
