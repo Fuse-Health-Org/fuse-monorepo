@@ -316,6 +316,79 @@ class StripeService {
     });
   }
 
+  // Refund methods
+  async createRefund({
+    paymentIntentId,
+    amount,
+    reverseTransfer = true,
+  }: {
+    paymentIntentId: string;
+    amount?: number;
+    reverseTransfer?: boolean;
+  }) {
+    const refundParams: Stripe.RefundCreateParams = {
+      payment_intent: paymentIntentId,
+      reverse_transfer: reverseTransfer,
+    };
+
+    if (amount) {
+      refundParams.amount = Math.round(amount * 100);
+    }
+
+    return stripe.refunds.create(refundParams);
+  }
+
+  // Transfer methods
+  async createTransfer({
+    amount,
+    currency = 'usd',
+    destination,
+    sourceTransaction,
+    metadata,
+    description,
+  }: {
+    amount: number;
+    currency?: string;
+    destination: string;
+    sourceTransaction?: string;
+    metadata?: Record<string, string>;
+    description?: string;
+  }) {
+    return stripe.transfers.create({
+      amount: Math.round(amount * 100),
+      currency,
+      destination,
+      source_transaction: sourceTransaction,
+      metadata,
+      description,
+    });
+  }
+
+  async createTransferFromConnectedAccount({
+    amount,
+    currency = 'usd',
+    destination,
+    connectedAccountId,
+    metadata,
+    description,
+  }: {
+    amount: number;
+    currency?: string;
+    destination: string;
+    connectedAccountId: string;
+    metadata?: Record<string, string>;
+    description?: string;
+  }) {
+    return stripe.transfers.create({
+      amount: Math.round(amount * 100),
+      currency,
+      destination,
+      metadata,
+      description,
+    }, {
+      stripeAccount: connectedAccountId,
+    });
+  }
 
 
 }

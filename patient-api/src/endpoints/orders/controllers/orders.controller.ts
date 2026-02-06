@@ -286,7 +286,7 @@ export const createPaymentIntent = async (req: Request, res: Response) => {
         // Create payment intent with optional transfer_data to send clinic margin
         let paymentIntent;
         try {
-            paymentIntent = await stripe.paymentIntents.create({
+            const paymentIntentParams: any = {
                 amount: Math.round(amount * 100), // Convert to cents
                 currency,
                 metadata: {
@@ -304,8 +304,17 @@ export const createPaymentIntent = async (req: Request, res: Response) => {
                     pharmacyWholesaleTotalUsd: pharmacyWholesaleTotal.toFixed(2),
                 },
                 description: `Order ${orderNumber} - ${treatment.name}`,
-                ...(transferData ? { transfer_data: transferData } : {}),
-            });
+            };
+
+            // Add transfer_data to automatically transfer brandAmount to clinic
+            if (transferData) {
+                paymentIntentParams.transfer_data = transferData;
+                console.log(
+                    `💸 Adding transfer_data: $${brandAmountUsd.toFixed(2)} to destination ${transferData.destination}`
+                );
+            }
+
+            paymentIntent = await stripe.paymentIntents.create(paymentIntentParams);
         } catch (stripeError: any) {
             if (process.env.NODE_ENV === "development") {
                 console.error("❌ Stripe payment intent creation failed:", stripeError);

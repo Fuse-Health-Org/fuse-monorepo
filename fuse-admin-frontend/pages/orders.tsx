@@ -21,7 +21,8 @@ import {
     Link as LinkIcon,
     CheckCircle,
     AlertCircle,
-    X
+    X,
+    RefreshCw
 } from 'lucide-react'
 import { loadConnectAndInitialize } from '@stripe/connect-js'
 
@@ -30,6 +31,11 @@ interface Order {
     orderNumber: string
     status: string
     totalAmount: number
+    brandAmount: number
+    platformFeeAmount: number
+    doctorAmount: number
+    pharmacyWholesaleAmount: number
+    stripeAmount: number
     createdAt: string
     shippedAt?: string
     deliveredAt?: string
@@ -75,6 +81,8 @@ export default function Orders() {
     const [searchTerm, setSearchTerm] = useState('')
     const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
     const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
+    const [refundingOrders, setRefundingOrders] = useState<Set<string>>(new Set())
+    const [refundSuccess, setRefundSuccess] = useState<string | null>(null)
     const { user, token } = useAuth()
 
     // Stripe Connect states
@@ -233,8 +241,62 @@ export default function Orders() {
         }
     }
 
+    const handleRefund = async (orderId: string, orderNumber: string) => {
+        if (!token) return
+
+        const confirmRefund = confirm(`Are you sure you want to refund order ${orderNumber}? This action cannot be undone.`)
+        if (!confirmRefund) return
+
+        try {
+            setRefundingOrders(prev => new Set(prev).add(orderId))
+            setError(null)
+            setRefundSuccess(null)
+
+            const response = await fetch(
+                `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/refunds`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        orderId: orderId
+                    })
+                }
+            )
+
+            const data = await response.json()
+
+            if (response.ok && data.success) {
+                setRefundSuccess(`Order ${orderNumber} has been refunded successfully!`)
+                // Refresh orders to show updated status
+                fetchOrders()
+                // Clear success message after 5 seconds
+                setTimeout(() => setRefundSuccess(null), 5000)
+            } else {
+                setError(data.message || 'Failed to process refund')
+            }
+        } catch (err) {
+            console.error('Error processing refund:', err)
+            setError('An error occurred while processing the refund')
+        } finally {
+            setRefundingOrders(prev => {
+                const newSet = new Set(prev)
+                newSet.delete(orderId)
+                return newSet
+            })
+        }
+    }
+
     // Calculate brand revenue for an order
     const calculateBrandRevenue = (order: Order) => {
+        // Use brandAmount directly from backend if available
+        if (order.brandAmount !== undefined && order.brandAmount !== null) {
+            return Number(order.brandAmount)
+        }
+
+        // Fallback to calculating from order items if brandAmount not available
         if (!order.orderItems || order.orderItems.length === 0) return 0
 
         return order.orderItems.reduce((total, item) => {
@@ -434,10 +496,23 @@ export default function Orders() {
                         </div>
                     </div>
 
+                    {/* Success Message */}
+                    {refundSuccess && (
+                        <div className="mb-6 p-4 border border-green-200 rounded-md bg-green-50">
+                            <div className="flex items-center gap-2">
+                                <CheckCircle className="h-5 w-5 text-green-600" />
+                                <p className="text-green-700 text-sm">{refundSuccess}</p>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Error Message */}
                     {error && (
-                        <div className="mb-6 p-4 border border-red-200 rounded-md bg-background">
-                            <p className="text-red-600 text-sm">{error}</p>
+                        <div className="mb-6 p-4 border border-red-200 rounded-md bg-red-50">
+                            <div className="flex items-center gap-2">
+                                <AlertCircle className="h-5 w-5 text-red-600" />
+                                <p className="text-red-600 text-sm">{error}</p>
+                            </div>
                         </div>
                     )}
 
@@ -563,7 +638,7 @@ export default function Orders() {
                                                                                                         {formatCurrency(item.totalPrice)}
                                                                                                     </div>
                                                                                                     <div className="text-xs font-medium text-green-600 mt-1">
-                                                                                                        Revenue: {formatCurrency(itemBrandRevenue)}
+                                                                                                        Revenue: {formatCurrency(calculateBrandRevenue(order))}
                                                                                                     </div>
                                                                                                 </div>
                                                                                             </div>
@@ -598,13 +673,44 @@ export default function Orders() {
                                                                                 {order.payment && (
                                                                                     <div>
                                                                                         <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Payment</h4>
-                                                                                        <div className="p-3 bg-card border border-border rounded-lg">
+                                                                                        <div className="p-3 bg-card border border-border rounded-lg space-y-3">
                                                                                             <div className="flex items-center gap-2 text-sm">
                                                                                                 <CreditCard className="h-4 w-4 text-muted-foreground" />
                                                                                                 <span className="text-foreground">
                                                                                                     {order.payment.paymentMethod || 'Card'} • {order.payment.status}
                                                                                                 </span>
                                                                                             </div>
+                                                                                            
+                                                                                            {/* Refund Button - Only show for paid/captured orders that are not already refunded */}
+                                                                                            {(order.payment.status === 'succeeded' || 
+                                                                                              order.payment.status === 'paid' || 
+                                                                                              order.payment.status === 'captured') && 
+                                                                                             order.status !== 'refunded' && (
+                                                                                                <button
+                                                                                                    onClick={(e) => {
+                                                                                                        e.stopPropagation()
+                                                                                                        handleRefund(order.id, order.orderNumber)
+                                                                                                    }}
+                                                                                                    disabled={refundingOrders.has(order.id)}
+                                                                                                    className={`w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                                                                                                        refundingOrders.has(order.id)
+                                                                                                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                                                                                            : 'bg-red-50 text-red-700 border border-red-200 hover:bg-red-100'
+                                                                                                    }`}
+                                                                                                >
+                                                                                                    {refundingOrders.has(order.id) ? (
+                                                                                                        <>
+                                                                                                            <RefreshCw className="h-4 w-4 animate-spin" />
+                                                                                                            Processing Refund...
+                                                                                                        </>
+                                                                                                    ) : (
+                                                                                                        <>
+                                                                                                            <RefreshCw className="h-4 w-4" />
+                                                                                                            Issue Refund
+                                                                                                        </>
+                                                                                                    )}
+                                                                                                </button>
+                                                                                            )}
                                                                                         </div>
                                                                                     </div>
                                                                                 )}
