@@ -189,4 +189,11 @@ export default class Questionnaire extends Entity {
         defaultValue: PatientPortalDashboardFormat.MD_INTEGRATIONS,
     })
     declare medicalCompanySource: PatientPortalDashboardFormat;
+
+    @Column({
+        type: DataType.ENUM('pending', 'approved', 'rejected'),
+        allowNull: false,
+        defaultValue: 'pending',
+    })
+    declare medicalTemplateApprovedByFuseAdmin: 'pending' | 'approved' | 'rejected';
 }

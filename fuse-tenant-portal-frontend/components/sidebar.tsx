@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext"
 import {
   BarChart3,
   FileText,
+  ClipboardList,
   LogOut,
   Building2,
   Package,
@@ -24,7 +25,8 @@ const navigation = [
   { name: "Overview", icon: BarChart3, href: "/" },
   { name: "Products", icon: Package, href: "/products" },
   { name: "Programs", icon: Stethoscope, href: "/programs" },
-  { name: "Forms", icon: FileText, href: "/forms" },
+  { name: "Teleforms", icon: ClipboardList, href: "/teleforms" },
+  { name: "Global Structures", icon: FileText, href: "/forms" },
   { name: "Client Management", icon: Users, href: "/client-management" },
   { name: "Doctor Applications", icon: UserCheck, href: "/doctor-applications" },
   { name: "Tier Management", icon: Settings, href: "/tier-management" },
@@ -64,7 +66,7 @@ export function Sidebar() {
             Main Menu
           </p>
           {navigation.map((item) => {
-            const isActive = router.pathname === item.href
+            const isActive = item.href === "/" ? router.pathname === "/" : router.pathname.startsWith(item.href)
             return (
               <a
                 key={item.name}

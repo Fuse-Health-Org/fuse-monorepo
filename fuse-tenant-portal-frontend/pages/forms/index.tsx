@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState, useRef } from "react"
 import { useRouter } from "next/router"
 import { useTenant } from "@/contexts/TenantContext"
 import { Sidebar } from "@/components/sidebar"
@@ -20,7 +20,7 @@ export default function Forms() {
   const { token } = useAuth()
   const { selectedTenant } = useTenant()
 
-  const [activeTab, setActiveTab] = useState<"products" | "templates" | "account" | "structure">("products")
+  const [activeTab, setActiveTab] = useState<"products" | "templates" | "account" | "structure">("structure")
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("")
   const [selectedStatus, setSelectedStatus] = useState("all")
@@ -34,6 +34,8 @@ export default function Forms() {
   const [productQStatus, setProductQStatus] = useState<Record<string, 'unknown' | 'exists' | 'none'>>({})
   const [productInfoById, setProductInfoById] = useState<Record<string, { placeholderSig?: string }>>({})
   const [productFormTemplates, setProductFormTemplates] = useState<Array<{ id: string; title: string; description: string }>>([])
+  const fetchedProductsRef = useRef<Set<string>>(new Set())
+  const fetchedQStatusRef = useRef<Set<string>>(new Set())
 
   useEffect(() => {
     refresh()
@@ -73,7 +75,12 @@ export default function Forms() {
     const toCheck = (assignments || []).map((a: any) => a.treatmentId).filter(Boolean)
     toCheck.forEach(async (productId: string) => {
       if (!productId) return
-      if (productQStatus[productId]) return
+      // Skip if already checked
+      if (fetchedQStatusRef.current.has(productId)) return
+      
+      // Mark as being checked
+      fetchedQStatusRef.current.add(productId)
+      
       try {
         const res = await fetch(`${baseUrl}/questionnaires/product/${productId}`, {
           headers: { Authorization: `Bearer ${token}` },
@@ -90,29 +97,37 @@ export default function Forms() {
         setProductQStatus(prev => ({ ...prev, [productId]: 'none' }))
       }
     })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [assignments, token])
+  }, [assignments, token, baseUrl])
 
   // Fetch product info (e.g., Placeholder Sig) for each assignment's productId
   useEffect(() => {
     if (!token) return
     const toCheck = (assignments || []).map((a: any) => a.treatmentId).filter(Boolean)
+    
     toCheck.forEach(async (productId: string) => {
       if (!productId) return
-      if (productInfoById[productId]) return
+      // Skip if already fetched
+      if (fetchedProductsRef.current.has(productId)) return
+      
+      // Mark as being fetched
+      fetchedProductsRef.current.add(productId)
+      
       try {
         const res = await fetch(`${baseUrl}/products/${productId}`, {
           headers: { Authorization: `Bearer ${token}` },
         })
         const data = await res.json().catch(() => null)
         if (res.ok && data?.success && data?.data) {
-          setProductInfoById(prev => ({ ...prev, [productId]: { placeholderSig: data.data.placeholderSig || undefined } }))
+          setProductInfoById(prev => ({ 
+            ...prev, 
+            [productId]: { placeholderSig: data.data.placeholderSig || undefined } 
+          }))
         }
       } catch {
         // ignore
       }
     })
-  }, [assignments, token, baseUrl, productInfoById])
+  }, [assignments, token, baseUrl])
 
   // Filter and sort assignments
   const filteredAndSortedAssignments = useMemo(() => {
@@ -376,7 +391,7 @@ export default function Forms() {
         <main className="flex-1 overflow-y-auto p-8 space-y-8">
           <div className="flex items-start justify-between">
             <div>
-              <h1 className="text-3xl font-semibold text-foreground mb-2">Form Management</h1>
+              <h1 className="text-3xl font-semibold text-foreground mb-2">Global Structures Management</h1>
               <p className="text-muted-foreground text-base">
                 Configure product-specific forms and manage standardized question templates.
               </p>
@@ -392,6 +407,15 @@ export default function Forms() {
 
           {/* Tabs */}
           <div className="flex items-center gap-2 bg-card rounded-2xl p-1.5 w-fit shadow-sm border border-border">
+            <button
+              onClick={() => setActiveTab("structure")}
+              className={`px-6 py-2 text-sm font-medium rounded-xl transition-all ${activeTab === "structure"
+                  ? "bg-[#4FA59C] text-white shadow-sm"
+                  : "text-muted-foreground hover:bg-muted"
+              }`}
+            >
+              Global Structure
+            </button>
             <button
               onClick={() => setActiveTab("products")}
               className={`px-6 py-2 text-sm font-medium rounded-xl transition-all ${activeTab === "products"
@@ -418,15 +442,6 @@ export default function Forms() {
               }`}
             >
               Account Questions
-            </button>
-            <button
-              onClick={() => setActiveTab("structure")}
-              className={`px-6 py-2 text-sm font-medium rounded-xl transition-all ${activeTab === "structure"
-                  ? "bg-[#4FA59C] text-white shadow-sm"
-                  : "text-muted-foreground hover:bg-muted"
-              }`}
-            >
-              Global Structure
             </button>
           </div>
 

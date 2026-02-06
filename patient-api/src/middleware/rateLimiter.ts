@@ -50,7 +50,7 @@ export const publicLimiter = rateLimit({
 // FLEXIBLE: Authenticated API endpoints
 export const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  limit: 150, // 150 requests per window
+  limit: 1500, // 150 requests per window
   message: {
     success: false,
     message: 'Rate limit exceeded, please slow down.',

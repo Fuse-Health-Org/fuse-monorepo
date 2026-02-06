@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState, useRef } from "react"
 import { useRouter } from "next/router"
-import { Sidebar } from "@/components/Sidebar"
-import { Header } from "@/components/Header"
+import { Sidebar } from "@/components/sidebar"
+import { Header } from "@/components/header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Input } from "@/components/ui/input"
-import { Loader2, ArrowLeft, Save, Plus, Trash2, GripVertical, MessageSquare, Info, Edit, X, Code2, ChevronDown, ChevronUp, RefreshCw, GitBranch, Eye, StopCircle, Link2, Unlink, FileText, Calculator, Package } from "lucide-react"
+import { Loader2, ArrowLeft, Save, Plus, Trash2, GripVertical, MessageSquare, Info, Edit, X, Code2, ChevronDown, ChevronUp, RefreshCw, GitBranch, Eye, StopCircle, Link2, Unlink, FileText, Calculator, Package, ShieldCheck, ShieldX } from "lucide-react"
 import { useAuth } from "@/contexts/AuthContext"
 import { QuestionEditor } from "../QuestionEditor"
 import { useProducts } from "@/hooks/useProducts"
@@ -56,6 +56,9 @@ export default function TemplateEditor() {
   const { token } = useAuth()
   const baseUrl = useMemo(() => process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001", [])
 
+  // View-only mode – editing is disabled in the Tenant Portal teleforms viewer
+  const readOnly = true
+
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -94,6 +97,8 @@ export default function TemplateEditor() {
   const [editingTemplateName, setEditingTemplateName] = useState(false)
   const [tempTemplateName, setTempTemplateName] = useState("")
   const [medicalCompanySource, setMedicalCompanySource] = useState<'fuse' | 'md-integrations' | 'beluga'>('md-integrations')
+  const [approvalStatus, setApprovalStatus] = useState<'pending' | 'approved' | 'rejected'>('pending')
+  const [togglingApproval, setTogglingApproval] = useState(false)
   const [selectedQuestionForConditional, setSelectedQuestionForConditional] = useState<{
     stepId: string
     questionId: string
@@ -334,6 +339,8 @@ export default function TemplateEditor() {
         setFormStatus(data.data?.status || 'in_progress')
         // Set medical company source from template data
         setMedicalCompanySource(data.data?.medicalCompanySource || 'md-integrations')
+        // Set approval status from template data
+        setApprovalStatus(data.data?.medicalTemplateApprovedByFuseAdmin || 'pending')
         // Normalize backend steps/questions/options into local editor shape
         const loadedSteps = (data.data?.steps || []).map((s: any, index: number) => ({
           id: String(s.id),
@@ -474,7 +481,7 @@ export default function TemplateEditor() {
   }, [token, template, baseUrl])
 
   const handleBack = () => {
-    router.push("/forms")
+    router.push("/teleforms")
   }
 
   const handleActivateProduct = async () => {
@@ -539,7 +546,7 @@ export default function TemplateEditor() {
       setTimeout(() => setSaveMessage(null), 3000)
 
       // Redirect to the newly attached form
-      router.push(`/forms/editor/${selectedFormId}`)
+      router.push(`/teleforms/editor/${selectedFormId}`)
     } catch (error: any) {
       console.error("❌ Error attaching form:", error)
       setError(error.message || "Failed to attach form")
@@ -640,7 +647,7 @@ export default function TemplateEditor() {
 
   const handleCreateNewForm = () => {
     // Navigate to the forms templates tab to create a new template
-    router.push("/forms?tab=templates")
+    router.push("/teleforms")
   }
 
   const handleAttachToProduct = async () => {
@@ -2091,6 +2098,19 @@ export default function TemplateEditor() {
             Back
           </Button>
 
+          {/* View-Only Banner */}
+          {readOnly && (
+            <div className="mb-4 p-4 rounded-xl border-2 border-blue-300 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-700 flex items-center gap-3">
+              <Eye className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+              <div>
+                <h3 className="font-semibold text-blue-900 dark:text-blue-100 text-sm">View-Only Mode</h3>
+                <p className="text-sm text-blue-700 dark:text-blue-300">
+                  You are viewing this form in read-only mode. Editing is only available in the Doctor Portal.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Inactive Product Banner */}
           {productInfo && !productInfo.isActive && (
             <Card className="border-blue-500/40 bg-blue-500/10 mb-4">
@@ -2132,7 +2152,7 @@ export default function TemplateEditor() {
               {/* Middle/Right: Metadata and Actions */}
               <div className="lg:col-span-8 space-y-4">
                 {/* Metadata Cards */}
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                   <div className="bg-card rounded-2xl p-5 shadow-md border border-border/40 hover:shadow-lg transition-shadow">
                     <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">Template Name</p>
                     {editingTemplateName ? (
@@ -2205,15 +2225,17 @@ export default function TemplateEditor() {
                     ) : (
                       <div className="flex items-center justify-between group">
                         <p className="font-semibold text-foreground text-base">{template.title}</p>
-                        <button
-                          onClick={() => {
-                            setTempTemplateName(template.title)
-                            setEditingTemplateName(true)
-                          }}
-                          className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-muted transition-all"
-                        >
-                          <Edit className="h-4 w-4 text-muted-foreground" />
-                        </button>
+                        {!readOnly && (
+                          <button
+                            onClick={() => {
+                              setTempTemplateName(template.title)
+                              setEditingTemplateName(true)
+                            }}
+                            className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-muted transition-all"
+                          >
+                            <Edit className="h-4 w-4 text-muted-foreground" />
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -2233,8 +2255,8 @@ export default function TemplateEditor() {
                           'Ready'}
                     </Badge>
                   </div>
-                  
-                  <div className="bg-card rounded-2xl p-5 shadow-md border border-border/40 hover:shadow-lg transition-shadow">
+
+                  <div className="bg-card rounded-2xl p-5 shadow-md border border-border/40 hover:shadow-lg transition-shadow col-span-2">
                     <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">Medical Platform</p>
                     <div className="flex items-center gap-2 mt-1">
                       <button
@@ -2355,6 +2377,96 @@ export default function TemplateEditor() {
                   </div>
                 </div>
 
+                {/* Fuse Approval Card - Wide */}
+                <div className={`rounded-2xl p-6 shadow-lg border-2 transition-all ${
+                  approvalStatus === 'approved'
+                    ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-300 dark:border-emerald-700'
+                    : approvalStatus === 'rejected'
+                      ? 'bg-red-50 dark:bg-red-900/20 border-red-300 dark:border-red-700'
+                      : 'bg-card border-border/40'
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className={`p-3 rounded-xl ${
+                        approvalStatus === 'approved'
+                          ? 'bg-emerald-100 dark:bg-emerald-900/40'
+                          : approvalStatus === 'rejected'
+                            ? 'bg-red-100 dark:bg-red-900/40'
+                            : 'bg-muted'
+                      }`}>
+                        {approvalStatus === 'approved' ? (
+                          <ShieldCheck className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
+                        ) : approvalStatus === 'rejected' ? (
+                          <ShieldX className="h-6 w-6 text-red-600 dark:text-red-400" />
+                        ) : (
+                          <ShieldX className="h-6 w-6 text-muted-foreground" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Fuse Approval</p>
+                        <p className={`text-base font-semibold ${
+                          approvalStatus === 'approved'
+                            ? 'text-emerald-700 dark:text-emerald-300'
+                            : approvalStatus === 'rejected'
+                              ? 'text-red-700 dark:text-red-300'
+                              : 'text-muted-foreground'
+                        }`}>
+                          {approvalStatus === 'approved' ? 'Approved' : approvalStatus === 'rejected' ? 'Rejected' : 'Pending Review'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {(['approved', 'pending', 'rejected'] as const).map((status) => (
+                        <button
+                          key={status}
+                          onClick={async () => {
+                            if (!token || !templateId || typeof templateId !== 'string' || approvalStatus === status) return
+                            setTogglingApproval(true)
+                            try {
+                              const res = await fetch(`${baseUrl}/questionnaires/templates/${templateId}`, {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                                body: JSON.stringify({ medicalTemplateApprovedByFuseAdmin: status })
+                              })
+                              if (res.ok) {
+                                setApprovalStatus(status)
+                                const data = await res.json()
+                                setTemplate(data.data)
+                                const msg = status === 'approved' ? '✅ Teleform approved!' : status === 'rejected' ? '❌ Teleform rejected' : '⏳ Teleform set to pending'
+                                setSaveMessage(msg)
+                                setTimeout(() => setSaveMessage(null), 3000)
+                              } else {
+                                const errorData = await res.json().catch(() => ({}))
+                                setSaveMessage(`❌ ${errorData.message || 'Failed to update approval'}`)
+                                setTimeout(() => setSaveMessage(null), 5000)
+                              }
+                            } catch (e: any) {
+                              console.error('Failed to update approval:', e)
+                              setSaveMessage(`❌ ${e.message || 'Failed to update approval'}`)
+                              setTimeout(() => setSaveMessage(null), 5000)
+                            } finally {
+                              setTogglingApproval(false)
+                            }
+                          }}
+                          disabled={togglingApproval || approvalStatus === status}
+                          className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all disabled:opacity-70 ${
+                            approvalStatus === status
+                              ? status === 'approved'
+                                ? 'bg-emerald-600 text-white shadow-md'
+                                : status === 'rejected'
+                                  ? 'bg-red-600 text-white shadow-md'
+                                  : 'bg-gray-600 text-white shadow-md'
+                              : 'bg-muted hover:bg-muted/80 text-muted-foreground'
+                          }`}
+                        >
+                          {togglingApproval && approvalStatus !== status ? null : 
+                            status === 'approved' ? 'Approve' : status === 'rejected' ? 'Reject' : 'Pending'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
                 {/* Incompatible Products Warning */}
                 {incompatibleProducts.length > 0 && (
                   <div className="p-4 bg-red-50 dark:bg-red-900/20 border-2 border-red-300 dark:border-red-700 rounded-2xl">
@@ -2386,7 +2498,7 @@ export default function TemplateEditor() {
                 )}
 
                 {/* Template Import UI - for product forms */}
-                {template?.formTemplateType === 'normal' && (
+                {!readOnly && template?.formTemplateType === 'normal' && (
                   <div className="flex gap-3 flex-wrap">
                     {/* Choose Template Dropdown */}
                     <div className="relative">
@@ -2465,7 +2577,7 @@ export default function TemplateEditor() {
 
                 {/* Action Buttons */}
                 <div className="flex gap-3">
-                  {formStatus === 'in_progress' && (
+                  {!readOnly && formStatus === 'in_progress' && (
                     <Button
                       onClick={async () => {
                         if (!token || !templateId) return
@@ -2500,7 +2612,7 @@ export default function TemplateEditor() {
                     </Button>
                   )}
 
-                  {formStatus !== 'in_progress' && (
+                  {!readOnly && formStatus !== 'in_progress' && (
                     <Button
                       onClick={handleSave}
                       disabled={saving}
@@ -2532,7 +2644,7 @@ export default function TemplateEditor() {
                   </Button>
 
                   {/* Save as Template - only show for product-specific forms (not already templates) */}
-                  {template && !template.isTemplate && template.productId && (
+                  {!readOnly && template && !template.isTemplate && template.productId && (
                     <Button
                       variant="outline"
                       className="rounded-full px-6 border-border/60 shadow-md hover:shadow-lg hover:bg-purple-50 transition-all"
@@ -2571,12 +2683,14 @@ export default function TemplateEditor() {
                     </Button>
                   )}
 
-                  <Button
-                    variant="outline"
-                    className="rounded-full px-6 border-border/60 shadow-md hover:shadow-lg hover:bg-muted/50 transition-all"
-                  >
-                    Add Voucher
-                  </Button>
+                  {!readOnly && (
+                    <Button
+                      variant="outline"
+                      className="rounded-full px-6 border-border/60 shadow-md hover:shadow-lg hover:bg-muted/50 transition-all"
+                    >
+                      Add Voucher
+                    </Button>
+                  )}
 
                   {/* Activate Product Button - only show if product is inactive */}
                   {productInfo && !productInfo.isActive && (
@@ -2601,9 +2715,9 @@ export default function TemplateEditor() {
           </div>
 
           {/* Main Content - Three Column Layout */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Left Column - Add Step Controls */}
-            <div className="lg:col-span-3 space-y-6 bg-muted/30 rounded-2xl p-4 border border-border/20">
+          <div className={`grid grid-cols-1 ${readOnly ? 'lg:grid-cols-11' : 'lg:grid-cols-12'} gap-6`}>
+            {/* Left Column - Add Step Controls (hidden in read-only mode) */}
+            {!readOnly && <div className="lg:col-span-3 space-y-6 bg-muted/30 rounded-2xl p-4 border border-border/20">
               {/* Add New Step Card */}
               <div className="bg-card rounded-2xl p-6 shadow-md border border-border/40">
                 <div className="mb-6">
@@ -2913,15 +3027,17 @@ export default function TemplateEditor() {
                   </Button>
                 )}
               </div>
-            </div>
+            </div>}
 
             {/* Middle Column - Steps List */}
-            <div className="lg:col-span-8 space-y-6">
+            <div className={`${readOnly ? 'lg:col-span-10' : 'lg:col-span-8'} space-y-6`}>
               {/* Questions Section Header */}
               <div className="bg-gradient-to-r from-muted/50 to-transparent rounded-xl p-5 border border-border/30">
                 <h2 className="text-2xl font-semibold tracking-tight mb-2">Questions</h2>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  These are the intake form questions. Some questions will be automatically added to every form when needed.
+                  {readOnly
+                    ? "These are the intake form questions for this template."
+                    : "These are the intake form questions. Some questions will be automatically added to every form when needed."}
                 </p>
               </div>
 
@@ -2956,10 +3072,10 @@ export default function TemplateEditor() {
                         ${isReferencedByHovered ? "ring-2 ring-orange-400 shadow-md" : ""}
                       `}
                         style={{ zIndex: 1 }}
-                        draggable
-                        onDragStart={() => handleDragStart(step.id)}
-                        onDragOver={(e) => handleDragOver(e, step.id)}
-                        onDragEnd={handleDragEnd}
+                        draggable={!readOnly}
+                        onDragStart={() => !readOnly && handleDragStart(step.id)}
+                        onDragOver={(e) => !readOnly && handleDragOver(e, step.id)}
+                        onDragEnd={() => !readOnly && handleDragEnd()}
                         onMouseEnter={() => step.conditionalLogic && setHoveredConditionalStepId(step.id)}
                         onMouseLeave={() => setHoveredConditionalStepId(null)}
                       >
@@ -3076,29 +3192,31 @@ export default function TemplateEditor() {
                                                   </Badge>
                                                 )}
                                               </div>
-                                              <div className="flex gap-1">
-                                                <Button
-                                                  variant="ghost"
-                                                  size="sm"
-                                                  onClick={() => {
-                                                    if (parentQ) {
-                                                      handleOpenEditConditionalModal(step.id, parentQ.id, q)
-                                                    }
-                                                  }}
-                                                  className="h-7 text-xs"
-                                                >
-                                                  <Edit className="h-3 w-3 mr-1" />
-                                                  Manage
-                                                </Button>
-                                                <Button
-                                                  variant="ghost"
-                                                  size="sm"
-                                                  onClick={() => handleDeleteConditionalStep(step.id, q.id)}
-                                                  className="h-7 text-xs text-destructive hover:text-destructive"
-                                                >
-                                                  <Trash2 className="h-3 w-3" />
-                                                </Button>
-                                              </div>
+                                              {!readOnly && (
+                                                <div className="flex gap-1">
+                                                  <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => {
+                                                      if (parentQ) {
+                                                        handleOpenEditConditionalModal(step.id, parentQ.id, q)
+                                                      }
+                                                    }}
+                                                    className="h-7 text-xs"
+                                                  >
+                                                    <Edit className="h-3 w-3 mr-1" />
+                                                    Manage
+                                                  </Button>
+                                                  <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => handleDeleteConditionalStep(step.id, q.id)}
+                                                    className="h-7 text-xs text-destructive hover:text-destructive"
+                                                  >
+                                                    <Trash2 className="h-3 w-3" />
+                                                  </Button>
+                                                </div>
+                                              )}
                                             </div>
 
                                             <div className="space-y-2">
@@ -3155,15 +3273,17 @@ export default function TemplateEditor() {
                                                 <p className="text-sm text-muted-foreground mb-3">{q.helpText}</p>
                                               )}
                                             </div>
-                                            <Button
-                                              variant="ghost"
-                                              size="sm"
-                                              onClick={() => handleOpenEditModal(step.id, q)}
-                                              className="flex-shrink-0 rounded-lg"
-                                            >
-                                              <Edit className="h-4 w-4 mr-1.5" />
-                                              Edit
-                                            </Button>
+                                            {!readOnly && (
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => handleOpenEditModal(step.id, q)}
+                                                className="flex-shrink-0 rounded-lg"
+                                              >
+                                                <Edit className="h-4 w-4 mr-1.5" />
+                                                Edit
+                                              </Button>
+                                            )}
                                           </div>
 
                                           {/* Show options for non-textarea questions */}
@@ -3201,7 +3321,7 @@ export default function TemplateEditor() {
                                       )}
 
                                       {/* Add Conditional Step Button - Only for main questions with options */}
-                                      {(q.conditionalLevel || 0) === 0 && q.answerType !== 'textarea' && q.options && q.options.length > 0 && (
+                                      {!readOnly && (q.conditionalLevel || 0) === 0 && q.answerType !== 'textarea' && q.options && q.options.length > 0 && (
                                         <div className="mt-4">
                                           <Button
                                             size="sm"
@@ -3274,15 +3394,17 @@ export default function TemplateEditor() {
                                           <p className="font-medium text-base mb-1">{step.title || 'Information Step'}</p>
                                           <p className="text-sm text-muted-foreground">{step.description || 'No description provided'}</p>
                                         </div>
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          onClick={() => setEditingStepId(step.id)}
-                                          className="flex-shrink-0 rounded-lg"
-                                        >
-                                          <Edit className="h-4 w-4 mr-1.5" />
-                                          Edit
-                                        </Button>
+                                        {!readOnly && (
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => setEditingStepId(step.id)}
+                                            className="flex-shrink-0 rounded-lg"
+                                          >
+                                            <Edit className="h-4 w-4 mr-1.5" />
+                                            Edit
+                                          </Button>
+                                        )}
                                       </div>
                                       {step.isDeadEnd && (
                                         <div className="mt-3 pt-3 border-t">
@@ -3298,40 +3420,42 @@ export default function TemplateEditor() {
                             </div>
 
                             {/* Action Icons */}
-                            <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                              {/* Only show "Create Rule" button if this is NOT the first step */}
-                              {index > 0 && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleOpenStepConditionalModal(step.id)}
-                                  className="h-8 text-xs px-2 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
-                                  title={step.conditionalLogic ? "Edit conditional logic" : "Create conditional rule"}
-                                >
-                                  <GitBranch className="h-3.5 w-3.5 mr-1" />
-                                  {step.conditionalLogic ? 'Edit Rule' : 'Create Rule'}
-                                </Button>
-                              )}
-                              <div className="flex items-start gap-1">
-                                {!isAccountTemplate && (
+                            {!readOnly && (
+                              <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                                {/* Only show "Create Rule" button if this is NOT the first step */}
+                                {index > 0 && (
                                   <Button
                                     variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 rounded-lg hover:bg-destructive/10 transition-colors"
-                                    onClick={() => handleDeleteStep(step.id)}
-                                    title="Delete step"
+                                    size="sm"
+                                    onClick={() => handleOpenStepConditionalModal(step.id)}
+                                    className="h-8 text-xs px-2 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                                    title={step.conditionalLogic ? "Edit conditional logic" : "Create conditional rule"}
                                   >
-                                    <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
+                                    <GitBranch className="h-3.5 w-3.5 mr-1" />
+                                    {step.conditionalLogic ? 'Edit Rule' : 'Create Rule'}
                                   </Button>
                                 )}
-                                <div
-                                  className="h-8 w-8 flex items-center justify-center cursor-grab active:cursor-grabbing rounded-lg hover:bg-muted/50 transition-colors"
-                                  title="Drag to reorder"
-                                >
-                                  <GripVertical className="h-4 w-4 text-muted-foreground" />
+                                <div className="flex items-start gap-1">
+                                  {!isAccountTemplate && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 rounded-lg hover:bg-destructive/10 transition-colors"
+                                      onClick={() => handleDeleteStep(step.id)}
+                                      title="Delete step"
+                                    >
+                                      <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
+                                    </Button>
+                                  )}
+                                  <div
+                                    className="h-8 w-8 flex items-center justify-center cursor-grab active:cursor-grabbing rounded-lg hover:bg-muted/50 transition-colors"
+                                    title="Drag to reorder"
+                                  >
+                                    <GripVertical className="h-4 w-4 text-muted-foreground" />
+                                  </div>
                                 </div>
                               </div>
-                            </div>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -3446,7 +3570,7 @@ export default function TemplateEditor() {
       </div>
 
       {/* Conditional Logic Modal */}
-      {showConditionalModal && (selectedQuestionForConditional || conditionalModalType === 'step') && (
+      {!readOnly && showConditionalModal && (selectedQuestionForConditional || conditionalModalType === 'step') && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <CardHeader>
@@ -4097,7 +4221,7 @@ export default function TemplateEditor() {
       )}
 
       {/* Edit Question Modal */}
-      {showEditModal && editingQuestion && editingStepId && (() => {
+      {!readOnly && showEditModal && editingQuestion && editingStepId && (() => {
         // Get question type label
         const getQuestionTypeLabel = () => {
           if (editingQuestion.questionSubtype === 'yesno') return 'Yes/No Question'

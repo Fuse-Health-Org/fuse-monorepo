@@ -12,7 +12,7 @@ TO RESTORE (LOCALLY):
 
 psql -h localhost -p 5432 -U guilhermereis -d postgres -c "DROP DATABASE IF EXISTS fusehealth_database;"
 
-psql -h localhost -p 5432 -U guilhermereis -d postgres < Guilherme_full_database_dump_18_Dec_2025.sql
+psql -h localhost -p 5432 -U guilhermereis -d postgres < Guilherme_full_database_dump_06_Feb_2026.sql
 
 TO RESTORE (PROD):
 
