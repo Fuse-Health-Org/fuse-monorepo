@@ -65,7 +65,8 @@ import formTemplateService from "./services/formTemplate.service";
 import User from "./models/User";
 import UserRoles from "./models/UserRoles";
 import MfaToken from "./models/MfaToken";
-import Clinic, { PatientPortalDashboardFormat } from "./models/Clinic";
+import Clinic from "./models/Clinic";
+import { PatientPortalDashboardFormat } from "@fuse/enums";
 import BrandInvitation, { InvitationType } from "./models/BrandInvitation";
 import Physician from "./models/Physician";
 import { Op } from "sequelize";
@@ -12227,6 +12228,10 @@ async function startServer() {
   // ============= MD INTEGRATIONS WEBHOOKS =============
   const { registerMDIntegrationsWebhooks } = await import('./endpoints/md-integrations/webhooks');
   registerMDIntegrationsWebhooks(app);
+
+  // ============= BELUGA ENDPOINTS =============
+  const belugaRouter = (await import('./endpoints/beluga')).default;
+  app.use('/beluga', belugaRouter);
 
   // ============================================
   // DOCTOR-PATIENT CHAT ENDPOINTS

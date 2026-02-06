@@ -1,6 +1,7 @@
 import React from 'react';
 import { apiCall } from '../lib/api';
-import { extractClinicSlugFromDomain, getDashboardPrefix, buildDashboardRoute, PatientPortalDashboardFormat } from '../lib/clinic-utils';
+import { extractClinicSlugFromDomain, getDashboardPrefix, buildDashboardRoute } from '../lib/clinic-utils';
+import { PatientPortalDashboardFormat } from '@fuse/enums';
 
 export interface Clinic {
   id: string;

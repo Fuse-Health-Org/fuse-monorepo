@@ -1,7 +1,6 @@
 // Utility functions for clinic subdomain handling
 import { apiCall } from './api';
-
-export type PatientPortalDashboardFormat = 'fuse' | 'md-integrations';
+import { PatientPortalDashboardFormat } from '@fuse/enums';
 
 export interface Clinic {
   id: string;
@@ -13,6 +12,24 @@ export interface Clinic {
 }
 
 /**
+ * Returns the dashboard route prefix based on questionnaire's medicalCompanySource.
+ * This is the primary function to use for post-checkout routing.
+ * 
+ * @param medicalCompanySource - The medical company source from the questionnaire
+ * @returns '/fuse-dashboard', '/mdi-dashboard', or '/beluga-dashboard'
+ */
+export function getDashboardPrefixByMedicalCompany(medicalCompanySource?: PatientPortalDashboardFormat | null): string {
+  if (medicalCompanySource === 'md-integrations') {
+    return '/mdi-dashboard';
+  }
+  if (medicalCompanySource === 'beluga') {
+    return '/beluga-dashboard';
+  }
+  return '/fuse-dashboard';
+}
+
+/**
+ * @deprecated Use getDashboardPrefixByMedicalCompany instead.
  * Returns the dashboard route prefix based on clinic's patientPortalDashboardFormat setting.
  * 
  * @param clinic - The clinic object (or null for default)
@@ -23,6 +40,9 @@ export function getDashboardPrefix(clinic?: Clinic | null): string {
   const format = clinic?.patientPortalDashboardFormat;
   if (format === 'md-integrations') {
     return '/mdi-dashboard';
+  }
+  if (format === 'beluga') {
+    return '/beluga-dashboard';
   }
   return '/fuse-dashboard';
 }

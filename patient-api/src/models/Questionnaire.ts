@@ -6,7 +6,7 @@ import User from './User';
 import TenantProduct from './TenantProduct';
 import Product from './Product';
 import FormProducts from './FormProducts';
-import { PatientPortalDashboardFormat } from './Clinic';
+import { PatientPortalDashboardFormat } from '@fuse/enums';
 
 export type ProductOfferType = 'single_choice' | 'multiple_choice';
 
@@ -184,9 +184,9 @@ export default class Questionnaire extends Entity {
      * - 'beluga': Beluga Health platform
      */
     @Column({
-        type: DataType.ENUM('fuse', 'md-integrations', 'beluga'),
+        type: DataType.ENUM(...Object.values(PatientPortalDashboardFormat)),
         allowNull: false,
-        defaultValue: 'md-integrations',
+        defaultValue: PatientPortalDashboardFormat.MD_INTEGRATIONS,
     })
     declare medicalCompanySource: PatientPortalDashboardFormat;
 }

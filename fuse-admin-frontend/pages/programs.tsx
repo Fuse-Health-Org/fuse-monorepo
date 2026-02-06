@@ -12,7 +12,8 @@ import {
     Trash2,
     FileText,
     Crown,
-    X
+    X,
+    Filter
 } from 'lucide-react'
 
 interface Program {
@@ -31,6 +32,7 @@ interface Program {
         title: string
         description?: string
         formTemplateType: string
+        medicalCompanySource?: 'fuse' | 'md-integrations' | 'beluga'
     }
     template?: {
         id: string
@@ -51,10 +53,33 @@ interface ProgramTemplate {
         title: string
         description?: string
         formTemplateType: string
+        medicalCompanySource?: 'fuse' | 'md-integrations' | 'beluga'
     }
 }
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
+
+// Helper to get medical company display info
+const getMedicalCompanyInfo = (source?: string) => {
+    switch (source) {
+        case 'fuse':
+            return { label: 'Fuse', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300', icon: '💙' }
+        case 'md-integrations':
+            return { label: 'MD Integrations', color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300', icon: '🏥' }
+        case 'beluga':
+            return { label: 'Beluga', color: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300', icon: '🐋' }
+        default:
+            return { label: 'Not Set', color: 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400', icon: '⚪' }
+    }
+}
+
+// Filter options for medical company
+const medicalCompanyFilterOptions = [
+    { value: 'all', label: 'All Companies', icon: '🔘' },
+    { value: 'fuse', label: 'Fuse', icon: '💙' },
+    { value: 'md-integrations', label: 'MD Integrations', icon: '🏥' },
+    { value: 'beluga', label: 'Beluga', icon: '🐋' },
+]
 
 export default function Programs() {
     const [programs, setPrograms] = useState<Program[]>([])
@@ -64,6 +89,7 @@ export default function Programs() {
     const [showTemplatesModal, setShowTemplatesModal] = useState(false)
     const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null)
     const [tutorialStep, setTutorialStep] = useState<number | null>(null)
+    const [medicalCompanyFilter, setMedicalCompanyFilter] = useState<string>('all')
     const { token, user, subscription } = useAuth()
     const router = useRouter()
 
@@ -199,6 +225,12 @@ export default function Programs() {
         template.isActive && !programs.some(program => program.templateId === template.id)
     )
 
+    // Filter programs by medical company
+    const filteredPrograms = programs.filter(program => {
+        if (medicalCompanyFilter === 'all') return true
+        return program.medicalTemplate?.medicalCompanySource === medicalCompanyFilter
+    })
+
     const handleDeleteProgram = async (programId: string, programName: string) => {
         if (!confirm(`Are you sure you want to delete "${programName}"? This action cannot be undone.`)) {
             return
@@ -297,6 +329,39 @@ export default function Programs() {
                         </div>
                     </div>
 
+                    {/* Filter Bar */}
+                    {programs.length > 0 && (
+                        <div className="mb-6 flex items-center gap-3">
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <Filter className="h-4 w-4" />
+                                <span>Filter by Medical Company:</span>
+                            </div>
+                            <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
+                                {medicalCompanyFilterOptions.map((option) => (
+                                    <button
+                                        key={option.value}
+                                        onClick={() => setMedicalCompanyFilter(option.value)}
+                                        className={`
+                                            flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all
+                                            ${medicalCompanyFilter === option.value
+                                                ? 'bg-background text-foreground shadow-sm'
+                                                : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
+                                            }
+                                        `}
+                                    >
+                                        <span>{option.icon}</span>
+                                        <span>{option.label}</span>
+                                    </button>
+                                ))}
+                            </div>
+                            {medicalCompanyFilter !== 'all' && (
+                                <span className="text-sm text-muted-foreground">
+                                    Showing {filteredPrograms.length} of {programs.length} programs
+                                </span>
+                            )}
+                        </div>
+                    )}
+
                     {/* Error/Success Messages */}
                     {error && (
                         <div
@@ -310,9 +375,9 @@ export default function Programs() {
                     )}
 
                     {/* Programs List */}
-                    {programs.length > 0 ? (
+                    {filteredPrograms.length > 0 ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {programs.map((program, index) => {
+                            {filteredPrograms.map((program, index) => {
                                 const isFirstCardInTutorial = index === 0 && (tutorialStep === 3 || tutorialStep === 4);
                                 return (
                                     <div
@@ -356,6 +421,14 @@ export default function Programs() {
                                                     <span className="text-xs font-medium text-muted-foreground">Medical Template</span>
                                                 </div>
                                                 <p className="text-sm font-medium">{program.medicalTemplate.title}</p>
+                                                {/* Medical Company Source Badge */}
+                                                <div className="mt-2 flex items-center gap-2">
+                                                    <span className="text-xs text-muted-foreground">Medical Company:</span>
+                                                    <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${getMedicalCompanyInfo(program.medicalTemplate.medicalCompanySource).color}`}>
+                                                        <span>{getMedicalCompanyInfo(program.medicalTemplate.medicalCompanySource).icon}</span>
+                                                        {getMedicalCompanyInfo(program.medicalTemplate.medicalCompanySource).label}
+                                                    </span>
+                                                </div>
                                             </div>
                                         )}
 
@@ -407,6 +480,29 @@ export default function Programs() {
                                     </div>
                                 );
                             })}
+                        </div>
+                    ) : programs.length > 0 && medicalCompanyFilter !== 'all' ? (
+                        // Programs exist but none match the filter
+                        <div className="bg-card rounded-lg border border-border p-16 text-center">
+                            <div className="flex flex-col items-center gap-4">
+                                <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+                                    <Filter className="h-6 w-6 text-muted-foreground" />
+                                </div>
+                                <div className='flex flex-col justify-center items-center'>
+                                    <h3 className="text-base font-medium mb-1">No programs match this filter</h3>
+                                    <p className="text-sm text-muted-foreground mb-4">
+                                        No programs found with {getMedicalCompanyInfo(medicalCompanyFilter).icon} {getMedicalCompanyInfo(medicalCompanyFilter).label} as medical company
+                                    </p>
+                                    <Button
+                                        onClick={() => setMedicalCompanyFilter('all')}
+                                        variant="outline"
+                                        className="flex items-center gap-2"
+                                    >
+                                        <X className="h-4 w-4" />
+                                        Clear Filter
+                                    </Button>
+                                </div>
+                            </div>
                         </div>
                     ) : unusedTemplates.length === 0 ? (
                         <div className="bg-card rounded-lg border border-border p-16 text-center">
@@ -476,6 +572,14 @@ export default function Programs() {
                                                     <span className="text-xs font-medium text-muted-foreground">Medical Template</span>
                                                 </div>
                                                 <p className="text-sm font-medium">{template.medicalTemplate.title}</p>
+                                                {/* Medical Company Source Badge */}
+                                                <div className="mt-2 flex items-center gap-2">
+                                                    <span className="text-xs text-muted-foreground">Medical Company:</span>
+                                                    <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${getMedicalCompanyInfo(template.medicalTemplate.medicalCompanySource).color}`}>
+                                                        <span>{getMedicalCompanyInfo(template.medicalTemplate.medicalCompanySource).icon}</span>
+                                                        {getMedicalCompanyInfo(template.medicalTemplate.medicalCompanySource).label}
+                                                    </span>
+                                                </div>
                                             </div>
                                         )}
 
@@ -558,9 +662,15 @@ export default function Programs() {
                                                                 </p>
                                                             )}
                                                             {template.medicalTemplate && (
-                                                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                                                    <FileText className="h-3 w-3" />
-                                                                    <span>{template.medicalTemplate.title}</span>
+                                                                <div className="space-y-1">
+                                                                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                                                        <FileText className="h-3 w-3" />
+                                                                        <span>{template.medicalTemplate.title}</span>
+                                                                    </div>
+                                                                    <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${getMedicalCompanyInfo(template.medicalTemplate.medicalCompanySource).color}`}>
+                                                                        <span>{getMedicalCompanyInfo(template.medicalTemplate.medicalCompanySource).icon}</span>
+                                                                        {getMedicalCompanyInfo(template.medicalTemplate.medicalCompanySource).label}
+                                                                    </span>
                                                                 </div>
                                                             )}
                                                             <div className="mt-3">

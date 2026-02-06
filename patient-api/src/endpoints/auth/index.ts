@@ -4,7 +4,8 @@ import {
     AuditAction,
     AuditResourceType,
 } from "../../services/audit.service";
-import Clinic, { PatientPortalDashboardFormat } from "../../models/Clinic";
+import Clinic from "../../models/Clinic";
+import { PatientPortalDashboardFormat } from "@fuse/enums";
 import BrandInvitation, { InvitationType } from "../../models/BrandInvitation";
 import {
     createJWTToken,

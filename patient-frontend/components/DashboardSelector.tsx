@@ -3,7 +3,7 @@ import { useRouter } from "next/router";
 import { Button, Tooltip } from "@heroui/react";
 import { Icon } from "@iconify/react";
 
-export type DashboardType = 'fuse' | 'mdi';
+export type DashboardType = 'fuse' | 'mdi' | 'beluga';
 
 const DASHBOARD_STORAGE_KEY = 'selected-dashboard';
 
@@ -32,6 +32,14 @@ const dashboardOptions: DashboardOption[] = [
     path: '/mdi-dashboard',
     color: 'secondary',
     description: 'MD Integrations Portal'
+  },
+  {
+    id: 'beluga',
+    label: 'Beluga',
+    icon: 'lucide:activity',
+    path: '/beluga-dashboard',
+    color: 'success',
+    description: 'Beluga Health Portal'
   }
 ];
 
@@ -41,7 +49,7 @@ const dashboardOptions: DashboardOption[] = [
 export function getSavedDashboard(): DashboardType | null {
   if (typeof window === 'undefined') return null;
   const saved = localStorage.getItem(DASHBOARD_STORAGE_KEY);
-  if (saved === 'fuse' || saved === 'mdi') {
+  if (saved === 'fuse' || saved === 'mdi' || saved === 'beluga') {
     return saved;
   }
   return null;
@@ -61,6 +69,9 @@ export function saveDashboard(dashboard: DashboardType): void {
 export function getCurrentDashboardFromPath(pathname: string): DashboardType {
   if (pathname.startsWith('/mdi-dashboard')) {
     return 'mdi';
+  }
+  if (pathname.startsWith('/beluga-dashboard')) {
+    return 'beluga';
   }
   return 'fuse';
 }
@@ -115,7 +126,7 @@ export const DashboardSelector: React.FC<DashboardSelectorProps> = ({
               isIconOnly={compact}
               size="sm"
               variant={isActive ? "solid" : "light"}
-              color={isActive ? (option.color as "primary" | "secondary") : "default"}
+              color={isActive ? (option.color as "primary" | "secondary" | "success") : "default"}
               className={`
                 transition-all duration-200
                 ${isActive 
