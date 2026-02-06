@@ -24,7 +24,7 @@ const navigation = [
   { name: "Overview", icon: BarChart3, href: "/" },
   { name: "Products", icon: Package, href: "/products" },
   { name: "Programs", icon: Stethoscope, href: "/programs" },
-  { name: "Forms", icon: FileText, href: "/forms" },
+  { name: "Global Structures", icon: FileText, href: "/forms" },
   { name: "Client Management", icon: Users, href: "/client-management" },
   { name: "Doctor Applications", icon: UserCheck, href: "/doctor-applications" },
   { name: "Tier Management", icon: Settings, href: "/tier-management" },
