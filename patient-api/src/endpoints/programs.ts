@@ -423,7 +423,7 @@ router.get('/program-templates', authenticateJWT, async (req: Request, res: Resp
         {
           model: Questionnaire,
           as: 'medicalTemplate',
-          attributes: ['id', 'title', 'description', 'formTemplateType'],
+          attributes: ['id', 'title', 'description', 'formTemplateType', 'medicalCompanySource'],
         },
         {
           model: Product,
@@ -735,7 +735,7 @@ router.get('/programs', authenticateJWT, async (req: Request, res: Response) => 
         {
           model: Questionnaire,
           as: 'medicalTemplate',
-          attributes: ['id', 'title', 'description', 'formTemplateType'],
+          attributes: ['id', 'title', 'description', 'formTemplateType', 'medicalCompanySource'],
         },
         {
           model: Product,
@@ -788,7 +788,7 @@ router.get('/program-templates/:id', authenticateJWT, async (req: Request, res: 
         {
           model: Questionnaire,
           as: 'medicalTemplate',
-          attributes: ['id', 'title', 'description', 'formTemplateType'],
+          attributes: ['id', 'title', 'description', 'formTemplateType', 'medicalCompanySource'],
         },
       ],
     });
@@ -836,7 +836,7 @@ router.get('/programs/:id', authenticateJWT, async (req: Request, res: Response)
         {
           model: Questionnaire,
           as: 'medicalTemplate',
-          attributes: ['id', 'title', 'description', 'formTemplateType'],
+          attributes: ['id', 'title', 'description', 'formTemplateType', 'medicalCompanySource'],
         },
         {
           model: Program,

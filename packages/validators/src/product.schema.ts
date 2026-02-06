@@ -41,6 +41,12 @@ export const productUpdateSchema = z.object({
   requiredDoctorQuestions: z.array(z.any()).optional(),
   suggestedRetailPrice: z.number().positive('Suggested retail price must be positive').optional(),
   isActive: z.boolean().optional(),
+  // MD Integrations fields
+  mdCaseId: z.string().optional().nullable(),
+  mdOfferingId: z.string().optional().nullable(),
+  mdOfferingName: z.string().optional().nullable(),
+  // Beluga Integration field
+  belugaProductId: z.string().optional().nullable(),
 });
 
 export const productGetSchema = z.object({

@@ -12229,6 +12229,10 @@ async function startServer() {
   const { registerMDIntegrationsWebhooks } = await import('./endpoints/md-integrations/webhooks');
   registerMDIntegrationsWebhooks(app);
 
+  // ============= BELUGA ENDPOINTS =============
+  const belugaRouter = (await import('./endpoints/beluga')).default;
+  app.use('/beluga', belugaRouter);
+
   // ============================================
   // DOCTOR-PATIENT CHAT ENDPOINTS
   // ============================================
