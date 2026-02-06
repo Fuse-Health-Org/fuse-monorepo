@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/router'
 import { Sidebar } from '@/components/sidebar'
 import { Header } from '@/components/header'
@@ -11,8 +11,19 @@ import {
     Edit,
     Trash2,
     FileText,
-    Loader2
+    Loader2,
+    Filter,
+    X
 } from 'lucide-react'
+import { cn } from '@/lib/utils'
+
+type MedicalCompanySource = 'fuse' | 'md-integrations' | 'beluga'
+
+const COMPANY_CONFIG: Record<MedicalCompanySource, { label: string; icon: string; color: string; bgColor: string; borderColor: string; textColor: string }> = {
+    'fuse': { label: 'Fuse', icon: '💙', color: 'bg-blue-500', bgColor: 'bg-blue-50 dark:bg-blue-900/20', borderColor: 'border-blue-200 dark:border-blue-700', textColor: 'text-blue-700 dark:text-blue-300' },
+    'md-integrations': { label: 'MDI', icon: '🩺', color: 'bg-purple-500', bgColor: 'bg-purple-50 dark:bg-purple-900/20', borderColor: 'border-purple-200 dark:border-purple-700', textColor: 'text-purple-700 dark:text-purple-300' },
+    'beluga': { label: 'Beluga', icon: '⚡', color: 'bg-teal-500', bgColor: 'bg-teal-50 dark:bg-teal-900/20', borderColor: 'border-teal-200 dark:border-teal-700', textColor: 'text-teal-700 dark:text-teal-300' },
+}
 
 interface ProgramTemplate {
     id: string
@@ -28,6 +39,7 @@ interface ProgramTemplate {
         title: string
         description?: string
         formTemplateType: string
+        medicalCompanySource?: MedicalCompanySource
     }
 }
 
@@ -37,8 +49,23 @@ export default function ProgramTemplates() {
     const [templates, setTemplates] = useState<ProgramTemplate[]>([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
+    const [companyFilter, setCompanyFilter] = useState<MedicalCompanySource | 'all'>('all')
     const { token } = useAuth()
     const router = useRouter()
+
+    const filteredTemplates = useMemo(() => {
+        if (companyFilter === 'all') return templates
+        return templates.filter(t => t.medicalTemplate?.medicalCompanySource === companyFilter)
+    }, [templates, companyFilter])
+
+    const companyCounts = useMemo(() => {
+        const counts: Record<string, number> = { all: templates.length, fuse: 0, 'md-integrations': 0, beluga: 0 }
+        templates.forEach(t => {
+            const source = t.medicalTemplate?.medicalCompanySource
+            if (source && counts[source] !== undefined) counts[source]++
+        })
+        return counts
+    }, [templates])
 
     useEffect(() => {
         if (token) {
@@ -153,14 +180,60 @@ export default function ProgramTemplates() {
                         </div>
                     </div>
 
+                    {/* Company Filter */}
+                    {!loading && templates.length > 0 && (
+                        <div className="mb-6 flex items-center gap-2 flex-wrap">
+                            <Filter className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm font-medium text-muted-foreground mr-1">Organization:</span>
+                            <Button
+                                size="sm"
+                                variant={companyFilter === 'all' ? 'default' : 'outline'}
+                                className={cn(
+                                    "h-8 px-3 text-xs rounded-full",
+                                    companyFilter === 'all' ? 'bg-[#4FA59C] hover:bg-[#478F87] text-white' : 'border-border hover:bg-muted/50'
+                                )}
+                                onClick={() => setCompanyFilter('all')}
+                            >
+                                All ({companyCounts.all})
+                            </Button>
+                            {(Object.entries(COMPANY_CONFIG) as [MedicalCompanySource, typeof COMPANY_CONFIG[MedicalCompanySource]][]).map(([key, config]) => (
+                                <Button
+                                    key={key}
+                                    size="sm"
+                                    variant={companyFilter === key ? 'default' : 'outline'}
+                                    className={cn(
+                                        "h-8 px-3 text-xs rounded-full",
+                                        companyFilter === key
+                                            ? `${config.color} hover:opacity-90 text-white`
+                                            : 'border-border hover:bg-muted/50'
+                                    )}
+                                    onClick={() => setCompanyFilter(key)}
+                                >
+                                    {config.icon} {config.label} ({companyCounts[key] || 0})
+                                </Button>
+                            ))}
+                            {companyFilter !== 'all' && (
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground"
+                                    onClick={() => setCompanyFilter('all')}
+                                >
+                                    <X className="h-3 w-3 mr-1" />
+                                    Clear
+                                </Button>
+                            )}
+                        </div>
+                    )}
+
                     {loading ? (
                         <div className="flex h-64 items-center justify-center text-muted-foreground">
                             <Loader2 className="mr-3 h-6 w-6 animate-spin text-[#4FA59C]" />
                             <span className="text-base">Loading templates...</span>
                         </div>
-                    ) : templates.length > 0 ? (
+                    ) : filteredTemplates.length > 0 ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {templates.map((template) => (
+                            {filteredTemplates.map((template) => (
                                 <div
                                     key={template.id}
                                     className="bg-card rounded-2xl shadow-sm border border-border p-6 hover:shadow-md hover:border-[#4FA59C] transition-all cursor-pointer"
@@ -180,11 +253,9 @@ export default function ProgramTemplates() {
                                         </div>
                                     </div>
 
-                                    {template.description && (
-                                        <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
-                                            {template.description}
-                                        </p>
-                                    )}
+                                    <p className="text-sm text-muted-foreground mb-4 line-clamp-2 min-h-[40px]">
+                                        {template.description || '\u00A0'}
+                                    </p>
 
                                     {template.medicalTemplate && (
                                         <div className="mb-4 p-3 bg-muted rounded-lg">
@@ -193,6 +264,23 @@ export default function ProgramTemplates() {
                                                 <span className="text-xs font-medium text-muted-foreground">Medical Template</span>
                                             </div>
                                             <p className="text-sm font-medium">{template.medicalTemplate.title}</p>
+                                        </div>
+                                    )}
+
+                                    {/* Organization Badge */}
+                                    {template.medicalTemplate?.medicalCompanySource && COMPANY_CONFIG[template.medicalTemplate.medicalCompanySource] && (
+                                        <div className={cn(
+                                            "mb-4 px-3 py-2 rounded-lg border flex items-center gap-2",
+                                            COMPANY_CONFIG[template.medicalTemplate.medicalCompanySource].bgColor,
+                                            COMPANY_CONFIG[template.medicalTemplate.medicalCompanySource].borderColor
+                                        )}>
+                                            <span className="text-base">{COMPANY_CONFIG[template.medicalTemplate.medicalCompanySource].icon}</span>
+                                            <div>
+                                                <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Organization</span>
+                                                <p className={cn("text-sm font-semibold -mt-0.5", COMPANY_CONFIG[template.medicalTemplate.medicalCompanySource].textColor)}>
+                                                    {COMPANY_CONFIG[template.medicalTemplate.medicalCompanySource].label}
+                                                </p>
+                                            </div>
                                         </div>
                                     )}
 
@@ -223,6 +311,28 @@ export default function ProgramTemplates() {
                                     </div>
                                 </div>
                             ))}
+                        </div>
+                    ) : templates.length > 0 && companyFilter !== 'all' ? (
+                        <div className="bg-card rounded-2xl border border-border p-16 text-center shadow-sm">
+                            <div className="flex flex-col items-center gap-4">
+                                <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
+                                    <Filter className="h-8 w-8 text-muted-foreground" />
+                                </div>
+                                <div className='flex flex-col justify-center items-center'>
+                                    <h3 className="text-lg font-semibold mb-1">No templates for this filter</h3>
+                                    <p className="text-sm text-muted-foreground mb-4 max-w-md">
+                                        No program templates found for {COMPANY_CONFIG[companyFilter]?.label || companyFilter}. Try a different filter.
+                                    </p>
+                                    <Button
+                                        onClick={() => setCompanyFilter('all')}
+                                        variant="outline"
+                                        className="flex items-center gap-2"
+                                    >
+                                        <X className="h-4 w-4" />
+                                        Clear Filter
+                                    </Button>
+                                </div>
+                            </div>
                         </div>
                     ) : (
                         <div className="bg-card rounded-2xl border border-border p-16 text-center shadow-sm">

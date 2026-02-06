@@ -39,6 +39,7 @@ interface MedicalTemplate {
     description?: string
     formTemplateType: string
     medicalCompanySource?: 'fuse' | 'md-integrations' | 'beluga'
+    medicalTemplateApprovedByFuseAdmin?: 'pending' | 'approved' | 'rejected'
     formProducts?: FormProduct[]
 }
 
@@ -228,9 +229,20 @@ export default function ProgramTemplateEditor() {
         }
     }
 
-    const filteredTemplates = templates.filter(t =>
-        t.title.toLowerCase().includes(templateSearch.toLowerCase())
-    )
+    const filteredTemplates = templates
+        .filter(t => {
+            const matchesSearch = t.title.toLowerCase().includes(templateSearch.toLowerCase())
+            // Only show approved templates, but always include the currently selected one
+            const isApproved = t.medicalTemplateApprovedByFuseAdmin === 'approved'
+            const isSelected = t.id === medicalTemplateId
+            return matchesSearch && (isApproved || isSelected)
+        })
+        .sort((a, b) => {
+            // Always show selected template first
+            if (a.id === medicalTemplateId) return -1
+            if (b.id === medicalTemplateId) return 1
+            return 0
+        })
 
     if (loading) {
         return (
@@ -361,6 +373,41 @@ export default function ProgramTemplateEditor() {
                                         />
                                     </button>
                                 </div>
+                                {/* Organization - derived from selected template */}
+                                {(() => {
+                                    const selectedTemplate = templates.find(t => t.id === medicalTemplateId)
+                                    const source = selectedTemplate?.medicalCompanySource
+                                    if (!medicalTemplateId || !source) return (
+                                        <div className="p-4 bg-muted/50 rounded-xl border border-dashed border-border">
+                                            <p className="text-sm font-medium text-muted-foreground">Organization</p>
+                                            <p className="text-xs text-muted-foreground mt-1">
+                                                Select a medical template below to see which organization handles this program
+                                            </p>
+                                        </div>
+                                    )
+                                    const config = source === 'fuse'
+                                        ? { label: 'Fuse Health', color: 'bg-blue-500', bgColor: 'bg-blue-50 dark:bg-blue-900/20', borderColor: 'border-blue-200 dark:border-blue-800', textColor: 'text-blue-700 dark:text-blue-300', icon: '💙' }
+                                        : source === 'md-integrations'
+                                            ? { label: 'MD Integrations', color: 'bg-purple-500', bgColor: 'bg-purple-50 dark:bg-purple-900/20', borderColor: 'border-purple-200 dark:border-purple-800', textColor: 'text-purple-700 dark:text-purple-300', icon: '🩺' }
+                                            : { label: 'Beluga Health', color: 'bg-teal-500', bgColor: 'bg-teal-50 dark:bg-teal-900/20', borderColor: 'border-teal-200 dark:border-teal-800', textColor: 'text-teal-700 dark:text-teal-300', icon: '⚡' }
+                                    return (
+                                        <div className={`p-4 rounded-xl border-2 ${config.bgColor} ${config.borderColor}`}>
+                                            <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">Organization</p>
+                                            <div className="flex items-center gap-3">
+                                                <span className="text-2xl">{config.icon}</span>
+                                                <div>
+                                                    <p className={`text-base font-semibold ${config.textColor}`}>{config.label}</p>
+                                                    <p className="text-xs text-muted-foreground mt-0.5">
+                                                        From template: {selectedTemplate?.title}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <p className="text-[11px] text-muted-foreground mt-3 italic">
+                                                This is determined by the medical template assigned to this program.
+                                            </p>
+                                        </div>
+                                    )
+                                })()}
                             </div>
                         </div>
 
@@ -423,6 +470,13 @@ export default function ProgramTemplateEditor() {
                                                                                 : 'bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400'
                                                                         }`}>
                                                                             {template.medicalCompanySource === 'md-integrations' ? 'MDI' : template.medicalCompanySource === 'beluga' ? 'Beluga' : 'Fuse'}
+                                                                        </span>
+                                                                    )}
+                                                                    {/* Approved Badge */}
+                                                                    {template.medicalTemplateApprovedByFuseAdmin === 'approved' && (
+                                                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400">
+                                                                            <Check className="h-3 w-3" />
+                                                                            Approved by Fuse Admin
                                                                         </span>
                                                                     )}
                                                                 </div>

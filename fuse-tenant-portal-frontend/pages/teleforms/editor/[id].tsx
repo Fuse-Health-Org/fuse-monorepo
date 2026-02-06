@@ -2256,84 +2256,7 @@ export default function TemplateEditor() {
                     </Badge>
                   </div>
 
-                  {/* Approval Status Card */}
-                  <div className={`rounded-2xl p-5 shadow-md border-2 hover:shadow-lg transition-all ${
-                    approvalStatus === 'approved'
-                      ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-300 dark:border-emerald-700'
-                      : approvalStatus === 'rejected'
-                        ? 'bg-red-50 dark:bg-red-900/20 border-red-300 dark:border-red-700'
-                        : 'bg-card border-border/40'
-                  }`}>
-                    <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">Fuse Approval</p>
-                    <div className="flex items-center gap-2 mb-3">
-                      {approvalStatus === 'approved' ? (
-                        <>
-                          <ShieldCheck className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-                          <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">Approved</span>
-                        </>
-                      ) : approvalStatus === 'rejected' ? (
-                        <>
-                          <ShieldX className="h-5 w-5 text-red-600 dark:text-red-400" />
-                          <span className="text-sm font-semibold text-red-700 dark:text-red-300">Rejected</span>
-                        </>
-                      ) : (
-                        <>
-                          <ShieldX className="h-5 w-5 text-muted-foreground" />
-                          <span className="text-sm font-medium text-muted-foreground">Pending</span>
-                        </>
-                      )}
-                    </div>
-                    <div className="flex gap-1">
-                      {(['approved', 'pending', 'rejected'] as const).map((status) => (
-                        <button
-                          key={status}
-                          onClick={async () => {
-                            if (!token || !templateId || typeof templateId !== 'string' || approvalStatus === status) return
-                            setTogglingApproval(true)
-                            try {
-                              const res = await fetch(`${baseUrl}/questionnaires/templates/${templateId}`, {
-                                method: 'PUT',
-                                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                                body: JSON.stringify({ medicalTemplateApprovedByFuseAdmin: status })
-                              })
-                              if (res.ok) {
-                                setApprovalStatus(status)
-                                const data = await res.json()
-                                setTemplate(data.data)
-                                const msg = status === 'approved' ? '✅ Teleform approved!' : status === 'rejected' ? '❌ Teleform rejected' : '⏳ Teleform set to pending'
-                                setSaveMessage(msg)
-                                setTimeout(() => setSaveMessage(null), 3000)
-                              } else {
-                                const errorData = await res.json().catch(() => ({}))
-                                setSaveMessage(`❌ ${errorData.message || 'Failed to update approval'}`)
-                                setTimeout(() => setSaveMessage(null), 5000)
-                              }
-                            } catch (e: any) {
-                              console.error('Failed to update approval:', e)
-                              setSaveMessage(`❌ ${e.message || 'Failed to update approval'}`)
-                              setTimeout(() => setSaveMessage(null), 5000)
-                            } finally {
-                              setTogglingApproval(false)
-                            }
-                          }}
-                          disabled={togglingApproval || approvalStatus === status}
-                          className={`flex-1 px-2 py-1.5 rounded-lg text-[10px] font-semibold transition-all disabled:opacity-70 ${
-                            approvalStatus === status
-                              ? status === 'approved'
-                                ? 'bg-emerald-600 text-white'
-                                : status === 'rejected'
-                                  ? 'bg-red-600 text-white'
-                                  : 'bg-gray-600 text-white'
-                              : 'bg-muted hover:bg-muted/80 text-muted-foreground'
-                          }`}
-                        >
-                          {status === 'approved' ? 'Approve' : status === 'rejected' ? 'Reject' : 'Pending'}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  
-                  <div className="bg-card rounded-2xl p-5 shadow-md border border-border/40 hover:shadow-lg transition-shadow">
+                  <div className="bg-card rounded-2xl p-5 shadow-md border border-border/40 hover:shadow-lg transition-shadow col-span-2">
                     <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">Medical Platform</p>
                     <div className="flex items-center gap-2 mt-1">
                       <button
@@ -2451,6 +2374,96 @@ export default function TemplateEditor() {
                       <Package className="h-4 w-4 mr-2" />
                       {getAssignedProducts(template.id).length === 0 ? 'Assign Products' : 'Manage Products'}
                     </Button>
+                  </div>
+                </div>
+
+                {/* Fuse Approval Card - Wide */}
+                <div className={`rounded-2xl p-6 shadow-lg border-2 transition-all ${
+                  approvalStatus === 'approved'
+                    ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-300 dark:border-emerald-700'
+                    : approvalStatus === 'rejected'
+                      ? 'bg-red-50 dark:bg-red-900/20 border-red-300 dark:border-red-700'
+                      : 'bg-card border-border/40'
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className={`p-3 rounded-xl ${
+                        approvalStatus === 'approved'
+                          ? 'bg-emerald-100 dark:bg-emerald-900/40'
+                          : approvalStatus === 'rejected'
+                            ? 'bg-red-100 dark:bg-red-900/40'
+                            : 'bg-muted'
+                      }`}>
+                        {approvalStatus === 'approved' ? (
+                          <ShieldCheck className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
+                        ) : approvalStatus === 'rejected' ? (
+                          <ShieldX className="h-6 w-6 text-red-600 dark:text-red-400" />
+                        ) : (
+                          <ShieldX className="h-6 w-6 text-muted-foreground" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Fuse Approval</p>
+                        <p className={`text-base font-semibold ${
+                          approvalStatus === 'approved'
+                            ? 'text-emerald-700 dark:text-emerald-300'
+                            : approvalStatus === 'rejected'
+                              ? 'text-red-700 dark:text-red-300'
+                              : 'text-muted-foreground'
+                        }`}>
+                          {approvalStatus === 'approved' ? 'Approved' : approvalStatus === 'rejected' ? 'Rejected' : 'Pending Review'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {(['approved', 'pending', 'rejected'] as const).map((status) => (
+                        <button
+                          key={status}
+                          onClick={async () => {
+                            if (!token || !templateId || typeof templateId !== 'string' || approvalStatus === status) return
+                            setTogglingApproval(true)
+                            try {
+                              const res = await fetch(`${baseUrl}/questionnaires/templates/${templateId}`, {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                                body: JSON.stringify({ medicalTemplateApprovedByFuseAdmin: status })
+                              })
+                              if (res.ok) {
+                                setApprovalStatus(status)
+                                const data = await res.json()
+                                setTemplate(data.data)
+                                const msg = status === 'approved' ? '✅ Teleform approved!' : status === 'rejected' ? '❌ Teleform rejected' : '⏳ Teleform set to pending'
+                                setSaveMessage(msg)
+                                setTimeout(() => setSaveMessage(null), 3000)
+                              } else {
+                                const errorData = await res.json().catch(() => ({}))
+                                setSaveMessage(`❌ ${errorData.message || 'Failed to update approval'}`)
+                                setTimeout(() => setSaveMessage(null), 5000)
+                              }
+                            } catch (e: any) {
+                              console.error('Failed to update approval:', e)
+                              setSaveMessage(`❌ ${e.message || 'Failed to update approval'}`)
+                              setTimeout(() => setSaveMessage(null), 5000)
+                            } finally {
+                              setTogglingApproval(false)
+                            }
+                          }}
+                          disabled={togglingApproval || approvalStatus === status}
+                          className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all disabled:opacity-70 ${
+                            approvalStatus === status
+                              ? status === 'approved'
+                                ? 'bg-emerald-600 text-white shadow-md'
+                                : status === 'rejected'
+                                  ? 'bg-red-600 text-white shadow-md'
+                                  : 'bg-gray-600 text-white shadow-md'
+                              : 'bg-muted hover:bg-muted/80 text-muted-foreground'
+                          }`}
+                        >
+                          {togglingApproval && approvalStatus !== status ? null : 
+                            status === 'approved' ? 'Approve' : status === 'rejected' ? 'Reject' : 'Pending'}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
