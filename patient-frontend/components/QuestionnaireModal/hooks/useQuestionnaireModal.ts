@@ -12,7 +12,8 @@ import { useQuestionnaireAnalytics } from "./useQuestionnaireAnalytics";
 import { useQuestionnairePlans } from "./useQuestionnairePlans";
 import { useQuestionnaireTheme } from "./useQuestionnaireTheme";
 import { usePharmacyCoverages } from "./usePharmacyCoverages";
-import { getDashboardPrefix } from "../../../lib/clinic-utils";
+import { getDashboardPrefix, getDashboardPrefixByMedicalCompany } from "../../../lib/clinic-utils";
+import { PatientPortalDashboardFormat } from "@fuse/enums";
 
 export function useQuestionnaireModal(
   props: QuestionnaireModalProps,
@@ -645,29 +646,30 @@ export function useQuestionnaireModal(
   const createMDCase = useCallback(async (orderIdForCase: string) => {
     console.log('🔵 [MDI] ========== MD INTEGRATIONS CASE CREATION ==========');
     console.log('🔵 [MDI] Order ID:', orderIdForCase);
+    console.log('🔵 [MDI] Questionnaire medicalCompanySource:', questionnaire?.medicalCompanySource);
     console.log('🔵 [MDI] Domain Clinic:', domainClinic ? {
       id: domainClinic.id,
       name: domainClinic.name,
       slug: domainClinic.slug,
-      patientPortalDashboardFormat: (domainClinic as any).patientPortalDashboardFormat
     } : 'null');
 
-    // Only proceed if clinic uses md-integrations dashboard format
+    // Only proceed if questionnaire uses md-integrations as medical company source
     if (!domainClinic) {
       console.log('⚠️ [MDI] No domain clinic found - skipping MDI case creation');
       return;
     }
 
-    const dashboardFormat = (domainClinic as any).patientPortalDashboardFormat;
-    console.log('🔵 [MDI] Dashboard format:', dashboardFormat);
+    // Use questionnaire's medicalCompanySource instead of clinic's patientPortalDashboardFormat
+    const medicalCompany = questionnaire?.medicalCompanySource;
+    console.log('🔵 [MDI] Medical company source:', medicalCompany);
 
-    if (dashboardFormat !== 'md-integrations') {
-      console.log('ℹ️ [MDI] Clinic uses "' + dashboardFormat + '" format - skipping MDI case creation');
+    if (medicalCompany !== PatientPortalDashboardFormat.MD_INTEGRATIONS) {
+      console.log('ℹ️ [MDI] Questionnaire uses "' + medicalCompany + '" medical company - skipping MDI case creation');
       console.log('🔵 [MDI] ========== END (SKIPPED) ==========');
       return;
     }
 
-    console.log('✅ [MDI] Clinic uses md-integrations format - proceeding with case creation');
+    console.log('✅ [MDI] Questionnaire uses md-integrations - proceeding with case creation');
 
     const patientOverrides = {
       firstName: answers['firstName'],
@@ -720,7 +722,7 @@ export function useQuestionnaireModal(
     }
 
     console.log('🔵 [MDI] ========== END ==========');
-  }, [domainClinic, answers]);
+  }, [domainClinic, answers, questionnaire]);
 
   const handlePaymentSuccess = useCallback(async (data?: { paymentIntentId?: string; orderId?: string }) => {
     // Use passed data or fall back to state
@@ -747,17 +749,17 @@ export function useQuestionnaireModal(
         console.log('🎉 [CHECKOUT] Conversion tracked');
       }
 
-      // Create MD Integrations case if clinic uses md-integrations format
-      const dashboardFormat = (domainClinic as any)?.patientPortalDashboardFormat;
-      const needsMDCase = dashboardFormat === 'md-integrations' || dashboardFormat === 'MD_INTEGRATIONS';
+      // Create MD Integrations case if questionnaire uses md-integrations as medical company source
+      const medicalCompany = questionnaire?.medicalCompanySource;
+      const needsMDCase = medicalCompany === PatientPortalDashboardFormat.MD_INTEGRATIONS;
 
       if (needsMDCase && finalOrderId) {
-        console.log('🎉 [CHECKOUT] Clinic uses MD Integrations, creating case...');
+        console.log('🎉 [CHECKOUT] Questionnaire uses MD Integrations, creating case...');
         setPaymentStatus('creatingMDCase'); // Update status to show MD case creation in progress
         await createMDCase(finalOrderId);
         console.log('✅ [CHECKOUT] MD case creation complete');
       } else {
-        console.log('ℹ️ [CHECKOUT] Skipping MD case creation (not md-integrations format or no orderId)');
+        console.log('ℹ️ [CHECKOUT] Skipping MD case creation (medicalCompanySource: ' + medicalCompany + ', orderId: ' + finalOrderId + ')');
       }
 
       // Set status to ready - all steps complete, user can now continue to dashboard
@@ -770,7 +772,7 @@ export function useQuestionnaireModal(
       setShowSuccessModal(false); // Ensure modal is closed on error
       alert('Payment processing error. Please contact support.');
     }
-  }, [paymentIntentId, orderId, userId, accountCreated, triggerCheckoutSequenceRun, trackConversion, createMDCase, domainClinic]);
+  }, [paymentIntentId, orderId, userId, accountCreated, triggerCheckoutSequenceRun, trackConversion, createMDCase, questionnaire]);
 
   const handlePaymentConfirm = useCallback(() => {
     // Open modal with processing state when payment confirmation starts
@@ -787,82 +789,27 @@ export function useQuestionnaireModal(
 
   const handleSuccessModalContinue = useCallback(async () => {
     try {
-      // Priority order for getting clinic:
-      // 1. Get clinic from order (most reliable)
-      // 2. Get clinic from authenticated user
-      // 3. Fallback to domainClinic
-
-      let clinicForRedirect = domainClinic;
-
-      console.log('🔍 [CHECKOUT] Determining redirect clinic:', {
-        hasOrderId: !!orderId,
+      // Use questionnaire's medicalCompanySource to determine dashboard redirect
+      const medicalCompany = questionnaire?.medicalCompanySource || PatientPortalDashboardFormat.FUSE;
+      
+      console.log('🔍 [CHECKOUT] Determining redirect based on questionnaire:', {
+        questionnaireId: questionnaire?.id,
+        medicalCompanySource: medicalCompany,
         orderId: orderId,
-        hasUserId: !!userId,
-        userId: userId,
-        domainClinicFormat: (domainClinic as any)?.patientPortalDashboardFormat,
-        domainClinicId: domainClinic?.id,
-        domainClinicName: domainClinic?.name,
-        domainClinicSlug: domainClinic?.slug,
       });
 
-      // Try to get clinic from order first (if we have orderId)
-      if (orderId) {
-        try {
-          const orderResult = await apiCall(`/orders/${orderId}`);
-          if (orderResult.success && orderResult.data?.data?.clinicId) {
-            const orderClinicId = orderResult.data.data.clinicId;
-            const clinicResult = await apiCall(`/clinic/${orderClinicId}`);
-            if (clinicResult.success && clinicResult.data?.data) {
-              clinicForRedirect = clinicResult.data.data;
-              console.log('✅ [CHECKOUT] Loaded clinic from order for redirect:', {
-                id: clinicForRedirect?.id,
-                patientPortalDashboardFormat: (clinicForRedirect as any)?.patientPortalDashboardFormat,
-                source: 'order',
-              });
-            }
-          }
-        } catch (error) {
-          console.warn('⚠️ [CHECKOUT] Could not fetch clinic from order:', error);
-        }
-      }
-
-      // If we still don't have clinic, try getting it from user
-      if (!clinicForRedirect || (clinicForRedirect === domainClinic && userId)) {
-        try {
-          const userResult = await apiCall('/auth/me');
-          if (userResult.success && userResult.data?.clinicId) {
-            const clinicResult = await apiCall(`/clinic/${userResult.data.clinicId}`);
-            if (clinicResult.success && clinicResult.data?.data) {
-              clinicForRedirect = clinicResult.data.data;
-              console.log('✅ [CHECKOUT] Loaded clinic from user for redirect:', {
-                id: clinicForRedirect?.id,
-                patientPortalDashboardFormat: (clinicForRedirect as any)?.patientPortalDashboardFormat,
-                source: 'user',
-              });
-            }
-          }
-        } catch (error) {
-          console.warn('⚠️ [CHECKOUT] Could not fetch user clinic:', error);
-        }
-      }
-
-      // Determine the correct dashboard based on clinic's patientPortalDashboardFormat
-      const dashboardFormat = (clinicForRedirect as any)?.patientPortalDashboardFormat;
-      let dashboardPrefix = getDashboardPrefix(clinicForRedirect);
+      // Get dashboard prefix based on questionnaire's medical company source
+      let dashboardPrefix = getDashboardPrefixByMedicalCompany(medicalCompany);
 
       // For MD Integrations, redirect to messages tab after checkout
-      // Normalize format to handle both 'md-integrations' and 'MD_INTEGRATIONS'
-      if (dashboardFormat === 'md-integrations' || dashboardFormat === 'MD_INTEGRATIONS') {
+      if (medicalCompany === PatientPortalDashboardFormat.MD_INTEGRATIONS) {
         dashboardPrefix = `${dashboardPrefix}?tab=messages`;
       }
 
       console.log('🎉 [CHECKOUT] Final redirect decision:', {
         dashboardPrefix,
-        patientPortalDashboardFormat: dashboardFormat,
-        clinicId: clinicForRedirect?.id,
-        clinicName: clinicForRedirect?.name,
-        usedDomainClinic: clinicForRedirect === domainClinic,
-        source: clinicForRedirect === domainClinic ? 'domainClinic' : 'order/user',
+        medicalCompanySource: medicalCompany,
+        questionnaireId: questionnaire?.id,
       });
 
       // Build full URL to handle subdomain correctly BEFORE closing modals
@@ -923,19 +870,18 @@ export function useQuestionnaireModal(
       }, 500);
     } catch (error) {
       console.error('❌ [CHECKOUT] Error in handleSuccessModalContinue:', error);
-      // Fallback to domainClinic if there's an error
-      let dashboardPrefix = getDashboardPrefix(domainClinic);
-      const dashboardFormat = (domainClinic as any)?.patientPortalDashboardFormat;
+      // Fallback to questionnaire's medicalCompanySource or default to fuse
+      const fallbackMedicalCompany = questionnaire?.medicalCompanySource || PatientPortalDashboardFormat.FUSE;
+      let dashboardPrefix = getDashboardPrefixByMedicalCompany(fallbackMedicalCompany);
 
       // For MD Integrations, redirect to messages tab after checkout
-      // Normalize format to handle both 'md-integrations' and 'MD_INTEGRATIONS'
-      if (dashboardFormat === 'md-integrations' || dashboardFormat === 'MD_INTEGRATIONS') {
+      if (fallbackMedicalCompany === PatientPortalDashboardFormat.MD_INTEGRATIONS) {
         dashboardPrefix = `${dashboardPrefix}?tab=messages`;
       }
 
-      console.warn('⚠️ [CHECKOUT] Using fallback domainClinic for redirect:', {
+      console.warn('⚠️ [CHECKOUT] Using fallback redirect:', {
         dashboardPrefix,
-        patientPortalDashboardFormat: dashboardFormat,
+        medicalCompanySource: fallbackMedicalCompany,
       });
       setShowSuccessModal(false);
       onClose();
@@ -958,7 +904,7 @@ export function useQuestionnaireModal(
         }
       }, 300);
     }
-  }, [domainClinic, userId, orderId, onClose]);
+  }, [questionnaire, orderId, onClose]);
 
   // Navigation
   const replaceCurrentVariables = useCallback((text: string): string => {

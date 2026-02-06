@@ -1,6 +1,7 @@
 import { Express } from "express";
 import User from "../models/User";
-import Clinic, { PatientPortalDashboardFormat } from "../models/Clinic";
+import Clinic from "../models/Clinic";
+import { PatientPortalDashboardFormat } from "@fuse/enums";
 import BrandInvitation, { InvitationType } from "../models/BrandInvitation";
 import UserRoles from "../models/UserRoles";
 

@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.886.0",
+    "@fuse/enums": "workspace:*",
     "@fuse/stripe": "workspace:*",
     "@fuse/tsconfig": "workspace:*",
     "@fuse/validators": "workspace:*",

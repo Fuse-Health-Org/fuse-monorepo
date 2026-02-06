@@ -2,7 +2,7 @@ import { Table, Column, DataType, ForeignKey, BelongsTo } from 'sequelize-typesc
 import Entity from './Entity';
 import User from './User';
 import Clinic from './Clinic';
-import { PatientPortalDashboardFormat } from './Clinic';
+import { PatientPortalDashboardFormat } from '@fuse/enums';
 
 export enum InvitationType {
   DOCTOR = 'doctor',

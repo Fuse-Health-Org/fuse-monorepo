@@ -5,4 +5,4 @@ export * from './categoryOptions';
 export * from './statusOptions';
 export * from './sortOptions';
 export * from './layoutOptions';
-
+export * from './modelEnums';
