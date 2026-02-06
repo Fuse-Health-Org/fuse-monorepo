@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/router"
 import { Sidebar } from "@/components/sidebar"
 import { Header } from "@/components/header"
-import { Loader2, RefreshCcw, Search, Edit3, Plus, Trash2, CheckCircle2, List } from "lucide-react"
+import { Loader2, RefreshCcw, Search, Edit3, Plus, Trash2, CheckCircle2, List, ShieldCheck, ShieldX } from "lucide-react"
 import { useAuth } from "@/contexts/AuthContext"
 import { SORT_OPTIONS } from "@fuse/enums"
 
@@ -13,7 +13,7 @@ interface TemplateItem {
   createdAt: string
   status: string
   medicalCompanySource: string | null
-  medicalTemplateApprovedByFuseAdmin: boolean
+  medicalTemplateApprovedByFuseAdmin: 'pending' | 'approved' | 'rejected'
   user?: { id: string; email: string; firstName?: string; lastName?: string } | null
 }
 
@@ -28,6 +28,29 @@ export default function Teleforms() {
   const [loading, setLoading] = useState(false)
   const [productFormTemplates, setProductFormTemplates] = useState<TemplateItem[]>([])
   const [activeTab, setActiveTab] = useState<"approved" | "all">("approved")
+  const [togglingApprovalId, setTogglingApprovalId] = useState<string | null>(null)
+
+  // Set approval status for a template
+  const setApproval = async (templateId: string, newStatus: 'pending' | 'approved' | 'rejected') => {
+    if (!token) return
+    setTogglingApprovalId(templateId)
+    try {
+      const res = await fetch(`${baseUrl}/questionnaires/templates/${templateId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ medicalTemplateApprovedByFuseAdmin: newStatus })
+      })
+      if (res.ok) {
+        setProductFormTemplates(prev => prev.map(t =>
+          t.id === templateId ? { ...t, medicalTemplateApprovedByFuseAdmin: newStatus } : t
+        ))
+      }
+    } catch (e) {
+      console.error('Failed to update approval:', e)
+    } finally {
+      setTogglingApprovalId(null)
+    }
+  }
 
   // Fetch product form templates
   const fetchProductFormTemplates = async () => {
@@ -48,7 +71,7 @@ export default function Teleforms() {
           createdAt: f.createdAt || '',
           status: f.status || 'in_progress',
           medicalCompanySource: f.medicalCompanySource || null,
-          medicalTemplateApprovedByFuseAdmin: f.medicalTemplateApprovedByFuseAdmin === true,
+          medicalTemplateApprovedByFuseAdmin: f.medicalTemplateApprovedByFuseAdmin || 'pending',
           user: f.user || null,
         })))
       }
@@ -73,7 +96,7 @@ export default function Teleforms() {
     })
 
     if (activeTab === "approved") {
-      filtered = filtered.filter(t => t.medicalTemplateApprovedByFuseAdmin === true)
+      filtered = filtered.filter(t => t.medicalTemplateApprovedByFuseAdmin === 'approved')
     }
 
     // Sort
@@ -97,7 +120,7 @@ export default function Teleforms() {
     return filtered
   }, [productFormTemplates, searchQuery, activeTab, selectedSort])
 
-  const approvedCount = productFormTemplates.filter(t => t.medicalTemplateApprovedByFuseAdmin === true).length
+  const approvedCount = productFormTemplates.filter(t => t.medicalTemplateApprovedByFuseAdmin === 'approved').length
   const allCount = productFormTemplates.length
 
   return (
@@ -297,8 +320,11 @@ export default function Teleforms() {
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <h3 className="text-lg font-semibold text-foreground">{template.title || "Untitled Template"}</h3>
-                          {template.medicalTemplateApprovedByFuseAdmin && (
+                          {template.medicalTemplateApprovedByFuseAdmin === 'approved' && (
                             <CheckCircle2 className="h-4 w-4 text-emerald-500 flex-shrink-0" />
+                          )}
+                          {template.medicalTemplateApprovedByFuseAdmin === 'rejected' && (
+                            <ShieldX className="h-4 w-4 text-red-500 flex-shrink-0" />
                           )}
                         </div>
                         {template.description && !template.description.startsWith('Questionnaire for') && (
@@ -354,6 +380,56 @@ export default function Teleforms() {
                         </span>
                       )}
                     </div>
+                    {/* Approval Status */}
+                    <div className={`p-3 rounded-xl border ${
+                      template.medicalTemplateApprovedByFuseAdmin === 'approved'
+                        ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-700'
+                        : template.medicalTemplateApprovedByFuseAdmin === 'rejected'
+                          ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700'
+                          : 'bg-muted/30 border-border/60'
+                    }`}>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          {template.medicalTemplateApprovedByFuseAdmin === 'approved' ? (
+                            <ShieldCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                          ) : template.medicalTemplateApprovedByFuseAdmin === 'rejected' ? (
+                            <ShieldX className="h-4 w-4 text-red-600 dark:text-red-400" />
+                          ) : (
+                            <ShieldX className="h-4 w-4 text-muted-foreground" />
+                          )}
+                          <span className={`text-xs font-semibold ${
+                            template.medicalTemplateApprovedByFuseAdmin === 'approved'
+                              ? 'text-emerald-700 dark:text-emerald-300'
+                              : template.medicalTemplateApprovedByFuseAdmin === 'rejected'
+                                ? 'text-red-700 dark:text-red-300'
+                                : 'text-muted-foreground'
+                          }`}>
+                            {template.medicalTemplateApprovedByFuseAdmin === 'approved' ? 'Approved' : template.medicalTemplateApprovedByFuseAdmin === 'rejected' ? 'Rejected' : 'Pending'}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex gap-1">
+                        {(['approved', 'pending', 'rejected'] as const).map((status) => (
+                          <button
+                            key={status}
+                            onClick={() => setApproval(template.id, status)}
+                            disabled={togglingApprovalId === template.id || template.medicalTemplateApprovedByFuseAdmin === status}
+                            className={`flex-1 px-2 py-1 rounded-lg text-[10px] font-semibold transition-all disabled:opacity-70 ${
+                              template.medicalTemplateApprovedByFuseAdmin === status
+                                ? status === 'approved'
+                                  ? 'bg-emerald-600 text-white'
+                                  : status === 'rejected'
+                                    ? 'bg-red-600 text-white'
+                                    : 'bg-gray-600 text-white'
+                                : 'bg-muted hover:bg-muted/80 text-muted-foreground'
+                            }`}
+                          >
+                            {status === 'approved' ? 'Approve' : status === 'rejected' ? 'Reject' : 'Pending'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
                     {/* Actions */}
                     <div className="flex gap-2 pt-2">
                       <button
