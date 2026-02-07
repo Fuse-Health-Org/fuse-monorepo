@@ -545,6 +545,9 @@ export default function CheckoutPage() {
   })
 
   useEffect(() => {
+    // Wait for router to be ready (query params are empty on first render in production)
+    if (!router.isReady) return
+
     // Wait for auth to load and check if user is authenticated
     if (isLoading) return
 
@@ -610,7 +613,7 @@ export default function CheckoutPage() {
       // Redirect back if missing data
       router.push('/plans')
     }
-  }, [router.query, user, isLoading, subscription])
+  }, [router.isReady, router.query, user, isLoading, subscription])
 
   const createPaymentIntent = async (planType: string, amount: number, brandSubscriptionPlanId?: string) => {
     try {
