@@ -27,6 +27,8 @@ interface Plan {
   monthlyPrice: string;
   introMonthlyPrice: string | null;
   introMonthlyPriceDurationMonths: number | null;
+  stripePriceId: string;
+  introMonthlyPriceStripeId: string | null;
   maxProducts: number;
   isActive: boolean;
   sortOrder: number;
@@ -53,6 +55,10 @@ export default function TierManagement() {
   const [editingIntroPrice, setEditingIntroPrice] = useState<string | null>(null);
   const [introPriceDraft, setIntroPriceDraft] = useState<number | null>(null);
   const [introMonthsDraft, setIntroMonthsDraft] = useState<number | null>(null);
+  const [editingStripePriceId, setEditingStripePriceId] = useState<string | null>(null);
+  const [stripePriceIdDraft, setStripePriceIdDraft] = useState<string>('');
+  const [editingIntroStripeId, setEditingIntroStripeId] = useState<string | null>(null);
+  const [introStripeIdDraft, setIntroStripeIdDraft] = useState<string>('');
 
   useEffect(() => {
     if (token) {
@@ -438,6 +444,102 @@ export default function TierManagement() {
     setIntroMonthsDraft(null);
   };
 
+  const handleStartEditingStripePriceId = (planId: string, currentValue: string) => {
+    setEditingStripePriceId(planId);
+    setStripePriceIdDraft(currentValue);
+  };
+
+  const handleSaveStripePriceId = async (planId: string) => {
+    if (!token) return;
+    if (!stripePriceIdDraft.trim()) {
+      alert('Stripe Price ID cannot be empty');
+      return;
+    }
+
+    setSaving(planId);
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/plans/${planId}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ stripePriceId: stripePriceIdDraft.trim() }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.message || 'Failed to update Stripe Price ID');
+      }
+
+      const result = await response.json();
+      setTiers(prevTiers => prevTiers.map(tier => {
+        if (tier.plan.id === planId) {
+          return { ...tier, plan: { ...tier.plan, stripePriceId: stripePriceIdDraft.trim() } };
+        }
+        return tier;
+      }));
+      setEditingStripePriceId(null);
+    } catch (error) {
+      console.error('Error updating Stripe Price ID:', error);
+      alert('Failed to update Stripe Price ID');
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  const handleCancelEditingStripePriceId = () => {
+    setEditingStripePriceId(null);
+    setStripePriceIdDraft('');
+  };
+
+  const handleStartEditingIntroStripeId = (planId: string, currentValue: string | null) => {
+    setEditingIntroStripeId(planId);
+    setIntroStripeIdDraft(currentValue || '');
+  };
+
+  const handleSaveIntroStripeId = async (planId: string) => {
+    if (!token) return;
+
+    setSaving(planId);
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/plans/${planId}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          introMonthlyPriceStripeId: introStripeIdDraft.trim() || null,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.message || 'Failed to update Intro Stripe Price ID');
+      }
+
+      const result = await response.json();
+      setTiers(prevTiers => prevTiers.map(tier => {
+        if (tier.plan.id === planId) {
+          return { ...tier, plan: { ...tier.plan, introMonthlyPriceStripeId: introStripeIdDraft.trim() || null } };
+        }
+        return tier;
+      }));
+      setEditingIntroStripeId(null);
+    } catch (error) {
+      console.error('Error updating Intro Stripe Price ID:', error);
+      alert('Failed to update Intro Stripe Price ID');
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  const handleCancelEditingIntroStripeId = () => {
+    setEditingIntroStripeId(null);
+    setIntroStripeIdDraft('');
+  };
+
   return (
     <div className="flex h-screen bg-background overflow-hidden">
       <Sidebar />
@@ -676,6 +778,105 @@ export default function TierManagement() {
                                   onClick={() => handleStartEditingFuseFee(tier.plan.id, tier.config?.fuseFeePercent ?? null)}
                                   className="p-1 text-muted-foreground hover:text-[#4FA59C] hover:bg-teal-50 dark:hover:bg-teal-900/30 rounded transition-colors"
                                   title="Edit fuse fee"
+                                >
+                                  <Edit2 className="h-3 w-3" />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                        {/* Stripe IDs Row */}
+                        <div className="flex items-center flex-wrap gap-x-6 gap-y-2 text-sm mt-2">
+                          {/* Stripe Price ID */}
+                          <div className="flex items-center gap-2">
+                            <span className="text-muted-foreground">Stripe Price ID:</span>{' '}
+                            {editingStripePriceId === tier.plan.id ? (
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="text"
+                                  value={stripePriceIdDraft}
+                                  onChange={(e) => setStripePriceIdDraft(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') handleSaveStripePriceId(tier.plan.id);
+                                    if (e.key === 'Escape') handleCancelEditingStripePriceId();
+                                  }}
+                                  className="w-64 px-2 py-1 text-sm border border-input rounded focus:outline-none focus:ring-2 focus:ring-[#4FA59C] bg-background text-foreground font-mono"
+                                  placeholder="price_..."
+                                  autoFocus
+                                />
+                                <button
+                                  onClick={() => handleSaveStripePriceId(tier.plan.id)}
+                                  disabled={saving === tier.plan.id}
+                                  className="p-1 text-[#4FA59C] hover:bg-teal-50 dark:hover:bg-teal-900/30 rounded transition-colors disabled:opacity-50"
+                                  title="Save"
+                                >
+                                  <Save className="h-4 w-4" />
+                                </button>
+                                <button
+                                  onClick={handleCancelEditingStripePriceId}
+                                  className="p-1 text-muted-foreground hover:bg-muted rounded transition-colors"
+                                  title="Cancel"
+                                >
+                                  <X className="h-4 w-4" />
+                                </button>
+                              </div>
+                            ) : (
+                              <>
+                                <span className="font-mono text-xs text-foreground bg-muted px-2 py-0.5 rounded">
+                                  {tier.plan.stripePriceId || 'Not set'}
+                                </span>
+                                <button
+                                  onClick={() => handleStartEditingStripePriceId(tier.plan.id, tier.plan.stripePriceId)}
+                                  className="p-1 text-muted-foreground hover:text-[#4FA59C] hover:bg-teal-50 dark:hover:bg-teal-900/30 rounded transition-colors"
+                                  title="Edit Stripe Price ID"
+                                >
+                                  <Edit2 className="h-3 w-3" />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                          {/* Intro Stripe Price ID */}
+                          <div className="flex items-center gap-2">
+                            <span className="text-muted-foreground">Intro Stripe Price ID:</span>{' '}
+                            {editingIntroStripeId === tier.plan.id ? (
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="text"
+                                  value={introStripeIdDraft}
+                                  onChange={(e) => setIntroStripeIdDraft(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') handleSaveIntroStripeId(tier.plan.id);
+                                    if (e.key === 'Escape') handleCancelEditingIntroStripeId();
+                                  }}
+                                  className="w-64 px-2 py-1 text-sm border border-input rounded focus:outline-none focus:ring-2 focus:ring-[#4FA59C] bg-background text-foreground font-mono"
+                                  placeholder="price_... (leave empty to clear)"
+                                  autoFocus
+                                />
+                                <button
+                                  onClick={() => handleSaveIntroStripeId(tier.plan.id)}
+                                  disabled={saving === tier.plan.id}
+                                  className="p-1 text-[#4FA59C] hover:bg-teal-50 dark:hover:bg-teal-900/30 rounded transition-colors disabled:opacity-50"
+                                  title="Save"
+                                >
+                                  <Save className="h-4 w-4" />
+                                </button>
+                                <button
+                                  onClick={handleCancelEditingIntroStripeId}
+                                  className="p-1 text-muted-foreground hover:bg-muted rounded transition-colors"
+                                  title="Cancel"
+                                >
+                                  <X className="h-4 w-4" />
+                                </button>
+                              </div>
+                            ) : (
+                              <>
+                                <span className="font-mono text-xs text-foreground bg-muted px-2 py-0.5 rounded">
+                                  {tier.plan.introMonthlyPriceStripeId || 'Not set'}
+                                </span>
+                                <button
+                                  onClick={() => handleStartEditingIntroStripeId(tier.plan.id, tier.plan.introMonthlyPriceStripeId)}
+                                  className="p-1 text-muted-foreground hover:text-[#4FA59C] hover:bg-teal-50 dark:hover:bg-teal-900/30 rounded transition-colors"
+                                  title="Edit Intro Stripe Price ID"
                                 >
                                   <Edit2 className="h-3 w-3" />
                                 </button>

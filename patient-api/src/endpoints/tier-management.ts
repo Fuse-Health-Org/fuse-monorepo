@@ -27,7 +27,7 @@ export function registerTierManagementEndpoints(
       }
 
       const { planId } = req.params;
-      const { maxProducts, name, introMonthlyPrice, introMonthlyPriceDurationMonths } = req.body;
+      const { maxProducts, name, introMonthlyPrice, introMonthlyPriceDurationMonths, stripePriceId, introMonthlyPriceStripeId } = req.body;
 
       const plan = await BrandSubscriptionPlans.findByPk(planId);
       if (!plan) {
@@ -52,6 +52,18 @@ export function registerTierManagementEndpoints(
       // introMonthlyPriceDurationMonths: allow setting a number or null to clear
       if (introMonthlyPriceDurationMonths !== undefined) {
         updates.introMonthlyPriceDurationMonths = introMonthlyPriceDurationMonths === null ? null : parseInt(introMonthlyPriceDurationMonths);
+      }
+
+      // stripePriceId: allow setting a string or clearing
+      if (typeof stripePriceId === "string" && stripePriceId.trim() !== "") {
+        updates.stripePriceId = stripePriceId.trim();
+      }
+
+      // introMonthlyPriceStripeId: allow setting a string or null to clear
+      if (introMonthlyPriceStripeId !== undefined) {
+        updates.introMonthlyPriceStripeId = typeof introMonthlyPriceStripeId === "string" && introMonthlyPriceStripeId.trim() !== "" 
+          ? introMonthlyPriceStripeId.trim() 
+          : null;
       }
 
       if (Object.keys(updates).length === 0) {
