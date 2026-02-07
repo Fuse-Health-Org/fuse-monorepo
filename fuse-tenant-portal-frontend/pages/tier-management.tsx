@@ -46,6 +46,8 @@ export default function TierManagement() {
   const [maxProductsDraft, setMaxProductsDraft] = useState<number>(0);
   const [editingFuseFee, setEditingFuseFee] = useState<string | null>(null);
   const [fuseFeeDraft, setFuseFeeDraft] = useState<number | null>(null);
+  const [editingName, setEditingName] = useState<string | null>(null);
+  const [nameDraft, setNameDraft] = useState<string>('');
 
   useEffect(() => {
     if (token) {
@@ -305,6 +307,71 @@ export default function TierManagement() {
     setFuseFeeDraft(null);
   };
 
+  const handleStartEditingName = (planId: string, currentName: string) => {
+    setEditingName(planId);
+    setNameDraft(currentName);
+  };
+
+  const handleSaveName = async (planId: string) => {
+    if (!token) return;
+    if (!nameDraft.trim()) {
+      alert('Plan name cannot be empty');
+      return;
+    }
+
+    setSaving(planId);
+    try {
+      const payload = { name: nameDraft.trim() };
+      console.log('🔍 [Frontend] Sending plan name update:', payload);
+      
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/plans/${planId}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      console.log('🔍 [Frontend] Response status:', response.status);
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        console.error('🔍 [Frontend] Error response:', errorData);
+        throw new Error(errorData?.message || 'Failed to update plan name');
+      }
+
+      const result = await response.json();
+      console.log('✅ Updated plan name:', result.data);
+
+      // Update local state
+      setTiers(prevTiers => prevTiers.map(tier => {
+        if (tier.plan.id === planId) {
+          return {
+            ...tier,
+            plan: {
+              ...tier.plan,
+              name: nameDraft.trim(),
+            },
+          };
+        }
+        return tier;
+      }));
+
+      setEditingName(null);
+    } catch (error) {
+      console.error('Error updating plan name:', error);
+      alert('Failed to update plan name');
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  const handleCancelEditingName = () => {
+    setEditingName(null);
+    setNameDraft('');
+  };
+
   return (
     <div className="flex h-screen bg-background overflow-hidden">
       <Sidebar />
@@ -343,9 +410,49 @@ export default function TierManagement() {
                       {/* Plan Info */}
                       <div className="flex-1">
                         <div className="flex items-center space-x-3 mb-2">
-                          <h3 className="text-lg font-semibold text-foreground">
-                            {tier.plan.name}
-                          </h3>
+                          {editingName === tier.plan.id ? (
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="text"
+                                value={nameDraft}
+                                onChange={(e) => setNameDraft(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') handleSaveName(tier.plan.id);
+                                  if (e.key === 'Escape') handleCancelEditingName();
+                                }}
+                                className="text-lg font-semibold px-2 py-1 border border-input rounded focus:outline-none focus:ring-2 focus:ring-[#4FA59C] bg-background text-foreground"
+                                autoFocus
+                              />
+                              <button
+                                onClick={() => handleSaveName(tier.plan.id)}
+                                disabled={saving === tier.plan.id}
+                                className="p-1 text-[#4FA59C] hover:bg-teal-50 dark:hover:bg-teal-900/30 rounded transition-colors disabled:opacity-50"
+                                title="Save"
+                              >
+                                <Save className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={handleCancelEditingName}
+                                className="p-1 text-muted-foreground hover:bg-muted rounded transition-colors"
+                                title="Cancel"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2 group">
+                              <h3 className="text-lg font-semibold text-foreground">
+                                {tier.plan.name}
+                              </h3>
+                              <button
+                                onClick={() => handleStartEditingName(tier.plan.id, tier.plan.name)}
+                                className="p-1 text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-[#4FA59C] hover:bg-teal-50 dark:hover:bg-teal-900/30 rounded transition-all"
+                                title="Edit plan name"
+                              >
+                                <Edit2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          )}
                           <span className="px-3 py-1 text-xs font-medium text-[#4FA59C] bg-teal-50 dark:bg-teal-900/30 rounded-full">
                             {tier.plan.planType}
                           </span>
