@@ -48,6 +48,9 @@ interface Plan {
   stripePriceId: string
   id?: string
   tierConfig?: TierConfig | null
+  introMonthlyPrice?: number | null
+  introMonthlyPriceDurationMonths?: number | null
+  introMonthlyPriceStripeId?: string | null
 }
 
 interface PlansResponse {
@@ -191,7 +194,10 @@ export default function Plans() {
                 features: plan.features,
                 stripePriceId: plan.stripePriceId,
                 id: plan.id,
-                tierConfig: plan.tierConfig || null
+                tierConfig: plan.tierConfig || null,
+                introMonthlyPrice: plan.introMonthlyPrice,
+                introMonthlyPriceDurationMonths: plan.introMonthlyPriceDurationMonths,
+                introMonthlyPriceStripeId: plan.introMonthlyPriceStripeId,
               }
               return acc
             }, {} as PlansResponse)
@@ -248,7 +254,15 @@ export default function Plans() {
     }
 
     const selectedPlan = plans[planType]
-    const downpaymentAmount = selectedPlan.price
+    const hasIntroPricing = selectedPlan.introMonthlyPrice != null
+      && selectedPlan.introMonthlyPriceDurationMonths
+      && selectedPlan.introMonthlyPriceStripeId
+
+    // For intro pricing plans, the first charge is handled by the subscription schedule
+    // For non-intro plans, the downpayment covers the first month
+    const downpaymentAmount = hasIntroPricing
+      ? selectedPlan.introMonthlyPrice!
+      : selectedPlan.price
 
     try {
       setCreatingCheckout(planType)
@@ -290,8 +304,15 @@ export default function Plans() {
         downpaymentName: `${selectedPlan.name} First Month`,
         downpaymentAmount: downpaymentAmount.toString(),
         brandSubscriptionPlanId: selectedPlan.id || '',
-        stripePriceId: selectedPlan.stripePriceId || ''
+        stripePriceId: selectedPlan.stripePriceId || '',
       })
+
+      // Add intro pricing params if applicable
+      if (hasIntroPricing) {
+        queryParams.set('introMonthlyPrice', selectedPlan.introMonthlyPrice!.toString())
+        queryParams.set('introMonthlyPriceDurationMonths', selectedPlan.introMonthlyPriceDurationMonths!.toString())
+        queryParams.set('introMonthlyPriceStripeId', selectedPlan.introMonthlyPriceStripeId!)
+      }
 
       router.push(`/checkout?${queryParams.toString()}`)
     } catch (error) {
@@ -443,10 +464,24 @@ export default function Plans() {
                         <CardTitle className="text-xl font-semibold">{plan.name}</CardTitle>
                       </div>
                       <div className="mb-4">
-                        <span className="text-3xl font-bold text-[#825AD1]">
-                          ${plan.price.toLocaleString()}
-                        </span>
-                        <span className="text-muted-foreground"> / month</span>
+                        {plan.introMonthlyPrice != null && plan.introMonthlyPriceDurationMonths ? (
+                          <>
+                            <span className="text-3xl font-bold text-[#825AD1]">
+                              ${plan.introMonthlyPrice.toLocaleString()}
+                            </span>
+                            <span className="text-muted-foreground"> / month</span>
+                            <div className="text-xs text-muted-foreground mt-1">
+                              for {plan.introMonthlyPriceDurationMonths} months, then ${plan.price.toLocaleString()}/mo
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <span className="text-3xl font-bold text-[#825AD1]">
+                              ${plan.price.toLocaleString()}
+                            </span>
+                            <span className="text-muted-foreground"> / month</span>
+                          </>
+                        )}
                         <div className="text-xs text-muted-foreground mt-1">+ 1% transaction fee</div>
                       </div>
                     </CardHeader>

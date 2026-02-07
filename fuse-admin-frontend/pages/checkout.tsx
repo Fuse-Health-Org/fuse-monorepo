@@ -55,6 +55,11 @@ interface CheckoutData {
   previousMonthlyPrice?: number
   brandSubscriptionPlanId?: string
   stripePriceId?: string
+  // Intro pricing fields
+  introMonthlyPrice?: number | null
+  introMonthlyPriceDurationMonths?: number | null
+  introMonthlyPriceStripeId?: string | null
+  hasIntroPricing?: boolean
 }
 
 // Payment Processing Modal Component
@@ -177,11 +182,13 @@ function PaymentModal({ isOpen, state, errorMessage, planName, amount, onClose, 
 }
 
 // Checkout form component that uses Stripe hooks
-function CheckoutForm({ checkoutData, paymentData, token, intentClientSecret, onSuccess, onError }: {
+function CheckoutForm({ checkoutData, paymentData, token, intentClientSecret, intentType, brandSubscriptionId, onSuccess, onError }: {
   checkoutData: CheckoutData
   paymentData: any
   token: string | null
   intentClientSecret: string
+  intentType: 'payment_intent' | 'setup_intent'
+  brandSubscriptionId?: string
   onSuccess: () => void
   onError: (error: string) => void
 }) {
@@ -203,6 +210,7 @@ function CheckoutForm({ checkoutData, paymentData, token, intentClientSecret, on
     console.log('🔍 Stripe loaded:', !!stripe)
     console.log('🔍 Elements loaded:', !!elements)
     console.log('🔍 Token available:', !!token)
+    console.log('🔍 Intent type:', intentType)
 
     if (!stripe || !elements) {
       const errorMsg = 'Stripe has not loaded yet.'
@@ -255,115 +263,199 @@ function CheckoutForm({ checkoutData, paymentData, token, intentClientSecret, on
         return
       }
 
-      const { error: confirmError, paymentIntent } = await stripe.confirmPayment({
-        elements,
-        clientSecret: intentClientSecret,
-        redirect: 'if_required',
-        confirmParams: {
-          receipt_email: paymentData.email || undefined,
-          payment_method_data: {
-            billing_details: {
-              name: `${paymentData.firstName} ${paymentData.lastName}`.trim() || undefined,
-              email: paymentData.email || undefined,
-              phone: paymentData.phone || undefined
+      if (intentType === 'setup_intent') {
+        // SetupIntent flow for intro pricing plans
+        console.log('🔍 Using SetupIntent flow for intro pricing plan')
+
+        const { error: setupError, setupIntent } = await stripe.confirmSetup({
+          elements,
+          clientSecret: intentClientSecret,
+          redirect: 'if_required',
+          confirmParams: {
+            payment_method_data: {
+              billing_details: {
+                name: `${paymentData.firstName} ${paymentData.lastName}`.trim() || undefined,
+                email: paymentData.email || undefined,
+                phone: paymentData.phone || undefined
+              }
             }
           }
-        }
-      })
-
-      if (confirmError) {
-        const errorMsg = confirmError.message || 'Payment authorization failed.'
-        console.error('❌ Payment confirmation error:', confirmError)
-        setCardError(errorMsg)
-        setModalState('error')
-        setModalError(errorMsg)
-        onError(errorMsg)
-        return
-      }
-
-      if (!paymentIntent) {
-        const errorMsg = 'Stripe did not return a payment intent.'
-        console.error('❌', errorMsg)
-        setModalState('error')
-        setModalError(errorMsg)
-        onError(errorMsg)
-        return
-      }
-
-      if (paymentIntent.status !== 'succeeded' && paymentIntent.status !== 'requires_capture') {
-        const errorMsg = `Downpayment not completed. Status: ${paymentIntent.status}`
-        console.error('❌', errorMsg)
-        setModalState('error')
-        setModalError(errorMsg)
-        onError(errorMsg)
-        return
-      }
-
-      const paymentMethodId = typeof paymentIntent.payment_method === 'string'
-        ? paymentIntent.payment_method
-        : paymentIntent.payment_method?.id
-
-      if (!paymentMethodId) {
-        const errorMsg = 'Unable to determine payment method after confirmation.'
-        console.error('❌', errorMsg)
-        setModalState('error')
-        setModalError(errorMsg)
-        onError(errorMsg)
-        return
-      }
-
-      console.log('🔍 Downpayment succeeded. Proceeding to create subscription...')
-      console.log('🔍 Payment method ID:', paymentMethodId)
-      console.log('🔍 Plan type:', checkoutData.planType)
-      console.log('🔍 Amount:', checkoutData.planPrice)
-
-      const response = await fetch('/api/confirm-payment', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          paymentMethodId,
-          planType: checkoutData.planType,
-          planCategory: checkoutData.planCategory,
-          downpaymentPlanType: checkoutData.downpaymentPlanType,
-          amount: checkoutData.planPrice,
-          currency: 'usd'
         })
-      })
 
-      console.log('🔍 Response status:', response.status)
-      console.log('🔍 Response ok:', response.ok)
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        const errorMsg = errorData.message || `Payment confirmation failed: ${response.statusText}`
-        console.error('❌ Payment confirmation error:', errorData)
-        throw new Error(errorMsg)
-      }
-
-      const { clientSecret: subscriptionClientSecret, requiresAction, subscription, subscriptionId } = await response.json()
-      console.log('🔍 Subscription confirmation response:', { clientSecret: !!subscriptionClientSecret, requiresAction, subscription, subscriptionId })
-
-      if (requiresAction && subscriptionClientSecret) {
-        // Handle 3D Secure or other authentication for the subscription invoice
-        const { error: subscriptionConfirmError } = await stripe.confirmCardPayment(subscriptionClientSecret)
-
-        if (subscriptionConfirmError) {
-          const errorMsg = subscriptionConfirmError.message || 'Subscription authentication failed.'
+        if (setupError) {
+          const errorMsg = setupError.message || 'Card setup failed.'
+          console.error('❌ Setup confirmation error:', setupError)
           setCardError(errorMsg)
           setModalState('error')
           setModalError(errorMsg)
           onError(errorMsg)
           return
         }
-      }
 
-      // Subscription created successfully
-      console.log('✅ Subscription created successfully:', subscriptionId)
-      setModalState('success')
-      onSuccess()
+        if (!setupIntent) {
+          const errorMsg = 'Stripe did not return a setup intent.'
+          console.error('❌', errorMsg)
+          setModalState('error')
+          setModalError(errorMsg)
+          onError(errorMsg)
+          return
+        }
+
+        const paymentMethodId = typeof setupIntent.payment_method === 'string'
+          ? setupIntent.payment_method
+          : (setupIntent.payment_method as any)?.id
+
+        if (!paymentMethodId) {
+          const errorMsg = 'Unable to determine payment method after setup.'
+          console.error('❌', errorMsg)
+          setModalState('error')
+          setModalError(errorMsg)
+          onError(errorMsg)
+          return
+        }
+
+        console.log('🔍 Setup succeeded. Creating subscription schedule...')
+        console.log('🔍 Payment method ID:', paymentMethodId)
+
+        // Call activate-schedule to create the 2-phase subscription schedule
+        const response = await fetch('/api/activate-schedule', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            paymentMethodId,
+            brandSubscriptionPlanId: checkoutData.brandSubscriptionPlanId,
+            brandSubscriptionId: brandSubscriptionId,
+          })
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          const errorMsg = errorData.message || 'Failed to create subscription schedule.'
+          console.error('❌ Schedule creation error:', errorData)
+          throw new Error(errorMsg)
+        }
+
+        const scheduleResult = await response.json()
+        console.log('✅ Subscription schedule created:', scheduleResult)
+
+        setModalState('success')
+        onSuccess()
+
+      } else {
+        // PaymentIntent flow for non-intro plans (existing behavior)
+        console.log('🔍 Using PaymentIntent flow for regular plan')
+
+        const { error: confirmError, paymentIntent } = await stripe.confirmPayment({
+          elements,
+          clientSecret: intentClientSecret,
+          redirect: 'if_required',
+          confirmParams: {
+            receipt_email: paymentData.email || undefined,
+            payment_method_data: {
+              billing_details: {
+                name: `${paymentData.firstName} ${paymentData.lastName}`.trim() || undefined,
+                email: paymentData.email || undefined,
+                phone: paymentData.phone || undefined
+              }
+            }
+          }
+        })
+
+        if (confirmError) {
+          const errorMsg = confirmError.message || 'Payment authorization failed.'
+          console.error('❌ Payment confirmation error:', confirmError)
+          setCardError(errorMsg)
+          setModalState('error')
+          setModalError(errorMsg)
+          onError(errorMsg)
+          return
+        }
+
+        if (!paymentIntent) {
+          const errorMsg = 'Stripe did not return a payment intent.'
+          console.error('❌', errorMsg)
+          setModalState('error')
+          setModalError(errorMsg)
+          onError(errorMsg)
+          return
+        }
+
+        if (paymentIntent.status !== 'succeeded' && paymentIntent.status !== 'requires_capture') {
+          const errorMsg = `Downpayment not completed. Status: ${paymentIntent.status}`
+          console.error('❌', errorMsg)
+          setModalState('error')
+          setModalError(errorMsg)
+          onError(errorMsg)
+          return
+        }
+
+        const paymentMethodId = typeof paymentIntent.payment_method === 'string'
+          ? paymentIntent.payment_method
+          : paymentIntent.payment_method?.id
+
+        if (!paymentMethodId) {
+          const errorMsg = 'Unable to determine payment method after confirmation.'
+          console.error('❌', errorMsg)
+          setModalState('error')
+          setModalError(errorMsg)
+          onError(errorMsg)
+          return
+        }
+
+        console.log('🔍 Downpayment succeeded. Proceeding to create subscription...')
+        console.log('🔍 Payment method ID:', paymentMethodId)
+        console.log('🔍 Plan type:', checkoutData.planType)
+        console.log('🔍 Amount:', checkoutData.planPrice)
+
+        const response = await fetch('/api/confirm-payment', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            paymentMethodId,
+            planType: checkoutData.planType,
+            planCategory: checkoutData.planCategory,
+            downpaymentPlanType: checkoutData.downpaymentPlanType,
+            amount: checkoutData.planPrice,
+            currency: 'usd'
+          })
+        })
+
+        console.log('🔍 Response status:', response.status)
+        console.log('🔍 Response ok:', response.ok)
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          const errorMsg = errorData.message || `Payment confirmation failed: ${response.statusText}`
+          console.error('❌ Payment confirmation error:', errorData)
+          throw new Error(errorMsg)
+        }
+
+        const { clientSecret: subscriptionClientSecret, requiresAction, subscription, subscriptionId } = await response.json()
+        console.log('🔍 Subscription confirmation response:', { clientSecret: !!subscriptionClientSecret, requiresAction, subscription, subscriptionId })
+
+        if (requiresAction && subscriptionClientSecret) {
+          const { error: subscriptionConfirmError } = await stripe.confirmCardPayment(subscriptionClientSecret)
+
+          if (subscriptionConfirmError) {
+            const errorMsg = subscriptionConfirmError.message || 'Subscription authentication failed.'
+            setCardError(errorMsg)
+            setModalState('error')
+            setModalError(errorMsg)
+            onError(errorMsg)
+            return
+          }
+        }
+
+        console.log('✅ Subscription created successfully:', subscriptionId)
+        setModalState('success')
+        onSuccess()
+      }
 
     } catch (error: any) {
       console.error('Payment error:', error)
@@ -502,7 +594,15 @@ function CheckoutForm({ checkoutData, paymentData, token, intentClientSecret, on
           ) : (
             <>
               <CreditCard className="w-5 h-5 mr-2" />
-              <span>Pay ${checkoutData.subscriptionMonthlyPrice?.toLocaleString() || checkoutData.planPrice.toLocaleString()} & Get Started</span>
+              {checkoutData.hasIntroPricing ? (
+                checkoutData.introMonthlyPrice === 0 ? (
+                  <span>Start Free Trial & Get Started</span>
+                ) : (
+                  <span>Pay ${(checkoutData.introMonthlyPrice ?? 0).toLocaleString()} & Get Started</span>
+                )
+              ) : (
+                <span>Pay ${checkoutData.subscriptionMonthlyPrice?.toLocaleString() || checkoutData.planPrice.toLocaleString()} & Get Started</span>
+              )}
             </>
           )}
         </Button>
@@ -526,6 +626,8 @@ export default function CheckoutPage() {
   const { user, token, isLoading, refreshSubscription, subscription } = useAuth()
   const [checkoutData, setCheckoutData] = useState<CheckoutData | null>(null)
   const [clientSecret, setClientSecret] = useState('')
+  const [intentType, setIntentType] = useState<'payment_intent' | 'setup_intent'>('payment_intent')
+  const [brandSubscriptionId, setBrandSubscriptionId] = useState<string | undefined>()
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -566,20 +668,29 @@ export default function CheckoutPage() {
       subscriptionPlanName,
       subscriptionMonthlyPrice,
       brandSubscriptionPlanId,
-      stripePriceId
+      stripePriceId,
+      introMonthlyPrice: introMonthlyPriceParam,
+      introMonthlyPriceDurationMonths: introMonthlyPriceDurationMonthsParam,
+      introMonthlyPriceStripeId: introMonthlyPriceStripeIdParam,
     } = router.query
 
     if (
       planCategory &&
       downpaymentPlanType &&
       downpaymentName &&
-      downpaymentAmount &&
+      downpaymentAmount !== undefined &&
       subscriptionPlanType &&
       subscriptionPlanName &&
       subscriptionMonthlyPrice
     ) {
       const downpaymentAmountNum = parseInt(downpaymentAmount as string)
       const monthlyPriceNum = parseInt(subscriptionMonthlyPrice as string)
+
+      // Parse intro pricing params
+      const introMonthlyPrice = introMonthlyPriceParam != null ? parseFloat(introMonthlyPriceParam as string) : null
+      const introMonthlyPriceDurationMonths = introMonthlyPriceDurationMonthsParam ? parseInt(introMonthlyPriceDurationMonthsParam as string) : null
+      const introMonthlyPriceStripeId = introMonthlyPriceStripeIdParam as string || null
+      const hasIntroPricing = introMonthlyPrice != null && !!introMonthlyPriceDurationMonths && !!introMonthlyPriceStripeId
 
       const existingPlanType = subscription?.plan?.type
       const existingMonthlyPrice =
@@ -601,7 +712,11 @@ export default function CheckoutPage() {
         upgradeDelta: isUpgrade ? delta : undefined,
         previousMonthlyPrice: existingMonthlyPrice ?? undefined,
         brandSubscriptionPlanId: brandSubscriptionPlanId as string,
-        stripePriceId: stripePriceId as string
+        stripePriceId: stripePriceId as string,
+        introMonthlyPrice,
+        introMonthlyPriceDurationMonths,
+        introMonthlyPriceStripeId,
+        hasIntroPricing,
       })
 
       if (isUpgrade) {
@@ -640,13 +755,16 @@ export default function CheckoutPage() {
         throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`)
       }
 
-      const { clientSecret } = await response.json()
-      setClientSecret(clientSecret)
+      const data = await response.json()
+      setClientSecret(data.clientSecret)
+      setIntentType(data.type || 'payment_intent')
+      if (data.brandSubscriptionId) {
+        setBrandSubscriptionId(data.brandSubscriptionId)
+      }
+      console.log(`🔍 Intent created: type=${data.type}, brandSubscriptionId=${data.brandSubscriptionId}`)
     } catch (error: any) {
       console.error('Error creating payment intent:', error)
-      // Show error message to user
       alert(`Payment setup failed: ${error.message}`)
-      // Redirect to plans page on error
       router.push('/plans')
     }
   }
@@ -819,52 +937,101 @@ export default function CheckoutPage() {
                   </div>
                   <div className="flex-1">
                     <h3 className="text-lg font-semibold">{checkoutData.planName} Plan</h3>
-                    <p className="text-sm text-muted-foreground">Monthly subscription</p>
+                    <p className="text-sm text-muted-foreground">
+                      {checkoutData.hasIntroPricing ? 'Introductory pricing subscription' : 'Monthly subscription'}
+                    </p>
                   </div>
                   <div className="text-right">
-                    <div className="text-2xl font-bold">${checkoutData.planPrice.toLocaleString()}.00</div>
+                    {checkoutData.hasIntroPricing ? (
+                      <div className="text-2xl font-bold">${(checkoutData.introMonthlyPrice ?? 0).toLocaleString()}/mo</div>
+                    ) : (
+                      <div className="text-2xl font-bold">${checkoutData.planPrice.toLocaleString()}.00</div>
+                    )}
                   </div>
                 </div>
 
                 <div className="border-t mt-6 pt-4">
-                  <div className="flex justify-between items-center py-2">
-                    <span className="text-sm text-muted-foreground">Monthly subscription</span>
-                    <span className="text-lg font-semibold text-[#825AD1]">
-                      ${checkoutData.subscriptionMonthlyPrice?.toLocaleString() || '0'} / month
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center py-2">
-                    <span className="text-sm text-muted-foreground">Previous plan</span>
-                    <span className="text-sm font-medium">
-                      {checkoutData.previousMonthlyPrice ? `$${checkoutData.previousMonthlyPrice.toLocaleString()} / month` : '—'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center py-2">
-                    <span className="text-sm text-muted-foreground">New plan</span>
-                    <span className="text-lg font-semibold text-[#825AD1]">
-                      ${checkoutData.subscriptionMonthlyPrice?.toLocaleString() || '0'} / month
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center py-2">
-                    <span className="text-sm text-muted-foreground">Due today</span>
-                    <span className="text-lg font-semibold text-[#825AD1]">
-                      ${checkoutData.planPrice.toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center py-2">
-                    <span className="text-sm text-muted-foreground">Transaction fee</span>
-                    <span className="text-sm font-medium">1% monthly</span>
-                  </div>
+                  {checkoutData.hasIntroPricing ? (
+                    <>
+                      {/* Intro pricing breakdown */}
+                      <div className="flex justify-between items-center py-2">
+                        <span className="text-sm text-muted-foreground">
+                          Intro price ({checkoutData.introMonthlyPriceDurationMonths} months)
+                        </span>
+                        <span className="text-lg font-semibold text-[#825AD1]">
+                          ${(checkoutData.introMonthlyPrice ?? 0).toLocaleString()} / month
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center py-2">
+                        <span className="text-sm text-muted-foreground">
+                          Regular price (after intro)
+                        </span>
+                        <span className="text-lg font-semibold text-[#825AD1]">
+                          ${checkoutData.subscriptionMonthlyPrice?.toLocaleString() || '0'} / month
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center py-2">
+                        <span className="text-sm text-muted-foreground">Due today</span>
+                        <span className="text-lg font-semibold text-[#825AD1]">
+                          ${(checkoutData.introMonthlyPrice ?? 0).toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center py-2">
+                        <span className="text-sm text-muted-foreground">Transaction fee</span>
+                        <span className="text-sm font-medium">1% monthly</span>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {/* Regular pricing breakdown */}
+                      <div className="flex justify-between items-center py-2">
+                        <span className="text-sm text-muted-foreground">Monthly subscription</span>
+                        <span className="text-lg font-semibold text-[#825AD1]">
+                          ${checkoutData.subscriptionMonthlyPrice?.toLocaleString() || '0'} / month
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center py-2">
+                        <span className="text-sm text-muted-foreground">Previous plan</span>
+                        <span className="text-sm font-medium">
+                          {checkoutData.previousMonthlyPrice ? `$${checkoutData.previousMonthlyPrice.toLocaleString()} / month` : '—'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center py-2">
+                        <span className="text-sm text-muted-foreground">New plan</span>
+                        <span className="text-lg font-semibold text-[#825AD1]">
+                          ${checkoutData.subscriptionMonthlyPrice?.toLocaleString() || '0'} / month
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center py-2">
+                        <span className="text-sm text-muted-foreground">Due today</span>
+                        <span className="text-lg font-semibold text-[#825AD1]">
+                          ${checkoutData.planPrice.toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center py-2">
+                        <span className="text-sm text-muted-foreground">Transaction fee</span>
+                        <span className="text-sm font-medium">1% monthly</span>
+                      </div>
+                    </>
+                  )}
                 </div>
                 <div className="flex justify-between items-center py-2 mt-4">
                   <span className="font-bold">Due Today</span>
-                  <div className="text-3xl font-bold text-[#825AD1]">${checkoutData.planPrice.toLocaleString()}</div>
+                  <div className="text-3xl font-bold text-[#825AD1]">
+                    ${checkoutData.hasIntroPricing
+                      ? (checkoutData.introMonthlyPrice ?? 0).toLocaleString()
+                      : checkoutData.planPrice.toLocaleString()}
+                  </div>
                 </div>
-                {checkoutData.subscriptionMonthlyPrice && (
+                {checkoutData.hasIntroPricing ? (
+                  <p className="text-sm text-muted-foreground">
+                    ${(checkoutData.introMonthlyPrice ?? 0).toLocaleString()}/mo for {checkoutData.introMonthlyPriceDurationMonths} months, then ${checkoutData.subscriptionMonthlyPrice?.toLocaleString()}/mo.
+                  </p>
+                ) : checkoutData.subscriptionMonthlyPrice ? (
                   <p className="text-sm text-muted-foreground">
                     Then ${checkoutData.subscriptionMonthlyPrice.toLocaleString()} billed monthly starting next period.
                   </p>
-                )}
+                ) : null}
               </CardContent>
             </Card>
 
@@ -909,6 +1076,8 @@ export default function CheckoutPage() {
                     paymentData={paymentData}
                     token={token}
                     intentClientSecret={clientSecret}
+                    intentType={intentType}
+                    brandSubscriptionId={brandSubscriptionId}
                     onSuccess={handlePaymentSuccess}
                     onError={handlePaymentError}
                   />

@@ -6869,6 +6869,9 @@ app.get("/brand-subscriptions/plans", async (req, res) => {
           monthlyPrice: Number(plan.monthlyPrice),
           planType: plan.planType,
           stripePriceId: plan.stripePriceId,
+          introMonthlyPrice: plan.introMonthlyPrice != null ? Number(plan.introMonthlyPrice) : null,
+          introMonthlyPriceDurationMonths: plan.introMonthlyPriceDurationMonths || null,
+          introMonthlyPriceStripeId: plan.introMonthlyPriceStripeId || null,
           features: plan.getFeatures(),
           tierConfig: tierConfig ? tierConfig.toJSON() : null,
         };
@@ -7171,31 +7174,15 @@ app.post(
         brandSubscriptionPlanId,
       });
 
-      const amount = selectedPlan.monthlyPrice;
-
-      // Create Payment Intent
-      const paymentIntent = await stripe.paymentIntents.create({
-        amount: Math.round(amount * 100), // Convert to cents
-        currency: "usd",
-        customer: stripeCustomerId,
-        metadata: {
-          userId: currentUser.id,
-          brandSubscriptionPlanId,
-          amount: amount.toString(),
-        },
-        automatic_payment_methods: {
-          enabled: true,
-          allow_redirects: "never",
-        },
-        setup_future_usage: "off_session",
-        receipt_email: user.email || undefined,
-        description: `${selectedPlan.name}`,
-      });
+      // Check if plan has intro pricing
+      const hasIntroPricing = selectedPlan.introMonthlyPrice != null 
+        && selectedPlan.introMonthlyPriceDurationMonths 
+        && selectedPlan.introMonthlyPriceStripeId;
 
       const brandSubscription = await BrandSubscription.create({
         userId: user.id,
         status: BrandSubscriptionStatus.PENDING,
-        stripeCustomerId: user.stripeCustomerId,
+        stripeCustomerId: stripeCustomerId,
         stripePriceId: selectedPlan.stripePriceId,
         monthlyPrice: selectedPlan.monthlyPrice,
         currentPeriodStart: new Date(),
@@ -7203,27 +7190,75 @@ app.post(
         planType: selectedPlan.planType,
       });
 
-      // Create payment record
-      await Payment.create({
-        stripePaymentIntentId: paymentIntent.id,
-        status: "pending",
-        paymentMethod: "card",
-        amount: amount,
-        currency: "usd",
-        stripeMetadata: {
-          userId: currentUser.id,
-          brandSubscriptionPlanId: brandSubscriptionPlanId,
-          stripePriceId: selectedPlan.stripePriceId,
-          amount: amount.toString(),
-        },
-        brandSubscriptionId: brandSubscription.id,
-      });
+      if (hasIntroPricing) {
+        // Intro pricing: use SetupIntent to collect payment method
+        // The subscription schedule will handle all billing (including first charge)
+        console.log(`📋 Plan has intro pricing: $${selectedPlan.introMonthlyPrice}/mo for ${selectedPlan.introMonthlyPriceDurationMonths} months, then $${selectedPlan.monthlyPrice}/mo`);
 
-      res.status(200).json({
-        success: true,
-        clientSecret: paymentIntent.client_secret,
-        paymentIntentId: paymentIntent.id,
-      });
+        const setupIntent = await stripe.setupIntents.create({
+          customer: stripeCustomerId,
+          metadata: {
+            userId: currentUser.id,
+            brandSubscriptionPlanId,
+            brandSubscriptionId: brandSubscription.id,
+          },
+          automatic_payment_methods: {
+            enabled: true,
+            allow_redirects: "never",
+          },
+        });
+
+        res.status(200).json({
+          success: true,
+          clientSecret: setupIntent.client_secret,
+          type: "setup_intent",
+          brandSubscriptionId: brandSubscription.id,
+        });
+      } else {
+        // No intro pricing: use PaymentIntent for first month (existing flow)
+        const amount = selectedPlan.monthlyPrice;
+
+        const paymentIntent = await stripe.paymentIntents.create({
+          amount: Math.round(amount * 100), // Convert to cents
+          currency: "usd",
+          customer: stripeCustomerId,
+          metadata: {
+            userId: currentUser.id,
+            brandSubscriptionPlanId,
+            amount: amount.toString(),
+          },
+          automatic_payment_methods: {
+            enabled: true,
+            allow_redirects: "never",
+          },
+          setup_future_usage: "off_session",
+          receipt_email: user.email || undefined,
+          description: `${selectedPlan.name}`,
+        });
+
+        // Create payment record (only for PaymentIntent flow)
+        await Payment.create({
+          stripePaymentIntentId: paymentIntent.id,
+          status: "pending",
+          paymentMethod: "card",
+          amount: amount,
+          currency: "usd",
+          stripeMetadata: {
+            userId: currentUser.id,
+            brandSubscriptionPlanId: brandSubscriptionPlanId,
+            stripePriceId: selectedPlan.stripePriceId,
+            amount: amount.toString(),
+          },
+          brandSubscriptionId: brandSubscription.id,
+        });
+
+        res.status(200).json({
+          success: true,
+          clientSecret: paymentIntent.client_secret,
+          paymentIntentId: paymentIntent.id,
+          type: "payment_intent",
+        });
+      }
     } catch (error) {
       if (process.env.NODE_ENV === "development") {
         console.error("❌ Error creating payment intent:", error);
@@ -7272,6 +7307,154 @@ app.post("/confirm-payment-intent", authenticateJWT, async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to confirm payment intent",
+    });
+  }
+});
+
+// Activate subscription schedule after SetupIntent confirmation (for intro pricing plans)
+app.post("/brand-subscriptions/activate-schedule", authenticateJWT, async (req, res) => {
+  try {
+    const currentUser = getCurrentUser(req);
+    if (!currentUser) {
+      return res.status(401).json({
+        success: false,
+        message: "Not authenticated",
+      });
+    }
+
+    const user = await User.findByPk(currentUser.id, {
+      include: [{ model: UserRoles, as: "userRoles", required: false }],
+    });
+    if (!user || !user.hasRoleSync("brand")) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. Brand role required.",
+      });
+    }
+
+    const { paymentMethodId, brandSubscriptionPlanId, brandSubscriptionId } = req.body;
+
+    if (!paymentMethodId || !brandSubscriptionPlanId || !brandSubscriptionId) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing required fields: paymentMethodId, brandSubscriptionPlanId, brandSubscriptionId",
+      });
+    }
+
+    // Find the plan
+    const selectedPlan = await BrandSubscriptionPlans.findByPk(brandSubscriptionPlanId);
+    if (!selectedPlan) {
+      return res.status(404).json({
+        success: false,
+        message: "Plan not found",
+      });
+    }
+
+    // Verify plan has intro pricing
+    if (!selectedPlan.introMonthlyPriceStripeId || !selectedPlan.introMonthlyPriceDurationMonths) {
+      return res.status(400).json({
+        success: false,
+        message: "Plan does not have intro pricing configured",
+      });
+    }
+
+    // Find the brand subscription
+    const brandSubscription = await BrandSubscription.findByPk(brandSubscriptionId);
+    if (!brandSubscription || brandSubscription.userId !== currentUser.id) {
+      return res.status(404).json({
+        success: false,
+        message: "Brand subscription not found",
+      });
+    }
+
+    // Get or create Stripe customer
+    let stripeCustomerId = await userService.getOrCreateCustomerId(user);
+
+    // Attach payment method to customer and set as default
+    try {
+      await stripe.paymentMethods.attach(paymentMethodId, {
+        customer: stripeCustomerId,
+      });
+    } catch (attachError: any) {
+      // Payment method might already be attached
+      if (!attachError.message?.includes("already been attached")) {
+        throw attachError;
+      }
+    }
+
+    await stripe.customers.update(stripeCustomerId, {
+      invoice_settings: {
+        default_payment_method: paymentMethodId,
+      },
+    });
+
+    console.log(`📋 Creating 2-phase subscription schedule for ${selectedPlan.name}:`);
+    console.log(`   Phase 1: $${selectedPlan.introMonthlyPrice}/mo (${selectedPlan.introMonthlyPriceStripeId}) for ${selectedPlan.introMonthlyPriceDurationMonths} months`);
+    console.log(`   Phase 2: $${selectedPlan.monthlyPrice}/mo (${selectedPlan.stripePriceId}) ongoing`);
+
+    // Create 2-phase subscription schedule
+    const stripeService = new StripeService();
+    const schedule = await stripeService.createSchedule({
+      customerId: stripeCustomerId,
+      paymentMethodId: paymentMethodId,
+      metadata: {
+        userId: currentUser.id,
+        brandSubscriptionPlanId: brandSubscriptionPlanId,
+        brandSubscriptionId: brandSubscriptionId,
+        introMonthlyPriceDurationMonths: selectedPlan.introMonthlyPriceDurationMonths.toString(),
+      },
+      phases: [
+        {
+          items: [{ price: selectedPlan.introMonthlyPriceStripeId }],
+          iterations: selectedPlan.introMonthlyPriceDurationMonths,
+        },
+        {
+          items: [{ price: selectedPlan.stripePriceId }],
+        },
+      ],
+    });
+
+    console.log(`✅ Subscription schedule created: ${schedule.id}`);
+
+    // Get subscription from the schedule
+    const subscriptionFromSchedule = schedule.subscription as any;
+    const subscriptionId = typeof subscriptionFromSchedule === 'string'
+      ? subscriptionFromSchedule
+      : subscriptionFromSchedule?.id;
+
+    // Update brand subscription with schedule and subscription info
+    const planFeatures = selectedPlan.getFeatures();
+    await brandSubscription.update({
+      status: BrandSubscriptionStatus.ACTIVE,
+      stripeSubscriptionId: subscriptionId || null,
+      stripeCustomerId: stripeCustomerId,
+      features: {
+        ...planFeatures,
+        subscriptionSchedule: {
+          id: schedule.id,
+          currentPhasePriceId: selectedPlan.introMonthlyPriceStripeId,
+          introductoryPlanType: selectedPlan.planType,
+        },
+      },
+    });
+
+    console.log(`✅ Brand subscription activated with schedule: ${brandSubscription.id}`);
+
+    res.status(200).json({
+      success: true,
+      message: "Subscription schedule created successfully",
+      subscriptionId: subscriptionId,
+      scheduleId: schedule.id,
+    });
+  } catch (error) {
+    if (process.env.NODE_ENV === "development") {
+      console.error("❌ Error creating subscription schedule:", error);
+    } else {
+      console.error("❌ Error creating subscription schedule");
+    }
+    res.status(500).json({
+      success: false,
+      message: "Failed to create subscription schedule",
     });
   }
 });
