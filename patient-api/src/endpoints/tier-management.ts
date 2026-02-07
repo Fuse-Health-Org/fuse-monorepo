@@ -27,7 +27,7 @@ export function registerTierManagementEndpoints(
       }
 
       const { planId } = req.params;
-      const { maxProducts, name, introMonthlyPrice, introMonthlyPriceDurationMonths, stripePriceId, introMonthlyPriceStripeId } = req.body;
+      const { maxProducts, name, monthlyPrice, introMonthlyPrice, introMonthlyPriceDurationMonths, stripePriceId, introMonthlyPriceStripeId } = req.body;
 
       const plan = await BrandSubscriptionPlans.findByPk(planId);
       if (!plan) {
@@ -42,6 +42,14 @@ export function registerTierManagementEndpoints(
 
       if (typeof name === "string" && name.trim() !== "") {
         updates.name = name.trim();
+      }
+
+      // monthlyPrice: allow setting a valid positive number
+      if (monthlyPrice !== undefined && monthlyPrice !== null) {
+        const parsed = parseFloat(monthlyPrice);
+        if (!isNaN(parsed) && parsed >= 0) {
+          updates.monthlyPrice = parsed;
+        }
       }
 
       // introMonthlyPrice: allow setting a number or null to clear

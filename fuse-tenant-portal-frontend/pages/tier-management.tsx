@@ -57,6 +57,8 @@ export default function TierManagement() {
   const [introMonthsDraft, setIntroMonthsDraft] = useState<number | null>(null);
   const [editingStripePriceId, setEditingStripePriceId] = useState<string | null>(null);
   const [stripePriceIdDraft, setStripePriceIdDraft] = useState<string>('');
+  const [editingPrice, setEditingPrice] = useState<string | null>(null);
+  const [priceDraft, setPriceDraft] = useState<string>('');
   const [editingIntroStripeId, setEditingIntroStripeId] = useState<string | null>(null);
   const [introStripeIdDraft, setIntroStripeIdDraft] = useState<string>('');
 
@@ -383,6 +385,65 @@ export default function TierManagement() {
     setNameDraft('');
   };
 
+  const handleStartEditingPrice = (planId: string, currentPrice: string) => {
+    setEditingPrice(planId);
+    setPriceDraft(currentPrice);
+  };
+
+  const handleSavePrice = async (planId: string) => {
+    if (!token) return;
+    const parsed = parseFloat(priceDraft);
+    if (isNaN(parsed) || parsed < 0) {
+      alert('Please enter a valid price');
+      return;
+    }
+
+    setSaving(planId);
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/plans/${planId}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ monthlyPrice: parsed }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.message || 'Failed to update price');
+      }
+
+      const result = await response.json();
+      console.log('✅ Updated price:', result.data);
+
+      setTiers(prevTiers => prevTiers.map(tier => {
+        if (tier.plan.id === planId) {
+          return {
+            ...tier,
+            plan: {
+              ...tier.plan,
+              monthlyPrice: parsed.toFixed(2),
+            },
+          };
+        }
+        return tier;
+      }));
+
+      setEditingPrice(null);
+    } catch (error) {
+      console.error('Error updating price:', error);
+      alert('Failed to update price');
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  const handleCancelEditingPrice = () => {
+    setEditingPrice(null);
+    setPriceDraft('');
+  };
+
   const handleStartEditingIntroPrice = (planId: string, currentIntroPrice: number | null, currentIntroMonths: number | null) => {
     setEditingIntroPrice(planId);
     setIntroPriceDraft(currentIntroPrice);
@@ -629,11 +690,57 @@ export default function TierManagement() {
                           {tier.plan.description}
                         </p>
                         <div className="flex items-center flex-wrap gap-x-6 gap-y-2 text-sm">
-                          <div>
+                          <div className="flex items-center gap-2">
                             <span className="text-muted-foreground">Price:</span>{' '}
-                            <span className="font-semibold text-foreground">
-                              ${tier.plan.monthlyPrice}/month
-                            </span>
+                            {editingPrice === tier.plan.id ? (
+                              <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1">
+                                  <span className="text-xs text-muted-foreground">$</span>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    value={priceDraft}
+                                    onChange={(e) => setPriceDraft(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') handleSavePrice(tier.plan.id);
+                                      if (e.key === 'Escape') handleCancelEditingPrice();
+                                    }}
+                                    className="w-28 px-2 py-1 text-sm border border-input rounded focus:outline-none focus:ring-2 focus:ring-[#4FA59C] bg-background text-foreground"
+                                    placeholder="e.g., 500.00"
+                                    autoFocus
+                                  />
+                                  <span className="text-xs text-muted-foreground">/month</span>
+                                </div>
+                                <button
+                                  onClick={() => handleSavePrice(tier.plan.id)}
+                                  disabled={saving === tier.plan.id}
+                                  className="p-1 text-[#4FA59C] hover:bg-teal-50 dark:hover:bg-teal-900/30 rounded transition-colors disabled:opacity-50"
+                                  title="Save"
+                                >
+                                  <Save className="h-4 w-4" />
+                                </button>
+                                <button
+                                  onClick={handleCancelEditingPrice}
+                                  className="p-1 text-muted-foreground hover:bg-muted rounded transition-colors"
+                                  title="Cancel"
+                                >
+                                  <X className="h-4 w-4" />
+                                </button>
+                              </div>
+                            ) : (
+                              <>
+                                <span className="font-semibold text-foreground">
+                                  ${tier.plan.monthlyPrice}/month
+                                </span>
+                                <button
+                                  onClick={() => handleStartEditingPrice(tier.plan.id, tier.plan.monthlyPrice)}
+                                  className="p-1 text-muted-foreground hover:text-[#4FA59C] hover:bg-teal-50 dark:hover:bg-teal-900/30 rounded transition-colors"
+                                  title="Edit price"
+                                >
+                                  <Edit2 className="h-3 w-3" />
+                                </button>
+                              </>
+                            )}
                           </div>
                           {/* Intro Monthly Price */}
                           <div className="flex items-center gap-2">
