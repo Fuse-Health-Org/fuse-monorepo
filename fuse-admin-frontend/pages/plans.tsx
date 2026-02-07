@@ -38,6 +38,7 @@ interface TierConfig {
   canCustomizeFormStructure: boolean
   customTierCardText: string[] | null
   isCustomTierCardTextActive: boolean
+  fuseFeePercent: number | null
 }
 
 interface Plan {
@@ -482,7 +483,7 @@ export default function Plans() {
                             <span className="text-muted-foreground"> / month</span>
                           </>
                         )}
-                        <div className="text-xs text-muted-foreground mt-1">+ 1% transaction fee</div>
+                        <div className="text-xs text-muted-foreground mt-1">+ {plan.tierConfig?.fuseFeePercent != null ? `${plan.tierConfig.fuseFeePercent}%` : '1%'} transaction fee</div>
                       </div>
                     </CardHeader>
 
