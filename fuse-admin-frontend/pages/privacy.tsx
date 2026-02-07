@@ -12,8 +12,9 @@ export default function PrivacyPolicy() {
         <meta name="description" content="Privacy Policy for Fuse Health" />
       </Head>
 
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="w-full max-w-4xl space-y-6">
+      <div className="h-screen bg-background overflow-y-auto">
+        <div className="flex items-center justify-center p-4 min-h-full">
+          <div className="w-full max-w-4xl space-y-6">
           <Card className="bg-card border-border">
             <CardHeader className="space-y-1">
               <div className="flex items-center gap-3 mb-4">
@@ -124,6 +125,7 @@ export default function PrivacyPolicy() {
               </div>
             </CardContent>
           </Card>
+          </div>
         </div>
       </div>
     </>

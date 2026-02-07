@@ -87,7 +87,8 @@ export default function BrandSignUp() {
         <meta name="description" content="Create a brand partner account" />
       </Head>
 
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <div className="h-screen bg-background overflow-y-auto">
+        <div className="flex items-center justify-center p-4 min-h-full">
         <div className="w-full max-w-md space-y-6">
           {/* Logo/Header */}
           <div className="text-center">
@@ -97,7 +98,7 @@ export default function BrandSignUp() {
               </div>
             </div>
             <h1 className="text-2xl font-bold text-foreground">Fuse</h1>
-            <p className="text-muted-foreground">Create your brand partner account</p>
+            <p className="text-muted-foreground">Create your brand partners account</p>
           </div>
 
           {/* Brand Sign Up Form */}
@@ -266,6 +267,7 @@ export default function BrandSignUp() {
               </div>
             </CardContent>
           </Card>
+        </div>
         </div>
       </div>
     </>
