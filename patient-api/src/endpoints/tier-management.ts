@@ -27,14 +27,7 @@ export function registerTierManagementEndpoints(
       }
 
       const { planId } = req.params;
-      const { maxProducts, name } = req.body;
-
-      console.log(`🔍 [Plan Update] Received request:`, { planId, maxProducts, name });
-      console.log(`🔍 [Plan Update] Type checks:`, { 
-        maxProductsType: typeof maxProducts,
-        nameType: typeof name,
-        nameValue: name 
-      });
+      const { maxProducts, name, introMonthlyPrice, introMonthlyPriceDurationMonths } = req.body;
 
       const plan = await BrandSubscriptionPlans.findByPk(planId);
       if (!plan) {
@@ -51,7 +44,15 @@ export function registerTierManagementEndpoints(
         updates.name = name.trim();
       }
 
-      console.log(`🔍 [Plan Update] Updates object:`, updates);
+      // introMonthlyPrice: allow setting a number or null to clear
+      if (introMonthlyPrice !== undefined) {
+        updates.introMonthlyPrice = introMonthlyPrice === null ? null : parseFloat(introMonthlyPrice);
+      }
+
+      // introMonthlyPriceDurationMonths: allow setting a number or null to clear
+      if (introMonthlyPriceDurationMonths !== undefined) {
+        updates.introMonthlyPriceDurationMonths = introMonthlyPriceDurationMonths === null ? null : parseInt(introMonthlyPriceDurationMonths);
+      }
 
       if (Object.keys(updates).length === 0) {
         return res.status(400).json({ success: false, message: "No valid fields to update" });

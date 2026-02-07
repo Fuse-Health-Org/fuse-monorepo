@@ -25,6 +25,8 @@ interface Plan {
   name: string;
   description: string;
   monthlyPrice: string;
+  introMonthlyPrice: string | null;
+  introMonthlyPriceDurationMonths: number | null;
   maxProducts: number;
   isActive: boolean;
   sortOrder: number;
@@ -48,6 +50,9 @@ export default function TierManagement() {
   const [fuseFeeDraft, setFuseFeeDraft] = useState<number | null>(null);
   const [editingName, setEditingName] = useState<string | null>(null);
   const [nameDraft, setNameDraft] = useState<string>('');
+  const [editingIntroPrice, setEditingIntroPrice] = useState<string | null>(null);
+  const [introPriceDraft, setIntroPriceDraft] = useState<number | null>(null);
+  const [introMonthsDraft, setIntroMonthsDraft] = useState<number | null>(null);
 
   useEffect(() => {
     if (token) {
@@ -372,6 +377,67 @@ export default function TierManagement() {
     setNameDraft('');
   };
 
+  const handleStartEditingIntroPrice = (planId: string, currentIntroPrice: number | null, currentIntroMonths: number | null) => {
+    setEditingIntroPrice(planId);
+    setIntroPriceDraft(currentIntroPrice);
+    setIntroMonthsDraft(currentIntroMonths);
+  };
+
+  const handleSaveIntroPrice = async (planId: string) => {
+    if (!token) return;
+
+    setSaving(planId);
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/plans/${planId}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          introMonthlyPrice: introPriceDraft,
+          introMonthlyPriceDurationMonths: introMonthsDraft,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.message || 'Failed to update intro price');
+      }
+
+      const result = await response.json();
+      console.log('✅ Updated intro price:', result.data);
+
+      // Update local state
+      setTiers(prevTiers => prevTiers.map(tier => {
+        if (tier.plan.id === planId) {
+          return {
+            ...tier,
+            plan: {
+              ...tier.plan,
+              introMonthlyPrice: introPriceDraft !== null ? String(introPriceDraft) : null,
+              introMonthlyPriceDurationMonths: introMonthsDraft,
+            },
+          };
+        }
+        return tier;
+      }));
+
+      setEditingIntroPrice(null);
+    } catch (error) {
+      console.error('Error updating intro price:', error);
+      alert('Failed to update intro price');
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  const handleCancelEditingIntroPrice = () => {
+    setEditingIntroPrice(null);
+    setIntroPriceDraft(null);
+    setIntroMonthsDraft(null);
+  };
+
   return (
     <div className="flex h-screen bg-background overflow-hidden">
       <Sidebar />
@@ -460,12 +526,74 @@ export default function TierManagement() {
                         <p className="text-sm text-muted-foreground mb-3">
                           {tier.plan.description}
                         </p>
-                        <div className="flex items-center space-x-6 text-sm">
+                        <div className="flex items-center flex-wrap gap-x-6 gap-y-2 text-sm">
                           <div>
                             <span className="text-muted-foreground">Price:</span>{' '}
                             <span className="font-semibold text-foreground">
                               ${tier.plan.monthlyPrice}/month
                             </span>
+                          </div>
+                          {/* Intro Monthly Price */}
+                          <div className="flex items-center gap-2">
+                            <span className="text-muted-foreground">Intro Price:</span>{' '}
+                            {editingIntroPrice === tier.plan.id ? (
+                              <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1">
+                                  <span className="text-xs text-muted-foreground">$</span>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    value={introPriceDraft ?? ''}
+                                    onChange={(e) => setIntroPriceDraft(e.target.value ? parseFloat(e.target.value) : null)}
+                                    className="w-24 px-2 py-1 text-sm border border-input rounded focus:outline-none focus:ring-2 focus:ring-[#4FA59C] bg-background text-foreground"
+                                    placeholder="e.g., 250.00"
+                                  />
+                                  <span className="text-xs text-muted-foreground">/mo for</span>
+                                  <input
+                                    type="number"
+                                    value={introMonthsDraft ?? ''}
+                                    onChange={(e) => setIntroMonthsDraft(e.target.value ? parseInt(e.target.value) : null)}
+                                    className="w-16 px-2 py-1 text-sm border border-input rounded focus:outline-none focus:ring-2 focus:ring-[#4FA59C] bg-background text-foreground"
+                                    placeholder="e.g., 3"
+                                  />
+                                  <span className="text-xs text-muted-foreground">months</span>
+                                </div>
+                                <button
+                                  onClick={() => handleSaveIntroPrice(tier.plan.id)}
+                                  disabled={saving === tier.plan.id}
+                                  className="p-1 text-[#4FA59C] hover:bg-teal-50 dark:hover:bg-teal-900/30 rounded transition-colors disabled:opacity-50"
+                                  title="Save"
+                                >
+                                  <Save className="h-4 w-4" />
+                                </button>
+                                <button
+                                  onClick={handleCancelEditingIntroPrice}
+                                  className="p-1 text-muted-foreground hover:bg-muted rounded transition-colors"
+                                  title="Cancel"
+                                >
+                                  <X className="h-4 w-4" />
+                                </button>
+                              </div>
+                            ) : (
+                              <>
+                                <span className="font-semibold text-foreground">
+                                  {tier.plan.introMonthlyPrice != null
+                                    ? `$${parseFloat(tier.plan.introMonthlyPrice).toFixed(2)}/mo for ${tier.plan.introMonthlyPriceDurationMonths ?? '?'} months`
+                                    : 'Not set'}
+                                </span>
+                                <button
+                                  onClick={() => handleStartEditingIntroPrice(
+                                    tier.plan.id,
+                                    tier.plan.introMonthlyPrice != null ? parseFloat(tier.plan.introMonthlyPrice) : null,
+                                    tier.plan.introMonthlyPriceDurationMonths
+                                  )}
+                                  className="p-1 text-muted-foreground hover:text-[#4FA59C] hover:bg-teal-50 dark:hover:bg-teal-900/30 rounded transition-colors"
+                                  title="Edit intro price"
+                                >
+                                  <Edit2 className="h-3 w-3" />
+                                </button>
+                              </>
+                            )}
                           </div>
                           <div className="flex items-center gap-2">
                             <span className="text-muted-foreground">Max Products:</span>{' '}

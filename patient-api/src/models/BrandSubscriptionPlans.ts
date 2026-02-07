@@ -94,6 +94,24 @@ export default class BrandSubscriptionPlans extends Entity {
   declare customIntegrations: boolean;
 
   @Column({
+    type: DataType.DECIMAL(10, 2),
+    allowNull: true,
+  })
+  declare introMonthlyPrice?: number;
+
+  @Column({
+    type: DataType.INTEGER,
+    allowNull: true,
+  })
+  declare introMonthlyPriceDurationMonths?: number;
+
+  @Column({
+    type: DataType.STRING,
+    allowNull: true,
+  })
+  declare introMonthlyPriceStripeId?: string;
+
+  @Column({
     type: DataType.BOOLEAN,
     allowNull: false,
     defaultValue: true,
