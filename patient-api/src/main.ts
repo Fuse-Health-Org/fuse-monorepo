@@ -66,7 +66,6 @@ import User from "./models/User";
 import UserRoles from "./models/UserRoles";
 import MfaToken from "./models/MfaToken";
 import Clinic from "./models/Clinic";
-import { PatientPortalDashboardFormat } from "@fuse/enums";
 import BrandInvitation, { InvitationType } from "./models/BrandInvitation";
 import Physician from "./models/Physician";
 import { Op } from "sequelize";
@@ -5402,7 +5401,8 @@ app.post(
           orderNumber: orderNumber,
           orderType: "product_subscription_initial_authorization",
         },
-        description: `Subscription Authorization ${orderNumber} - ${tenantProduct.product.name}`,
+        // HIPAA: Generic description only; no product/treatment names (Payment Processing Exemption)
+        description: `Subscription Authorization ${orderNumber}`,
         automatic_payment_methods: { enabled: true, allow_redirects: "never" },
         setup_future_usage: "off_session",
       };
@@ -5609,19 +5609,15 @@ app.post("/payments/product/sub", async (req, res) => {
           tenantProductId
         );
 
+        // HIPAA: Do not send product name/description to Stripe (could be PHI). Use generic label only.
         const productParams: any = {
-          name: `${product.name} - ${(tenantProduct as any).clinic?.name || "Subscription"}`,
+          name: `Subscription - ${(tenantProduct as any).clinic?.name || "Service"}`,
           metadata: {
             productId: product.id,
             tenantProductId: (tenantProduct as any).id,
             clinicId: (tenantProduct as any).clinicId,
           },
         };
-
-        // Only include description if it's not empty
-        if (product.description && product.description.trim() !== "") {
-          productParams.description = product.description;
-        }
 
         const stripeProduct = await stripe.products.create(productParams);
 
@@ -5940,7 +5936,8 @@ app.post("/payments/product/sub", async (req, res) => {
         orderNumber: orderNumber,
         orderType: "product_subscription_initial_authorization",
       },
-      description: `Subscription Authorization ${orderNumber} - ${(tenantProduct as any).product.name}`,
+      // HIPAA: Generic description only; no product/treatment names (Payment Processing Exemption)
+      description: `Subscription Authorization ${orderNumber}`,
       automatic_payment_methods: { enabled: true, allow_redirects: "never" },
       setup_future_usage: "off_session",
     };
@@ -6116,8 +6113,9 @@ app.post("/payments/program/sub", async (req, res) => {
     // Create dynamic Stripe product and price for this program subscription
     console.log("📦 Creating Stripe product for program subscription...");
 
+    // HIPAA: Do not send program name to Stripe (could be PHI). Use generic label only.
     const stripeProduct = await stripe.products.create({
-      name: `${program.name} Subscription`,
+      name: `Program Subscription`,
       metadata: {
         programId: program.id,
         clinicId: program.clinicId || '',
@@ -6243,7 +6241,8 @@ app.post("/payments/program/sub", async (req, res) => {
         orderNumber: orderNumber,
         orderType: "program_subscription_initial_authorization",
       },
-      description: `Program Subscription ${orderNumber} - ${program.name}`,
+      // HIPAA: Generic description only; no program/treatment names (Payment Processing Exemption)
+      description: `Program Subscription ${orderNumber}`,
       automatic_payment_methods: { enabled: true, allow_redirects: "never" },
       setup_future_usage: "off_session",
     };
@@ -7189,7 +7188,8 @@ app.post(
         },
         setup_future_usage: "off_session",
         receipt_email: user.email || undefined,
-        description: `${selectedPlan.name}`,
+        // HIPAA: Generic description only; no plan names that could imply condition (Payment Processing Exemption)
+        description: `Subscription`,
       });
 
       const brandSubscription = await BrandSubscription.create({
