@@ -12230,6 +12230,10 @@ async function startServer() {
   const { registerMDIntegrationsWebhooks } = await import('./endpoints/md-integrations/webhooks');
   registerMDIntegrationsWebhooks(app);
 
+  // ============= OLYMPIA PHARMACY WEBHOOKS =============
+  const { registerOlympiaPharmacyWebhooks } = await import('./endpoints/olympia-pharmacy/webhook');
+  registerOlympiaPharmacyWebhooks(app, webhookLimiter);
+
   // ============= BELUGA ENDPOINTS =============
   const belugaRouter = (await import('./endpoints/beluga')).default;
   app.use('/beluga', belugaRouter);
