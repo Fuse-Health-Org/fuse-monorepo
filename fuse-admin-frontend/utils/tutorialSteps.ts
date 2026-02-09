@@ -19,29 +19,39 @@ export const tutorialSteps: TutorialStep[] = [
     placement: "top",
   },
   {
-    target: "#tutorial-step-3",
-    content: "Great! Now let's set up your products. Click here to go to the products page.",
+    target: "#tutorial-step-programs",
+    content: "Great! Now let's set up your programs. Click here to go to the programs page.",
     placement: "right",
   },
   {
-    target: "#select-products-btn",
-    content: "Here you can select products from our catalog.",
-    placement: "right",
-  },
-  {
-    target: "#first-product-item",
-    content: "Perfect! Here you can add new products to your catalog. Click \"Activate\".",
+    target: "#first-program-template",
+    content: "Here you can use pre-built templates. Click \"Use Template\".",
     placement: "top",
     hideNextButton: true,
   },
   {
-    target: "#my-products-btn",
-    content: "After enabling your product, you can view it in your My Products tab.",
+    target: "#first-program-card",
+    content: "Great! Your program was created successfully.",
+    placement: "top",
+  },
+  {
+    target: "#tutorial-step-portal",
+    content: "You can find your Portal in the Portal section.",
     placement: "right",
   },
   {
-    target: "#first-product-item",
-    content: "Perfect! Here is your product enabled.",
+    target: "#brand-portal-url-section",
+    content: "Perfect! Here is your Portal URL that you can share with patients.",
+    placement: "top",
+  },
+  {
+    target: "#tutorial-step-overview",
+    content: "Now click Overview to manage your brand and see analytics.",
+    placement: "right",
+  },
+  {
+    target: "#overview-dashboard",
+    content: "Here you can view your brand's performance, revenue, recent activity, and key metrics at a glance.",
     placement: "top",
   },
 ];

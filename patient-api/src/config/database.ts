@@ -332,6 +332,17 @@ export async function initializeDatabase() {
       console.log('✅ Database tables synchronized successfully');
     }
 
+    // Allow Program.clinicId to be NULL for templates
+    try {
+      console.log('🔄 Allowing Program.clinicId to be NULL for templates...');
+      await sequelize.query(`
+        ALTER TABLE "Program" ALTER COLUMN "clinicId" DROP NOT NULL;
+      `);
+      console.log('✅ Program.clinicId constraint updated successfully');
+    } catch (constraintError) {
+      console.log('⚠️  Program.clinicId constraint update:', constraintError instanceof Error ? constraintError.message : constraintError);
+    }
+
     // Ensure FormProducts table exists for multi-choice forms feature
     try {
       console.log('🔄 Ensuring FormProducts table exists...');

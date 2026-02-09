@@ -74,6 +74,16 @@ export default class TierConfiguration extends Entity {
   })
   declare isCustomTierCardTextActive: boolean;
 
+  // Fuse fee percentage for this tier (e.g., 5.0 for 5%, 17.0 for 17%)
+  // If null, falls back to GlobalFees.fuseTransactionFeePercent
+  @Column({
+    type: DataType.DECIMAL(5, 2),
+    allowNull: true,
+    defaultValue: null,
+    comment: 'Fuse platform transaction fee percentage for this tier (e.g., 5.0 for 5%, 17.0 for 17%)',
+  })
+  declare fuseFeePercent: number | null;
+
   @BelongsTo(() => BrandSubscriptionPlans)
   declare plan?: BrandSubscriptionPlans;
 
@@ -88,6 +98,7 @@ export default class TierConfiguration extends Entity {
       canCustomizeFormStructure: this.canCustomizeFormStructure,
       customTierCardText: this.customTierCardText,
       isCustomTierCardTextActive: this.isCustomTierCardTextActive,
+      fuseFeePercent: this.fuseFeePercent,
     };
   }
 }

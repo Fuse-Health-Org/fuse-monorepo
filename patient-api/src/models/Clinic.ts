@@ -6,24 +6,8 @@ import TenantProduct from './TenantProduct';
 import Sale from './Sale';
 import CustomWebsite from './CustomWebsite';
 import User from './User';
-
-
-export enum PaymentStatus {
-    PENDING = 'pending',
-    PAID = 'paid',
-    PAYMENT_DUE = 'payment_due',
-    CANCELLED = 'cancelled',
-}
-
-export enum MerchantOfRecord {
-    FUSE = 'fuse',
-    MYSELF = 'myself',
-}
-
-export enum PatientPortalDashboardFormat {
-    FUSE = 'fuse',
-    MD_INTEGRATIONS = 'md-integrations',
-}
+import BrandSubscriptionPlans from './BrandSubscriptionPlans';
+import { PaymentStatus, MerchantOfRecord, PatientPortalDashboardFormat } from '@fuse/enums';
 
 @Table({
     freezeTableName: true,
@@ -185,6 +169,17 @@ export default class Clinic extends Entity {
 
     @BelongsTo(() => User, 'mainDoctorId')
     declare mainDoctor?: User;
+
+    // Brand subscription plan (tier) for this clinic
+    @ForeignKey(() => BrandSubscriptionPlans)
+    @Column({
+        type: DataType.UUID,
+        allowNull: true,
+    })
+    declare brandSubscriptionPlanId?: string;
+
+    @BelongsTo(() => BrandSubscriptionPlans, 'brandSubscriptionPlanId')
+    declare brandSubscriptionPlan?: BrandSubscriptionPlans;
 
     @HasOne(() => Subscription)
     declare subscription?: Subscription;

@@ -27,6 +27,7 @@ export const signUpSchema = z.object({
   website: z.string().optional(),
   businessType: z.string().optional(),
   npiNumber: z.string().optional(),
+  doctorLicenseStatesCoverage: z.array(z.string()).optional(),
   patientPortalDashboardFormat: z.enum(['fuse', 'md-integrations']).optional(),
   invitationSlug: z.string().optional(),
 });

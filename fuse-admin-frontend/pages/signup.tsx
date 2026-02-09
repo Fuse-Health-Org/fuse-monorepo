@@ -236,8 +236,8 @@ export default function SignUp() {
         <meta name="description" content="Create your brand partner account" />
       </Head>
 
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="w-full max-w-2xl space-y-6">
+      <div className="h-screen bg-background overflow-y-auto">
+        <div className="w-full max-w-2xl mx-auto space-y-6 p-4 py-8">
           {/* Logo/Header */}
           <div className="text-center">
             <div className="flex justify-center mb-4">

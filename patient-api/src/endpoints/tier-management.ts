@@ -27,7 +27,14 @@ export function registerTierManagementEndpoints(
       }
 
       const { planId } = req.params;
-      const { maxProducts } = req.body;
+      const { maxProducts, name } = req.body;
+
+      console.log(`🔍 [Plan Update] Received request:`, { planId, maxProducts, name });
+      console.log(`🔍 [Plan Update] Type checks:`, { 
+        maxProductsType: typeof maxProducts,
+        nameType: typeof name,
+        nameValue: name 
+      });
 
       const plan = await BrandSubscriptionPlans.findByPk(planId);
       if (!plan) {
@@ -39,6 +46,12 @@ export function registerTierManagementEndpoints(
       if (typeof maxProducts === "number") {
         updates.maxProducts = maxProducts;
       }
+
+      if (typeof name === "string" && name.trim() !== "") {
+        updates.name = name.trim();
+      }
+
+      console.log(`🔍 [Plan Update] Updates object:`, updates);
 
       if (Object.keys(updates).length === 0) {
         return res.status(400).json({ success: false, message: "No valid fields to update" });
@@ -160,6 +173,7 @@ export function registerTierManagementEndpoints(
           canCustomizeFormStructure,
           customTierCardText,
           isCustomTierCardTextActive,
+          fuseFeePercent,
         } = req.body;
 
         // Check if plan exists
@@ -210,6 +224,10 @@ export function registerTierManagementEndpoints(
               typeof isCustomTierCardTextActive === "boolean"
                 ? isCustomTierCardTextActive
                 : false,
+            fuseFeePercent:
+              typeof fuseFeePercent === "number"
+                ? fuseFeePercent
+                : null,
           });
           console.log(`✅ Created TierConfiguration for plan: ${plan.name}`);
         } else {
@@ -247,6 +265,10 @@ export function registerTierManagementEndpoints(
 
           if (typeof isCustomTierCardTextActive === "boolean") {
             updates.isCustomTierCardTextActive = isCustomTierCardTextActive;
+          }
+
+          if (fuseFeePercent !== undefined) {
+            updates.fuseFeePercent = typeof fuseFeePercent === "number" ? fuseFeePercent : null;
           }
 
           await config.update(updates);

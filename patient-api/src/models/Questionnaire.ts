@@ -6,6 +6,7 @@ import User from './User';
 import TenantProduct from './TenantProduct';
 import Product from './Product';
 import FormProducts from './FormProducts';
+import { PatientPortalDashboardFormat } from '@fuse/enums';
 
 export type ProductOfferType = 'single_choice' | 'multiple_choice';
 
@@ -169,4 +170,30 @@ export default class Questionnaire extends Entity {
 
     @HasMany(() => FormProducts)
     declare formProducts: FormProducts[];
+
+    /**
+     * Medical Company Source
+     * 
+     * Specifies which medical company/platform provides the medical services for this form.
+     * This determines which dashboard format should be used and which API integrations
+     * are needed when patients complete this form.
+     * 
+     * Options:
+     * - 'md-integrations': MD Integrations platform (default)
+     * - 'fuse': Fuse Health platform
+     * - 'beluga': Beluga Health platform
+     */
+    @Column({
+        type: DataType.ENUM(...Object.values(PatientPortalDashboardFormat)),
+        allowNull: false,
+        defaultValue: PatientPortalDashboardFormat.MD_INTEGRATIONS,
+    })
+    declare medicalCompanySource: PatientPortalDashboardFormat;
+
+    @Column({
+        type: DataType.ENUM('pending', 'approved', 'rejected'),
+        allowNull: false,
+        defaultValue: 'pending',
+    })
+    declare medicalTemplateApprovedByFuseAdmin: 'pending' | 'approved' | 'rejected';
 }

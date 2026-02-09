@@ -135,13 +135,14 @@ export default function SignIn() {
           <meta name="description" content="Enter verification code" />
         </Head>
 
-        <div className="min-h-screen bg-background flex items-center justify-center p-4">
-          <div className="w-full max-w-md space-y-6">
-            {/* Logo/Header */}
-            <div className="text-center">
-              <div className="flex justify-center mb-4">
-                <div className="w-12 h-12 bg-emerald-600 rounded-lg flex items-center justify-center">
-                  <Mail className="h-6 w-6 text-white" />
+        <div className="h-screen bg-background overflow-y-auto">
+          <div className="flex items-center justify-center p-4 min-h-full">
+            <div className="w-full max-w-md space-y-6">
+              {/* Logo/Header */}
+              <div className="text-center">
+                <div className="flex justify-center mb-4">
+                  <div className="w-12 h-12 bg-emerald-600 rounded-lg flex items-center justify-center">
+                    <Mail className="h-6 w-6 text-white" />
                 </div>
               </div>
               <h1 className="text-2xl font-bold text-foreground">Check Your Email</h1>
@@ -234,10 +235,11 @@ export default function SignIn() {
               </CardContent>
             </Card>
 
-            {/* Security notice */}
-            <p className="text-xs text-center text-muted-foreground">
-              🔒 Two-factor authentication required for HIPAA compliance
-            </p>
+              {/* Security notice */}
+              <p className="text-xs text-center text-muted-foreground">
+                🔒 Two-factor authentication required for HIPAA compliance
+              </p>
+            </div>
           </div>
         </div>
       </>
@@ -251,12 +253,13 @@ export default function SignIn() {
         <meta name="description" content="Sign in to admin dashboard" />
       </Head>
 
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="w-full max-w-md space-y-6">
-          {/* Logo/Header */}
-          <div className="text-center">
-            <div className="flex justify-center mb-4">
-              <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center">
+      <div className="h-screen bg-background overflow-y-auto">
+        <div className="flex items-center justify-center p-4 min-h-full">
+          <div className="w-full max-w-md space-y-6">
+            {/* Logo/Header */}
+            <div className="text-center">
+              <div className="flex justify-center mb-4">
+                <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center">
                 <Shield className="h-6 w-6 text-primary-foreground" />
               </div>
             </div>
@@ -361,7 +364,7 @@ export default function SignIn() {
               </div>
             </CardContent>
           </Card>
-
+          </div>
         </div>
       </div>
     </>

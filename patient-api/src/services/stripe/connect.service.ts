@@ -143,7 +143,16 @@ export class StripeConnectService {
         await this.updateAccountCapabilities(accountId, merchantModel);
       } catch (error: any) {
         console.error(`❌ Error retrieving account ${accountId}:`, error.message);
-        // If account doesn't exist or is invalid, create a new one
+        
+        // Mask the account ID for security (show first 9 chars, rest as asterisks)
+        const maskedAccountId = accountId.substring(0, 9) + '******';
+        
+        // If account doesn't exist or is invalid, throw a user-friendly error
+        if (error.code === 'resource_missing' || error.message?.includes('No such')) {
+          throw new Error(`Your Stripe account ID ${maskedAccountId} is invalid!`);
+        }
+        
+        // For other errors, try to create a new account
         accountId = await this.createOrGetConnectAccount(clinicId, merchantModel);
       }
     }
@@ -193,6 +202,15 @@ export class StripeConnectService {
       if (error.type === 'StripeInvalidRequestError') {
         console.error(`❌ Stripe error details:`, error.raw);
       }
+      
+      // Mask the account ID in error messages for security
+      const maskedAccountId = accountId.substring(0, 9) + '******';
+      
+      // Check if it's a "no such account" error
+      if (error.code === 'resource_missing' || error.message?.includes('No such account')) {
+        throw new Error(`Your Stripe account ID ${maskedAccountId} is invalid!`);
+      }
+      
       throw error;
     }
   }

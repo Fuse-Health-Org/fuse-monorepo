@@ -83,6 +83,7 @@ export default function Orders() {
     const [connectLoading, setConnectLoading] = useState(false)
     const [connectInstance, setConnectInstance] = useState<any>(null)
     const [merchantModel, setMerchantModel] = useState<'platform' | 'direct'>('platform')
+    const [connectError, setConnectError] = useState<string | null>(null)
 
     useEffect(() => {
         fetchOrders()
@@ -115,41 +116,46 @@ export default function Orders() {
         if (!token || connectInstance) return
 
         setConnectLoading(true)
+        setConnectError(null) // Clear any previous errors
+        
+        // First, fetch the client secret to check for errors
         try {
+            const response = await fetch(
+                `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/stripe/connect/session`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        merchantModel: merchantModel
+                    })
+                }
+            )
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}))
+                console.error('Failed to fetch client secret:', response.status, errorData)
+                const errorMessage = errorData.message || 'Failed to fetch client secret'
+                setConnectError(errorMessage)
+                setConnectLoading(false)
+                return
+            }
+
+            const data = await response.json()
+            if (!data.data?.client_secret) {
+                setConnectError('Client secret not returned from server')
+                setConnectLoading(false)
+                return
+            }
+
+            const clientSecret = data.data.client_secret
+
+            // Now initialize Stripe Connect with the client secret
             const instance = loadConnectAndInitialize({
                 publishableKey: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '',
-                fetchClientSecret: async () => {
-                    try {
-                        const response = await fetch(
-                            `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/stripe/connect/session`,
-                            {
-                                method: 'POST',
-                                headers: {
-                                    'Authorization': `Bearer ${token}`,
-                                    'Content-Type': 'application/json'
-                                },
-                                body: JSON.stringify({
-                                    merchantModel: merchantModel
-                                })
-                            }
-                        )
-
-                        if (!response.ok) {
-                            const errorData = await response.json().catch(() => ({}))
-                            console.error('Failed to fetch client secret:', response.status, errorData)
-                            throw new Error(errorData.message || 'Failed to fetch client secret')
-                        }
-
-                        const data = await response.json()
-                        if (!data.data?.client_secret) {
-                            throw new Error('Client secret not returned from server')
-                        }
-                        return data.data.client_secret
-                    } catch (error: any) {
-                        console.error('Error in fetchClientSecret:', error)
-                        throw error
-                    }
-                },
+                fetchClientSecret: async () => clientSecret,
                 appearance: {
                     variables: {
                         colorPrimary: '#000000',
@@ -158,8 +164,9 @@ export default function Orders() {
             })
 
             setConnectInstance(instance)
-        } catch (err) {
+        } catch (err: any) {
             console.error('Error initializing Stripe Connect:', err)
+            setConnectError(err.message || 'Failed to initialize Stripe Connect. Please try again.')
         } finally {
             setConnectLoading(false)
         }
@@ -170,12 +177,14 @@ export default function Orders() {
         setShowConnectModal(true)
         setMerchantModel('platform') // Reset to default
         setConnectInstance(null) // Clear any existing instance
+        setConnectError(null) // Clear any previous errors
     }
 
     // Go back to merchant model selection
     const goBackToSelection = () => {
         setConnectInstance(null)
         setConnectLoading(false)
+        setConnectError(null) // Clear any errors when going back
     }
 
     // Close modal and refresh status
@@ -663,6 +672,25 @@ export default function Orders() {
 
                                 {/* Modal Body */}
                                 <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+                                    {/* Error Message */}
+                                    {connectError && (
+                                        <div className="mb-6 p-4 border border-red-200 rounded-lg bg-red-50">
+                                            <div className="flex gap-3">
+                                                <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                                                <div className="flex-1">
+                                                    <h4 className="font-medium text-red-900 mb-1">Connection Error</h4>
+                                                    <p className="text-sm text-red-700">{connectError}</p>
+                                                </div>
+                                                <button
+                                                    onClick={() => setConnectError(null)}
+                                                    className="text-red-400 hover:text-red-600 transition-colors"
+                                                >
+                                                    <X className="h-4 w-4" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+
                                     {!connectInstance && !connectLoading && !connectStatus?.onboardingComplete ? (
                                         <div className="py-6">
                                             <h3 className="text-lg font-semibold text-gray-900 mb-2">Choose Your Payment Model</h3>

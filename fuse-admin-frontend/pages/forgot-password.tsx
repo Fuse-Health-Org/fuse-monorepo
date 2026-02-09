@@ -212,8 +212,9 @@ export default function ForgotPassword() {
         <meta name="description" content="Reset your password" />
       </Head>
       
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="w-full max-w-md space-y-6">
+      <div className="h-screen bg-background overflow-y-auto">
+        <div className="flex items-center justify-center p-4 min-h-full">
+          <div className="w-full max-w-md space-y-6">
           {/* Header */}
           <div className="text-center">
             <div className="flex justify-center mb-4">
@@ -446,6 +447,7 @@ export default function ForgotPassword() {
               )}
             </CardContent>
           </Card>
+          </div>
         </div>
       </div>
 

@@ -27,21 +27,24 @@ import {
 import Tutorial from "./ui/tutorial"
 
 const navigation = [
-  { name: "Overview", icon: BarChart3, current: true, href: "/" },
+  { name: "Overview", icon: BarChart3, current: true, href: "/", id: "tutorial-step-overview" },
   { name: "Customers", icon: Users, current: false, href: "/customers" },
   { name: "Plans", icon: Crown, current: false, href: "/plans" },
 ]
 
 const allOperations = [
-  { name: "Programs", icon: Stethoscope, current: false, href: "/programs" },
+  { name: "Programs", icon: Stethoscope, current: false, href: "/programs", id: "tutorial-step-programs" },
   // { name: "Offerings", icon: Gift, current: false, href: "/offerings" },
-  { name: "Products", icon: Package, current: false, href: "/products", id: "tutorial-step-3" },
+  { name: "Products", icon: Package, current: false, href: "/products" },
   { name: "Orders", icon: ShoppingCart, current: false, href: "/orders" },
   { name: "Payouts", icon: CreditCard, current: false, href: "/payouts" },
   { name: "Analytics", icon: TrendingUp, current: false, href: "/analytics" },
+]
+
+const crmItems = [
+  { name: "Contacts", icon: UserCircle, current: false, href: "/contacts" },
   { name: "Sequences", icon: Workflow, current: false, href: "/sequences" },
   { name: "Templates", icon: FileText, current: false, href: "/templates" },
-  { name: "Contacts", icon: UserCircle, current: false, href: "/contacts" },
   { name: "Tags", icon: Tag, current: false, href: "/tags" },
 ]
 
@@ -50,7 +53,7 @@ const allOperations = [
 // ]
 
 const configuration = [
-  { name: "Portal", icon: Globe, current: false, href: "/portal" },
+  { name: "Portal", icon: Globe, current: false, href: "/portal", id: "tutorial-step-portal" },
   { name: "Affiliates", icon: UserPlus, current: false, href: "/affiliates" },
   { name: "Settings", icon: Settings, current: false, href: "/settings" },
 ]
@@ -64,14 +67,22 @@ export function Sidebar() {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [runTutorial, setRunTutorial] = useState(false)
   const [tutorialStep, setTutorialStep] = useState<number>(0)
+  const [clinicName, setClinicName] = useState<string>('')
+  const [clinicLogo, setClinicLogo] = useState<string>('')
+  
+  // Check if any CRM route is active
+  const isCrmActive = crmItems.some(item => router.pathname === item.href)
+  const [isCrmOpen, setIsCrmOpen] = useState(isCrmActive)
 
-  // Filter out Sequences, Templates, Contacts, and Tags in production
-  const operations = allOperations.filter(item => {
-    if (process.env.NODE_ENV === 'production') {
-      return !['Sequences', 'Templates', 'Contacts', 'Tags'].includes(item.name)
+  // Auto-expand CRM when on a CRM page
+  useEffect(() => {
+    if (isCrmActive) {
+      setIsCrmOpen(true)
     }
-    return true
-  })
+  }, [isCrmActive])
+
+  // Operations array (no longer contains CRM items)
+  const operations = allOperations
 
   // Check if user has access to analytics based on tier or custom features
   const hasAccessToAnalytics =
@@ -101,6 +112,7 @@ export function Sidebar() {
 
       if (response.ok) {
         const data = await response.json();
+        console.log("📍 Response data:", data);
         if (data.success) {
           console.log("data.data", data.data);
           const needsTutorial = data.data.tutorialFinished === false && data.data.status === "active" && data.data.stripeCustomerId !== null;
@@ -108,10 +120,12 @@ export function Sidebar() {
 
           // Set tutorial step from DB, default to 0 if not set
           const step = data.data.tutorialStep || 0;
+          console.log("📍 Tutorial step from DB:", step);
           setTutorialStep(step);
 
           // If tutorial needs to run and we're at step 0 or 1, redirect to settings page
           // because those steps' target elements are on the settings page
+          console.log("📍 Checking redirect condition:", { needsTutorial, step, pathname: router.pathname });
           if (needsTutorial && step <= 1 && router.pathname !== '/settings') {
             console.log("📍 Tutorial step", step, "requires settings page, redirecting...");
             router.push('/settings');
@@ -119,14 +133,20 @@ export function Sidebar() {
             return;
           }
 
+          console.log("📍 Passed redirect check, now checking if should run tutorial");
           // Add small delay to ensure page elements are rendered before starting tutorial
           if (needsTutorial) {
+            console.log("📍 Setting runTutorial to true in 500ms for step", step);
             setTimeout(() => {
+              console.log("📍 NOW setting runTutorial to TRUE");
               setRunTutorial(true);
             }, 500);
           } else {
+            console.log("📍 Setting runTutorial to false");
             setRunTutorial(false);
           }
+        } else {
+          console.log("📍 data.success is false");
         }
       }
     } catch (error) {
@@ -137,6 +157,28 @@ export function Sidebar() {
   useEffect(() => {
     fetchSubscriptionBasicInfo()
   }, [router.pathname])
+
+  // Fetch clinic/organization information for branding
+  useEffect(() => {
+    const fetchClinicInfo = async () => {
+      try {
+        const response = await authenticatedFetch(`${API_URL}/organization`, {
+          method: "GET",
+          skipLogoutOn401: true,
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setClinicName(data.clinicName || data.businessName || 'Fuse Health');
+          setClinicLogo(data.logo || '');
+        }
+      } catch (error) {
+        console.error('Error fetching clinic info:', error);
+      }
+    };
+
+    fetchClinicInfo();
+  }, [authenticatedFetch])
 
   const handleRefreshSubscription = async () => {
     if (isRefreshing) return
@@ -264,10 +306,10 @@ export function Sidebar() {
           <Link
             href={item.href || "#"}
             className={cn(
-              "group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors",
+              "group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-smooth",
               isActive
-                ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-apple"
+                : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
             )}
             onClick={(e) => {
               if (disabled) {
@@ -275,25 +317,48 @@ export function Sidebar() {
                 return;
               }
 
-              // If tutorial is running and Products tab is the current tutorial target (step 2),
-              // advance the tutorial instead of just navigating
-              // But don't auto-advance if we're navigating backwards
-              if (runTutorial && item.id === 'tutorial-step-3') {
-                const tutorialAdvance = (window as any).__tutorialAdvance;
-                const tutorialStep = (window as any).__tutorialCurrentStep;
-                const isNavigatingBackwards = (window as any).__tutorialNavigatingBackwards;
-                if (tutorialAdvance && tutorialStep === 2 && !isNavigatingBackwards) {
-                  e.preventDefault();
-                  console.log('📍 Tutorial active - advancing from Products click');
+              // Handle tutorial navigation for sidebar tabs
+              const tutorialAdvance = (window as any).__tutorialAdvance;
+              const tutorialStep = (window as any).__tutorialCurrentStep;
+              const isNavigatingBackwards = (window as any).__tutorialNavigatingBackwards;
+
+              // Programs tab (step 2 → 3)
+              if (runTutorial && item.id === 'tutorial-step-programs' && tutorialStep === 2 && !isNavigatingBackwards) {
+                console.log('📍 Tutorial active - navigating to Programs and advancing');
+                // Let the navigation happen, then advance tutorial
+                setTimeout(() => {
                   tutorialAdvance();
-                  return;
-                }
+                }, 300);
+                return;
+              }
+
+              // Portal tab (step 5 → 6)
+              if (runTutorial && item.id === 'tutorial-step-portal' && tutorialStep === 5 && !isNavigatingBackwards) {
+                console.log('📍 Tutorial active - navigating to Portal and advancing');
+                // Let the navigation happen, then advance tutorial
+                setTimeout(() => {
+                  tutorialAdvance();
+                }, 300);
+                return;
+              }
+
+              // Overview tab (step 7 → 8)
+              if (runTutorial && item.id === 'tutorial-step-overview' && tutorialStep === 7 && !isNavigatingBackwards) {
+                console.log('📍 Tutorial active - navigating to Overview and advancing');
+                // Let the navigation happen, then advance tutorial
+                setTimeout(() => {
+                  tutorialAdvance();
+                }, 300);
+                return;
               }
             }}
           >
             <div className="flex items-center">
-              <item.icon className="mr-3 h-4 w-4" />
-              {item.name}
+              <item.icon className={cn(
+                "mr-3 h-5 w-5 transition-smooth",
+                isActive ? "text-sidebar-accent-foreground" : "text-sidebar-foreground/60"
+              )} />
+              <span className="font-medium">{item.name}</span>
             </div>
             {item.hasSubmenu && <ChevronDown className="ml-auto h-4 w-4" />}
           </Link>
@@ -316,11 +381,32 @@ export function Sidebar() {
   }
 
   return (
-    <div className="w-64 h-full bg-sidebar border-r border-sidebar-border flex flex-col overflow-hidden">
+    <div className="w-64 flex-shrink-0 h-full bg-sidebar border-r border-sidebar-border flex flex-col overflow-hidden">
       <Tutorial runTutorial={runTutorial} setRunTutorial={setRunTutorial} initialStep={tutorialStep} />
-      {/* Logo */}
+      {/* Logo with Brand Icon */}
       <div className="p-6 flex-shrink-0">
-        <h1 className="text-xl font-bold text-sidebar-foreground">Fuse</h1>
+        <div className="flex items-center gap-3">
+          {clinicLogo ? (
+            <div className="w-10 h-10 rounded-xl overflow-hidden shadow-apple-md flex-shrink-0">
+              <img 
+                src={clinicLogo} 
+                alt={clinicName || 'Brand'} 
+                className="w-full h-full object-cover"
+              />
+            </div>
+          ) : (
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-apple-md flex-shrink-0" style={{ background: 'linear-gradient(135deg, hsl(270, 80%, 65%) 0%, hsl(280, 75%, 72%) 100%)' }}>
+              <span className="text-white font-bold text-lg">
+                {(clinicName || user?.name || 'F').charAt(0).toUpperCase()}
+              </span>
+            </div>
+          )}
+          <div className="flex-1 min-w-0">
+            <h1 className="text-base font-semibold text-sidebar-foreground truncate">
+              {clinicName || user?.name || 'Fuse Health'}
+            </h1>
+          </div>
+        </div>
       </div>
 
       {/* Navigation */}
@@ -334,21 +420,44 @@ export function Sidebar() {
 
         {/* Operations Section */}
         <div className="pt-6">
-          <h3 className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Operations</h3>
-          {process.env.NODE_ENV !== 'production' && (
-            <div className="px-3 mb-2 p-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md">
-              <p className="text-xs text-amber-800 dark:text-amber-200 font-medium">
-                ⚠️ Testing Mode
-              </p>
-              <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
-                Sequences, Templates, Contacts, and Tags are being tested and won't be available in production.
-              </p>
-            </div>
-          )}
+          <h3 className="px-3 text-xs font-semibold text-muted-foreground/60 uppercase tracking-wide mb-3">Operations</h3>
           <div className="space-y-1">
             {operations.map((item) => renderSidebarItem(item, 'operations'))}
           </div>
         </div>
+
+        {/* CRM Section */}
+        {process.env.NODE_ENV !== 'production' && (
+          <div className="pt-6">
+            <button
+              onClick={() => setIsCrmOpen(!isCrmOpen)}
+              className={cn(
+                "w-full group flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-smooth",
+                isCrmActive || isCrmOpen
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                  : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
+              )}
+            >
+              <div className="flex items-center gap-3">
+                <Users className={cn(
+                  "h-5 w-5 transition-smooth",
+                  isCrmActive || isCrmOpen ? "text-sidebar-accent-foreground" : "text-sidebar-foreground/60"
+                )} />
+                <span className="font-medium">CRM</span>
+              </div>
+              <ChevronDown className={cn(
+                "h-4 w-4 transition-transform",
+                isCrmOpen ? "rotate-180" : ""
+              )} />
+            </button>
+
+            {isCrmOpen && (
+              <div className="mt-1 ml-4 space-y-1 border-l-2 border-sidebar-border pl-3">
+                {crmItems.map((item) => renderSidebarItem(item, 'crm'))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Services Section */}
         {/* <div className="pt-6">
@@ -360,7 +469,7 @@ export function Sidebar() {
 
         {/* Configuration Section */}
         <div className="pt-6">
-          <h3 className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+          <h3 className="px-3 text-xs font-semibold text-muted-foreground/60 uppercase tracking-wide mb-3">
             Configuration
           </h3>
           <div className="space-y-1">
@@ -373,24 +482,24 @@ export function Sidebar() {
       <div className="p-4 border-t border-sidebar-border flex-shrink-0">
         <div className="flex items-center justify-between space-x-3">
           <div className="flex items-center space-x-3 flex-1 min-w-0">
-            <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
-              <span className="text-sm font-medium text-white">
+            <div className="w-9 h-9 rounded-full flex items-center justify-center shadow-apple" style={{ background: 'linear-gradient(135deg, hsl(270, 80%, 65%) 0%, hsl(280, 75%, 72%) 100%)' }}>
+              <span className="text-sm font-semibold text-white">
                 {user?.name?.charAt(0).toUpperCase() || 'A'}
               </span>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-sidebar-foreground truncate">
-                {user?.name || 'Admin User'}
+              <p className="text-sm font-semibold text-sidebar-foreground truncate">
+                {user?.name || 'Admin'}
               </p>
-              <p className="text-xs text-muted-foreground truncate">
-                {user?.email || 'admin@example.com'}
+              <p className="text-xs text-muted-foreground/70 truncate">
+                Admin
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             <button
               onClick={handleRefreshSubscription}
-              className="p-1 text-muted-foreground hover:text-foreground hover:bg-sidebar-accent rounded"
+              className="p-1.5 text-muted-foreground/60 hover:text-foreground hover:bg-sidebar-accent/50 rounded-lg transition-smooth"
               title="Refresh subscription status"
               aria-label="Refresh subscription status"
             >
@@ -398,7 +507,7 @@ export function Sidebar() {
             </button>
             <button
               onClick={() => logout()}
-              className="p-1 text-muted-foreground hover:text-foreground hover:bg-sidebar-accent rounded"
+              className="p-1.5 text-muted-foreground/60 hover:text-foreground hover:bg-sidebar-accent/50 rounded-lg transition-smooth"
               title="Logout"
               aria-label="Logout"
             >

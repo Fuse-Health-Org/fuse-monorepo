@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext"
 import {
   BarChart3,
   FileText,
+  ClipboardList,
   LogOut,
   Building2,
   Package,
@@ -17,12 +18,15 @@ import {
   ExternalLink,
   Palette,
   Ship,
+  Stethoscope,
 } from "lucide-react"
 
 const navigation = [
   { name: "Overview", icon: BarChart3, href: "/" },
   { name: "Products", icon: Package, href: "/products" },
-  { name: "Forms", icon: FileText, href: "/forms" },
+  { name: "Programs", icon: Stethoscope, href: "/programs" },
+  { name: "Teleforms", icon: ClipboardList, href: "/teleforms" },
+  { name: "Global Structures", icon: FileText, href: "/forms" },
   { name: "Client Management", icon: Users, href: "/client-management" },
   { name: "Doctor Applications", icon: UserCheck, href: "/doctor-applications" },
   { name: "Tier Management", icon: Settings, href: "/tier-management" },
@@ -40,7 +44,7 @@ export function Sidebar() {
   const { user, logout } = useAuth()
   
   return (
-    <div className="w-72 bg-background border-r border-border flex flex-col shadow-sm">
+    <div className="w-72 h-screen bg-background border-r border-border flex flex-col shadow-sm">
       {/* Logo */}
       <div className="p-8 pb-6">
         <div className="flex items-center space-x-3">
@@ -55,14 +59,14 @@ export function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-5 py-4 space-y-2">
+      <nav className="flex-1 px-5 py-4 space-y-2 overflow-y-auto">
         {/* Main Navigation */}
         <div className="space-y-1.5">
           <p className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
             Main Menu
           </p>
           {navigation.map((item) => {
-            const isActive = router.pathname === item.href
+            const isActive = item.href === "/" ? router.pathname === "/" : router.pathname.startsWith(item.href)
             return (
               <a
                 key={item.name}

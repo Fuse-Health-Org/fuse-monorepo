@@ -43,11 +43,26 @@ const Tutorial: React.FC<TutorialProps> = ({
   const [tooltipPosition, setTooltipPosition] = useState<TooltipPosition | null>(null);
   const [isNavigating, setIsNavigating] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [adaptiveStepOverride, setAdaptiveStepOverride] = useState<TutorialStep | null>(null);
+  const [skippedStep4, setSkippedStep4] = useState(false);
   const tooltipRef = useRef<HTMLDivElement>(null);
+  const lastHandledStepRef = useRef<string | null>(null);
 
   const activeSteps = steps || tutorialSteps;
-  const currentStepData = activeSteps[currentStep];
+  const currentStepData = adaptiveStepOverride || activeSteps[currentStep];
   const totalSteps = activeSteps.length;
+
+  // Debug logging
+  console.log('🔍 Tutorial render:', {
+    runTutorial,
+    mounted,
+    currentStep,
+    initialStep,
+    pathname: router.pathname,
+    targetRect: targetRect ? 'SET' : 'NULL',
+    currentStepData: currentStepData?.target,
+    adaptiveStepOverride: adaptiveStepOverride?.target || 'NONE'
+  });
 
   // Mount check for portal
   useEffect(() => {
@@ -57,6 +72,7 @@ const Tutorial: React.FC<TutorialProps> = ({
 
   // Reset step when initialStep changes or tutorial restarts
   useEffect(() => {
+    console.log('🔍 initialStep effect:', { runTutorial, initialStep, currentStep });
     if (runTutorial) {
       setCurrentStep(initialStep);
     }
@@ -96,17 +112,62 @@ const Tutorial: React.FC<TutorialProps> = ({
 
   // Calculate target element position
   const updateTargetPosition = useCallback(() => {
-    if (!currentStepData || !runTutorial || isNavigating) return;
+    console.log('🔍 updateTargetPosition called:', {
+      currentStepData: currentStepData?.target,
+      runTutorial,
+      isNavigating,
+      currentStep,
+      pathname: router.pathname
+    });
+    if (!currentStepData || !runTutorial || isNavigating) {
+      console.log('🔍 updateTargetPosition returning early');
+      return;
+    }
 
-    const target = currentStepData.target;
+    let target = currentStepData.target;
     let element: Element | null = null;
+    let effectiveStepData = currentStepData;
 
-    if (target.startsWith('#')) {
-      element = document.getElementById(target.slice(1));
-    } else if (target.startsWith('.')) {
-      element = document.querySelector(target);
+    // For step 3 on programs page: handle fallback from template to program card
+    if (currentStep === 3 && router.pathname === '/programs') {
+      // First try to find the template
+      element = document.getElementById('first-program-template');
+      console.log('📍 Step 3 - looking for template:', element ? 'FOUND' : 'NOT FOUND');
+
+      // If no template, try to find the program card instead
+      if (!element) {
+        element = document.getElementById('first-program-card');
+        // Also try data attribute as backup
+        if (!element) {
+          element = document.querySelector('[data-program-index="0"]');
+        }
+        console.log('📍 Step 3 - looking for program card:', element ? 'FOUND' : 'NOT FOUND');
+
+        if (element) {
+          // Use fallback content for this step
+          effectiveStepData = {
+            target: "#first-program-card",
+            content: "Looks like you already set up your program! Let's continue.",
+            placement: "top",
+          };
+          target = "#first-program-card";
+
+          // Set the adaptive override for other logic (like skipping step 4)
+          if (!adaptiveStepOverride) {
+            console.log('📍 Setting adaptive step override');
+            setAdaptiveStepOverride(effectiveStepData);
+          }
+        }
+      }
     } else {
-      element = document.querySelector(target);
+      // Normal element lookup
+      if (target.startsWith('#')) {
+        element = document.getElementById(target.slice(1));
+      } else if (target.startsWith('.')) {
+        element = document.querySelector(target);
+      } else {
+        element = document.querySelector(target);
+      }
     }
 
     if (element) {
@@ -120,7 +181,7 @@ const Tutorial: React.FC<TutorialProps> = ({
       });
 
       // Calculate tooltip position based on placement
-      const placement = currentStepData.placement || 'bottom';
+      const placement = effectiveStepData.placement || 'bottom';
       const tooltipWidth = 320;
       const tooltipHeight = 150; // Approximate
       const gap = 12;
@@ -161,7 +222,7 @@ const Tutorial: React.FC<TutorialProps> = ({
       setTargetRect(null);
       setTooltipPosition(null);
     }
-  }, [currentStepData, runTutorial, isNavigating]);
+  }, [currentStepData, runTutorial, isNavigating, currentStep, router.pathname, adaptiveStepOverride]);
 
   // Update position on scroll, resize, and step change
   useEffect(() => {
@@ -184,55 +245,170 @@ const Tutorial: React.FC<TutorialProps> = ({
   }, [runTutorial, currentStep, updateTargetPosition]);
 
   // Handle navigation for specific steps
-  const handleStepNavigation = useCallback(async (stepIndex: number) => {
+  // Returns the step index we should actually be on (for skipping)
+  const handleStepNavigation = useCallback(async (stepIndex: number): Promise<number | void> => {
     const stepData = activeSteps[stepIndex];
 
-    // Step 2 -> 3: Navigate to products page
-    if (stepIndex === 3 && router.pathname !== '/products') {
-      console.log('📍 Navigating to products page for step 3');
-      setIsNavigating(true);
-      await router.push('/products');
+    // Step 3: Navigate to programs page and adapt step content based on what's available
+    if (stepIndex === 3) {
+      if (router.pathname !== '/programs') {
+        console.log('📍 Step 3 - navigating to programs page');
+        setIsNavigating(true);
+        await router.push('/programs');
+      }
+
+      // Wait for elements and determine which version to show
+      const result = await new Promise<'template' | 'program' | 'timeout'>((resolve) => {
+        const checkElement = setInterval(() => {
+          if (document.getElementById('first-program-template')) {
+            clearInterval(checkElement);
+            console.log('📍 Found first-program-template element');
+            resolve('template');
+          } else if (document.getElementById('first-program-card')) {
+            clearInterval(checkElement);
+            console.log('📍 Found first-program-card element (no templates)');
+            resolve('program');
+          }
+        }, 100);
+        setTimeout(() => {
+          clearInterval(checkElement);
+          console.log('⚠️ Timeout waiting for program elements');
+          resolve('timeout');
+        }, 3000);
+      });
+
+      setIsNavigating(false);
+
+      // Set adaptive step content based on what's available
+      if (result === 'program') {
+        // Show alternative version targeting the program card
+        setAdaptiveStepOverride({
+          target: "#first-program-card",
+          content: "Looks like you already set up your program! Let's continue.",
+          placement: "top",
+        });
+      } else if (result === 'template') {
+        // Show default version targeting template
+        setAdaptiveStepOverride(null);
+      } else {
+        // Timeout - clear override
+        setAdaptiveStepOverride(null);
+      }
+    } else {
+      // Clear adaptive override for other steps
+      setAdaptiveStepOverride(null);
+    }
+
+    // Step 5: Scroll sidebar to show Portal section (it might be hidden on small screens)
+    if (stepIndex === 5) {
+      console.log('📍 Step 5 - scrolling sidebar to show Portal section');
+      // Find the sidebar nav element and scroll to show the Portal item
+      const sidebarNav = document.querySelector('nav.overflow-y-auto');
+      const portalElement = document.getElementById('tutorial-step-portal');
+
+      if (sidebarNav && portalElement) {
+        // Scroll the sidebar to make the Portal element visible
+        portalElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Alternative: scroll the sidebar nav container directly
+        // sidebarNav.scrollTo({ top: sidebarNav.scrollHeight, behavior: 'smooth' });
+      } else if (sidebarNav) {
+        // If portal element not found yet, scroll sidebar to bottom to ensure it's visible
+        sidebarNav.scrollTo({ top: sidebarNav.scrollHeight, behavior: 'smooth' });
+      }
+
+      // Wait a bit for the scroll animation to complete
+      await new Promise<void>((resolve) => setTimeout(resolve, 300));
+    }
+
+    // Step 6: Navigate to portal page (or wait for element if already there)
+    if (stepIndex === 6) {
+      if (router.pathname !== '/portal') {
+        console.log('📍 Step 6 - navigating to portal page');
+        setIsNavigating(true);
+        await router.push('/portal');
+        setIsNavigating(false);
+      } else {
+        console.log('📍 Step 6 - already on portal page');
+      }
+
       // Wait for element to appear
       await new Promise<void>((resolve) => {
         const checkElement = setInterval(() => {
-          if (document.getElementById('select-products-btn')) {
+          if (document.getElementById('brand-portal-url-section')) {
             clearInterval(checkElement);
+            console.log('📍 Found brand-portal-url-section element');
             resolve();
           }
         }, 100);
         setTimeout(() => {
           clearInterval(checkElement);
+          console.log('⚠️ Timeout waiting for brand-portal-url-section');
           resolve();
         }, 3000);
       });
-      setIsNavigating(false);
     }
 
-    // Step 3 -> 4: Click select products button
-    if (stepIndex === 4) {
-      console.log('📍 Clicking select products button');
-      setTimeout(() => {
-        document.getElementById('select-products-btn')?.click();
-      }, 100);
-    }
+    // Step 8: Navigate to overview page
+    if (stepIndex === 8) {
+      if (router.pathname !== '/') {
+        console.log('📍 Step 8 - navigating to overview page');
+        setIsNavigating(true);
+        await router.push('/');
+        setIsNavigating(false);
+      } else {
+        console.log('📍 Step 8 - already on overview page');
+      }
 
-    // Step 6: Switch to My Products tab to show the enabled product
-    if (stepIndex === 6) {
-      console.log('📍 Switching to My Products tab for final step');
-      setTimeout(() => {
-        document.getElementById('my-products-btn')?.click();
-      }, 100);
+      // Wait for element to appear
+      await new Promise<void>((resolve) => {
+        const checkElement = setInterval(() => {
+          if (document.getElementById('overview-dashboard')) {
+            clearInterval(checkElement);
+            console.log('📍 Found overview-dashboard element');
+            resolve();
+          }
+        }, 100);
+        setTimeout(() => {
+          clearInterval(checkElement);
+          console.log('⚠️ Timeout waiting for overview-dashboard');
+          resolve();
+        }, 3000);
+      });
     }
   }, [router, activeSteps]);
 
+  // Run step navigation when route changes to ensure adaptive steps work
+  useEffect(() => {
+    if (!runTutorial || isNavigating) return;
+
+    const stepPathKey = `${currentStep}-${router.pathname}`;
+
+    // Prevent running multiple times for same step/path
+    if (lastHandledStepRef.current === stepPathKey) return;
+    lastHandledStepRef.current = stepPathKey;
+
+    // Re-run step navigation for current step when route changes
+    // This ensures adaptive step logic runs even on page refresh
+    console.log('📍 Route/step changed - running step navigation for step', currentStep);
+    handleStepNavigation(currentStep);
+  }, [runTutorial, currentStep, router.pathname, isNavigating, handleStepNavigation]);
+
   // Public method to advance tutorial (can be called from outside)
-  const advanceTutorial = useCallback(() => {
+  const advanceTutorial = useCallback(async () => {
     if (currentStep < totalSteps - 1) {
-      const nextStep = currentStep + 1;
+      let nextStep = currentStep + 1;
+
+      // If we're on step 3 with adaptive override (program already exists), skip step 4
+      if (currentStep === 3 && adaptiveStepOverride) {
+        console.log('📍 Skipping step 4 (program already created) - jumping to step 5');
+        nextStep = 5; // Skip to Portal tab
+        setSkippedStep4(true);
+      }
+
       console.log(`📍 Advancing tutorial to step ${nextStep}`);
       setCurrentStep(nextStep);
       handleUpdateStep(nextStep);
-      handleStepNavigation(nextStep);
+      await handleStepNavigation(nextStep);
     } else {
       // Last step - finish tutorial
       console.log('✅ Tutorial completed');
@@ -240,15 +416,15 @@ const Tutorial: React.FC<TutorialProps> = ({
       handleTutorialFinish(currentStep);
       onFinish?.();
     }
-  }, [currentStep, totalSteps, handleUpdateStep, handleStepNavigation, setRunTutorial, handleTutorialFinish, onFinish]);
+  }, [currentStep, totalSteps, adaptiveStepOverride, handleUpdateStep, handleStepNavigation, setRunTutorial, handleTutorialFinish, onFinish]);
 
   // Public method to jump to a specific step
-  const jumpToStep = useCallback((stepIndex: number) => {
+  const jumpToStep = useCallback(async (stepIndex: number) => {
     if (stepIndex >= 0 && stepIndex < totalSteps) {
       console.log(`📍 Jumping to step ${stepIndex}`);
       setCurrentStep(stepIndex);
       handleUpdateStep(stepIndex);
-      handleStepNavigation(stepIndex);
+      await handleStepNavigation(stepIndex);
     } else if (stepIndex >= totalSteps) {
       // Finish tutorial
       console.log('✅ Tutorial completed');
@@ -286,10 +462,17 @@ const Tutorial: React.FC<TutorialProps> = ({
 
   const handleBack = useCallback(async () => {
     if (currentStep > 0) {
-      const prevStep = currentStep - 1;
+      let prevStep = currentStep - 1;
 
       // Set flag to prevent auto-advance during backwards navigation
       (window as any).__tutorialNavigatingBackwards = true;
+
+      // If we're on step 5 and we skipped step 4, go back to step 3 instead
+      if (currentStep === 5 && skippedStep4) {
+        console.log('📍 Going back from step 5 to 3 (step 4 was skipped)');
+        prevStep = 3;
+        setSkippedStep4(false); // Clear the flag
+      }
 
       // Handle specific navigation when going backwards
       // From step 2 (index 1): Scroll to top of settings page for logo
@@ -316,32 +499,49 @@ const Tutorial: React.FC<TutorialProps> = ({
         setCurrentStep(prevStep);
         handleUpdateStep(prevStep);
       }
-      // From step 5 (index 4): Ensure we're on Select Products tab
-      else if (currentStep === 4) {
-        console.log('📍 Going back from step 5 to 4 - switching to Select Products tab');
-        // Click the tab first
-        document.getElementById('select-products-btn')?.click();
-        // Wait for tab switch to complete, THEN update the step
-        setTimeout(() => {
-          setCurrentStep(prevStep);
-          handleUpdateStep(prevStep);
-        }, 300);
+      // From step 4 (index 3): Stay on programs page
+      // From step 5 (index 4): Navigate back to programs page (if not already there)
+      else if ((currentStep === 5 || currentStep === 4) && router.pathname !== '/programs') {
+        console.log(`📍 Going back from step ${currentStep + 1} to ${prevStep + 1} - navigating to Programs`);
+        setIsNavigating(true);
+        await router.push('/programs');
+        setIsNavigating(false);
+        setCurrentStep(prevStep);
+        handleUpdateStep(prevStep);
       }
-      // From step 6 (index 5): Switch to Select Products tab
-      else if (currentStep === 5) {
-        console.log('📍 Going back from step 6 to 5 - switching to Select Products tab');
-        // Click the tab first
-        document.getElementById('select-products-btn')?.click();
-        // Wait for tab switch to complete, THEN update the step
-        setTimeout(() => {
-          setCurrentStep(prevStep);
-          handleUpdateStep(prevStep);
-        }, 300);
+      // From step 6 (index 5): Navigate back to programs page
+      else if (currentStep === 6 && router.pathname !== '/programs') {
+        console.log('📍 Going back from step 6 to 5 - navigating to Programs');
+        setIsNavigating(true);
+        await router.push('/programs');
+        setIsNavigating(false);
+        setCurrentStep(prevStep);
+        handleUpdateStep(prevStep);
+      }
+      // From step 7 (index 6): Stay on portal page
+      // From step 8 (index 7): Navigate back to portal page
+      else if (currentStep === 7 && router.pathname !== '/portal') {
+        console.log('📍 Going back from step 8 to 7 - navigating to Portal');
+        setIsNavigating(true);
+        await router.push('/portal');
+        setIsNavigating(false);
+        setCurrentStep(prevStep);
+        handleUpdateStep(prevStep);
+      }
+      // From step 9 (index 8): Navigate back to overview page (if somehow we're not there)
+      else if (currentStep === 8 && router.pathname !== '/') {
+        console.log('📍 Going back from step 9 to 8 - navigating to Overview');
+        setIsNavigating(true);
+        await router.push('/');
+        setIsNavigating(false);
+        setCurrentStep(prevStep);
+        handleUpdateStep(prevStep);
       }
       else {
         // No special navigation needed, just go back
         setCurrentStep(prevStep);
         handleUpdateStep(prevStep);
+        await handleStepNavigation(prevStep);
       }
 
       // Clear the flag after a longer delay
@@ -349,7 +549,7 @@ const Tutorial: React.FC<TutorialProps> = ({
         (window as any).__tutorialNavigatingBackwards = false;
       }, 600);
     }
-  }, [currentStep, handleUpdateStep, router]);
+  }, [currentStep, skippedStep4, handleUpdateStep, handleStepNavigation, router]);
 
   const handleSkip = useCallback(() => {
     console.log('⏭️ Tutorial skipped at step', currentStep);
@@ -512,7 +712,7 @@ const Tutorial: React.FC<TutorialProps> = ({
               onClick={handleSkip}
               className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
             >
-              Skip
+              Skip Tutorial
             </button>
 
             <div className="flex items-center gap-2">
@@ -539,15 +739,6 @@ const Tutorial: React.FC<TutorialProps> = ({
 
                 return (
                   <>
-                    {currentStep > 0 && showNextButton && (
-                      <button
-                        onClick={handleBack}
-                        className="px-3 py-1.5 text-sm text-green-700 hover:text-green-800 transition-colors"
-                      >
-                        Back
-                      </button>
-                    )}
-
                     {showNextButton && (
                       <button
                         onClick={handleNext}

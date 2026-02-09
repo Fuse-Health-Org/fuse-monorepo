@@ -54,6 +54,7 @@
     "embla-carousel-react": "catalog:",
     "input-otp": "catalog:",
     "jsonwebtoken": "catalog:",
+    "lru-cache": "catalog:",
     "lucide-react": "catalog:",
     "next": "catalog:next14",
     "next-themes": "catalog:",

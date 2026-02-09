@@ -15,7 +15,7 @@ import UserRoles from "@models/UserRoles";
 import { AuditAction, AuditResourceType, AuditService } from "@services/audit.service";
 import OrderService from "@services/order.service";
 import stripe from "@utils/useGetStripeClient";
-import { useGlobalFees } from "@utils/useGlobalFees";
+import { useGlobalFees, getPlatformFeePercent } from "@utils/useGlobalFees";
 import { createPaymentIntentSchema } from "@fuse/validators";
 import { Request, Response } from 'express';
 import { Op } from "sequelize";
@@ -185,7 +185,12 @@ export const createPaymentIntent = async (req: Request, res: Response) => {
         // Calculate distribution: platform fee (% of total), stripe fee, doctor flat, pharmacy wholesale, brand residual
         // If Clinic has a Stripe Connect account, we transfer only the brand residual to the clinic
         const fees = await useGlobalFees();
-        const platformFeePercent = fees.platformFeePercent;
+        
+        // Get platform fee percent based on clinic's tier (or global fallback)
+        const platformFeePercent = treatment.clinicId 
+            ? await getPlatformFeePercent(treatment.clinicId)
+            : fees.platformFeePercent;
+        
         const stripeFeePercent = fees.stripeFeePercent;
         const doctorFlatUsd = fees.doctorFlatFeeUsd;
 
@@ -264,6 +269,7 @@ export const createPaymentIntent = async (req: Request, res: Response) => {
         try {
             await order.update({
                 platformFeeAmount: platformFeeUsd,
+                platformFeePercent: Number(platformFeePercent.toFixed(2)),
                 stripeAmount: Number(stripeFeeUsd.toFixed(2)),
                 doctorAmount: Number(doctorFlatUsd.toFixed(2)),
                 pharmacyWholesaleAmount: Number(pharmacyWholesaleTotal.toFixed(2)),

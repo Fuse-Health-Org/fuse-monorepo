@@ -86,9 +86,9 @@ export function MetricCards({ startDate, endDate }: MetricCardsProps) {
   const formatPercentage = (value: number) => {
     const isPositive = value >= 0;
     return (
-      <span className={`inline-flex items-center text-xs ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
-        {isPositive ? <ArrowUp className="h-3 w-3 mr-0.5" /> : <ArrowDown className="h-3 w-3 mr-0.5" />}
-        {Math.abs(value).toFixed(1)}%
+      <span className={`inline-flex items-center text-sm font-medium ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
+        {isPositive ? <ArrowUp className="h-3.5 w-3.5 mr-0.5" /> : <ArrowDown className="h-3.5 w-3.5 mr-0.5" />}
+        {isPositive ? '+' : ''}{Math.abs(value).toFixed(0)}% this week
       </span>
     );
   };
@@ -129,7 +129,7 @@ export function MetricCards({ startDate, endDate }: MetricCardsProps) {
       value: formatCurrency(metrics.revenue),
       description: metrics.percentageChanges?.revenue !== undefined 
         ? formatPercentage(metrics.percentageChanges.revenue)
-        : "No previous data",
+        : <span className="text-sm text-muted-foreground">No previous data</span>,
       icon: DollarSign,
     },
     {
@@ -137,13 +137,16 @@ export function MetricCards({ startDate, endDate }: MetricCardsProps) {
       value: metrics.orderCount.toString(),
       description: metrics.percentageChanges?.orders !== undefined
         ? formatPercentage(metrics.percentageChanges.orders)
-        : `${metrics.conversionRate.toFixed(1)}% conversion`,
+        : <span className="text-sm text-orange-600 flex items-center gap-1">
+            <span className="inline-block w-2 h-2 bg-orange-600 rounded-full"></span>
+            Needs attention
+          </span>,
       icon: ShoppingCart,
     },
     {
       title: "Active Subscriptions",
       value: metrics.activeSubscriptions.toString(),
-      description: `${metrics.newPatients} new patients`,
+      description: <span className="text-sm text-muted-foreground">Last 30 days</span>,
       icon: Users,
     },
     {
@@ -151,26 +154,29 @@ export function MetricCards({ startDate, endDate }: MetricCardsProps) {
       value: formatCurrency(metrics.avgOrderValue),
       description: metrics.percentageChanges?.avgOrderValue !== undefined
         ? formatPercentage(metrics.percentageChanges.avgOrderValue)
-        : `Based on ${metrics.orderCount} orders`,
+        : <span className="text-sm text-muted-foreground">Based on {metrics.orderCount} orders</span>,
       icon: TrendingUp,
     },
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-      {metricItems.map((metric) => (
-        <Card key={metric.title} className="bg-card border-border">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-medium text-muted-foreground">{metric.title}</h3>
-              <metric.icon className="h-4 w-4 text-muted-foreground" />
-            </div>
-            <div className="space-y-2">
-              <p className="text-2xl font-bold text-foreground">{metric.value}</p>
-              <div className="text-xs text-muted-foreground">{metric.description}</div>
-            </div>
-          </CardContent>
-        </Card>
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+      {metricItems.map((metric, index) => (
+        <div key={metric.title} className={index === 0 ? "glow-card" : ""}>
+          <Card className={`bg-card border-border shadow-apple-md hover:shadow-apple-lg transition-smooth ${index === 0 ? "border-0" : ""}`}>
+            <CardContent className="p-6">
+              <div className="space-y-1 mb-4">
+                <h3 className="text-xs font-semibold text-muted-foreground/70 uppercase tracking-wide">{metric.title}</h3>
+              </div>
+              <div className="space-y-3">
+                <p className="text-3xl font-semibold text-foreground tracking-tight">{metric.value}</p>
+                <div className="flex items-center gap-1.5">
+                  {metric.description}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       ))}
     </div>
   )

@@ -170,6 +170,49 @@ export default function ProgramEditor() {
         }
     }, [token, id, isCreateMode, router.isReady, authLoading])
 
+    // Load template data if creating from template
+    useEffect(() => {
+        const loadTemplate = async () => {
+            if (!router.isReady || !isCreateMode || !token) return
+            
+            const templateId = router.query.templateId as string
+            if (!templateId) return
+
+            try {
+                const response = await fetch(`${API_URL}/program-templates/${templateId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                })
+
+                if (response.ok) {
+                    const data = await response.json()
+                    if (data.success && data.data) {
+                        const template = data.data
+                        // Pre-fill form with template data
+                        setName(template.name)
+                        setDescription(template.description || '')
+                        setMedicalTemplateId(template.medicalTemplateId || null)
+                        setIsActive(template.isActive)
+                        // Load non-medical services from template
+                        setHasPatientPortal(template.hasPatientPortal || false)
+                        setPatientPortalPrice(parseFloat(template.patientPortalPrice) || 0)
+                        setHasBmiCalculator(template.hasBmiCalculator || false)
+                        setBmiCalculatorPrice(parseFloat(template.bmiCalculatorPrice) || 0)
+                        setHasProteinIntakeCalculator(template.hasProteinIntakeCalculator || false)
+                        setProteinIntakeCalculatorPrice(parseFloat(template.proteinIntakeCalculatorPrice) || 0)
+                        setHasCalorieDeficitCalculator(template.hasCalorieDeficitCalculator || false)
+                        setCalorieDeficitCalculatorPrice(parseFloat(template.calorieDeficitCalculatorPrice) || 0)
+                        setHasEasyShopping(template.hasEasyShopping || false)
+                        setEasyShoppingPrice(parseFloat(template.easyShoppingPrice) || 0)
+                    }
+                }
+            } catch (err) {
+                console.error('Error loading template:', err)
+            }
+        }
+
+        loadTemplate()
+    }, [router.isReady, router.query.templateId, isCreateMode, token])
+
     // Load medical templates
     useEffect(() => {
         if (token) {
@@ -441,7 +484,7 @@ export default function ProgramEditor() {
             setSaving(true)
             setError(null)
 
-            const payload = {
+            const payload: any = {
                 name: name.trim(),
                 description: description.trim() || undefined,
                 medicalTemplateId: medicalTemplateId || undefined,
@@ -458,6 +501,11 @@ export default function ProgramEditor() {
                 hasEasyShopping: programMode === 'unified' ? hasEasyShopping : false,
                 easyShoppingPrice: programMode === 'unified' ? easyShoppingPrice : 0,
                 isActive,
+            }
+
+            // Include templateId if creating from template
+            if (isCreateMode && router.query.templateId) {
+                payload.templateId = router.query.templateId as string
             }
 
             const url = isCreateMode ? `${API_URL}/programs` : `${API_URL}/programs/${id}`

@@ -96,6 +96,9 @@ class QuestionnaireService {
         "category",
         "userId",
         "productOfferType",
+        "medicalCompanySource",
+        "medicalTemplateApprovedByFuseAdmin",
+        "status",
         "createdAt",
         "updatedAt",
       ],
@@ -225,6 +228,8 @@ class QuestionnaireService {
       doctorQuestionsSetup?: boolean;
       status?: "in_progress" | "ready_for_review" | "ready";
       productId?: string | null;
+      medicalCompanySource?: 'fuse' | 'md-integrations' | 'beluga'; // Medical company source
+      medicalTemplateApprovedByFuseAdmin?: 'pending' | 'approved' | 'rejected';
     }
   ) {
     const template = await Questionnaire.findOne({
@@ -248,6 +253,8 @@ class QuestionnaireService {
         updates.doctorQuestionsSetup ?? template.doctorQuestionsSetup,
       ...(updates.status !== undefined && { status: updates.status }),
       ...(updates.productId !== undefined && { productId: updates.productId }),
+      ...(updates.medicalCompanySource !== undefined && { medicalCompanySource: updates.medicalCompanySource }),
+      ...(updates.medicalTemplateApprovedByFuseAdmin !== undefined && { medicalTemplateApprovedByFuseAdmin: updates.medicalTemplateApprovedByFuseAdmin }),
     });
 
     return this.getTemplateById(id);

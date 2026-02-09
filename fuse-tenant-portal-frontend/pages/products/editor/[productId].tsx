@@ -15,6 +15,7 @@ import { ProductDetailsEditor } from "@/components/products/ProductDetailsEditor
 import { NoFormAttached } from "@/components/products/NoFormAttached"
 import { PharmacyStateManager } from "@/components/products/PharmacyStateManager"
 import { MDIOfferingManager } from "@/components/products/MDIOfferingManager"
+import { BelugaProductManager } from "@/components/products/BelugaProductManager"
 
 interface Step {
   id: string
@@ -68,6 +69,7 @@ interface Product {
   isActive: boolean
   slug?: string
   imageUrl?: string
+  belugaProductId?: string | null
 }
 
 export default function ProductEditor() {
@@ -2151,9 +2153,9 @@ export default function ProductEditor() {
   }
 
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex h-screen bg-background overflow-hidden">
       <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col min-h-0">
         <Header />
         <main className="flex-1 overflow-y-auto p-8 space-y-6">
           {/* Back Button */}
@@ -2176,6 +2178,15 @@ export default function ProductEditor() {
             <MDIOfferingManager 
               productId={product.id} 
               productName={product.name}
+            />
+          )}
+
+          {/* Beluga Integration */}
+          {product && (
+            <BelugaProductManager 
+              productId={product.id} 
+              productName={product.name}
+              currentBelugaProductId={product.belugaProductId}
             />
           )}
 

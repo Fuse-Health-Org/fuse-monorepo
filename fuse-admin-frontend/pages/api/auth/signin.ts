@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
+import { applyRateLimit, rateLimitPresets } from '../../../lib/rateLimiter'
 
 // Mock user database - in production, this would be a real database
 const MOCK_USERS = [
@@ -30,7 +31,14 @@ function generateMockToken(userId: string): string {
   return Buffer.from(JSON.stringify(payload)).toString('base64')
 }
 
-export default function handler(req: NextApiRequest, res: NextApiResponse) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  // Apply rate limiting for auth endpoints (5 attempts per 15 minutes)
+  try {
+    await applyRateLimit(req, res, rateLimitPresets.auth);
+  } catch {
+    return; // Rate limit response already sent
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({ success: false, message: 'Method not allowed' })
   }

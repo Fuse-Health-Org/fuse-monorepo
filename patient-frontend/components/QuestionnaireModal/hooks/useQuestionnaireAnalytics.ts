@@ -18,6 +18,7 @@ export function useQuestionnaireAnalytics(
   const hasTrackedDropOffRef = useRef(false);
   const lastStageRef = useRef<'product' | 'payment' | 'account'>('product');
   const prevIsOpenRef = useRef(isOpen);
+  const lastTrackedStepRef = useRef<number>(-1);
 
   // Track form view when modal opens
   useEffect(() => {
@@ -124,6 +125,8 @@ export function useQuestionnaireAnalytics(
 
           hasTrackedDropOffRef.current = true;
 
+          const currentStep = questionnaire?.steps?.[currentStepIndex];
+          
           trackFormDropOff({
             userId,
             productId: tenantProductId,
@@ -135,6 +138,9 @@ export function useQuestionnaireAnalytics(
             useBeacon,
             sourceType: affiliateSlug ? 'affiliate' : 'brand',
             affiliateSlug: affiliateSlug || undefined,
+            stepNumber: currentStepIndex + 1,
+            stepTitle: currentStep?.title,
+            sectionType: currentStep?.sectionType || currentStep?.category,
           });
         }
       }
@@ -175,6 +181,8 @@ export function useQuestionnaireAnalytics(
 
         hasTrackedDropOffRef.current = true;
 
+        const currentStep = questionnaire?.steps?.[currentStepIndex];
+        
         trackFormDropOff({
           userId,
           productId: tenantProductId,
@@ -183,9 +191,12 @@ export function useQuestionnaireAnalytics(
           clinicId: domainClinic.id,
           clinicName: domainClinic.name,
           productName: productName || undefined,
-          useBeacon: false, // Use regular fetch for explicit closes
+          useBeacon: false,
           sourceType: affiliateSlug ? 'affiliate' : 'brand',
           affiliateSlug: affiliateSlug || undefined,
+          stepNumber: currentStepIndex + 1,
+          stepTitle: currentStep?.title,
+          sectionType: currentStep?.sectionType || currentStep?.category,
         });
       }
     }
@@ -193,6 +204,50 @@ export function useQuestionnaireAnalytics(
     // Update the previous value
     prevIsOpenRef.current = isOpen;
   }, [isOpen, tenantProductFormId, tenantProductId, domainClinic, productName]);
+
+  // Track step views whenever user navigates to a new step
+  useEffect(() => {
+    const trackStepView = async () => {
+      if (!isOpen || !questionnaire || !tenantProductFormId || !tenantProductId || !domainClinic) {
+        return;
+      }
+
+      // Skip if we've already tracked this step
+      if (lastTrackedStepRef.current === currentStepIndex) {
+        return;
+      }
+
+      const currentStep = questionnaire.steps?.[currentStepIndex];
+      if (!currentStep) return;
+
+      const userId = (domainClinic as any).userId || (domainClinic as any).ownerId;
+      if (!userId) return;
+
+      console.log('📊 [Analytics] Tracking step view:', {
+        stepNumber: currentStepIndex + 1,
+        stepTitle: currentStep.title,
+        sectionType: currentStep.sectionType || currentStep.category
+      });
+
+      await trackFormView({
+        userId,
+        productId: tenantProductId,
+        formId: tenantProductFormId,
+        clinicId: domainClinic.id,
+        clinicName: domainClinic.name,
+        productName: productName || undefined,
+        sourceType: affiliateSlug ? 'affiliate' : 'brand',
+        affiliateSlug: affiliateSlug || undefined,
+        stepNumber: currentStepIndex + 1,
+        stepTitle: currentStep.title,
+        sectionType: currentStep.sectionType || currentStep.category
+      });
+
+      lastTrackedStepRef.current = currentStepIndex;
+    };
+
+    trackStepView();
+  }, [currentStepIndex, isOpen, questionnaire, tenantProductFormId, tenantProductId, domainClinic, productName, affiliateSlug]);
 
   // Update the last stage ref whenever the user navigates
   useEffect(() => {
