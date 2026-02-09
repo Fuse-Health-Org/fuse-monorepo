@@ -64,34 +64,75 @@ interface SearchPatientsRequest {
 
 // ========== Prescription Interfaces ==========
 
-// Example interfaces - adjust based on Olympia's actual API structure
+interface PrescriptionProduct {
+  prod_id: number;
+  qty: number;
+  sig: string; // Prescription instructions (e.g., "Use as directed")
+  doc_note?: string; // Doctor's notes
+  refills: number;
+}
+
+interface PrescriptionPhysician {
+  physician_fname: string;
+  physician_lname: string;
+  physician_phone: string;
+  physician_npi: string; // National Provider Identifier
+}
+
 interface CreatePrescriptionRequest {
-  patient: {
-    first_name: string;
-    last_name: string;
-    email: string;
-    phone: string;
-    date_of_birth: string;
-    address: {
-      street: string;
-      city: string;
-      state: string;
-      zip: string;
-    };
-  };
-  prescription: {
-    product_id: string;
-    quantity: number;
-    dosage: string;
-    instructions: string;
-  };
-  vendor_order_id: string; // Your internal order ID
+  patient_id: string; // Olympia patient UUID (13 characters)
+  physician: PrescriptionPhysician;
+  products: PrescriptionProduct[];
+  allergies?: string;
+  med_cond?: string; // Medical conditions
+  p_last_visit?: string; // Format: YYYY-MM-DD
+  ship_method: string; // e.g., "overnight", "standard"
+  ship_to: string; // e.g., "patient", "physician"
+  bill_to: string; // e.g., "patient", "physician"
+  vendor_order_id?: string; // Your internal order ID for tracking
+  pt_team_username?: string;
+  
+  // Optional patient override fields
+  pt_fname?: string;
+  pt_lname?: string;
+  pt_address?: string;
+  pt_address2?: string;
+  pt_city?: string;
+  pt_state?: string;
+  pt_zip?: string;
+  pt_phone?: string;
+  pt_email?: string;
+  pt_dob?: string;
+  pt_dl_state?: string;
+  pt_dl_number?: string;
+  pt_dl_exp?: string;
+  
+  // Optional shipping override
+  ship_address_1?: string;
+  ship_address_2?: string;
+  ship_city?: string;
+  ship_state?: string;
+  ship_zip?: string;
+  
+  // Optional additional fields
+  created_date?: string; // datetime
+  est_ship_date?: string; // datetime
+  ship_date?: string; // datetime
+  technician?: number;
+  notes?: string;
+  entered?: string; // date
+  entered_by?: number;
+  po?: string; // Purchase order
+  refills?: number;
+  can_by?: string;
+  cc_used?: number;
+  patient_team_id?: number;
+  credit_card_ref?: string;
+  discount_code_applied?: string;
 }
 
 interface CreatePrescriptionResponse {
-  success: boolean;
-  order_id: string;
-  message?: string;
+  prescriptionID: number;
 }
 
 class OlympiaPharmacyApiService {
@@ -209,24 +250,24 @@ class OlympiaPharmacyApiService {
   // ========== Prescription Methods ==========
 
   /**
-   * Create a new prescription order
-   * @param data Prescription data
-   * @returns Response from Olympia Pharmacy API
+   * Create a new prescription order in Olympia Pharmacy
+   * @param data Prescription data including patient ID, physician, and products
+   * @returns Prescription ID
    */
   async createPrescription(data: CreatePrescriptionRequest): Promise<CreatePrescriptionResponse> {
     try {
-      console.log('📝 Creating prescription order with Olympia Pharmacy:', data.vendor_order_id);
+      console.log('💊 Creating prescription in Olympia Pharmacy for patient:', data.patient_id);
 
       // Get authenticated axios client
       const client = await olympiaPharmacyAuthService.getAuthenticatedClient();
 
-      // Make API request (adjust endpoint path based on actual API)
+      // Make API request
       const response = await client.post<CreatePrescriptionResponse>(
-        '/api/v2/prescription',
+        '/api/v2/createPrescription',
         data
       );
 
-      console.log('✅ Prescription created successfully:', response.data.order_id);
+      console.log('✅ Prescription created successfully, ID:', response.data.prescriptionID);
 
       return response.data;
     } catch (error: any) {
@@ -239,7 +280,7 @@ class OlympiaPharmacyApiService {
         const client = await olympiaPharmacyAuthService.getAuthenticatedClient();
         
         const response = await client.post<CreatePrescriptionResponse>(
-          '/api/v2/prescription',
+          '/api/v2/createPrescription',
           data
         );
         
@@ -335,6 +376,8 @@ export type {
   UpdatePatientResponse,
   SearchPatientsRequest,
   SearchPatientField,
+  PrescriptionProduct,
+  PrescriptionPhysician,
   CreatePrescriptionRequest,
   CreatePrescriptionResponse,
 };
