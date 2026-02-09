@@ -39,6 +39,10 @@ playwright-report/
 playwright/.cache/
 backup env
 
+# Temporary files and cache
+temp/
+*.cache.json
+
 MdIntegrationsAPIDocs.pdf
 
 caddy.tar.gzMdIntegrationsAPIDocs.txt
