@@ -7,7 +7,7 @@ import Sale from './Sale';
 import CustomWebsite from './CustomWebsite';
 import User from './User';
 import BrandSubscriptionPlans from './BrandSubscriptionPlans';
-import { PaymentStatus, MerchantOfRecord, PatientPortalDashboardFormat } from '@fuse/enums';
+import { PaymentStatus, MerchantOfRecord, MedicalCompanySlug } from '@fuse/enums';
 
 @Table({
     freezeTableName: true,
@@ -128,11 +128,11 @@ export default class Clinic extends Entity {
     declare defaultFormColor?: string;
 
     @Column({
-        type: DataType.ENUM(...Object.values(PatientPortalDashboardFormat)),
+        type: DataType.STRING,
         allowNull: false,
-        defaultValue: PatientPortalDashboardFormat.FUSE,
+        defaultValue: MedicalCompanySlug.FUSE,
     })
-    declare patientPortalDashboardFormat: PatientPortalDashboardFormat;
+    declare patientPortalDashboardFormat: string;
 
     // Affiliate relationship - if this clinic belongs to an affiliate of another clinic
     @ForeignKey(() => Clinic)

@@ -5,7 +5,7 @@ import {
     AuditResourceType,
 } from "../../services/audit.service";
 import Clinic from "../../models/Clinic";
-import { PatientPortalDashboardFormat } from "@fuse/enums";
+import { MedicalCompanySlug } from "@fuse/enums";
 import BrandInvitation, { InvitationType } from "../../models/BrandInvitation";
 import {
     createJWTToken,
@@ -1299,10 +1299,10 @@ export function registerAuthEndpoints(
                 const slug = await generateUniqueSlug(clinicName.trim());
 
                 // Determine dashboard format based on invitation or default
-                let dashboardFormat: PatientPortalDashboardFormat;
+                let dashboardFormat: string;
                 if (isFixedMDILink) {
                     // Fixed MDI link - always use MD_INTEGRATIONS
-                    dashboardFormat = PatientPortalDashboardFormat.MD_INTEGRATIONS;
+                    dashboardFormat = MedicalCompanySlug.MD_INTEGRATIONS;
                 } else if (brandInvitation) {
                     // Use format from invitation (doctor invitation)
                     dashboardFormat = brandInvitation.patientPortalDashboardFormat;
@@ -1310,9 +1310,9 @@ export function registerAuthEndpoints(
                     // For brand signup, default to MD_INTEGRATIONS format
                     // (can be changed later in Tenant Management portal if needed)
                     dashboardFormat =
-                        patientPortalDashboardFormat === 'fuse'
-                            ? PatientPortalDashboardFormat.FUSE
-                            : PatientPortalDashboardFormat.MD_INTEGRATIONS;
+                        patientPortalDashboardFormat === MedicalCompanySlug.FUSE
+                            ? MedicalCompanySlug.FUSE
+                            : MedicalCompanySlug.MD_INTEGRATIONS;
                 }
 
                 clinic = await Clinic.create({

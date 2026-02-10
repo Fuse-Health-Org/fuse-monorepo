@@ -12,6 +12,7 @@ import { useAuth } from "@/contexts/AuthContext"
 import { QuestionEditor } from "../QuestionEditor"
 import { useProducts } from "@/hooks/useProducts"
 import { ProductAssignmentModal } from "@/components/ProductAssignmentModal"
+import { MedicalCompanySlug } from "@fuse/enums"
 
 interface Step {
   id: string
@@ -96,7 +97,7 @@ export default function TemplateEditor() {
   const stepRefs = useRef<Map<string, HTMLDivElement>>(new Map())
   const [editingTemplateName, setEditingTemplateName] = useState(false)
   const [tempTemplateName, setTempTemplateName] = useState("")
-  const [medicalCompanySource, setMedicalCompanySource] = useState<'fuse' | 'md-integrations' | 'beluga'>('md-integrations')
+  const [medicalCompanySource, setMedicalCompanySource] = useState<MedicalCompanySlug>(MedicalCompanySlug.MD_INTEGRATIONS)
   const [approvalStatus, setApprovalStatus] = useState<'pending' | 'approved' | 'rejected'>('pending')
   const [togglingApproval, setTogglingApproval] = useState(false)
   const [selectedQuestionForConditional, setSelectedQuestionForConditional] = useState<{
@@ -139,7 +140,7 @@ export default function TemplateEditor() {
 
   // Medical platform change confirmation
   const [showPlatformChangeModal, setShowPlatformChangeModal] = useState(false)
-  const [pendingPlatformChange, setPendingPlatformChange] = useState<'fuse' | 'md-integrations' | 'beluga' | null>(null)
+  const [pendingPlatformChange, setPendingPlatformChange] = useState<MedicalCompanySlug | null>(null)
 
   // Use products hook
   const {
@@ -156,17 +157,17 @@ export default function TemplateEditor() {
     const assignedProducts = products.filter(p => assignedProductIds.includes(p.id))
     
     return assignedProducts.filter(product => {
-      if (medicalCompanySource === 'fuse') {
+      if (medicalCompanySource === MedicalCompanySlug.FUSE) {
         // Fuse products should NOT have mdOfferingId or belugaProductId
         if (product.mdOfferingId || product.belugaProductId) {
           return true // Incompatible: Fuse selected but product has platform-specific ID
         }
-      } else if (medicalCompanySource === 'md-integrations') {
+      } else if (medicalCompanySource === MedicalCompanySlug.MD_INTEGRATIONS) {
         // MDI products MUST have mdOfferingId
         if (!product.mdOfferingId) {
           return true // Incompatible: MDI selected but product has no MDI ID
         }
-      } else if (medicalCompanySource === 'beluga') {
+      } else if (medicalCompanySource === MedicalCompanySlug.BELUGA) {
         // Beluga products MUST have belugaProductId
         if (!product.belugaProductId) {
           return true // Incompatible: Beluga selected but product has no Beluga ID
@@ -177,7 +178,7 @@ export default function TemplateEditor() {
   }, [template?.id, products, getAssignedProducts, medicalCompanySource])
 
   // Check if changing to a new platform would create incompatibilities
-  const getIncompatibleProductsForPlatform = (newPlatform: 'fuse' | 'md-integrations' | 'beluga') => {
+  const getIncompatibleProductsForPlatform = (newPlatform: MedicalCompanySlug) => {
     if (!template?.id) return []
     
     const assignedProductIds = getAssignedProducts(template.id)
@@ -187,20 +188,20 @@ export default function TemplateEditor() {
     console.log('📦 Assigned products:', assignedProducts.map(p => ({ name: p.name, mdOfferingId: p.mdOfferingId, belugaProductId: p.belugaProductId })))
     
     const incompatible = assignedProducts.filter(product => {
-      if (newPlatform === 'fuse') {
+      if (newPlatform === MedicalCompanySlug.FUSE) {
         // Fuse products should NOT have mdOfferingId or belugaProductId
         // If they do, they're specific to another platform
         if (product.mdOfferingId || product.belugaProductId) {
           console.log('❌ Product incompatible with Fuse:', product.name, 'has platform-specific ID')
           return true
         }
-      } else if (newPlatform === 'md-integrations') {
+      } else if (newPlatform === MedicalCompanySlug.MD_INTEGRATIONS) {
         // MDI products MUST have mdOfferingId
         if (!product.mdOfferingId) {
           console.log('❌ Product incompatible with MDI:', product.name, 'mdOfferingId:', product.mdOfferingId)
           return true
         }
-      } else if (newPlatform === 'beluga') {
+      } else if (newPlatform === MedicalCompanySlug.BELUGA) {
         // Beluga products MUST have belugaProductId
         if (!product.belugaProductId) {
           console.log('❌ Product incompatible with Beluga:', product.name, 'belugaProductId:', product.belugaProductId)
@@ -215,7 +216,7 @@ export default function TemplateEditor() {
   }
 
   // Handle medical platform change with confirmation if needed
-  const handlePlatformChange = async (newPlatform: 'fuse' | 'md-integrations' | 'beluga') => {
+  const handlePlatformChange = async (newPlatform: MedicalCompanySlug) => {
     console.log('🔄 Attempting to change platform to:', newPlatform, 'from:', medicalCompanySource)
     if (newPlatform === medicalCompanySource) return
     
@@ -239,7 +240,7 @@ export default function TemplateEditor() {
   }
 
   // Actually update the medical platform
-  const updateMedicalPlatform = async (newSource: 'fuse' | 'md-integrations' | 'beluga') => {
+  const updateMedicalPlatform = async (newSource: MedicalCompanySlug) => {
     if (!token || !templateId || typeof templateId !== 'string') return
     
     try {
@@ -254,11 +255,11 @@ export default function TemplateEditor() {
             const product = products.find(p => p.id === id)
             if (!product) return false // Can't verify → remove to be safe
             
-            if (newSource === 'fuse') {
+            if (newSource === MedicalCompanySlug.FUSE) {
               return !product.mdOfferingId && !product.belugaProductId
-            } else if (newSource === 'md-integrations') {
+            } else if (newSource === MedicalCompanySlug.MD_INTEGRATIONS) {
               return !!product.mdOfferingId
-            } else if (newSource === 'beluga') {
+            } else if (newSource === MedicalCompanySlug.BELUGA) {
               return !!product.belugaProductId
             }
             return false
@@ -338,7 +339,7 @@ export default function TemplateEditor() {
         // Set form status from template data
         setFormStatus(data.data?.status || 'in_progress')
         // Set medical company source from template data
-        setMedicalCompanySource(data.data?.medicalCompanySource || 'md-integrations')
+        setMedicalCompanySource(data.data?.medicalCompanySource || MedicalCompanySlug.MD_INTEGRATIONS)
         // Set approval status from template data
         setApprovalStatus(data.data?.medicalTemplateApprovedByFuseAdmin || 'pending')
         // Normalize backend steps/questions/options into local editor shape
@@ -2261,17 +2262,17 @@ export default function TemplateEditor() {
                     <div className="flex items-center gap-2 mt-1">
                       <div
                         className={`flex-1 p-2 rounded-lg border-2 ${
-                          medicalCompanySource === 'fuse'
+                          medicalCompanySource === MedicalCompanySlug.FUSE
                             ? 'border-[#4FA59C] bg-[#4FA59C]/10'
                             : 'border-border opacity-40'
                         }`}
                         title="Fuse Health Platform"
                       >
                         <div className="flex flex-col items-center gap-1">
-                          <svg className={`w-4 h-4 ${medicalCompanySource === 'fuse' ? 'text-[#4FA59C]' : 'text-muted-foreground'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className={`w-4 h-4 ${medicalCompanySource === MedicalCompanySlug.FUSE ? 'text-[#4FA59C]' : 'text-muted-foreground'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                           </svg>
-                          <span className={`text-[10px] font-medium ${medicalCompanySource === 'fuse' ? 'text-[#4FA59C]' : 'text-muted-foreground'}`}>
+                          <span className={`text-[10px] font-medium ${medicalCompanySource === MedicalCompanySlug.FUSE ? 'text-[#4FA59C]' : 'text-muted-foreground'}`}>
                             Fuse
                           </span>
                         </div>
@@ -2279,17 +2280,17 @@ export default function TemplateEditor() {
 
                       <div
                         className={`flex-1 p-2 rounded-lg border-2 ${
-                          medicalCompanySource === 'md-integrations'
+                          medicalCompanySource === MedicalCompanySlug.MD_INTEGRATIONS
                             ? 'border-[#4FA59C] bg-[#4FA59C]/10'
                             : 'border-border opacity-40'
                         }`}
                         title="MD Integrations Platform"
                       >
                         <div className="flex flex-col items-center gap-1">
-                          <svg className={`w-4 h-4 ${medicalCompanySource === 'md-integrations' ? 'text-[#4FA59C]' : 'text-muted-foreground'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className={`w-4 h-4 ${medicalCompanySource === MedicalCompanySlug.MD_INTEGRATIONS ? 'text-[#4FA59C]' : 'text-muted-foreground'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3M8 15v1a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6v-4M20 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" />
                           </svg>
-                          <span className={`text-[10px] font-medium ${medicalCompanySource === 'md-integrations' ? 'text-[#4FA59C]' : 'text-muted-foreground'}`}>
+                          <span className={`text-[10px] font-medium ${medicalCompanySource === MedicalCompanySlug.MD_INTEGRATIONS ? 'text-[#4FA59C]' : 'text-muted-foreground'}`}>
                             MDI
                           </span>
                         </div>
@@ -2297,17 +2298,17 @@ export default function TemplateEditor() {
 
                       <div
                         className={`flex-1 p-2 rounded-lg border-2 ${
-                          medicalCompanySource === 'beluga'
+                          medicalCompanySource === MedicalCompanySlug.BELUGA
                             ? 'border-[#4FA59C] bg-[#4FA59C]/10'
                             : 'border-border opacity-40'
                         }`}
                         title="Beluga Health Platform"
                       >
                         <div className="flex flex-col items-center gap-1">
-                          <svg className={`w-4 h-4 ${medicalCompanySource === 'beluga' ? 'text-[#4FA59C]' : 'text-muted-foreground'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className={`w-4 h-4 ${medicalCompanySource === MedicalCompanySlug.BELUGA ? 'text-[#4FA59C]' : 'text-muted-foreground'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                           </svg>
-                          <span className={`text-[10px] font-medium ${medicalCompanySource === 'beluga' ? 'text-[#4FA59C]' : 'text-muted-foreground'}`}>
+                          <span className={`text-[10px] font-medium ${medicalCompanySource === MedicalCompanySlug.BELUGA ? 'text-[#4FA59C]' : 'text-muted-foreground'}`}>
                             Beluga
                           </span>
                         </div>
@@ -2475,7 +2476,7 @@ export default function TemplateEditor() {
                         <p className="text-sm text-red-700 dark:text-red-300 mb-3">
                           {incompatibleProducts.length} {incompatibleProducts.length === 1 ? 'product is' : 'products are'} not configured for{' '}
                           <strong>
-                            {medicalCompanySource === 'md-integrations' ? 'MDI' : medicalCompanySource === 'beluga' ? 'Beluga' : 'Fuse'}
+                            {medicalCompanySource === MedicalCompanySlug.MD_INTEGRATIONS ? 'MDI' : medicalCompanySource === MedicalCompanySlug.BELUGA ? 'Beluga' : 'Fuse'}
                           </strong>. 
                           Please remove {incompatibleProducts.length === 1 ? 'it' : 'them'} or select a different medical platform.
                         </p>
@@ -4356,7 +4357,7 @@ export default function TemplateEditor() {
               <p className="text-muted-foreground leading-relaxed mb-4">
                 You are about to change the medical platform to{' '}
                 <strong className="text-foreground">
-                  {pendingPlatformChange === 'md-integrations' ? 'MDI' : pendingPlatformChange === 'beluga' ? 'Beluga' : 'Fuse'}
+                  {pendingPlatformChange === MedicalCompanySlug.MD_INTEGRATIONS ? 'MDI' : pendingPlatformChange === MedicalCompanySlug.BELUGA ? 'Beluga' : 'Fuse'}
                 </strong>.
               </p>
               

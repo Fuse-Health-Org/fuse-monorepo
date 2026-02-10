@@ -64,6 +64,7 @@ import BrandInvitation from '../models/BrandInvitation';
 import MedicalCompany from '../models/MedicalCompany';
 import MedicalCompanyPharmacy from '../models/MedicalCompanyPharmacy';
 import DoctorPharmacy from '../models/DoctorPharmacy';
+import { MedicalCompanySlug } from '@fuse/enums';
 import { MigrationService } from '../services/migration.service';
 
 // Load environment variables from .env.local
@@ -817,6 +818,44 @@ export async function initializeDatabase() {
     } catch (e) {
       if (process.env.NODE_ENV === 'development') {
         console.error('❌ Error creating Likes indexes:', e);
+      }
+      // ignore - don't fail startup
+    }
+
+    // Ensure default MedicalCompany records exist
+    try {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔍 Checking MedicalCompany records...');
+      }
+
+      const defaultCompanies = [
+        { name: 'Fuse', slug: MedicalCompanySlug.FUSE },
+        { name: 'MDI', slug: MedicalCompanySlug.MD_INTEGRATIONS },
+        { name: 'Beluga', slug: MedicalCompanySlug.BELUGA },
+      ];
+
+      for (const company of defaultCompanies) {
+        const existing = await MedicalCompany.findOne({
+          where: { slug: company.slug }
+        });
+
+        if (!existing) {
+          await MedicalCompany.create({
+            name: company.name,
+            slug: company.slug,
+          });
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`✅ Created MedicalCompany: ${company.name} (${company.slug})`);
+          }
+        } else {
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`✅ MedicalCompany already exists: ${company.name} (${company.slug})`);
+          }
+        }
+      }
+    } catch (e) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('❌ Error seeding MedicalCompany records:', e);
       }
       // ignore - don't fail startup
     }

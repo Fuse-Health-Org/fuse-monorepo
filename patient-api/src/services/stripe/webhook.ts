@@ -1,4 +1,5 @@
 import Stripe from 'stripe';
+import { MedicalCompanySlug } from '@fuse/enums';
 import Payment, { PaymentGoesTo } from '../../models/Payment';
 import Order, { OrderStatus } from '../../models/Order';
 import { StripeService } from '@fuse/stripe';
@@ -814,7 +815,7 @@ export const handlePaymentIntentAmountCapturableUpdated = async (paymentIntent: 
         clinic = await Clinic.findByPk(user.clinicId);
     }
 
-    if (!clinic || (clinic as any).patientPortalDashboardFormat !== 'md-integrations') {
+    if (!clinic || (clinic as any).patientPortalDashboardFormat !== MedicalCompanySlug.MD_INTEGRATIONS) {
         console.log('[MD-WH] ℹ️ Skipping MD Integrations - clinic does not use md-integrations format');
         return;
     }

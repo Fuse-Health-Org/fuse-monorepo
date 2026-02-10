@@ -1,4 +1,5 @@
 import Questionnaire from "../models/Questionnaire";
+import { MedicalCompanySlug } from "@fuse/enums";
 import QuestionnaireStep from "../models/QuestionnaireStep";
 import Question from "../models/Question";
 import QuestionOption from "../models/QuestionOption";
@@ -228,7 +229,7 @@ class QuestionnaireService {
       doctorQuestionsSetup?: boolean;
       status?: "in_progress" | "ready_for_review" | "ready";
       productId?: string | null;
-      medicalCompanySource?: 'fuse' | 'md-integrations' | 'beluga'; // Medical company source
+      medicalCompanySource?: MedicalCompanySlug; // Medical company source
       medicalTemplateApprovedByFuseAdmin?: 'pending' | 'approved' | 'rejected';
     }
   ) {

@@ -6,7 +6,7 @@ import BrandSubscriptionPlans from "../models/BrandSubscriptionPlans";
 import TenantCustomFeatures from "../models/TenantCustomFeatures";
 import UserRoles from "../models/UserRoles";
 import Clinic from "../models/Clinic";
-import { PatientPortalDashboardFormat } from "@fuse/enums";
+import { MedicalCompanySlug } from "@fuse/enums";
 import Order from "../models/Order";
 import Payment from "../models/Payment";
 import Prescription from "../models/Prescription";
@@ -1088,7 +1088,7 @@ export function registerClientManagementEndpoints(
         const { patientPortalDashboardFormat, forceUpdate } = req.body;
 
         // Validate patientPortalDashboardFormat
-        if (!patientPortalDashboardFormat || !['fuse', 'md-integrations'].includes(patientPortalDashboardFormat)) {
+        if (!patientPortalDashboardFormat || !Object.values(MedicalCompanySlug).includes(patientPortalDashboardFormat)) {
           return res.status(400).json({
             success: false,
             message: "Invalid patientPortalDashboardFormat. Must be 'fuse' or 'md-integrations'",
@@ -1115,9 +1115,7 @@ export function registerClientManagementEndpoints(
 
         // Check if format is changing
         const currentFormat = clinic.patientPortalDashboardFormat;
-        const newFormat = patientPortalDashboardFormat === 'md-integrations' 
-          ? PatientPortalDashboardFormat.MD_INTEGRATIONS 
-          : PatientPortalDashboardFormat.FUSE;
+        const newFormat = patientPortalDashboardFormat;
 
         if (currentFormat === newFormat) {
           return res.status(200).json({
@@ -1239,7 +1237,7 @@ export function registerClientManagementEndpoints(
         }
 
         // Validate that patientPortalDashboardFormat is FUSE
-        if (clinic.patientPortalDashboardFormat !== PatientPortalDashboardFormat.FUSE) {
+        if (clinic.patientPortalDashboardFormat !== MedicalCompanySlug.FUSE) {
           return res.status(400).json({
             success: false,
             message: "Cannot change main doctor. This feature is only available when patientPortalDashboardFormat is 'fuse'",

@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { useAuth } from "@/contexts/AuthContext"
 import { Search, Loader2, User as UserIcon, Save, Eye } from "lucide-react"
 import { toast } from "sonner"
+import { MedicalCompanySlug } from "@fuse/enums"
 
 interface BrandSubscriptionPlan {
   id: string
@@ -86,8 +87,8 @@ export default function ClientManagement() {
   const [previewing, setPreviewing] = useState(false)
   const [availablePlans, setAvailablePlans] = useState<BrandSubscriptionPlan[]>([])
   const [updatingRole, setUpdatingRole] = useState(false)
-  const [patientPortalDashboardFormat, setPatientPortalDashboardFormat] = useState<string>('fuse')
-  const [originalPatientPortalDashboardFormat, setOriginalPatientPortalDashboardFormat] = useState<string>('fuse')
+  const [patientPortalDashboardFormat, setPatientPortalDashboardFormat] = useState<string>(MedicalCompanySlug.FUSE)
+  const [originalPatientPortalDashboardFormat, setOriginalPatientPortalDashboardFormat] = useState<string>(MedicalCompanySlug.FUSE)
   const [showWarningModal, setShowWarningModal] = useState(false)
   const [pendingFormatChange, setPendingFormatChange] = useState<string | null>(null)
   const [checkingData, setCheckingData] = useState(false)
@@ -185,7 +186,7 @@ export default function ClientManagement() {
 
       if (response.ok) {
         const result = await response.json()
-        const format = result.data?.patientPortalDashboardFormat || 'fuse'
+        const format = result.data?.patientPortalDashboardFormat || MedicalCompanySlug.FUSE
         setPatientPortalDashboardFormat(format)
         setOriginalPatientPortalDashboardFormat(format)
         setMainDoctorId(result.data?.mainDoctorId || result.data?.mainDoctor?.id || null)
@@ -490,7 +491,7 @@ export default function ClientManagement() {
       }
 
       // Update main doctor if patientPortalDashboardFormat is FUSE
-      if (patientPortalDashboardFormat === 'fuse') {
+      if (patientPortalDashboardFormat === MedicalCompanySlug.FUSE) {
         const mainDoctorResponse = await fetch(`${baseUrl}/admin/users/${selectedUser.id}/clinic/main-doctor`, {
           method: 'PATCH',
           headers: {
@@ -1195,7 +1196,7 @@ export default function ClientManagement() {
                                   onChange={(e) => {
                                     setPatientPortalDashboardFormat(e.target.value)
                                     // Reset mainDoctorId if switching away from FUSE
-                                    if (e.target.value !== 'fuse') {
+                                    if (e.target.value !== MedicalCompanySlug.FUSE) {
                                       setMainDoctorId(null)
                                     }
                                   }}
@@ -1229,7 +1230,7 @@ export default function ClientManagement() {
                             </div>
 
                             {/* Main Doctor (only for FUSE format) */}
-                            {patientPortalDashboardFormat === 'fuse' && (
+                            {patientPortalDashboardFormat === MedicalCompanySlug.FUSE && (
                               <div className="space-y-4 pt-6 border-t border-border">
                                 <h3 className="font-semibold text-foreground">Responsible Doctor</h3>
                                 <p className="text-sm text-muted-foreground">
