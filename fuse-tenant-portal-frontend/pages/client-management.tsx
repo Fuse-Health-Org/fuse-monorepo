@@ -131,6 +131,24 @@ export default function ClientManagement() {
   const [loadingPharmacies, setLoadingPharmacies] = useState(false)
   const [togglingPharmacy, setTogglingPharmacy] = useState<string | null>(null)
 
+  // Doctor profile form state
+  const [savingDoctorProfile, setSavingDoctorProfile] = useState(false)
+  const [doctorForm, setDoctorForm] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phoneNumber: '',
+    dob: '',
+    gender: '',
+    address: '',
+    city: '',
+    state: '',
+    zipCode: '',
+    npiNumber: '',
+    isApprovedDoctor: false,
+    doctorLicenseStatesCoverage: [] as string[],
+  })
+
   // BrandSubscription form state
   const [formData, setFormData] = useState({
     productsChangedAmountOnCurrentCycle: 0,
@@ -453,6 +471,45 @@ export default function ClientManagement() {
         brand: user.role === 'brand',
         superAdmin: false,
       })
+    }
+
+    // Load doctor profile fields
+    setDoctorForm({
+      firstName: user.firstName || '',
+      lastName: user.lastName || '',
+      email: user.email || '',
+      phoneNumber: (user as any).phoneNumber || '',
+      dob: (user as any).dob || '',
+      gender: (user as any).gender || '',
+      address: (user as any).address || '',
+      city: (user as any).city || '',
+      state: (user as any).state || '',
+      zipCode: (user as any).zipCode || '',
+      npiNumber: (user as any).npiNumber || '',
+      isApprovedDoctor: (user as any).isApprovedDoctor || false,
+      doctorLicenseStatesCoverage: (user as any).doctorLicenseStatesCoverage || [],
+    })
+  }
+
+  const handleSaveDoctorProfile = async () => {
+    if (!selectedUser) return
+    setSavingDoctorProfile(true)
+    try {
+      const response = await fetch(`${baseUrl}/admin/users/${selectedUser.id}/doctor-profile`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(doctorForm),
+      })
+      if (!response.ok) throw new Error('Failed to update doctor profile')
+      alert('Doctor profile updated successfully!')
+    } catch (error) {
+      console.error('Error saving doctor profile:', error)
+      alert('Failed to save doctor profile')
+    } finally {
+      setSavingDoctorProfile(false)
     }
   }
 
@@ -997,6 +1054,220 @@ export default function ClientManagement() {
                         <Building2 className="h-12 w-12 mb-4" />
                         <p className="text-lg font-medium">No Medical Company Selected</p>
                         <p className="text-sm mt-2">Select a medical company from the list to view and edit its settings</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ) : roleFilter === 'doctor' ? (
+                // Doctor Profile Details
+                <Card className="lg:col-span-2">
+                  <CardHeader>
+                    <CardTitle>Doctor Profile</CardTitle>
+                    <CardDescription>
+                      View and edit doctor information
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {selectedUser ? (
+                      <div className="space-y-6">
+                        {/* Basic Info */}
+                        <div className="bg-muted/50 rounded-lg p-4 border border-border">
+                          <h3 className="font-semibold text-foreground mb-4">Basic Information</h3>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-sm text-muted-foreground mb-1">First Name</label>
+                              <Input
+                                value={doctorForm.firstName}
+                                onChange={(e) => setDoctorForm({ ...doctorForm, firstName: e.target.value })}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm text-muted-foreground mb-1">Last Name</label>
+                              <Input
+                                value={doctorForm.lastName}
+                                onChange={(e) => setDoctorForm({ ...doctorForm, lastName: e.target.value })}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm text-muted-foreground mb-1">Email</label>
+                              <Input
+                                value={doctorForm.email}
+                                onChange={(e) => setDoctorForm({ ...doctorForm, email: e.target.value })}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm text-muted-foreground mb-1">Phone Number</label>
+                              <Input
+                                value={doctorForm.phoneNumber}
+                                onChange={(e) => setDoctorForm({ ...doctorForm, phoneNumber: e.target.value })}
+                                placeholder="(555) 123-4567"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm text-muted-foreground mb-1">Date of Birth</label>
+                              <Input
+                                type="date"
+                                value={doctorForm.dob}
+                                onChange={(e) => setDoctorForm({ ...doctorForm, dob: e.target.value })}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm text-muted-foreground mb-1">Gender</label>
+                              <select
+                                value={doctorForm.gender}
+                                onChange={(e) => setDoctorForm({ ...doctorForm, gender: e.target.value })}
+                                className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              >
+                                <option value="">Select...</option>
+                                <option value="male">Male</option>
+                                <option value="female">Female</option>
+                                <option value="other">Other</option>
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Address */}
+                        <div className="bg-muted/50 rounded-lg p-4 border border-border">
+                          <h3 className="font-semibold text-foreground mb-4">Address</h3>
+                          <div className="space-y-4">
+                            <div>
+                              <label className="block text-sm text-muted-foreground mb-1">Street Address</label>
+                              <Input
+                                value={doctorForm.address}
+                                onChange={(e) => setDoctorForm({ ...doctorForm, address: e.target.value })}
+                              />
+                            </div>
+                            <div className="grid grid-cols-3 gap-4">
+                              <div>
+                                <label className="block text-sm text-muted-foreground mb-1">City</label>
+                                <Input
+                                  value={doctorForm.city}
+                                  onChange={(e) => setDoctorForm({ ...doctorForm, city: e.target.value })}
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm text-muted-foreground mb-1">State</label>
+                                <Input
+                                  value={doctorForm.state}
+                                  onChange={(e) => setDoctorForm({ ...doctorForm, state: e.target.value })}
+                                  placeholder="e.g. CA"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm text-muted-foreground mb-1">Zip Code</label>
+                                <Input
+                                  value={doctorForm.zipCode}
+                                  onChange={(e) => setDoctorForm({ ...doctorForm, zipCode: e.target.value })}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Medical Credentials */}
+                        <div className="bg-muted/50 rounded-lg p-4 border border-border">
+                          <h3 className="font-semibold text-foreground mb-4">Medical Credentials</h3>
+                          <div className="space-y-4">
+                            <div>
+                              <label className="block text-sm text-muted-foreground mb-1">NPI Number</label>
+                              <Input
+                                value={doctorForm.npiNumber}
+                                onChange={(e) => setDoctorForm({ ...doctorForm, npiNumber: e.target.value })}
+                                placeholder="10-digit NPI"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm text-muted-foreground mb-1">
+                                License States Coverage
+                              </label>
+                              <Input
+                                value={doctorForm.doctorLicenseStatesCoverage.join(', ')}
+                                onChange={(e) => setDoctorForm({
+                                  ...doctorForm,
+                                  doctorLicenseStatesCoverage: e.target.value
+                                    .split(',')
+                                    .map(s => s.trim().toUpperCase())
+                                    .filter(s => s.length > 0),
+                                })}
+                                placeholder="CA, NY, TX (comma separated)"
+                              />
+                              <p className="text-xs text-muted-foreground mt-1">Enter state codes separated by commas</p>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <label className="block text-sm font-medium text-foreground">Approved Doctor</label>
+                                <p className="text-xs text-muted-foreground">Whether this doctor is approved to practice on the platform</p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setDoctorForm({ ...doctorForm, isApprovedDoctor: !doctorForm.isApprovedDoctor })}
+                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-offset-2 ${
+                                  doctorForm.isApprovedDoctor ? 'bg-[#4FA59C]' : 'bg-gray-300 dark:bg-gray-600'
+                                }`}
+                              >
+                                <span
+                                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                    doctorForm.isApprovedDoctor ? 'translate-x-6' : 'translate-x-1'
+                                  }`}
+                                />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Roles */}
+                        <div className="bg-muted/50 rounded-lg p-4 border border-border">
+                          <h3 className="font-semibold text-foreground mb-2">Roles</h3>
+                          <p className="text-xs text-muted-foreground mb-3">Select all that apply</p>
+                          <div className="space-y-2">
+                            {[
+                              { key: 'patient', label: 'Patient' },
+                              { key: 'doctor', label: 'Doctor' },
+                              { key: 'admin', label: 'Admin' },
+                              { key: 'brand', label: 'Brand' },
+                              { key: 'superAdmin', label: 'Super Admin' },
+                            ].map(({ key, label }) => (
+                              <label key={key} className="flex items-center space-x-3 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={(userRolesData as any)[key]}
+                                  onChange={(e) => setUserRolesData({ ...userRolesData, [key]: e.target.checked })}
+                                  disabled={updatingRole}
+                                  className="w-4 h-4 text-[#4FA59C] border-input rounded focus:ring-[#4FA59C] bg-background"
+                                />
+                                <span className="text-sm text-foreground">{label}</span>
+                              </label>
+                            ))}
+                          </div>
+                          <Button
+                            onClick={handleRolesChange}
+                            disabled={updatingRole}
+                            className="mt-3 bg-[#4FA59C] hover:bg-[#3d8a82] text-white text-xs"
+                            size="sm"
+                          >
+                            {updatingRole ? 'Updating...' : 'Update Roles'}
+                          </Button>
+                        </div>
+
+                        <Button
+                          onClick={handleSaveDoctorProfile}
+                          disabled={savingDoctorProfile}
+                          className="bg-[#4FA59C] hover:bg-[#3d8a82] text-white"
+                        >
+                          {savingDoctorProfile ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          ) : (
+                            <Save className="h-4 w-4 mr-2" />
+                          )}
+                          {savingDoctorProfile ? 'Saving...' : 'Save Doctor Profile'}
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                        <UserIcon className="h-12 w-12 mb-4" />
+                        <p className="text-lg font-medium">No Doctor Selected</p>
+                        <p className="text-sm mt-2">Select a doctor from the list to view and edit their profile</p>
                       </div>
                     )}
                   </CardContent>

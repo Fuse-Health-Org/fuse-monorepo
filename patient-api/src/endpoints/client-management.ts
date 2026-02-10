@@ -748,6 +748,55 @@ export function registerClientManagementEndpoints(
     }
   });
 
+  // Update doctor profile fields
+  app.patch("/admin/users/:userId/doctor-profile", authenticateJWT, async (req, res) => {
+    try {
+      const currentUser = getCurrentUser(req);
+      if (!currentUser) {
+        return res.status(401).json({ success: false, message: "Not authenticated" });
+      }
+
+      const { userId } = req.params;
+      const targetUser = await User.findByPk(userId);
+      if (!targetUser) {
+        return res.status(404).json({ success: false, message: "User not found" });
+      }
+
+      const {
+        firstName, lastName, email, phoneNumber, dob, gender,
+        address, city, state, zipCode, npiNumber,
+        isApprovedDoctor, doctorLicenseStatesCoverage,
+      } = req.body;
+
+      await targetUser.update({
+        ...(firstName !== undefined && { firstName }),
+        ...(lastName !== undefined && { lastName }),
+        ...(email !== undefined && { email }),
+        ...(phoneNumber !== undefined && { phoneNumber }),
+        ...(dob !== undefined && { dob }),
+        ...(gender !== undefined && { gender }),
+        ...(address !== undefined && { address }),
+        ...(city !== undefined && { city }),
+        ...(state !== undefined && { state }),
+        ...(zipCode !== undefined && { zipCode }),
+        ...(npiNumber !== undefined && { npiNumber }),
+        ...(isApprovedDoctor !== undefined && { isApprovedDoctor }),
+        ...(doctorLicenseStatesCoverage !== undefined && { doctorLicenseStatesCoverage }),
+      });
+
+      console.log(`✅ [Client Mgmt] Updated doctor profile for user ${userId}`);
+
+      res.status(200).json({
+        success: true,
+        message: "Doctor profile updated successfully",
+        data: targetUser,
+      });
+    } catch (error) {
+      console.error("❌ Error updating doctor profile:", error);
+      res.status(500).json({ success: false, message: "Failed to update doctor profile" });
+    }
+  });
+
   // Impersonate user (generate token for preview)
   app.post(
     "/admin/users/:userId/impersonate",
