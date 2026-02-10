@@ -80,6 +80,7 @@ export default function ClientManagement() {
   const [loading, setLoading] = useState(false)
   const [users, setUsers] = useState<User[]>([])
   const [searchTerm, setSearchTerm] = useState("")
+  const [roleFilter, setRoleFilter] = useState<string>('brand')
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [saving, setSaving] = useState(false)
   const [previewing, setPreviewing] = useState(false)
@@ -550,6 +551,10 @@ export default function ClientManagement() {
   }
 
   const filteredUsers = users.filter(user => {
+    // Role filter
+    if (user.role !== roleFilter) return false
+
+    // Search filter
     const search = searchTerm.toLowerCase()
     return (
       user.firstName.toLowerCase().includes(search) ||
@@ -579,6 +584,31 @@ export default function ClientManagement() {
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="pl-10"
                     />
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 mt-3">
+                    {[
+                      { value: 'brand', label: 'Brands' },
+                      { value: 'doctor', label: 'Doctors' },
+                      { value: 'patient', label: 'Patients' },
+                      { value: 'affiliate', label: 'Affiliates' },
+                      { value: 'admin', label: 'Admins' },
+                    ].map((role) => (
+                      <button
+                        key={role.value}
+                        type="button"
+                        onClick={() => {
+                          setRoleFilter(role.value)
+                          setSearchTerm('')
+                        }}
+                        className={`px-3 py-1 text-xs font-medium rounded-full border transition-all ${
+                          roleFilter === role.value
+                            ? 'bg-[#4FA59C] text-white border-[#4FA59C]'
+                            : 'bg-muted/50 text-muted-foreground border-border hover:bg-muted hover:text-foreground'
+                        }`}
+                      >
+                        {role.label}
+                      </button>
+                    ))}
                   </div>
                 </CardHeader>
                 <CardContent>
