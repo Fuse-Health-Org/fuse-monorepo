@@ -303,7 +303,8 @@ export const createPaymentIntent = async (req: Request, res: Response) => {
                     doctorFlatUsd: doctorFlatUsd.toFixed(2),
                     pharmacyWholesaleTotalUsd: pharmacyWholesaleTotal.toFixed(2),
                 },
-                description: `Order ${orderNumber} - ${treatment.name}`,
+                // HIPAA: Use generic description only; do not include treatment/product names (Payment Processing Exemption)
+                description: `Order ${orderNumber} - Service`,
                 ...(transferData ? { transfer_data: transferData } : {}),
             });
         } catch (stripeError: any) {
