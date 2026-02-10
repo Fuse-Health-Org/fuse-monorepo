@@ -446,7 +446,8 @@ export const createPaymentIntent = async (req: Request, res: Response) => {
                     visitType: visitType || 'none',
                     visitFeeAmount: visitFeeAmount.toFixed(2),
                 },
-                description: `Order ${orderNumber}${treatment ? ` - ${treatment.name}` : ''}`,
+                // HIPAA: Use generic description only; do not include treatment/product names (Payment Processing Exemption)
+                description: `Order ${orderNumber} - Service`,
                 ...(transferData ? { transfer_data: transferData } : {}),
             });
         } catch (stripeError: any) {
