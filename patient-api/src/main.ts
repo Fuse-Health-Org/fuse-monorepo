@@ -12230,6 +12230,10 @@ async function startServer() {
   const { registerMDIntegrationsWebhooks } = await import('./endpoints/md-integrations/webhooks');
   registerMDIntegrationsWebhooks(app);
 
+  // ============= OLYMPIA PHARMACY ENDPOINTS =============
+  const { registerOlympiaAdminEndpoints } = await import('./endpoints/olympia-pharmacy/olympia-admin');
+  registerOlympiaAdminEndpoints(app, authenticateJWT);
+
   // ============= OLYMPIA PHARMACY WEBHOOKS =============
   const { registerOlympiaPharmacyWebhooks } = await import('./endpoints/olympia-pharmacy/webhook');
   registerOlympiaPharmacyWebhooks(app, webhookLimiter);
