@@ -147,7 +147,22 @@ export default function ClientManagement() {
     npiNumber: '',
     isApprovedDoctor: false,
     doctorLicenseStatesCoverage: [] as string[],
+    medicalCompanyId: '',
   })
+
+  interface DoctorPharmacyApproval {
+    id: string
+    name: string
+    slug: string
+    isActive: boolean
+    companyStatus: 'pending' | 'approved' | 'rejected' | null
+    doctorOverride: 'pending' | 'approved' | 'rejected' | null
+    effectiveStatus: 'pending' | 'approved' | 'rejected'
+    hasOverride: boolean
+  }
+  const [doctorPharmacyApprovals, setDoctorPharmacyApprovals] = useState<DoctorPharmacyApproval[]>([])
+  const [loadingDoctorPharmacies, setLoadingDoctorPharmacies] = useState(false)
+  const [togglingDoctorPharmacy, setTogglingDoctorPharmacy] = useState<string | null>(null)
 
   // BrandSubscription form state
   const [formData, setFormData] = useState({
@@ -488,7 +503,54 @@ export default function ClientManagement() {
       npiNumber: (user as any).npiNumber || '',
       isApprovedDoctor: (user as any).isApprovedDoctor || false,
       doctorLicenseStatesCoverage: (user as any).doctorLicenseStatesCoverage || [],
+      medicalCompanyId: (user as any).medicalCompanyId || '',
     })
+
+    // Fetch doctor pharmacy approvals if doctor filter is active
+    if (roleFilter === 'doctor') {
+      fetchDoctorPharmacyApprovals(user.id)
+    }
+  }
+
+  const fetchDoctorPharmacyApprovals = async (doctorUserId: string) => {
+    setLoadingDoctorPharmacies(true)
+    try {
+      const response = await fetch(`${baseUrl}/medical-companies/doctor/${doctorUserId}/pharmacies`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      })
+      if (!response.ok) throw new Error('Failed to fetch doctor pharmacy approvals')
+      const result = await response.json()
+      setDoctorPharmacyApprovals(result.data || [])
+    } catch (error) {
+      console.error('Error fetching doctor pharmacy approvals:', error)
+    } finally {
+      setLoadingDoctorPharmacies(false)
+    }
+  }
+
+  const handleDoctorPharmacyOverride = async (pharmacyId: string, newStatus: 'pending' | 'approved' | 'rejected' | 'inherit') => {
+    if (!selectedUser) return
+    setTogglingDoctorPharmacy(pharmacyId)
+    try {
+      const response = await fetch(
+        `${baseUrl}/medical-companies/doctor/${selectedUser.id}/pharmacies/${pharmacyId}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ doctorApprovedByPharmacy: newStatus }),
+        }
+      )
+      if (!response.ok) throw new Error('Failed to update doctor pharmacy override')
+      // Re-fetch to get updated effective statuses
+      await fetchDoctorPharmacyApprovals(selectedUser.id)
+    } catch (error) {
+      console.error('Error updating doctor pharmacy override:', error)
+    } finally {
+      setTogglingDoctorPharmacy(null)
+    }
   }
 
   const handleSaveDoctorProfile = async () => {
@@ -1214,6 +1276,101 @@ export default function ClientManagement() {
                               </button>
                             </div>
                           </div>
+                        </div>
+
+                        {/* Medical Company */}
+                        <div className="bg-muted/50 rounded-lg p-4 border border-border">
+                          <h3 className="font-semibold text-foreground mb-4">Medical Company</h3>
+                          <div>
+                            <label className="block text-sm text-muted-foreground mb-1">Assigned Medical Company</label>
+                            <select
+                              value={doctorForm.medicalCompanyId}
+                              onChange={(e) => setDoctorForm({ ...doctorForm, medicalCompanyId: e.target.value })}
+                              className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            >
+                              <option value="">None</option>
+                              {medicalCompanies.map((company) => (
+                                <option key={company.id} value={company.id}>
+                                  {company.name} ({company.slug})
+                                </option>
+                              ))}
+                            </select>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              The doctor inherits pharmacy approvals from their medical company. Save the profile to apply changes.
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Pharmacy Approvals */}
+                        <div className="bg-muted/50 rounded-lg p-4 border border-border">
+                          <h3 className="font-semibold text-foreground mb-2">Pharmacy Approvals</h3>
+                          <p className="text-xs text-muted-foreground mb-4">
+                            By default, the doctor inherits the approval status from their medical company.
+                            You can override per pharmacy.
+                          </p>
+                          {loadingDoctorPharmacies ? (
+                            <div className="flex items-center justify-center py-6">
+                              <Loader2 className="h-6 w-6 animate-spin text-[#4FA59C]" />
+                            </div>
+                          ) : doctorPharmacyApprovals.length === 0 ? (
+                            <p className="text-sm text-muted-foreground text-center py-4">No pharmacies found</p>
+                          ) : (
+                            <div className="space-y-3">
+                              {doctorPharmacyApprovals.map((pharmacy) => {
+                                const isUpdating = togglingDoctorPharmacy === pharmacy.id
+                                return (
+                                  <div
+                                    key={pharmacy.id}
+                                    className="p-3 rounded-lg border border-border bg-background"
+                                  >
+                                    <div className="flex items-center justify-between mb-2">
+                                      <div className="flex-1 min-w-0 mr-3">
+                                        <p className="font-medium text-sm text-foreground">{pharmacy.name}</p>
+                                        <p className="text-xs text-muted-foreground">{pharmacy.slug}</p>
+                                      </div>
+                                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                                        pharmacy.effectiveStatus === 'approved'
+                                          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                          : pharmacy.effectiveStatus === 'pending'
+                                            ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                                            : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                                      }`}>
+                                        {pharmacy.effectiveStatus.charAt(0).toUpperCase() + pharmacy.effectiveStatus.slice(1)}
+                                        {pharmacy.hasOverride ? ' (Override)' : ' (Inherited)'}
+                                      </span>
+                                    </div>
+                                    <div className={`flex rounded-lg border border-border overflow-hidden ${isUpdating ? 'opacity-50 pointer-events-none' : ''}`}>
+                                      {([
+                                        { value: 'inherit' as const, label: `Inherit${pharmacy.companyStatus ? ` (${pharmacy.companyStatus})` : ''}`, activeClass: 'bg-blue-500 text-white border-blue-500' },
+                                        { value: 'pending' as const, label: 'Pending', activeClass: 'bg-yellow-500 text-white border-yellow-500' },
+                                        { value: 'approved' as const, label: 'Approved', activeClass: 'bg-[#4FA59C] text-white border-[#4FA59C]' },
+                                        { value: 'rejected' as const, label: 'Rejected', activeClass: 'bg-red-500 text-white border-red-500' },
+                                      ]).map((option) => {
+                                        const isActive = option.value === 'inherit'
+                                          ? !pharmacy.hasOverride
+                                          : pharmacy.hasOverride && pharmacy.doctorOverride === option.value
+                                        return (
+                                          <button
+                                            key={option.value}
+                                            type="button"
+                                            disabled={isUpdating}
+                                            onClick={() => handleDoctorPharmacyOverride(pharmacy.id, option.value)}
+                                            className={`flex-1 px-2 py-1.5 text-xs font-medium transition-all ${
+                                              isActive
+                                                ? option.activeClass
+                                                : 'bg-background text-muted-foreground hover:bg-muted'
+                                            }`}
+                                          >
+                                            {option.label}
+                                          </button>
+                                        )
+                                      })}
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )}
                         </div>
 
                         {/* Roles */}

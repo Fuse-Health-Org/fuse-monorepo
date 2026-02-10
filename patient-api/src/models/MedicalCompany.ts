@@ -39,7 +39,4 @@ export default class MedicalCompany extends Entity {
 
     @HasMany(() => require('./MedicalCompanyPharmacy').default)
     declare pharmacies: any[];
-
-    @HasMany(() => require('./DoctorPharmacy').default)
-    declare doctors: any[];
 }

@@ -2,6 +2,7 @@ import { Table, Column, DataType, ForeignKey, BelongsTo, HasMany, HasOne } from 
 import bcrypt from 'bcrypt';
 import Entity from './Entity';
 import Clinic from './Clinic';
+import MedicalCompany from './MedicalCompany';
 import ShippingAddress from './ShippingAddress';
 import { PatientAllergy, PatientDisease, PatientMedication } from '../services/pharmacy/patient';
 import BrandTreatment from './BrandTreatment';
@@ -268,6 +269,16 @@ export default class User extends Entity {
 
   @BelongsTo(() => Clinic)
   declare clinic?: Clinic;
+
+  @ForeignKey(() => MedicalCompany)
+  @Column({
+    type: DataType.UUID,
+    allowNull: true,
+  })
+  declare medicalCompanyId?: string;
+
+  @BelongsTo(() => MedicalCompany)
+  declare medicalCompany?: MedicalCompany;
 
   @HasMany(() => ShippingAddress)
   declare shippingAddresses: ShippingAddress[];

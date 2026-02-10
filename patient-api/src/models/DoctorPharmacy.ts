@@ -1,6 +1,7 @@
 import { Table, Column, DataType, ForeignKey, BelongsTo } from 'sequelize-typescript';
 import Entity from './Entity';
 import MedicalCompany from './MedicalCompany';
+import Pharmacy from './Pharmacy';
 import User from './User';
 
 @Table({
@@ -8,16 +9,6 @@ import User from './User';
     tableName: 'DoctorPharmacy'
 })
 export default class DoctorPharmacy extends Entity {
-    @ForeignKey(() => MedicalCompany)
-    @Column({
-        type: DataType.UUID,
-        allowNull: false,
-    })
-    declare medicalCompanyId: string;
-
-    @BelongsTo(() => MedicalCompany)
-    declare medicalCompany: MedicalCompany;
-
     @ForeignKey(() => User)
     @Column({
         type: DataType.UUID,
@@ -27,6 +18,16 @@ export default class DoctorPharmacy extends Entity {
 
     @BelongsTo(() => User)
     declare doctor: User;
+
+    @ForeignKey(() => Pharmacy)
+    @Column({
+        type: DataType.UUID,
+        allowNull: false,
+    })
+    declare pharmacyId: string;
+
+    @BelongsTo(() => Pharmacy)
+    declare pharmacy: Pharmacy;
 
     @Column({
         type: DataType.ENUM('pending', 'approved', 'rejected'),

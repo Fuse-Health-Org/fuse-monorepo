@@ -5,8 +5,14 @@ import Link from 'next/link'
 import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Eye, EyeOff, Stethoscope, User, Mail, Phone, MapPin } from 'lucide-react'
+import { Eye, EyeOff, Stethoscope, User, Mail, Phone, MapPin, Building2 } from 'lucide-react'
 import { US_STATES } from '@fuse/enums'
+
+interface MedicalCompanyOption {
+    id: string
+    name: string
+    slug: string
+}
 
 interface FormData {
     firstName: string
@@ -17,6 +23,7 @@ interface FormData {
     phoneNumber: string
     npiNumber: string
     licensedStates: string[]
+    medicalCompanyId: string
 }
 
 export default function SignUp() {
@@ -28,7 +35,8 @@ export default function SignUp() {
         confirmPassword: '',
         phoneNumber: '',
         npiNumber: '',
-        licensedStates: []
+        licensedStates: [],
+        medicalCompanyId: ''
     })
     const [showPassword, setShowPassword] = useState(false)
     const [showConfirmPassword, setShowConfirmPassword] = useState(false)
@@ -36,6 +44,7 @@ export default function SignUp() {
     const [agreedToTerms, setAgreedToTerms] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const [medicalCompanies, setMedicalCompanies] = useState<MedicalCompanyOption[]>([])
     const { user } = useAuth()
     const router = useRouter()
 
@@ -45,6 +54,31 @@ export default function SignUp() {
             router.push('/')
         }
     }, [user, router])
+
+    // Fetch medical companies for dropdown
+    useEffect(() => {
+        const fetchMedicalCompanies = async () => {
+            try {
+                const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+                const response = await fetch(`${apiUrl}/medical-companies`)
+                if (response.ok) {
+                    const result = await response.json()
+                    const companies = result.data || []
+                    setMedicalCompanies(companies)
+                    // Default to Fuse (first company or the one with slug 'fuse')
+                    const fuse = companies.find((c: MedicalCompanyOption) => c.slug === 'fuse')
+                    if (fuse) {
+                        setFormData(prev => ({ ...prev, medicalCompanyId: fuse.id }))
+                    } else if (companies.length > 0) {
+                        setFormData(prev => ({ ...prev, medicalCompanyId: companies[0].id }))
+                    }
+                }
+            } catch (err) {
+                console.error('Error fetching medical companies:', err)
+            }
+        }
+        fetchMedicalCompanies()
+    }, [])
 
     // Password strength validation
     const validatePasswordStrength = (password: string): number => {
@@ -149,7 +183,8 @@ export default function SignUp() {
                 role: 'doctor',
                 phoneNumber: formData.phoneNumber,
                 npiNumber: formData.npiNumber,
-                doctorLicenseStatesCoverage: formData.licensedStates
+                doctorLicenseStatesCoverage: formData.licensedStates,
+                medicalCompanyId: formData.medicalCompanyId || undefined,
             }
             
             const response = await fetch(`${apiUrl}/auth/signup`, {
@@ -308,6 +343,33 @@ export default function SignUp() {
                                             required
                                         />
                                     </div>
+                                </div>
+
+                                {/* Medical Company */}
+                                <div className="space-y-2">
+                                    <label htmlFor="medicalCompany" className="text-sm font-medium text-foreground">
+                                        Medical Company *
+                                    </label>
+                                    <div className="relative">
+                                        <Building2 className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                        <select
+                                            id="medicalCompany"
+                                            value={formData.medicalCompanyId}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, medicalCompanyId: e.target.value }))}
+                                            className="w-full pl-10 pr-3 py-2 border border-input rounded-md bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                                            required
+                                        >
+                                            <option value="">Select a medical company...</option>
+                                            {medicalCompanies.map((company) => (
+                                                <option key={company.id} value={company.id}>
+                                                    {company.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground">
+                                        The medical company you are associated with
+                                    </p>
                                 </div>
 
                                 {/* NPI Number */}

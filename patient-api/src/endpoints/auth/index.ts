@@ -1187,8 +1187,9 @@ export function registerAuthEndpoints(
                 invitationSlug,
             } = validation.data;
 
-            // Extract doctorLicenseStatesCoverage separately to avoid TypeScript issues
+            // Extract doctorLicenseStatesCoverage and medicalCompanyId separately to avoid TypeScript issues
             const doctorLicenseStatesCoverage = (validation.data as any).doctorLicenseStatesCoverage;
+            const medicalCompanyId = (validation.data as any).medicalCompanyId;
 
             // Validate required fields for doctor role
             if (role === "doctor") {
@@ -1382,13 +1383,16 @@ export function registerAuthEndpoints(
                 businessType,
             });
 
-            // Set NPI number and license coverage for doctors if provided
+            // Set NPI number, license coverage, and medical company for doctors if provided
             if (mappedRole === "doctor") {
                 if (npiNumber) {
                     user.npiNumber = npiNumber;
                 }
                 if (doctorLicenseStatesCoverage && Array.isArray(doctorLicenseStatesCoverage)) {
                     user.doctorLicenseStatesCoverage = doctorLicenseStatesCoverage;
+                }
+                if (medicalCompanyId) {
+                    user.medicalCompanyId = medicalCompanyId;
                 }
                 await user.save();
             }

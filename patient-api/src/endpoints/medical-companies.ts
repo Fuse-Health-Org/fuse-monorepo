@@ -1,7 +1,9 @@
 import { Router, Request, Response } from 'express';
 import MedicalCompany from '../models/MedicalCompany';
 import MedicalCompanyPharmacy from '../models/MedicalCompanyPharmacy';
+import DoctorPharmacy from '../models/DoctorPharmacy';
 import Pharmacy from '../models/Pharmacy';
+import User from '../models/User';
 
 const router = Router();
 
@@ -158,6 +160,117 @@ router.put('/:id/pharmacies/:pharmacyId', async (req: Request, res: Response) =>
   } catch (error) {
     console.error('Error updating pharmacy association:', error);
     res.status(500).json({ success: false, message: 'Failed to update pharmacy association' });
+  }
+});
+
+// GET /medical-companies/doctor/:doctorUserId/pharmacies
+// Returns all pharmacies with effective approval status for a doctor:
+// - Inherits from MedicalCompanyPharmacy (company-level approval)
+// - Can be overridden by DoctorPharmacy (doctor-level override per pharmacy)
+router.get('/doctor/:doctorUserId/pharmacies', async (req: Request, res: Response) => {
+  try {
+    const doctor = await User.findByPk(req.params.doctorUserId);
+    if (!doctor) {
+      return res.status(404).json({ success: false, message: 'Doctor not found' });
+    }
+
+    const medicalCompanyId = doctor.medicalCompanyId;
+
+    // Get all pharmacies
+    const pharmacies = await Pharmacy.findAll({ order: [['name', 'ASC']] });
+
+    // Get company-level approvals (if doctor has a medical company)
+    let companyApprovalMap = new Map<string, 'pending' | 'approved' | 'rejected'>();
+    if (medicalCompanyId) {
+      const companyApprovals = await MedicalCompanyPharmacy.findAll({
+        where: { medicalCompanyId },
+      });
+      for (const ca of companyApprovals) {
+        companyApprovalMap.set(ca.pharmacyId, ca.doctorCompanyApprovedByPharmacy);
+      }
+    }
+
+    // Get doctor-level overrides (per pharmacy)
+    const doctorOverrides = await DoctorPharmacy.findAll({
+      where: { doctorUserId: req.params.doctorUserId },
+    });
+    const doctorOverrideMap = new Map(
+      doctorOverrides.map(d => [d.pharmacyId, d])
+    );
+
+    // Build the result: each pharmacy gets an effective status
+    const result = pharmacies.map(pharmacy => {
+      const companyStatus = companyApprovalMap.get(pharmacy.id) || null;
+      const doctorOverride = doctorOverrideMap.get(pharmacy.id);
+      const hasOverride = !!doctorOverride;
+      const effectiveStatus = hasOverride
+        ? doctorOverride.doctorApprovedByPharmacy
+        : companyStatus || 'pending';
+
+      return {
+        id: pharmacy.id,
+        name: pharmacy.name,
+        slug: pharmacy.slug,
+        isActive: pharmacy.isActive,
+        companyStatus,       // inherited from MedicalCompanyPharmacy
+        doctorOverride: hasOverride ? doctorOverride.doctorApprovedByPharmacy : null,
+        effectiveStatus,     // what actually applies
+        hasOverride,
+      };
+    });
+
+    res.json({ success: true, data: result, medicalCompanyId });
+  } catch (error) {
+    console.error('Error fetching doctor pharmacy approvals:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch doctor pharmacy approvals' });
+  }
+});
+
+// PUT /medical-companies/doctor/:doctorUserId/pharmacies/:pharmacyId
+// Create or update a DoctorPharmacy override for a specific pharmacy
+router.put('/doctor/:doctorUserId/pharmacies/:pharmacyId', async (req: Request, res: Response) => {
+  try {
+    const { doctorApprovedByPharmacy } = req.body;
+
+    // If value is 'inherit', delete the override so doctor inherits from company
+    if (doctorApprovedByPharmacy === 'inherit') {
+      await DoctorPharmacy.destroy({
+        where: {
+          doctorUserId: req.params.doctorUserId,
+          pharmacyId: req.params.pharmacyId,
+        },
+      });
+      return res.json({ success: true, message: 'Override removed, inheriting from company' });
+    }
+
+    if (!['pending', 'approved', 'rejected'].includes(doctorApprovedByPharmacy)) {
+      return res.status(400).json({
+        success: false,
+        message: 'doctorApprovedByPharmacy must be pending, approved, rejected, or inherit',
+      });
+    }
+
+    let override = await DoctorPharmacy.findOne({
+      where: {
+        doctorUserId: req.params.doctorUserId,
+        pharmacyId: req.params.pharmacyId,
+      },
+    });
+
+    if (override) {
+      await override.update({ doctorApprovedByPharmacy });
+    } else {
+      override = await DoctorPharmacy.create({
+        doctorUserId: req.params.doctorUserId,
+        pharmacyId: req.params.pharmacyId,
+        doctorApprovedByPharmacy,
+      });
+    }
+
+    res.json({ success: true, data: override });
+  } catch (error) {
+    console.error('Error updating doctor pharmacy override:', error);
+    res.status(500).json({ success: false, message: 'Failed to update doctor pharmacy override' });
   }
 });
 

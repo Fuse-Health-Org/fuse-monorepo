@@ -146,6 +146,17 @@ export function registerClientManagementEndpoints(
           "createdAt",
           "updatedAt",
           "clinicId",
+          "phoneNumber",
+          "dob",
+          "gender",
+          "address",
+          "city",
+          "state",
+          "zipCode",
+          "npiNumber",
+          "isApprovedDoctor",
+          "doctorLicenseStatesCoverage",
+          "medicalCompanyId",
         ],
         include: [
           {
@@ -765,23 +776,27 @@ export function registerClientManagementEndpoints(
       const {
         firstName, lastName, email, phoneNumber, dob, gender,
         address, city, state, zipCode, npiNumber,
-        isApprovedDoctor, doctorLicenseStatesCoverage,
+        isApprovedDoctor, doctorLicenseStatesCoverage, medicalCompanyId,
       } = req.body;
+
+      // Sanitize dob: empty string or "Invalid date" should become null
+      const sanitizedDob = dob && dob !== '' && dob !== 'Invalid date' ? dob : null;
 
       await targetUser.update({
         ...(firstName !== undefined && { firstName }),
         ...(lastName !== undefined && { lastName }),
         ...(email !== undefined && { email }),
-        ...(phoneNumber !== undefined && { phoneNumber }),
-        ...(dob !== undefined && { dob }),
-        ...(gender !== undefined && { gender }),
-        ...(address !== undefined && { address }),
-        ...(city !== undefined && { city }),
-        ...(state !== undefined && { state }),
-        ...(zipCode !== undefined && { zipCode }),
-        ...(npiNumber !== undefined && { npiNumber }),
+        ...(phoneNumber !== undefined && { phoneNumber: phoneNumber || null }),
+        ...(dob !== undefined && { dob: sanitizedDob }),
+        ...(gender !== undefined && { gender: gender || null }),
+        ...(address !== undefined && { address: address || null }),
+        ...(city !== undefined && { city: city || null }),
+        ...(state !== undefined && { state: state || null }),
+        ...(zipCode !== undefined && { zipCode: zipCode || null }),
+        ...(npiNumber !== undefined && { npiNumber: npiNumber || null }),
         ...(isApprovedDoctor !== undefined && { isApprovedDoctor }),
         ...(doctorLicenseStatesCoverage !== undefined && { doctorLicenseStatesCoverage }),
+        ...(medicalCompanyId !== undefined && { medicalCompanyId: medicalCompanyId || null }),
       });
 
       console.log(`✅ [Client Mgmt] Updated doctor profile for user ${userId}`);
