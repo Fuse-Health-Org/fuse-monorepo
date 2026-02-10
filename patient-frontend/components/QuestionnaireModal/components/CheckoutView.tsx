@@ -42,6 +42,11 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
     selectedProgramProducts = {},
     onProgramProductToggle,
     onCreateProgramSubscription,
+    // Visit fee props
+    visitFeeAmount = 0,
+    visitType,
+    loadingVisitFee = false,
+    onCalculateVisitFee,
 }) => {
     const selectedPlanData = plans.find((plan) => plan.id === selectedPlan);
     const isProgramCheckout = !!programData;
@@ -60,11 +65,11 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                 // Use the product's individual program fee if available, otherwise 0
                 return sum + (p.perProductProgram?.nonMedicalServicesFee || 0);
             }, 0);
-            return productsTotal + nonMedicalTotal;
+            return productsTotal + nonMedicalTotal + visitFeeAmount;
         }
 
         // For unified pricing, use the parent program's non-medical services fee
-        return productsTotal + programData.nonMedicalServicesFee;
+        return productsTotal + programData.nonMedicalServicesFee + visitFeeAmount;
     };
 
     // Calculate total non-medical services fee based on selected products
@@ -358,6 +363,30 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                                 </div>
                             )}
 
+                            {/* Visit Fee (if applicable) */}
+                            {visitFeeAmount > 0 && (
+                                <div className="mt-6 pt-6 border-t border-gray-200">
+                                    <div className="flex items-start gap-2 p-3 bg-blue-50 rounded-lg">
+                                        <Icon icon="lucide:stethoscope" className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                                        <div className="flex-1">
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-sm font-medium text-blue-900">
+                                                    {visitType === 'synchronous' ? 'Doctor Video Visit' : 'Doctor Consultation'}
+                                                </span>
+                                                <span className="text-sm font-semibold text-blue-900">
+                                                    ${visitFeeAmount.toFixed(2)}/mo
+                                                </span>
+                                            </div>
+                                            <p className="text-xs text-blue-700 mt-1">
+                                                {visitType === 'synchronous' 
+                                                    ? `Required for ${shippingInfo.state || 'your state'}: Live video consultation`
+                                                    : 'Asynchronous consultation included'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Program Total */}
                             <div className="mt-6 pt-6 border-t border-gray-200">
                                 <div className="flex justify-between items-center">
@@ -483,6 +512,11 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                                         onSelectionChange={(keys) => {
                                             const selectedKey = Array.from(keys)[0] as string;
                                             onShippingInfoChange('state', selectedKey);
+                                            // Calculate visit fee when state changes
+                                            if (selectedKey && onCalculateVisitFee) {
+                                                console.log('🔄 [STATE CHANGE] Triggering visit fee calculation for:', selectedKey);
+                                                onCalculateVisitFee(selectedKey);
+                                            }
                                         }}
                                         variant="bordered"
                                         isRequired
@@ -496,7 +530,14 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                                         label="State/Province"
                                         placeholder="Enter state or province"
                                         value={shippingInfo.state}
-                                        onValueChange={(value) => onShippingInfoChange('state', value)}
+                                        onValueChange={(value) => {
+                                            onShippingInfoChange('state', value);
+                                            // Calculate visit fee when state changes
+                                            if (value && onCalculateVisitFee) {
+                                                console.log('🔄 [STATE CHANGE] Triggering visit fee calculation for:', value);
+                                                onCalculateVisitFee(value);
+                                            }
+                                        }}
                                         variant="bordered"
                                         isRequired
                                     />
@@ -718,7 +759,22 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                                 <Divider className="my-4" />
 
                                 <div className="space-y-2 mb-4">
-                                    <div className="flex justify-between items-center">
+                                    {/* Visit Fee Info (if applicable) */}
+                                    {visitFeeAmount > 0 && (
+                                        <div className="flex justify-between items-center pt-3 border-t border-gray-200">
+                                            <div className="flex items-center gap-2">
+                                                <Icon icon="lucide:video" className="w-4 h-4 text-blue-600" />
+                                                <span className="text-sm text-gray-700">
+                                                    {visitType === 'synchronous' ? 'Video Visit Fee' : 'Consultation Fee'}
+                                                </span>
+                                            </div>
+                                            <span className="text-sm font-medium text-gray-900">
+                                                ${visitFeeAmount.toFixed(2)}
+                                            </span>
+                                        </div>
+                                    )}
+                                    
+                                    <div className="flex justify-between items-center pt-3 border-t border-gray-200">
                                         <span className="font-medium text-gray-900">Due Today</span>
                                         <span className="text-xl font-semibold">$0.00</span>
                                     </div>
@@ -772,6 +828,31 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                                         <span className="font-medium text-gray-900">Due Today</span>
                                         <span className="text-xl font-semibold">$0.00</span>
                                     </div>
+                                    
+                                    {/* Visit Fee Breakdown for Programs */}
+                                    {isProgramCheckout && visitFeeAmount > 0 && (
+                                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-2">
+                                            <div className="flex items-start gap-2">
+                                                <Icon icon="lucide:stethoscope" className="text-blue-600 mt-0.5 flex-shrink-0" />
+                                                <div className="flex-1">
+                                                    <div className="flex justify-between items-center">
+                                                        <span className="text-sm font-medium text-blue-900">
+                                                            {visitType === 'synchronous' ? 'Doctor Video Visit' : 'Doctor Consultation'}
+                                                        </span>
+                                                        <span className="text-sm font-semibold text-blue-900">
+                                                            ${visitFeeAmount.toFixed(2)}
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-xs text-blue-700 mt-1">
+                                                        {visitType === 'synchronous' 
+                                                            ? `Required for ${shippingInfo.state || 'your state'}: Live video consultation with a licensed physician`
+                                                            : 'Asynchronous consultation with a licensed physician'}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
                                     <div className="flex justify-between items-center">
                                         <span className="text-sm text-gray-600">Due if approved</span>
                                         <span className="text-sm font-medium" style={{ color: theme.primary }}>${dueIfApproved.toFixed(2)}</span>

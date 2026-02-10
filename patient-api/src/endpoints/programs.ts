@@ -1233,4 +1233,123 @@ router.delete('/programs/:id', authenticateJWT, async (req: Request, res: Respon
   }
 });
 
+/**
+ * Calculate visit fee for a program based on patient's state
+ * POST /programs/calculate-visit-fee
+ */
+router.post('/calculate-visit-fee', async (req: Request, res: Response) => {
+  try {
+    const { programId, state } = req.body || {};
+
+    console.log("🔍 [CALC VISIT FEE] Request received:", { programId, state });
+
+    if (!programId || !state) {
+      console.log("❌ [CALC VISIT FEE] Missing required fields");
+      return res.status(400).json({
+        success: false,
+        message: "programId and state are required",
+      });
+    }
+
+    // Fetch program
+    const program = await Program.findByPk(programId);
+    if (!program) {
+      console.log("❌ [CALC VISIT FEE] Program not found:", programId);
+      return res.status(404).json({
+        success: false,
+        message: "Program not found",
+      });
+    }
+
+    console.log("✅ [CALC VISIT FEE] Program found:", {
+      programId: program.id,
+      medicalTemplateId: program.medicalTemplateId,
+      clinicId: program.clinicId,
+    });
+
+    let visitFeeAmount = 0;
+    let visitType: 'synchronous' | 'asynchronous' | null = null;
+    
+    try {
+      const patientState = state.toUpperCase();
+      console.log("🔍 [CALC VISIT FEE] Patient state:", patientState);
+      
+      if (program.medicalTemplateId && program.clinicId) {
+        // Get questionnaire with visit type configuration
+        const questionnaire = await Questionnaire.findByPk(program.medicalTemplateId, {
+          attributes: ['id', 'visitTypeByState'],
+        });
+
+        console.log("🔍 [CALC VISIT FEE] Questionnaire found:", {
+          id: questionnaire?.id,
+          hasVisitTypeByState: !!questionnaire?.visitTypeByState,
+          visitTypeByState: questionnaire?.visitTypeByState,
+        });
+
+        if (questionnaire && questionnaire.visitTypeByState) {
+          // Determine visit type required for this state
+          visitType = (questionnaire.visitTypeByState as any)[patientState] || 'asynchronous';
+          console.log("✅ [CALC VISIT FEE] Visit type for state:", { patientState, visitType });
+          
+          // Get clinic's visit type fees
+          const clinic = await Clinic.findByPk(program.clinicId, {
+            attributes: ['id', 'visitTypeFees'],
+          });
+
+          console.log("🔍 [CALC VISIT FEE] Clinic found:", {
+            id: clinic?.id,
+            hasVisitTypeFees: !!clinic?.visitTypeFees,
+            visitTypeFees: clinic?.visitTypeFees,
+          });
+
+          if (clinic && clinic.visitTypeFees && visitType) {
+            visitFeeAmount = Number((clinic.visitTypeFees as any)[visitType]) || 0;
+            console.log("✅ [CALC VISIT FEE] Final calculation:", {
+              visitType,
+              visitFeeAmount,
+              rawValue: (clinic.visitTypeFees as any)[visitType],
+            });
+          } else {
+            console.warn("⚠️ [CALC VISIT FEE] Missing data:", {
+              hasClinic: !!clinic,
+              hasVisitTypeFees: !!clinic?.visitTypeFees,
+              visitType,
+            });
+          }
+        } else {
+          console.warn("⚠️ [CALC VISIT FEE] No questionnaire or visitTypeByState");
+        }
+      } else {
+        console.warn("⚠️ [CALC VISIT FEE] Missing medicalTemplateId or clinicId:", {
+          medicalTemplateId: program.medicalTemplateId,
+          clinicId: program.clinicId,
+        });
+      }
+    } catch (error) {
+      console.warn("⚠️ [CALC VISIT FEE] Failed to calculate visit fee:", error);
+    }
+
+    console.log("📤 [CALC VISIT FEE] Sending response:", {
+      visitType,
+      visitFeeAmount,
+      requiresVisit: visitFeeAmount > 0,
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        visitType,
+        visitFeeAmount,
+        requiresVisit: visitFeeAmount > 0,
+      },
+    });
+  } catch (error) {
+    console.error("❌ [CALC VISIT FEE] Error calculating visit fee:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to calculate visit fee",
+    });
+  }
+});
+
 export default router;

@@ -216,6 +216,11 @@ export interface CheckoutViewProps {
     selectedProducts: Record<string, number>;
     treatmentName: string;
     pharmacyCoverages?: PharmacyCoverage[];
+    // Visit fee props
+    visitFeeAmount?: number;
+    visitType?: 'synchronous' | 'asynchronous' | null;
+    loadingVisitFee?: boolean;
+    onCalculateVisitFee?: (state: string) => Promise<void>;
     // Program checkout props
     programData?: ProgramData;
     selectedProgramProducts?: Record<string, boolean>;

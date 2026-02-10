@@ -352,6 +352,33 @@ export default class Order extends Entity {
   @BelongsTo(() => User, 'approvedByDoctorId')
   declare approvedByDoctorUser?: User;
 
+  /**
+   * Visit Type
+   * 
+   * The type of doctor visit required for this order.
+   * Determined by the patient's state and the questionnaire's visitTypeByState configuration.
+   * 
+   * Values: 'synchronous' | 'asynchronous'
+   */
+  @Column({
+    type: DataType.STRING(50),
+    allowNull: true,
+  })
+  declare visitType?: 'synchronous' | 'asynchronous';
+
+  /**
+   * Visit Fee Amount
+   * 
+   * The fee charged for the doctor visit for this order.
+   * Based on the visit type and the organization's visitTypeFees configuration.
+   */
+  @Column({
+    type: DataType.DECIMAL(10, 2),
+    allowNull: false,
+    defaultValue: 0,
+  })
+  declare visitFeeAmount: number;
+
 
   // Static method to generate order number
   /**

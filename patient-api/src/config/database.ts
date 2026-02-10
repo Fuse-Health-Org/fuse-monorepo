@@ -151,6 +151,107 @@ export const sequelize = new Sequelize(databaseUrl, {
   ],
 });
 
+async function ensureVisitTypeColumns() {
+  const queryInterface = sequelize.getQueryInterface();
+
+  try {
+    // 1. Ensure visit_type_by_state column exists on Questionnaire
+    const questionnaireTable = await queryInterface.describeTable('Questionnaire');
+    if (!Object.prototype.hasOwnProperty.call(questionnaireTable, 'visitTypeByState') && 
+        !Object.prototype.hasOwnProperty.call(questionnaireTable, 'visit_type_by_state')) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('⚙️  Adding visit_type_by_state column to Questionnaire table...');
+      }
+      await queryInterface.addColumn('Questionnaire', 'visitTypeByState', {
+        type: DataTypes.JSONB,
+        allowNull: false,
+        defaultValue: {},
+      });
+      if (process.env.NODE_ENV === 'development') {
+        console.log('✅ visit_type_by_state column added to Questionnaire');
+      }
+    }
+
+    // 2. Ensure visit_type_fees column exists on Clinic
+    const clinicTable = await queryInterface.describeTable('Clinic');
+    if (!Object.prototype.hasOwnProperty.call(clinicTable, 'visitTypeFees') && 
+        !Object.prototype.hasOwnProperty.call(clinicTable, 'visit_type_fees')) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('⚙️  Adding visit_type_fees column to Clinic table...');
+      }
+      await queryInterface.addColumn('Clinic', 'visitTypeFees', {
+        type: DataTypes.JSONB,
+        allowNull: false,
+        defaultValue: { synchronous: 0, asynchronous: 0 },
+      });
+      if (process.env.NODE_ENV === 'development') {
+        console.log('✅ visit_type_fees column added to Clinic');
+      }
+    }
+
+    // 3. Ensure visit_type column exists on Order
+    const orderTable = await queryInterface.describeTable('Order');
+    if (!Object.prototype.hasOwnProperty.call(orderTable, 'visitType') && 
+        !Object.prototype.hasOwnProperty.call(orderTable, 'visit_type')) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('⚙️  Adding visit_type column to Order table...');
+      }
+      await queryInterface.addColumn('Order', 'visitType', {
+        type: DataTypes.STRING(50),
+        allowNull: true,
+      });
+      if (process.env.NODE_ENV === 'development') {
+        console.log('✅ visit_type column added to Order');
+      }
+    }
+
+    // 4. Ensure visit_fee_amount column exists on Order
+    if (!Object.prototype.hasOwnProperty.call(orderTable, 'visitFeeAmount') && 
+        !Object.prototype.hasOwnProperty.call(orderTable, 'visit_fee_amount')) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('⚙️  Adding visit_fee_amount column to Order table...');
+      }
+      await queryInterface.addColumn('Order', 'visitFeeAmount', {
+        type: DataTypes.DECIMAL(10, 2),
+        allowNull: false,
+        defaultValue: 0,
+      });
+      if (process.env.NODE_ENV === 'development') {
+        console.log('✅ visit_fee_amount column added to Order');
+      }
+    }
+
+    // 5. Ensure program_id column exists on Order (for new Program-based architecture)
+    if (!Object.prototype.hasOwnProperty.call(orderTable, 'programId') && 
+        !Object.prototype.hasOwnProperty.call(orderTable, 'program_id')) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('⚙️  Adding program_id column to Order table...');
+      }
+      await queryInterface.addColumn('Order', 'programId', {
+        type: DataTypes.UUID,
+        allowNull: true,
+        references: {
+          model: 'Program',
+          key: 'id',
+        },
+        onUpdate: 'CASCADE',
+        onDelete: 'SET NULL',
+      });
+      if (process.env.NODE_ENV === 'development') {
+        console.log('✅ program_id column added to Order');
+      }
+    }
+
+    if (process.env.NODE_ENV === 'development') {
+      console.log('✅ Visit type columns check completed');
+    }
+  } catch (error) {
+    if (process.env.NODE_ENV === 'development') {
+      console.error('❌ Failed to ensure visit type columns:', error);
+    }
+  }
+}
+
 async function ensureProductCategoriesColumn() {
   const queryInterface = sequelize.getQueryInterface();
 
@@ -630,6 +731,7 @@ export async function initializeDatabase() {
 
     await ensureDefaultFormStructures();
     await ensureProductCategoriesColumn();
+    await ensureVisitTypeColumns();
 
     // Run active to isActive migration
     try {

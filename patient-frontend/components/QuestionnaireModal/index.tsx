@@ -305,6 +305,11 @@ export const QuestionnaireModal: React.FC<QuestionnaireModalProps> = (props) => 
                         selectedProducts={modal.selectedProducts}
                         treatmentName={props.treatmentName ?? props.productName ?? ''}
                         pharmacyCoverages={modal.pharmacyCoverages}
+                        // Visit fee props
+                        visitFeeAmount={modal.visitFeeAmount}
+                        visitType={modal.visitType}
+                        loadingVisitFee={modal.loadingVisitFee}
+                        onCalculateVisitFee={modal.calculateVisitFee}
                         onNext={modal.handleNext}
                         // Program props
                         programData={modal.programData}

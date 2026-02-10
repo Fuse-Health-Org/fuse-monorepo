@@ -196,4 +196,21 @@ export default class Questionnaire extends Entity {
         defaultValue: 'pending',
     })
     declare medicalTemplateApprovedByFuseAdmin: 'pending' | 'approved' | 'rejected';
+
+    /**
+     * Visit Type By State
+     * 
+     * Stores the required visit type for each US state for this questionnaire.
+     * Structure: { "CA": "asynchronous", "NY": "synchronous", ... }
+     * 
+     * Visit Types:
+     * - 'synchronous': Real-time visits (video calls, phone calls)
+     * - 'asynchronous': Non-real-time visits (messaging, forms)
+     */
+    @Column({
+        type: DataType.JSONB,
+        allowNull: false,
+        defaultValue: {},
+    })
+    declare visitTypeByState: Record<string, 'synchronous' | 'asynchronous'>;
 }

@@ -195,4 +195,21 @@ export default class Clinic extends Entity {
 
     @HasOne(() => CustomWebsite)
     declare customWebsite?: CustomWebsite;
+
+    /**
+     * Visit Type Fees
+     * 
+     * Stores the fees this organization charges for different types of doctor visits.
+     * Structure: { "synchronous": 75.00, "asynchronous": 50.00 }
+     * 
+     * Visit Types:
+     * - 'synchronous': Real-time visits (video calls, phone calls)
+     * - 'asynchronous': Non-real-time visits (messaging, forms)
+     */
+    @Column({
+        type: DataType.JSONB,
+        allowNull: false,
+        defaultValue: { synchronous: 0, asynchronous: 0 },
+    })
+    declare visitTypeFees: { synchronous: number; asynchronous: number };
 }

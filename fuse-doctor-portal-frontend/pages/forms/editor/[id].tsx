@@ -12,6 +12,7 @@ import { useAuth } from "@/contexts/AuthContext"
 import { QuestionEditor } from "../QuestionEditor"
 import { useProducts } from "@/hooks/useProducts"
 import { ProductAssignmentModal } from "@/components/ProductAssignmentModal"
+import { US_STATES } from "@fuse/enums"
 
 interface Step {
   id: string
@@ -94,6 +95,10 @@ export default function TemplateEditor() {
   const [editingTemplateName, setEditingTemplateName] = useState(false)
   const [tempTemplateName, setTempTemplateName] = useState("")
   const [medicalCompanySource, setMedicalCompanySource] = useState<'fuse' | 'md-integrations' | 'beluga'>('md-integrations')
+  const [visitTypeByState, setVisitTypeByState] = useState<Record<string, 'synchronous' | 'asynchronous'>>({})
+  const [savingVisitTypes, setSavingVisitTypes] = useState(false)
+  const [showVisitTypesConfig, setShowVisitTypesConfig] = useState(false)
+  const [visitTypeSearch, setVisitTypeSearch] = useState('')
   const [selectedQuestionForConditional, setSelectedQuestionForConditional] = useState<{
     stepId: string
     questionId: string
@@ -306,6 +311,82 @@ export default function TemplateEditor() {
     }
   }
 
+  // Handle visit types configuration
+  const handleSaveVisitTypes = async () => {
+    if (!templateId || !token) {
+      console.error('❌ Missing templateId or token')
+      return
+    }
+    
+    console.log('💾 Saving visit types...', { templateId, visitTypeByState })
+    setSavingVisitTypes(true)
+    
+    try {
+      const res = await fetch(`${baseUrl}/questionnaires/${templateId}/visit-types`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json', 
+          Authorization: `Bearer ${token}` 
+        },
+        body: JSON.stringify({ visitTypeByState })
+      })
+      
+      console.log('📡 Response status:', res.status)
+      
+      if (res.ok) {
+        const data = await res.json()
+        console.log('✅ Save successful:', data)
+        setSaveMessage("✅ Visit type configuration saved!")
+        setTimeout(() => setSaveMessage(null), 3000)
+      } else {
+        const errorData = await res.json()
+        console.error('❌ Save failed:', errorData)
+        setError(errorData.message || "Failed to save visit types")
+      }
+    } catch (e: any) {
+      console.error('❌ Failed to save visit types:', e)
+      setError("Failed to save visit types")
+    } finally {
+      setSavingVisitTypes(false)
+    }
+  }
+
+  const handleSetVisitTypeForState = (stateCode: string, visitType: 'synchronous' | 'asynchronous') => {
+    console.log('🔧 Setting visit type:', { stateCode, visitType })
+    setVisitTypeByState(prev => {
+      const newState = {
+        ...prev,
+        [stateCode]: visitType
+      }
+      console.log('📋 New visitTypeByState:', newState)
+      return newState
+    })
+  }
+
+  const handleRemoveStateVisitType = (stateCode: string) => {
+    setVisitTypeByState(prev => {
+      const newState = { ...prev }
+      delete newState[stateCode]
+      return newState
+    })
+  }
+
+  const handleApplyToAllStates = (visitType: 'synchronous' | 'asynchronous') => {
+    const US_STATES_IMPORT = [
+      'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
+      'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
+      'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
+      'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
+      'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY', 'DC'
+    ]
+    
+    const allStates: Record<string, 'synchronous' | 'asynchronous'> = {}
+    US_STATES_IMPORT.forEach(state => {
+      allStates[state] = visitType
+    })
+    setVisitTypeByState(allStates)
+  }
+
   useEffect(() => {
     if (!token) return
     if (typeof templateId !== 'string' || !templateId) return
@@ -334,6 +415,8 @@ export default function TemplateEditor() {
         setFormStatus(data.data?.status || 'in_progress')
         // Set medical company source from template data
         setMedicalCompanySource(data.data?.medicalCompanySource || 'md-integrations')
+        // Set visit type by state from template data
+        setVisitTypeByState(data.data?.visitTypeByState || {})
         // Normalize backend steps/questions/options into local editor shape
         const loadedSteps = (data.data?.steps || []).map((s: any, index: number) => ({
           id: String(s.id),
@@ -2298,6 +2381,139 @@ export default function TemplateEditor() {
                       </button>
                     </div>
                   </div>
+                </div>
+
+                {/* Visit Types Configuration Section */}
+                <div className="bg-card rounded-2xl p-5 shadow-md border border-border/40 hover:shadow-lg transition-shadow">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground mb-1 uppercase tracking-wider">Visit Type Requirements</p>
+                      <p className="text-xs text-muted-foreground">Configure required visit types by state</p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowVisitTypesConfig(!showVisitTypesConfig)}
+                    >
+                      {showVisitTypesConfig ? 'Hide' : 'Configure'}
+                    </Button>
+                  </div>
+
+                  {showVisitTypesConfig && (
+                    <div className="space-y-4 mt-4">
+                      {/* Quick Actions */}
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleApplyToAllStates('asynchronous')}
+                          className="flex-1"
+                        >
+                          Set All Asynchronous
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleApplyToAllStates('synchronous')}
+                          className="flex-1"
+                        >
+                          Set All Synchronous
+                        </Button>
+                      </div>
+
+                      {/* Search */}
+                      <Input
+                        type="text"
+                        placeholder="Search states..."
+                        value={visitTypeSearch}
+                        onChange={(e) => setVisitTypeSearch(e.target.value)}
+                        className="w-full"
+                      />
+
+                      {/* States List */}
+                      <div className="max-h-96 overflow-y-auto space-y-2 border rounded-lg p-3">
+                        {US_STATES
+                          .filter(state => 
+                            visitTypeSearch === '' || 
+                            state.name.toLowerCase().includes(visitTypeSearch.toLowerCase()) ||
+                            state.key.toLowerCase().includes(visitTypeSearch.toLowerCase())
+                          )
+                          .map(state => (
+                            <div
+                              key={state.key}
+                              className="flex items-center justify-between p-2 rounded hover:bg-muted/50"
+                            >
+                              <span className="text-sm font-medium">{state.name}</span>
+                              <div className="flex items-center gap-2">
+                                <select
+                                  value={visitTypeByState[state.key] || ''}
+                                  onChange={(e) => {
+                                    const value = e.target.value as 'synchronous' | 'asynchronous'
+                                    if (value) {
+                                      handleSetVisitTypeForState(state.key, value)
+                                    }
+                                  }}
+                                  className="text-xs border rounded px-2 py-1 bg-background"
+                                >
+                                  <option value="">Not set</option>
+                                  <option value="asynchronous">Asynchronous</option>
+                                  <option value="synchronous">Synchronous</option>
+                                </select>
+                                {visitTypeByState[state.key] && (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleRemoveStateVisitType(state.key)}
+                                    className="h-6 w-6 p-0"
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+
+                      {/* Save Button */}
+                      <Button
+                        type="button"
+                        onClick={handleSaveVisitTypes}
+                        disabled={savingVisitTypes}
+                        className="w-full"
+                      >
+                        {savingVisitTypes ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="mr-2 h-4 w-4" />
+                            Save Visit Types
+                          </>
+                        )}
+                      </Button>
+
+                      {/* Summary */}
+                      <div className="text-xs text-muted-foreground border-t pt-3">
+                        <p>
+                          <strong>{Object.keys(visitTypeByState).length}</strong> states configured
+                          {Object.keys(visitTypeByState).length > 0 && (
+                            <>
+                              {' • '}
+                              <strong>{Object.values(visitTypeByState).filter(v => v === 'synchronous').length}</strong> synchronous
+                              {' • '}
+                              <strong>{Object.values(visitTypeByState).filter(v => v === 'asynchronous').length}</strong> asynchronous
+                            </>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Products Assignment Section - Prominent */}

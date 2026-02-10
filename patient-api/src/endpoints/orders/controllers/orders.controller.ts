@@ -7,6 +7,8 @@ import Prescription from "@models/Prescription";
 import PrescriptionExtension from "@models/PrescriptionExtension";
 import PrescriptionProducts from "@models/PrescriptionProducts";
 import Product from "@models/Product";
+import Program from "@models/Program";
+import Questionnaire from "@models/Questionnaire";
 import ShippingAddress from "@models/ShippingAddress";
 import ShippingOrder from "@models/ShippingOrder";
 import Treatment from "@models/Treatment";
@@ -48,6 +50,7 @@ export const createPaymentIntent = async (req: Request, res: Response) => {
             amount,
             currency,
             treatmentId,
+            programId,
             selectedProducts,
             selectedPlan,
             shippingInfo,
@@ -56,23 +59,63 @@ export const createPaymentIntent = async (req: Request, res: Response) => {
         } = validation.data;
 
         // Get treatment with products to validate order
-        const treatment = await Treatment.findByPk(treatmentId, {
-            include: [
-                {
-                    model: Product,
-                    as: "products",
-                    through: {
-                        attributes: ["placeholderSig", "numberOfDoses", "nextDose"],
-                    },
-                },
-            ],
-        });
+        // Support both legacy treatmentId and new programId
+        let treatment: Treatment | null = null;
+        let questionnaireIdFromProgram: string | null = null;
+        let clinicIdFromProgram: string | null = null;
 
-        if (!treatment) {
-            return res.status(404).json({
-                success: false,
-                message: "Treatment not found",
+        if (programId) {
+            // New flow: Get Program and extract medicalTemplateId + clinicId
+            const program = await Program.findByPk(programId, {
+                include: [
+                    {
+                        model: Questionnaire,
+                        as: "medicalTemplate",
+                        required: false,
+                    },
+                ],
             });
+
+            if (!program) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Program not found",
+                });
+            }
+
+            questionnaireIdFromProgram = program.medicalTemplateId || null;
+            clinicIdFromProgram = program.clinicId || null;
+
+            console.log("✅ Using Program flow:", {
+                programId,
+                questionnaireId: questionnaireIdFromProgram,
+                clinicId: clinicIdFromProgram,
+            });
+        } else if (treatmentId) {
+            // Legacy flow: Use Treatment
+            treatment = await Treatment.findByPk(treatmentId, {
+                include: [
+                    {
+                        model: Product,
+                        as: "products",
+                        through: {
+                            attributes: ["placeholderSig", "numberOfDoses", "nextDose"],
+                        },
+                    },
+                    {
+                        model: Questionnaire,
+                        as: "questionnaires",
+                        required: false,
+                    },
+                ],
+            });
+
+            if (!treatment) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Treatment not found",
+                });
+            }
         }
 
         // Validate affiliateId if provided, or detect from hostname
@@ -132,8 +175,10 @@ export const createPaymentIntent = async (req: Request, res: Response) => {
         const order = await Order.create({
             orderNumber,
             userId: currentUser.id,
-            treatmentId,
-            questionnaireId: null, // Will be updated if questionnaire is available
+            treatmentId: treatmentId || null,
+            programId: programId || null,
+            questionnaireId: questionnaireIdFromProgram || null,
+            clinicId: clinicIdFromProgram || treatment?.clinicId || null,
             status: "pending",
             billingPlan: selectedPlan,
             subtotalAmount: amount,
@@ -147,19 +192,21 @@ export const createPaymentIntent = async (req: Request, res: Response) => {
 
         // Create order items
         const orderItems: any[] = [];
-        for (const [productId, quantity] of Object.entries(selectedProducts)) {
-            if (quantity && Number(quantity) > 0) {
-                const product = treatment.products?.find((p) => p.id === productId);
-                if (product) {
-                    const orderItem = await OrderItem.create({
-                        orderId: order.id,
-                        productId: product.id,
-                        quantity: Number(quantity),
-                        unitPrice: product.price,
-                        totalPrice: product.price * Number(quantity),
-                        placeholderSig: product.placeholderSig,
-                    });
-                    orderItems.push(orderItem);
+        if (treatment && treatment.products) {
+            for (const [productId, quantity] of Object.entries(selectedProducts)) {
+                if (quantity && Number(quantity) > 0) {
+                    const product = treatment.products.find((p) => p.id === productId);
+                    if (product) {
+                        const orderItem = await OrderItem.create({
+                            orderId: order.id,
+                            productId: product.id,
+                            quantity: Number(quantity),
+                            unitPrice: product.price,
+                            totalPrice: product.price * Number(quantity),
+                            placeholderSig: product.placeholderSig,
+                        });
+                        orderItems.push(orderItem);
+                    }
                 }
             }
         }
@@ -182,13 +229,100 @@ export const createPaymentIntent = async (req: Request, res: Response) => {
             });
         }
 
+        // Calculate visit fee based on patient state and questionnaire configuration
+        let visitFeeAmount = 0;
+        let visitType: 'synchronous' | 'asynchronous' | null = null;
+        
+        try {
+            // Get patient's state from shipping address
+            const patientState = shippingInfo.state?.toUpperCase();
+            
+            // Determine questionnaire and clinic IDs
+            let questionnaireId: string | null = null;
+            let clinicId: string | null = null;
+            
+            // Priority 1: Use Program flow (new architecture)
+            if (questionnaireIdFromProgram) {
+                questionnaireId = questionnaireIdFromProgram;
+                clinicId = clinicIdFromProgram;
+                console.log("✅ Using questionnaire from Program:", { questionnaireId, clinicId });
+            }
+            // Priority 2: Use Treatment flow (legacy architecture)
+            else if (treatment?.questionnaires && treatment.questionnaires.length > 0) {
+                questionnaireId = treatment.questionnaires[0].id;
+                clinicId = treatment.clinicId || null;
+                console.log("✅ Using questionnaire from Treatment:", { questionnaireId, clinicId });
+            }
+            
+            if (patientState && questionnaireId && clinicId) {
+                // Get questionnaire with visit type configuration
+                const questionnaire = await Questionnaire.findByPk(questionnaireId, {
+                    attributes: ['id', 'visitTypeByState'],
+                });
+
+                if (questionnaire && questionnaire.visitTypeByState) {
+                    // Determine visit type required for this state
+                    visitType = (questionnaire.visitTypeByState as any)[patientState] || 'asynchronous';
+                    
+                    // Get clinic's visit type fees
+                    const clinic = await Clinic.findByPk(clinicId, {
+                        attributes: ['id', 'visitTypeFees'],
+                    });
+
+                    if (clinic && clinic.visitTypeFees && visitType) {
+                        visitFeeAmount = Number(clinic.visitTypeFees[visitType]) || 0;
+                        
+                        if (visitFeeAmount > 0) {
+                            console.log(`✅ Visit fee calculated:`, {
+                                orderId: order.id,
+                                patientState,
+                                visitType,
+                                visitFeeAmount,
+                                clinicId,
+                                source: questionnaireIdFromProgram ? 'Program' : 'Treatment',
+                            });
+                        }
+                    } else {
+                        console.warn("⚠️ No clinic or visitTypeFees found:", { clinicId, visitType });
+                    }
+                } else {
+                    console.warn("⚠️ No questionnaire or visitTypeByState found:", { questionnaireId });
+                }
+            } else {
+                console.warn("⚠️ Missing required data for visit fee calculation:", { 
+                    patientState, 
+                    questionnaireId, 
+                    clinicId,
+                    hasProgram: !!questionnaireIdFromProgram,
+                    hasTreatment: !!treatment,
+                });
+            }
+        } catch (error) {
+            if (process.env.NODE_ENV === "development") {
+                console.warn("⚠️ Failed to calculate visit fee, defaulting to 0:", error);
+            } else {
+                console.warn("⚠️ Failed to calculate visit fee, defaulting to 0");
+            }
+            visitFeeAmount = 0;
+        }
+
+        // Update order with visit type and fee
+        if (visitType || visitFeeAmount > 0) {
+            await order.update({
+                visitType,
+                visitFeeAmount,
+                totalAmount: Number(amount) + visitFeeAmount,
+            });
+        }
+
         // Calculate distribution: platform fee (% of total), stripe fee, doctor flat, pharmacy wholesale, brand residual
         // If Clinic has a Stripe Connect account, we transfer only the brand residual to the clinic
         const fees = await useGlobalFees();
         
         // Get platform fee percent based on clinic's tier (or global fallback)
-        const platformFeePercent = treatment.clinicId 
-            ? await getPlatformFeePercent(treatment.clinicId)
+        const effectiveClinicId = clinicIdFromProgram || treatment?.clinicId || null;
+        const platformFeePercent = effectiveClinicId 
+            ? await getPlatformFeePercent(effectiveClinicId)
             : fees.platformFeePercent;
         
         const stripeFeePercent = fees.stripeFeePercent;
@@ -200,7 +334,7 @@ export const createPaymentIntent = async (req: Request, res: Response) => {
         let stripeFeeUsd = 0;
         try {
             // Sum wholesale cost from treatment products aligned with selectedProducts
-            if (treatment.products && selectedProducts) {
+            if (treatment?.products && selectedProducts) {
                 for (const [productId, qty] of Object.entries(
                     selectedProducts as Record<string, any>
                 )) {
@@ -213,7 +347,8 @@ export const createPaymentIntent = async (req: Request, res: Response) => {
                     pharmacyWholesaleTotal += wholesale * quantity;
                 }
             }
-            const totalPaid = Number(amount) || 0;
+            // Include visit fee in total calculation
+            const totalPaid = Number(amount) + visitFeeAmount;
             platformFeeUsd = Math.max(0, (platformFeePercent / 100) * totalPaid);
             stripeFeeUsd = Math.max(0, (stripeFeePercent / 100) * totalPaid);
             const doctorUsd = Math.max(0, doctorFlatUsd);
@@ -238,14 +373,16 @@ export const createPaymentIntent = async (req: Request, res: Response) => {
             brandAmountUsd = 0;
         }
 
-        // Resolve clinic's Stripe account (via treatment.clinicId if present)
+        // Resolve clinic's Stripe account (via effectiveClinicId if present)
         let transferData: any = undefined;
         try {
-            const treatmentWithClinic = await Treatment.findByPk(treatmentId, {
-                include: [{ model: Clinic, as: "clinic" }] as any,
-            });
-            const clinicStripeAccountId = (treatmentWithClinic as any)?.clinic
-                ?.stripeAccountId;
+            let clinicStripeAccountId: string | undefined = undefined;
+            
+            if (effectiveClinicId) {
+                const clinic = await Clinic.findByPk(effectiveClinicId);
+                clinicStripeAccountId = clinic?.stripeAccountId;
+            }
+            
             if (clinicStripeAccountId && brandAmountUsd > 0) {
                 transferData = {
                     destination: clinicStripeAccountId,
@@ -286,24 +423,30 @@ export const createPaymentIntent = async (req: Request, res: Response) => {
         // Create payment intent with optional transfer_data to send clinic margin
         let paymentIntent;
         try {
+            // Total amount including visit fee
+            const totalAmount = Number(amount) + visitFeeAmount;
+            
             paymentIntent = await stripe.paymentIntents.create({
-                amount: Math.round(amount * 100), // Convert to cents
+                amount: Math.round(totalAmount * 100), // Convert to cents
                 currency,
                 metadata: {
                     userId: currentUser.id,
-                    treatmentId,
+                    treatmentId: treatmentId || null,
+                    programId: programId || null,
                     orderId: order.id,
                     orderNumber: orderNumber,
                     selectedProducts: JSON.stringify(selectedProducts),
                     selectedPlan,
-                    orderType: "treatment_order",
+                    orderType: programId ? "program_order" : "treatment_order",
                     brandAmountUsd: brandAmountUsd.toFixed(2),
                     platformFeePercent: String(platformFeePercent),
                     platformFeeUsd: platformFeeUsd.toFixed(2),
                     doctorFlatUsd: doctorFlatUsd.toFixed(2),
                     pharmacyWholesaleTotalUsd: pharmacyWholesaleTotal.toFixed(2),
+                    visitType: visitType || 'none',
+                    visitFeeAmount: visitFeeAmount.toFixed(2),
                 },
-                description: `Order ${orderNumber} - ${treatment.name}`,
+                description: `Order ${orderNumber}${treatment ? ` - ${treatment.name}` : ''}`,
                 ...(transferData ? { transfer_data: transferData } : {}),
             });
         } catch (stripeError: any) {
@@ -330,7 +473,7 @@ export const createPaymentIntent = async (req: Request, res: Response) => {
             stripePaymentIntentId: paymentIntent.id,
             status: "pending",
             paymentMethod: "card",
-            amount,
+            amount: Number(amount) + visitFeeAmount,
             currency: currency.toUpperCase(),
         });
 

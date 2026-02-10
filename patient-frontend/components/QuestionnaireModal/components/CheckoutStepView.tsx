@@ -35,6 +35,11 @@ interface CheckoutStepViewProps {
   selectedProgramProducts?: Record<string, boolean>;
   onProgramProductToggle?: (productId: string) => void;
   onCreateProgramSubscription?: () => Promise<PaymentIntentResult | null>;
+  // Visit fee props
+  visitFeeAmount?: number;
+  visitType?: 'synchronous' | 'asynchronous' | null;
+  loadingVisitFee?: boolean;
+  onCalculateVisitFee?: (state: string) => Promise<void>;
 }
 
 export const CheckoutStepView: React.FC<CheckoutStepViewProps> = ({
@@ -67,6 +72,11 @@ export const CheckoutStepView: React.FC<CheckoutStepViewProps> = ({
   selectedProgramProducts,
   onProgramProductToggle,
   onCreateProgramSubscription,
+  // Visit fee props
+  visitFeeAmount,
+  visitType,
+  loadingVisitFee,
+  onCalculateVisitFee,
 }) => {
   return (
     <>
@@ -106,6 +116,11 @@ export const CheckoutStepView: React.FC<CheckoutStepViewProps> = ({
           selectedProgramProducts={selectedProgramProducts}
           onProgramProductToggle={onProgramProductToggle}
           onCreateProgramSubscription={onCreateProgramSubscription}
+          // Visit fee props
+          visitFeeAmount={visitFeeAmount}
+          visitType={visitType}
+          loadingVisitFee={loadingVisitFee}
+          onCalculateVisitFee={onCalculateVisitFee}
         />
 
         {/* {paymentStatus === 'succeeded' && (

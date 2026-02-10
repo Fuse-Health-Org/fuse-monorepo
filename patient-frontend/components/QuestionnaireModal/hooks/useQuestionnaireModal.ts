@@ -54,6 +54,59 @@ export function useQuestionnaireModal(
   const [shippingInfo, setShippingInfo] = useState({
     address: "", apartment: "", city: "", state: "", zipCode: "", country: "us"
   });
+  // Visit fee state
+  const [visitFeeAmount, setVisitFeeAmount] = useState<number>(0);
+  const [visitType, setVisitType] = useState<'synchronous' | 'asynchronous' | null>(null);
+  const [loadingVisitFee, setLoadingVisitFee] = useState<boolean>(false);
+
+  // Callback to calculate visit fee (can be called manually)
+  const calculateVisitFee = useCallback(async (state?: string) => {
+    const stateToUse = state || shippingInfo.state;
+    
+    console.log('🔍 [VISIT FEE] calculateVisitFee called:', {
+      hasProgramData: !!programData,
+      state: stateToUse,
+      programId: programData?.id,
+    });
+
+    if (!programData || !stateToUse) {
+      console.log('⏭️ [VISIT FEE] Skipping: no program or state');
+      return;
+    }
+
+    setLoadingVisitFee(true);
+    try {
+      const result = await apiCall('/programs/calculate-visit-fee', {
+        method: 'POST',
+        body: JSON.stringify({
+          programId: programData.id,
+          state: stateToUse,
+        }),
+      });
+
+      console.log('📥 [VISIT FEE] API Response:', result);
+      console.log('📥 [VISIT FEE] API Response.data:', result.data);
+
+      if (result.success && result.data) {
+        const feeData = result.data.data || result.data; // Handle nested response
+        console.log('📥 [VISIT FEE] Fee data extracted:', feeData);
+        
+        setVisitFeeAmount(feeData.visitFeeAmount || 0);
+        setVisitType(feeData.visitType || null);
+        console.log('✅ [VISIT FEE] Visit fee set:', {
+          state: stateToUse,
+          visitType: feeData.visitType,
+          visitFeeAmount: feeData.visitFeeAmount,
+        });
+      }
+    } catch (error) {
+      console.error('❌ [VISIT FEE] Failed to calculate visit fee:', error);
+      setVisitFeeAmount(0);
+      setVisitType(null);
+    } finally {
+      setLoadingVisitFee(false);
+    }
+  }, [programData, shippingInfo.state]);
   const [checkoutPaymentInfo, setCheckoutPaymentInfo] = useState({
     cardNumber: "", expiryDate: "", securityCode: "", country: "brazil"
   });
@@ -82,6 +135,28 @@ export function useQuestionnaireModal(
 
     detectAffiliateSlug();
   }, []);
+
+  // Calculate visit fee when entering checkout step
+  useEffect(() => {
+    // Only calculate for program flows when on checkout step
+    if (!programData || !questionnaire) return;
+    
+    const checkoutPos = questionnaire.checkoutStepPosition;
+    const checkoutStepIndex = checkoutPos === -1 ? questionnaire.steps.length : checkoutPos;
+    const isOnCheckout = currentStepIndex === checkoutStepIndex;
+    
+    console.log('🔍 [VISIT FEE] useEffect check:', {
+      isOnCheckout,
+      currentStepIndex,
+      checkoutStepIndex,
+      state: shippingInfo.state,
+    });
+    
+    if (isOnCheckout && shippingInfo.state) {
+      console.log('🚀 [VISIT FEE] Triggering calculation from useEffect');
+      calculateVisitFee(shippingInfo.state);
+    }
+  }, [programData, questionnaire, currentStepIndex, shippingInfo.state, calculateVisitFee]);
 
   // Auth state
   const [isSignInMode, setIsSignInMode] = useState(false);
@@ -1055,12 +1130,33 @@ export function useQuestionnaireModal(
         nonMedicalServicesFee = programData.nonMedicalServicesFee;
       }
 
-      const totalAmount = productsTotal + nonMedicalServicesFee;
+      // Calculate visit fee (ensure it's fresh)
+      let calculatedVisitFee = 0;
+      if (shippingInfo.state && programData.id) {
+        try {
+          const feeResult = await apiCall('/programs/calculate-visit-fee', {
+            method: 'POST',
+            body: JSON.stringify({
+              programId: programData.id,
+              state: shippingInfo.state,
+            }),
+          });
+          if (feeResult.success && feeResult.data) {
+            calculatedVisitFee = feeResult.data.visitFeeAmount || 0;
+            console.log('💰 Visit fee recalculated before payment:', calculatedVisitFee);
+          }
+        } catch (error) {
+          console.warn('⚠️ Failed to calculate visit fee, using 0:', error);
+        }
+      }
+
+      const totalAmount = productsTotal + nonMedicalServicesFee + calculatedVisitFee;
 
       console.log('💰 [PROGRAM SUB] Price calculation:', {
         hasPerProductPricing,
         productsTotal,
         nonMedicalServicesFee,
+        visitFeeAmount: calculatedVisitFee,
         totalAmount,
         selectedProducts: selectedProductsList.map(p => ({
           name: p.name,
@@ -1207,6 +1303,8 @@ export function useQuestionnaireModal(
     patientName, patientFirstName,
     shippingInfo, setShippingInfo,
     checkoutPaymentInfo, setCheckoutPaymentInfo,
+    // Visit fee
+    visitFeeAmount, visitType, loadingVisitFee, calculateVisitFee,
     // Auth state
     isSignInMode, setIsSignInMode,
     isSignInOptionsMode, setIsSignInOptionsMode,

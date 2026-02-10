@@ -6166,6 +6166,51 @@ app.post("/payments/program/sub", async (req, res) => {
       totalAmount - platformFeeUsd - stripeFeeUsd - doctorUsd - productsTotal
     );
 
+    // Calculate visit fee based on patient state and program's questionnaire
+    let visitFeeAmount = 0;
+    let visitType: 'synchronous' | 'asynchronous' | null = null;
+    
+    try {
+      const patientState = shippingInfo?.state?.toUpperCase();
+      
+      if (patientState && program.medicalTemplateId && program.clinicId) {
+        // Get questionnaire with visit type configuration
+        const questionnaire = await Questionnaire.findByPk(program.medicalTemplateId, {
+          attributes: ['id', 'visitTypeByState'],
+        });
+
+        if (questionnaire && questionnaire.visitTypeByState) {
+          // Determine visit type required for this state
+          visitType = (questionnaire.visitTypeByState as any)[patientState] || 'asynchronous';
+          
+          // Get clinic's visit type fees
+          const clinicWithFees = await Clinic.findByPk(program.clinicId, {
+            attributes: ['id', 'visitTypeFees'],
+          });
+
+          if (clinicWithFees && clinicWithFees.visitTypeFees && visitType) {
+            visitFeeAmount = Number((clinicWithFees.visitTypeFees as any)[visitType]) || 0;
+            
+            if (visitFeeAmount > 0) {
+              console.log(`✅ Visit fee calculated for program:`, {
+                programId,
+                patientState,
+                visitType,
+                visitFeeAmount,
+                clinicId: program.clinicId,
+              });
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.warn("⚠️ Failed to calculate visit fee for program, defaulting to 0:", error);
+      visitFeeAmount = 0;
+    }
+
+    // Add visit fee to total amount
+    const finalTotalAmount = totalAmount + visitFeeAmount;
+
     // Create order
     const orderNumber = await Order.generateOrderNumber();
     const order = await Order.create({
@@ -6178,7 +6223,9 @@ app.post("/payments/program/sub", async (req, res) => {
       discountAmount: 0,
       taxAmount: 0,
       shippingAmount: 0,
-      totalAmount: totalAmount,
+      totalAmount: finalTotalAmount,
+      visitType,
+      visitFeeAmount,
       questionnaireAnswers,
       stripePriceId: stripePrice.id,
       programId: program.id,
@@ -6232,7 +6279,7 @@ app.post("/payments/program/sub", async (req, res) => {
 
     // Create PaymentIntent
     const paymentIntentParams: any = {
-      amount: Math.round(totalAmount * 100),
+      amount: Math.round(finalTotalAmount * 100),
       currency: "usd",
       customer: stripeCustomerId,
       capture_method: "manual",
@@ -6242,6 +6289,8 @@ app.post("/payments/program/sub", async (req, res) => {
         orderId: order.id,
         orderNumber: orderNumber,
         orderType: "program_subscription_initial_authorization",
+        visitType: visitType || 'none',
+        visitFeeAmount: visitFeeAmount.toFixed(2),
       },
       description: `Program Subscription ${orderNumber} - ${program.name}`,
       automatic_payment_methods: { enabled: true, allow_redirects: "never" },
@@ -6268,7 +6317,7 @@ app.post("/payments/program/sub", async (req, res) => {
       stripePaymentIntentId: paymentIntent.id,
       status: "pending",
       paymentMethod: "card",
-      amount: totalAmount,
+      amount: finalTotalAmount,
       currency: "USD",
     });
 
@@ -6276,6 +6325,9 @@ app.post("/payments/program/sub", async (req, res) => {
       orderId: order.id,
       orderNumber,
       paymentIntentId: paymentIntent.id,
+      visitType,
+      visitFeeAmount,
+      finalTotalAmount,
     });
 
     return res.status(200).json({
@@ -9045,6 +9097,151 @@ app.post(
   }
 );
 
+// Update visit type configuration for a questionnaire
+app.put(
+  "/questionnaires/:id/visit-types",
+  authenticateJWT,
+  async (req, res) => {
+    try {
+      const currentUser = getCurrentUser(req);
+
+      if (!currentUser) {
+        return res
+          .status(401)
+          .json({ success: false, message: "Not authenticated" });
+      }
+
+      const { id } = req.params;
+      const { visitTypeByState } = req.body;
+
+      if (!id) {
+        return res
+          .status(400)
+          .json({ success: false, message: "Questionnaire ID is required" });
+      }
+
+      if (!visitTypeByState || typeof visitTypeByState !== "object") {
+        return res.status(400).json({
+          success: false,
+          message:
+            "visitTypeByState is required and must be an object with state codes as keys",
+        });
+      }
+
+      // Validate visit types
+      const validVisitTypes = ["synchronous", "asynchronous"];
+      for (const [state, visitType] of Object.entries(visitTypeByState)) {
+        if (!validVisitTypes.includes(visitType as string)) {
+          return res.status(400).json({
+            success: false,
+            message: `Invalid visit type "${visitType}" for state ${state}. Must be "synchronous" or "asynchronous"`,
+          });
+        }
+      }
+
+      // Find and update the questionnaire
+      const questionnaire = await Questionnaire.findByPk(id);
+
+      if (!questionnaire) {
+        return res
+          .status(404)
+          .json({ success: false, message: "Questionnaire not found" });
+      }
+
+      // Check ownership (user must be the creator or have appropriate permissions)
+      if (questionnaire.userId && questionnaire.userId !== currentUser.id) {
+        // For templates or if no userId, allow anyone to update
+        // Otherwise check if user is authorized (admin or provider)
+        if (currentUser.role !== 'admin' && currentUser.role !== 'provider') {
+          return res.status(403).json({
+            success: false,
+            message: "Not authorized to update this questionnaire",
+          });
+        }
+      }
+
+      await questionnaire.update({ visitTypeByState });
+
+      console.log(`✅ Updated visit types for questionnaire ${id}:`, {
+        visitTypeByState,
+        userId: currentUser.id,
+      });
+
+      res.status(200).json({
+        success: true,
+        data: {
+          id: questionnaire.id,
+          visitTypeByState: questionnaire.visitTypeByState,
+        },
+      });
+    } catch (error: any) {
+      if (process.env.NODE_ENV === "development") {
+        console.error("❌ Error updating visit types:", error);
+      } else {
+        console.error("❌ Error updating visit types");
+      }
+      return res.status(500).json({
+        success: false,
+        message: error?.message || "Failed to update visit types",
+      });
+    }
+  }
+);
+
+// Get visit type configuration for a questionnaire
+app.get(
+  "/questionnaires/:id/visit-types",
+  authenticateJWT,
+  async (req, res) => {
+    try {
+      const currentUser = getCurrentUser(req);
+
+      if (!currentUser) {
+        return res
+          .status(401)
+          .json({ success: false, message: "Not authenticated" });
+      }
+
+      const { id } = req.params;
+
+      if (!id) {
+        return res
+          .status(400)
+          .json({ success: false, message: "Questionnaire ID is required" });
+      }
+
+      const questionnaire = await Questionnaire.findByPk(id, {
+        attributes: ["id", "title", "visitTypeByState"],
+      });
+
+      if (!questionnaire) {
+        return res
+          .status(404)
+          .json({ success: false, message: "Questionnaire not found" });
+      }
+
+      res.status(200).json({
+        success: true,
+        data: {
+          id: questionnaire.id,
+          title: questionnaire.title,
+          visitTypeByState: questionnaire.visitTypeByState || {},
+        },
+      });
+    } catch (error: any) {
+      if (process.env.NODE_ENV === "development") {
+        console.error("❌ Error fetching visit types:", error);
+      } else {
+        console.error("❌ Error fetching visit types");
+      }
+      return res.status(500).json({
+        success: false,
+        message: error?.message || "Failed to fetch visit types",
+      });
+    }
+  }
+);
+
 // IMPORTANT: This route must come AFTER all specific /questionnaires/templates/* routes
 app.get("/questionnaires/templates/:id", authenticateJWT, async (req, res) => {
   try {
@@ -11354,6 +11551,7 @@ app.get("/organization", authenticateJWT, async (req, res) => {
       customDomain: (clinic as any)?.customDomain || "",
       defaultFormColor: (clinic as any)?.defaultFormColor || "",
       patientPortalDashboardFormat: (clinic as any)?.patientPortalDashboardFormat || "fuse",
+      visitTypeFees: (clinic as any)?.visitTypeFees || { synchronous: 0, asynchronous: 0 },
     });
   } catch (error) {
     if (process.env.NODE_ENV === "development") {
@@ -11400,6 +11598,16 @@ app.put("/organization/update", authenticateJWT, async (req, res) => {
       | "fuse"
       | "md-integrations"
       | undefined;
+    const visitTypeFees = (validation.data as any).visitTypeFees as
+      | { synchronous: number; asynchronous: number }
+      | undefined;
+
+    console.log('📥 Received organization update:', {
+      businessName,
+      visitTypeFees,
+      defaultFormColor,
+      patientPortalDashboardFormat
+    });
 
     const user = await User.findByPk(currentUser.id);
     if (!user) {
@@ -11486,7 +11694,43 @@ app.put("/organization/update", authenticateJWT, async (req, res) => {
           updateData.patientPortalDashboardFormat = patientPortalDashboardFormat;
         }
 
+        // Update visit type fees if provided
+        if (visitTypeFees !== undefined) {
+          console.log('💰 Updating visit type fees:', visitTypeFees);
+          
+          // Validate visit type fees structure
+          if (
+            typeof visitTypeFees !== "object" ||
+            typeof visitTypeFees.synchronous !== "number" ||
+            typeof visitTypeFees.asynchronous !== "number"
+          ) {
+            console.error('❌ Invalid visit type fees structure:', visitTypeFees);
+            return res.status(400).json({
+              success: false,
+              message:
+                "Visit type fees must be an object with 'synchronous' and 'asynchronous' number values",
+            });
+          }
+
+          // Validate non-negative values
+          if (
+            visitTypeFees.synchronous < 0 ||
+            visitTypeFees.asynchronous < 0
+          ) {
+            console.error('❌ Negative visit type fees:', visitTypeFees);
+            return res.status(400).json({
+              success: false,
+              message: "Visit type fees must be non-negative",
+            });
+          }
+
+          updateData.visitTypeFees = visitTypeFees;
+          console.log('✅ Visit type fees added to updateData');
+        }
+
+        console.log('💾 Updating clinic with data:', updateData);
         await clinic.update(updateData);
+        console.log('✅ Clinic updated successfully. New visitTypeFees:', clinic.visitTypeFees);
         updatedClinic = clinic;
       }
     }
@@ -11507,6 +11751,7 @@ app.put("/organization/update", authenticateJWT, async (req, res) => {
             status: updatedClinic.status,
             defaultFormColor: updatedClinic.defaultFormColor,
             patientPortalDashboardFormat: updatedClinic.patientPortalDashboardFormat,
+            visitTypeFees: updatedClinic.visitTypeFees,
           }
           : null,
       },
