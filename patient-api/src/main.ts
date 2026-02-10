@@ -6,28 +6,24 @@ import multer from "multer";
 import dns from "dns/promises";
 import jwt from "jsonwebtoken";
 import { initializeDatabase } from "./config/database";
-import { MailsSender } from "./services/mailsSender";
-import Treatment from "./models/Treatment";
-import Product from "./models/Product";
-import Order from "./models/Order";
-import OrderItem from "./models/OrderItem";
-import Payment, { PaymentGoesTo } from "./models/Payment";
-import ShippingAddress from "./models/ShippingAddress";
-import Pharmacy from "./models/Pharmacy";
-import PharmacyCoverage from "./models/PharmacyCoverage";
-import PharmacyProduct from "./models/PharmacyProduct";
-import Prescription from "./models/Prescription";
-import PrescriptionExtension from "./models/PrescriptionExtension";
-import PrescriptionProducts from "./models/PrescriptionProducts";
+import { MailsSender } from "@services/mailsSender";
+import Treatment from "@models/Treatment";
+import Product from "@models/Product";
+import Order from "@models/Order";
+import OrderItem from "@models/OrderItem";
+import Payment from "@models/Payment";
+import ShippingAddress from "@models/ShippingAddress";
+import Pharmacy from "@models/Pharmacy";
+import PharmacyCoverage from "@models/PharmacyCoverage";
+import PharmacyProduct from "@models/PharmacyProduct";
 import BrandSubscription, {
   BrandSubscriptionStatus,
-} from "./models/BrandSubscription";
-import BrandSubscriptionPlans from "./models/BrandSubscriptionPlans";
-import TierConfiguration from "./models/TierConfiguration";
-import TenantCustomFeatures from "./models/TenantCustomFeatures";
-import Subscription from "./models/Subscription";
+} from "@models/BrandSubscription";
+import BrandSubscriptionPlans from "@models/BrandSubscriptionPlans";
+import TierConfiguration from "@models/TierConfiguration";
+import TenantCustomFeatures from "@models/TenantCustomFeatures";
+import Subscription from "@models/Subscription";
 import {
-  createJWTToken,
   authenticateJWT,
   getCurrentUser,
   extractTokenFromHeader,
@@ -46,31 +42,28 @@ import {
   webhookLimiter,
 } from "./middleware/rateLimiter";
 import Stripe from "stripe";
-import OrderService from "./services/order.service";
-import UserService from "./services/user.service";
+import OrderService from "@services/order.service";
+import UserService from "@services/user.service";
 import {
   AuditService,
   AuditAction,
   AuditResourceType,
-} from "./services/audit.service";
-import TreatmentService from "./services/treatment.service";
-import PaymentService from "./services/payment.service";
-import ClinicService from "./services/clinic.service";
-import { getDefaultCustomWebsiteValues, getDefaultFooterValues, getDefaultSocialMediaValues } from "./utils/customWebsiteDefaults";
-import TreatmentProducts from "./models/TreatmentProducts";
-import TreatmentPlan, { BillingInterval } from "./models/TreatmentPlan";
-import ShippingOrder from "./models/ShippingOrder";
-import QuestionnaireService from "./services/questionnaire.service";
-import formTemplateService from "./services/formTemplate.service";
-import User from "./models/User";
-import UserRoles from "./models/UserRoles";
-import MfaToken from "./models/MfaToken";
-import Clinic from "./models/Clinic";
-import BrandInvitation, { InvitationType } from "./models/BrandInvitation";
-import Physician from "./models/Physician";
+} from "@services/audit.service";
+import TreatmentService from "@services/treatment.service";
+import PaymentService from "@services/payment.service";
+import ClinicService from "@services/clinic.service";
+import { getDefaultCustomWebsiteValues, getDefaultFooterValues, getDefaultSocialMediaValues } from "@utils/customWebsiteDefaults";
+import TreatmentProducts from "@models/TreatmentProducts";
+import TreatmentPlan, { BillingInterval } from "@models/TreatmentPlan";
+import ShippingOrder from "@models/ShippingOrder";
+import QuestionnaireService from "@services/questionnaire.service";
+import formTemplateService from "@services/formTemplate.service";
+import User from "@models/User";
+import UserRoles from "@models/UserRoles";
+import Clinic from "@models/Clinic";
 import { Op } from "sequelize";
-import QuestionnaireStepService from "./services/questionnaireStep.service";
-import QuestionService from "./services/question.service";
+import QuestionnaireStepService from "@services/questionnaireStep.service";
+import QuestionService from "@services/question.service";
 import { StripeService } from "@fuse/stripe";
 import {
   clinicUpdateSchema,
@@ -80,7 +73,6 @@ import {
   treatmentUpdateSchema,
   treatmentPlanCreateSchema,
   treatmentPlanUpdateSchema,
-  createPaymentIntentSchema,
   createProductSubscriptionSchema,
   treatmentSubscriptionSchema,
   clinicSubscriptionSchema,
@@ -100,30 +92,30 @@ import {
   organizationUpdateSchema,
   listProductsSchema,
 } from "@fuse/validators";
-import TreatmentPlanService from "./services/treatmentPlan.service";
-import SubscriptionService from "./services/subscription.service";
-import MDWebhookService from "./services/mdIntegration/MDWebhook.service";
-import MDFilesService from "./services/mdIntegration/MDFiles.service";
-import PharmacyWebhookService from "./services/pharmacy/webhook";
-import BrandSubscriptionService from "./services/brandSubscription.service";
-import MessageService from "./services/Message.service";
-import ProductService from "./services/product.service";
-import TenantProductForm from "./models/TenantProductForm";
-import TenantProduct from "./models/TenantProduct";
-import FormProducts from "./models/FormProducts";
-import GlobalFormStructure from "./models/GlobalFormStructure";
-import Program from "./models/Program";
-import Question from "./models/Question";
-import QuestionOption from "./models/QuestionOption";
+import TreatmentPlanService from "@services/treatmentPlan.service";
+import SubscriptionService from "@services/subscription.service";
+import MDWebhookService from "@services/mdIntegration/MDWebhook.service";
+import MDFilesService from "@services/mdIntegration/MDFiles.service";
+import PharmacyWebhookService from "@services/pharmacy/webhook";
+import BrandSubscriptionService from "@services/brandSubscription.service";
+import MessageService from "@services/Message.service";
+import ProductService from "@services/product.service";
+import TenantProductForm from "@models/TenantProductForm";
+import TenantProduct from "@models/TenantProduct";
+import FormProducts from "@models/FormProducts";
+import GlobalFormStructure from "@models/GlobalFormStructure";
+import Program from "@models/Program";
+import Question from "@models/Question";
+import QuestionOption from "@models/QuestionOption";
 import { assignTemplatesSchema } from "./validators/formTemplates";
-import BrandTreatment from "./models/BrandTreatment";
-import Questionnaire from "./models/Questionnaire";
-import QuestionnaireCustomization from "./models/QuestionnaireCustomization";
-import CustomWebsite from "./models/CustomWebsite";
-import TenantProductService from "./services/tenantProduct.service";
-import QuestionnaireStep from "./models/QuestionnaireStep";
-import DoctorPatientChats from "./models/DoctorPatientChats";
-import SmsService from "./services/sms.service";
+import BrandTreatment from "@models/BrandTreatment";
+import Questionnaire from "@models/Questionnaire";
+import QuestionnaireCustomization from "@models/QuestionnaireCustomization";
+import CustomWebsite from "@models/CustomWebsite";
+import TenantProductService from "@services/tenantProduct.service";
+import QuestionnaireStep from "@models/QuestionnaireStep";
+import DoctorPatientChats from "@models/DoctorPatientChats";
+import SmsService from "@services/sms.service";
 import { sequenceRoutes, webhookRoutes as sequenceWebhookRoutes } from "@endpoints/sequences";
 import dashboardRoutes from "@endpoints/dashboard/routes/dashboard.routes";
 import { templateRoutes } from "@endpoints/templates";
@@ -131,10 +123,24 @@ import { contactRoutes } from "@endpoints/contacts";
 import { tagRoutes } from "@endpoints/tags";
 import ordersRoutes from "@endpoints/orders/routes/orders.routes";
 import payoutsRoutes from "@endpoints/payouts/routes/payouts.routes";
+import { tenantRoutes } from "@endpoints/tenant";
 import { stripeRoutes, webhookRoutes as stripeWebhookRoutes } from "@endpoints/stripe";
 import { GlobalFees } from "./models/GlobalFees";
-import { WebsiteBuilderConfigs, DEFAULT_FOOTER_DISCLAIMER } from "./models/WebsiteBuilderConfigs";
-import { useGlobalFees, getPlatformFeePercent } from "./utils/useGlobalFees";
+import { WebsiteBuilderConfigs, DEFAULT_FOOTER_DISCLAIMER } from "@models/WebsiteBuilderConfigs";
+import { getPlatformFeePercent, useGlobalFees } from "@utils/useGlobalFees";
+
+// Helper function to fetch global fees from database
+async function getGlobalFees() {
+  const globalFees = await GlobalFees.findOne();
+  if (!globalFees) {
+    throw new Error("Global fees configuration not found in database");
+  }
+  return {
+    platformFeePercent: Number(globalFees.fuseTransactionFeePercent),
+    stripeFeePercent: Number(globalFees.stripeTransactionFeePercent),
+    doctorFlatFeeUsd: Number(globalFees.fuseTransactionDoctorFeeUsd),
+  };
+}
 
 // Helper function to generate unique clinic slug
 async function generateUniqueSlug(
@@ -381,6 +387,7 @@ app.use("/", dashboardRoutes);
 app.use("/", stripeRoutes);
 app.use("/", stripeWebhookRoutes);
 app.use("/", payoutsRoutes);
+app.use("/", tenantRoutes);
 // Clone 'doctor' steps from master_template into a target questionnaire (preserve order)
 app.post(
   "/questionnaires/clone-doctor-from-master",
@@ -7491,71 +7498,6 @@ app.post("/subscriptions/cancel", authenticateJWT, async (req, res) => {
 // Add questionnaire step
 const questionnaireService = new QuestionnaireService();
 
-// Get tenants (clinics) with their owners
-app.get("/tenants", authenticateJWT, async (req, res) => {
-  try {
-    const currentUser = getCurrentUser(req);
-    if (!currentUser) {
-      return res
-        .status(401)
-        .json({ success: false, message: "Not authenticated" });
-    }
-
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 10;
-
-    const result = await clinicService.listTenants({ page, limit });
-
-    if (result.success) {
-      res.status(200).json(result);
-    } else {
-      res.status(400).json(result);
-    }
-  } catch (error) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("❌ Error fetching tenants:", error);
-    } else {
-      console.error("❌ Error fetching tenants");
-    }
-
-    res.status(500).json({
-      success: false,
-      message: "Internal server error",
-    });
-  }
-});
-
-// Get single tenant by ID
-app.get("/tenants/:id", authenticateJWT, async (req, res) => {
-  try {
-    const currentUser = getCurrentUser(req);
-    if (!currentUser) {
-      return res
-        .status(401)
-        .json({ success: false, message: "Not authenticated" });
-    }
-
-    const { id } = req.params;
-    const result = await clinicService.getTenantById(id);
-
-    if (result.success) {
-      res.status(200).json(result);
-    } else {
-      res.status(404).json(result);
-    }
-  } catch (error) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("❌ Error fetching tenant:", error);
-    } else {
-      console.error("❌ Error fetching tenant");
-    }
-    res.status(500).json({
-      success: false,
-      message: "Internal server error",
-    });
-  }
-});
-
 // Admin routes: list tenants (users with clinic) and questionnaires by tenant
 app.get("/admin/tenants", authenticateJWT, async (req, res) => {
   try {
@@ -9717,99 +9659,6 @@ app.put(
   }
 );
 
-// Retry product selection: clears TenantProduct and TenantProductForm for current clinic, once per cycle
-app.post(
-  "/tenant-products/retry-selection",
-  authenticateJWT,
-  async (req, res) => {
-    try {
-      const currentUser = getCurrentUser(req);
-      if (!currentUser) {
-        return res
-          .status(401)
-          .json({ success: false, message: "Not authenticated" });
-      }
-
-      const user = await User.findByPk(currentUser.id);
-      if (!user || !user.clinicId) {
-        return res
-          .status(400)
-          .json({ success: false, message: "User clinic not found" });
-      }
-
-      const subscription = await BrandSubscription.findOne({
-        where: {
-          userId: currentUser.id,
-          status: BrandSubscriptionStatus.ACTIVE,
-        },
-        order: [["createdAt", "DESC"]],
-      });
-      if (!subscription) {
-        return res
-          .status(400)
-          .json({ success: false, message: "No active subscription found" });
-      }
-
-      const periodStart = subscription.currentPeriodStart
-        ? new Date(subscription.currentPeriodStart)
-        : null;
-      const periodEnd = subscription.currentPeriodEnd
-        ? new Date(subscription.currentPeriodEnd)
-        : null;
-      if (
-        (subscription as any).retriedProductSelectionForCurrentCycle &&
-        periodStart &&
-        periodEnd &&
-        new Date() >= periodStart &&
-        new Date() < periodEnd
-      ) {
-        return res
-          .status(400)
-          .json({
-            success: false,
-            message: "You already retried once for this billing cycle.",
-          });
-      }
-
-      // Hard delete all mappings for this clinic
-      await (
-        await import("./models/TenantProduct")
-      ).default.destroy({
-        where: { clinicId: user.clinicId } as any,
-        force: true,
-      } as any);
-      await (
-        await import("./models/TenantProductForm")
-      ).default.destroy({
-        where: { clinicId: user.clinicId } as any,
-        force: true,
-      } as any);
-
-      await subscription.update({
-        productsChangedAmountOnCurrentCycle: 0,
-        retriedProductSelectionForCurrentCycle: true,
-        lastProductChangeAt: new Date(),
-      } as any);
-
-      res
-        .status(200)
-        .json({
-          success: true,
-          message: "Selections cleared. You can choose products again.",
-        });
-    } catch (error) {
-      if (process.env.NODE_ENV === "development") {
-        console.error("❌ Error retrying product selection:", error);
-      } else {
-        console.error("❌ Error retrying product selection");
-      }
-      res
-        .status(500)
-        .json({ success: false, message: "Failed to retry product selection" });
-    }
-  }
-);
-
 app.get("/questionnaires/:id", authenticateJWT, async (req, res) => {
   try {
     const currentUser = getCurrentUser(req);
@@ -11777,105 +11626,7 @@ app.post(
         "clinic-logos",
         "logo"
       );
-
-      // Retry product selection: clears TenantProduct and TenantProductForm for current clinic, once per cycle
-      app.post(
-        "/tenant-products/retry-selection",
-        authenticateJWT,
-        async (req, res) => {
-          try {
-            const currentUser = getCurrentUser(req);
-            if (!currentUser) {
-              return res
-                .status(401)
-                .json({ success: false, message: "Not authenticated" });
-            }
-
-            const user = await User.findByPk(currentUser.id);
-            if (!user || !user.clinicId) {
-              return res
-                .status(400)
-                .json({ success: false, message: "User clinic not found" });
-            }
-
-            const subscription = await BrandSubscription.findOne({
-              where: {
-                userId: currentUser.id,
-                status: BrandSubscriptionStatus.ACTIVE,
-              },
-              order: [["createdAt", "DESC"]],
-            });
-            if (!subscription) {
-              return res
-                .status(400)
-                .json({
-                  success: false,
-                  message: "No active subscription found",
-                });
-            }
-
-            const periodStart = subscription.currentPeriodStart
-              ? new Date(subscription.currentPeriodStart)
-              : null;
-            const periodEnd = subscription.currentPeriodEnd
-              ? new Date(subscription.currentPeriodEnd)
-              : null;
-            if (
-              (subscription as any).retriedProductSelectionForCurrentCycle &&
-              periodStart &&
-              periodEnd &&
-              new Date() >= periodStart &&
-              new Date() < periodEnd
-            ) {
-              return res
-                .status(400)
-                .json({
-                  success: false,
-                  message: "You already retried once for this billing cycle.",
-                });
-            }
-
-            // Hard delete all mappings for this clinic
-            await (
-              await import("./models/TenantProduct")
-            ).default.destroy({
-              where: { clinicId: user.clinicId } as any,
-              force: true,
-            } as any);
-            await (
-              await import("./models/TenantProductForm")
-            ).default.destroy({
-              where: { clinicId: user.clinicId } as any,
-              force: true,
-            } as any);
-
-            await subscription.update({
-              productsChangedAmountOnCurrentCycle: 0,
-              retriedProductSelectionForCurrentCycle: true,
-              lastProductChangeAt: new Date(),
-            } as any);
-
-            res
-              .status(200)
-              .json({
-                success: true,
-                message: "Selections cleared. You can choose products again.",
-              });
-          } catch (error) {
-            if (process.env.NODE_ENV === "development") {
-              console.error("❌ Error retrying product selection:", error);
-            } else {
-              console.error("❌ Error retrying product selection");
-            }
-            res
-              .status(500)
-              .json({
-                success: false,
-                message: "Failed to retry product selection",
-              });
-          }
-        }
-      );
+      
       // Update clinic logo
       const user = await User.findByPk(currentUser.id);
       if (user && user.clinicId) {
@@ -11985,12 +11736,12 @@ const PORT = process.env.PORT || 3001;
 
 // Initialize database connection and start server
 async function startServer() {
-  // const dbConnected = await initializeDatabase();
+  const dbConnected = await initializeDatabase();
 
-  // if (!dbConnected) {
-  //   console.error("❌ Failed to connect to database. Exiting...");
-  //   process.exit(1);
-  // }
+  if (!dbConnected) {
+    console.error("❌ Failed to connect to database. Exiting...");
+    process.exit(1);
+  }
 
   const httpServer = app.listen(PORT, () => {
     console.log(`🚀 API listening on :${PORT}`);
@@ -14333,59 +14084,6 @@ app.get("/public/questionnaires/first-user-profile", async (_req, res) => {
   }
 });
 
-// Public: get tenant product by ID
-app.get("/tenant-products/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    console.log("🏢 [PUBLIC] Fetching tenant product:", id);
-
-    const tenantProduct = await TenantProduct.findByPk(id, {
-      include: [
-        { model: Product, as: "product" },
-        { model: Questionnaire, as: "questionnaire" },
-      ],
-    });
-
-    if (!tenantProduct) {
-      return res.status(404).json({
-        success: false,
-        message: "Tenant product not found",
-      });
-    }
-
-    console.log(
-      "🏢 [PUBLIC] Found tenant product, productId:",
-      tenantProduct.productId
-    );
-
-    res.json({
-      success: true,
-      data: {
-        id: tenantProduct.id,
-        productId: tenantProduct.productId,
-        clinicId: tenantProduct.clinicId,
-        questionnaireId: tenantProduct.questionnaireId,
-        price: tenantProduct.price,
-        stripeProductId: tenantProduct.stripeProductId,
-        stripePriceId: tenantProduct.stripePriceId,
-        product: tenantProduct.product,
-        questionnaire: tenantProduct.questionnaire,
-      },
-    });
-  } catch (error: any) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("❌ [PUBLIC] Error fetching tenant product:", error);
-    } else {
-      console.error("❌ [PUBLIC] Error fetching tenant product");
-    }
-    res.status(500).json({
-      success: false,
-      message: error.message || "Failed to fetch tenant product",
-    });
-  }
-});
-
 // Public: get pharmacy coverages for a product
 app.get("/public/products/:productId/pharmacy-coverages", async (req, res) => {
   try {
@@ -14533,342 +14231,3 @@ app.get("/public/brand-treatments/:clinicSlug/:slug", async (req, res) => {
       .json({ success: false, message: "Failed to fetch treatment" });
   }
 });
-
-// ========================================
-// Tenant Product Endpoints
-// ========================================
-
-// Update product selection for a clinic
-app.post(
-  "/tenant-products/update-selection",
-  authenticateJWT,
-  async (req, res) => {
-    try {
-      const currentUser = getCurrentUser(req);
-
-      if (!currentUser) {
-        return res.status(401).json({
-          success: false,
-          message: "Not authenticated",
-        });
-      }
-
-      // Validate request body using a relaxed schema that allows missing questionnaireId
-      const { z } = require("zod");
-      const relaxedItemSchema = z.object({
-        productId: z.string().uuid("Invalid product ID"),
-        questionnaireId: z.string().uuid("Invalid questionnaire ID").optional(),
-      });
-      const relaxedSchema = z.object({
-        products: z.array(relaxedItemSchema).min(1).max(100),
-      });
-
-      // Sanitize incoming to drop null questionnaireId values
-      const sanitized = {
-        products: Array.isArray(req.body?.products)
-          ? req.body.products.map((p: any) => {
-            const obj: any = { productId: p?.productId };
-            if (
-              typeof p?.questionnaireId === "string" &&
-              p.questionnaireId.length > 0
-            ) {
-              obj.questionnaireId = p.questionnaireId;
-            }
-            return obj;
-          })
-          : [],
-      };
-
-      const validation = relaxedSchema.safeParse(sanitized);
-      if (!validation.success) {
-        return res.status(400).json({
-          success: false,
-          message: "Validation failed",
-          errors: validation.error.errors,
-        });
-      }
-
-      // Create tenant product service instance
-      const tenantProductService = new TenantProductService();
-
-      // Update product selection
-      const tenantProducts = await tenantProductService.updateSelection(
-        validation.data,
-        currentUser.id
-      );
-
-      console.log("✅ Tenant products updated:", {
-        count: tenantProducts.length,
-        userId: currentUser.id,
-        // clinicId: currentUser.clinicId
-      });
-
-      res.status(200).json({
-        success: true,
-        message: `Successfully updated ${tenantProducts.length} product(s)`,
-        data: tenantProducts,
-      });
-    } catch (error) {
-      if (process.env.NODE_ENV === "development") {
-        console.error("❌ Error updating tenant product selection:", error);
-      } else {
-        console.error("❌ Error updating tenant product selection");
-      }
-
-      if (error instanceof Error) {
-        // Handle specific error types
-        if (error.message.includes("not found")) {
-          return res.status(404).json({
-            success: false,
-            message: error.message,
-          });
-        }
-
-        if (
-          error.message.includes("Unauthorized") ||
-          error.message.includes("does not belong to")
-        ) {
-          return res.status(403).json({
-            success: false,
-            message: error.message,
-          });
-        }
-
-        if (error.message.includes("Duplicate")) {
-          return res.status(400).json({
-            success: false,
-            message: error.message,
-          });
-        }
-
-        if (error.message.includes("Product limit exceeded")) {
-          return res.status(400).json({
-            success: false,
-            message: error.message,
-          });
-        }
-
-        if (
-          error.message.includes("only change products once per billing cycle")
-        ) {
-          return res.status(400).json({
-            success: false,
-            message: error.message,
-          });
-        }
-      }
-
-      res.status(500).json({
-        success: false,
-        message: "Failed to update tenant product selection",
-      });
-    }
-  }
-);
-
-// Update tenant product price
-app.post("/tenant-products/update", authenticateJWT, async (req, res) => {
-  try {
-    const currentUser = getCurrentUser(req);
-
-    if (!currentUser) {
-      return res.status(401).json({
-        success: false,
-        message: "Not authenticated",
-      });
-    }
-
-    // Basic validation (schema removed): expect tenantProductId (uuid) and positive price
-    const { tenantProductId, price } = req.body || {};
-    if (
-      typeof tenantProductId !== "string" ||
-      tenantProductId.trim().length === 0
-    ) {
-      return res
-        .status(400)
-        .json({ success: false, message: "tenantProductId is required" });
-    }
-    if (typeof price !== "number" || !(price > 0)) {
-      return res
-        .status(400)
-        .json({ success: false, message: "price must be a positive number" });
-    }
-
-    // Create tenant product service instance
-    const tenantProductService = new TenantProductService();
-
-    // Update tenant product price
-    const result = await tenantProductService.updatePrice({
-      tenantProductId,
-      price,
-      userId: currentUser.id,
-    });
-
-    if (!result.success) {
-      // Handle specific error types
-      if (result.error?.includes("not found")) {
-        return res.status(404).json({
-          success: false,
-          message: result.error,
-        });
-      }
-
-      if (result.error?.includes("does not belong to")) {
-        return res.status(403).json({
-          success: false,
-          message: result.error,
-        });
-      }
-
-      return res.status(400).json({
-        success: false,
-        message: result.error || "Failed to update price",
-      });
-    }
-
-    console.log("✅ Tenant product price updated:", {
-      tenantProductId,
-      price,
-      stripeProductId: result.stripeProductId,
-      stripePriceId: result.stripePriceId,
-      userId: currentUser.id,
-    });
-
-    res.status(200).json({
-      success: true,
-      message: result.message || "Price updated successfully",
-      data: {
-        tenantProduct: result.tenantProduct,
-        stripeProductId: result.stripeProductId,
-        stripePriceId: result.stripePriceId,
-      },
-    });
-  } catch (error) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("❌ Error updating tenant product price:", error);
-    } else {
-      console.error("❌ Error updating tenant product price");
-    }
-
-    res.status(500).json({
-      success: false,
-      message: "Failed to update tenant product price",
-    });
-  }
-});
-
-// Get all tenant products for a clinic
-app.get("/tenant-products", authenticateJWT, async (req, res) => {
-  try {
-    const currentUser = getCurrentUser(req);
-
-    if (!currentUser) {
-      return res.status(401).json({
-        success: false,
-        message: "Not authenticated",
-      });
-    }
-
-    const tenantProductService = new TenantProductService();
-    const tenantProducts = await tenantProductService.listByClinic(
-      currentUser.id
-    );
-
-    res.status(200).json({
-      success: true,
-      message: `Retrieved ${tenantProducts.length} tenant product(s)`,
-      data: tenantProducts,
-    });
-  } catch (error) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("❌ Error fetching tenant products:", error);
-    } else {
-      console.error("❌ Error fetching tenant products");
-    }
-
-    if (error instanceof Error) {
-      if (error.message.includes("Unauthorized")) {
-        return res.status(403).json({
-          success: false,
-          message: error.message,
-        });
-      }
-    }
-
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch tenant products",
-    });
-  }
-});
-
-// Delete a tenant product
-app.delete("/tenant-products/:id", authenticateJWT, async (req, res) => {
-  try {
-    const currentUser = getCurrentUser(req);
-
-    if (!currentUser) {
-      return res.status(401).json({
-        success: false,
-        message: "Not authenticated",
-      });
-    }
-
-    const { id } = req.params;
-
-    if (!id) {
-      return res.status(400).json({
-        success: false,
-        message: "Tenant product ID is required",
-      });
-    }
-
-    const tenantProductService = new TenantProductService();
-    const result = await tenantProductService.delete(id, currentUser.id);
-
-    console.log("✅ Tenant product deleted:", {
-      tenantProductId: id,
-      userId: currentUser.id,
-    });
-
-    res.status(200).json({
-      success: true,
-      message: "Tenant product deleted successfully",
-      data: result,
-    });
-  } catch (error) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("❌ Error deleting tenant product:", error);
-    } else {
-      console.error("❌ Error deleting tenant product");
-    }
-
-    if (error instanceof Error) {
-      if (error.message.includes("not found")) {
-        return res.status(404).json({
-          success: false,
-          message: error.message,
-        });
-      }
-
-      if (
-        error.message.includes("Unauthorized") ||
-        error.message.includes("does not belong to")
-      ) {
-        return res.status(403).json({
-          success: false,
-          message: error.message,
-        });
-      }
-    }
-
-    res.status(500).json({
-      success: false,
-      message: "Failed to delete tenant product",
-    });
-  }
-});
-
-// ✅ MESSAGE TEMPLATES & WEBHOOKS MOVED TO: src/features/
-// - Templates: features/templates/
-// - Webhooks: features/sequences/webhooks/
