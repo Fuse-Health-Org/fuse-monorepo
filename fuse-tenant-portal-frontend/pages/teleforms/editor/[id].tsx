@@ -2256,16 +2256,14 @@ export default function TemplateEditor() {
                     </Badge>
                   </div>
 
-                  <div className="bg-card rounded-2xl p-5 shadow-md border border-border/40 hover:shadow-lg transition-shadow col-span-2">
+                  <div className="bg-card rounded-2xl p-5 shadow-md border border-border/40 col-span-2">
                     <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">Medical Platform</p>
                     <div className="flex items-center gap-2 mt-1">
-                      <button
-                        type="button"
-                        onClick={() => handlePlatformChange('fuse')}
-                        className={`flex-1 p-2 rounded-lg border-2 transition-all ${
+                      <div
+                        className={`flex-1 p-2 rounded-lg border-2 ${
                           medicalCompanySource === 'fuse'
                             ? 'border-[#4FA59C] bg-[#4FA59C]/10'
-                            : 'border-border hover:border-muted-foreground/50'
+                            : 'border-border opacity-40'
                         }`}
                         title="Fuse Health Platform"
                       >
@@ -2277,15 +2275,13 @@ export default function TemplateEditor() {
                             Fuse
                           </span>
                         </div>
-                      </button>
+                      </div>
 
-                      <button
-                        type="button"
-                        onClick={() => handlePlatformChange('md-integrations')}
-                        className={`flex-1 p-2 rounded-lg border-2 transition-all ${
+                      <div
+                        className={`flex-1 p-2 rounded-lg border-2 ${
                           medicalCompanySource === 'md-integrations'
                             ? 'border-[#4FA59C] bg-[#4FA59C]/10'
-                            : 'border-border hover:border-muted-foreground/50'
+                            : 'border-border opacity-40'
                         }`}
                         title="MD Integrations Platform"
                       >
@@ -2297,15 +2293,13 @@ export default function TemplateEditor() {
                             MDI
                           </span>
                         </div>
-                      </button>
+                      </div>
 
-                      <button
-                        type="button"
-                        onClick={() => handlePlatformChange('beluga')}
-                        className={`flex-1 p-2 rounded-lg border-2 transition-all ${
+                      <div
+                        className={`flex-1 p-2 rounded-lg border-2 ${
                           medicalCompanySource === 'beluga'
                             ? 'border-[#4FA59C] bg-[#4FA59C]/10'
-                            : 'border-border hover:border-muted-foreground/50'
+                            : 'border-border opacity-40'
                         }`}
                         title="Beluga Health Platform"
                       >
@@ -2317,7 +2311,7 @@ export default function TemplateEditor() {
                             Beluga
                           </span>
                         </div>
-                      </button>
+                      </div>
                     </div>
                   </div>
                 </div>
