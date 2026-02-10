@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useAuth } from "@/contexts/AuthContext"
-import { Search, Loader2, User as UserIcon, Save, Eye } from "lucide-react"
+import { Search, Loader2, User as UserIcon, Save, Eye, Building2 } from "lucide-react"
 import { toast } from "sonner"
 import { MedicalCompanySlug } from "@fuse/enums"
 
@@ -98,6 +98,27 @@ export default function ClientManagement() {
   const [doctors, setDoctors] = useState<User[]>([])
   const [loadingDoctors, setLoadingDoctors] = useState(false)
 
+  // Medical companies state
+  interface MedicalCompanyItem {
+    id: string
+    name: string
+    slug: string
+    apiUrl?: string
+    dashboardUrl?: string
+    documentationUrl?: string
+  }
+  const [medicalCompanies, setMedicalCompanies] = useState<MedicalCompanyItem[]>([])
+  const [selectedMedicalCompany, setSelectedMedicalCompany] = useState<MedicalCompanyItem | null>(null)
+  const [loadingMedicalCompanies, setLoadingMedicalCompanies] = useState(false)
+  const [savingMedicalCompany, setSavingMedicalCompany] = useState(false)
+  const [medicalCompanyForm, setMedicalCompanyForm] = useState({
+    name: '',
+    slug: '',
+    apiUrl: '',
+    dashboardUrl: '',
+    documentationUrl: '',
+  })
+
   // BrandSubscription form state
   const [formData, setFormData] = useState({
     productsChangedAmountOnCurrentCycle: 0,
@@ -130,7 +151,64 @@ export default function ClientManagement() {
     fetchUsers()
     fetchAvailablePlans()
     fetchDoctors()
+    fetchMedicalCompanies()
   }, [])
+
+  const fetchMedicalCompanies = async () => {
+    setLoadingMedicalCompanies(true)
+    try {
+      const response = await fetch(`${baseUrl}/medical-companies`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+      if (!response.ok) throw new Error('Failed to fetch medical companies')
+      const result = await response.json()
+      setMedicalCompanies(result.data || [])
+    } catch (error) {
+      console.error('Error fetching medical companies:', error)
+    } finally {
+      setLoadingMedicalCompanies(false)
+    }
+  }
+
+  const handleSelectMedicalCompany = (company: MedicalCompanyItem) => {
+    setSelectedMedicalCompany(company)
+    setSelectedUser(null)
+    setMedicalCompanyForm({
+      name: company.name || '',
+      slug: company.slug || '',
+      apiUrl: company.apiUrl || '',
+      dashboardUrl: company.dashboardUrl || '',
+      documentationUrl: company.documentationUrl || '',
+    })
+  }
+
+  const handleSaveMedicalCompany = async () => {
+    if (!selectedMedicalCompany) return
+    setSavingMedicalCompany(true)
+    try {
+      const response = await fetch(`${baseUrl}/medical-companies/${selectedMedicalCompany.id}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(medicalCompanyForm),
+      })
+      if (!response.ok) throw new Error('Failed to update medical company')
+      const result = await response.json()
+      // Update local state
+      setMedicalCompanies(prev => prev.map(c => c.id === selectedMedicalCompany.id ? { ...c, ...medicalCompanyForm } : c))
+      setSelectedMedicalCompany({ ...selectedMedicalCompany, ...medicalCompanyForm })
+      alert('Medical company updated successfully!')
+    } catch (error) {
+      console.error('Error saving medical company:', error)
+      alert('Failed to save medical company')
+    } finally {
+      setSavingMedicalCompany(false)
+    }
+  }
 
   const fetchAvailablePlans = async () => {
     try {
@@ -235,6 +313,7 @@ export default function ClientManagement() {
   }
 
   const handleSelectUser = async (user: User) => {
+    setSelectedMedicalCompany(null)
     console.log('👤 [Client Mgmt Frontend] Selected user:', user)
     console.log('📋 [Client Mgmt Frontend] User subscription:', user.brandSubscriptions?.[0])
     console.log('📦 [Client Mgmt Frontend] Subscription plan:', user.brandSubscriptions?.[0]?.plan)
@@ -593,6 +672,7 @@ export default function ClientManagement() {
                       { value: 'patient', label: 'Patients' },
                       { value: 'affiliate', label: 'Affiliates' },
                       { value: 'admin', label: 'Admins' },
+                      { value: 'medical_company', label: 'Medical Companies' },
                     ].map((role) => (
                       <button
                         key={role.value}
@@ -600,6 +680,11 @@ export default function ClientManagement() {
                         onClick={() => {
                           setRoleFilter(role.value)
                           setSearchTerm('')
+                          if (role.value === 'medical_company') {
+                            setSelectedUser(null)
+                          } else {
+                            setSelectedMedicalCompany(null)
+                          }
                         }}
                         className={`px-3 py-1 text-xs font-medium rounded-full border transition-all ${
                           roleFilter === role.value
@@ -613,60 +698,193 @@ export default function ClientManagement() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  {loading ? (
-                    <div className="flex items-center justify-center py-8">
-                      <Loader2 className="h-8 w-8 animate-spin text-[#4FA59C]" />
-                    </div>
+                  {roleFilter === 'medical_company' ? (
+                    // Medical Companies list
+                    loadingMedicalCompanies ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="h-8 w-8 animate-spin text-[#4FA59C]" />
+                      </div>
+                    ) : (
+                      <div className="space-y-2 max-h-[600px] overflow-y-auto">
+                        {medicalCompanies
+                          .filter(c => {
+                            if (!searchTerm) return true
+                            const search = searchTerm.toLowerCase()
+                            return c.name.toLowerCase().includes(search) || c.slug.toLowerCase().includes(search)
+                          })
+                          .map((company) => (
+                          <button
+                            key={company.id}
+                            onClick={() => handleSelectMedicalCompany(company)}
+                            className={`w-full text-left p-3 rounded-lg transition-all ${selectedMedicalCompany?.id === company.id
+                              ? 'bg-[#4FA59C] text-white'
+                              : 'bg-muted/50 hover:bg-muted text-foreground'
+                              }`}
+                          >
+                            <div className="flex items-center space-x-3">
+                              <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${selectedMedicalCompany?.id === company.id
+                                ? 'bg-white/20'
+                                : 'bg-[#4FA59C]/10'
+                                }`}>
+                                <Building2 className={`h-5 w-5 ${selectedMedicalCompany?.id === company.id
+                                  ? 'text-white'
+                                  : 'text-[#4FA59C]'
+                                  }`} />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium truncate">{company.name}</p>
+                                <p className={`text-xs truncate ${selectedMedicalCompany?.id === company.id
+                                  ? 'text-white/80'
+                                  : 'text-muted-foreground'
+                                  }`}>
+                                  {company.slug}
+                                </p>
+                              </div>
+                            </div>
+                          </button>
+                        ))}
+                        {medicalCompanies.length === 0 && (
+                          <p className="text-center text-muted-foreground py-8">No medical companies found</p>
+                        )}
+                      </div>
+                    )
                   ) : (
-                    <div className="space-y-2 max-h-[600px] overflow-y-auto">
-                      {filteredUsers.map((user) => (
-                        <button
-                          key={user.id}
-                          onClick={() => handleSelectUser(user)}
-                          className={`w-full text-left p-3 rounded-lg transition-all ${selectedUser?.id === user.id
-                            ? 'bg-[#4FA59C] text-white'
-                            : 'bg-muted/50 hover:bg-muted text-foreground'
-                            }`}
-                        >
-                          <div className="flex items-center space-x-3">
-                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${selectedUser?.id === user.id
-                              ? 'bg-white/20'
-                              : 'bg-[#4FA59C]/10'
-                              }`}>
-                              <UserIcon className={`h-5 w-5 ${selectedUser?.id === user.id
-                                ? 'text-white'
-                                : 'text-[#4FA59C]'
-                                }`} />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium truncate">
-                                {user.firstName} {user.lastName}
-                              </p>
-                              <p className={`text-xs truncate ${selectedUser?.id === user.id
-                                ? 'text-white/80'
-                                : 'text-muted-foreground'
+                    // Users list
+                    loading ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="h-8 w-8 animate-spin text-[#4FA59C]" />
+                      </div>
+                    ) : (
+                      <div className="space-y-2 max-h-[600px] overflow-y-auto">
+                        {filteredUsers.map((user) => (
+                          <button
+                            key={user.id}
+                            onClick={() => handleSelectUser(user)}
+                            className={`w-full text-left p-3 rounded-lg transition-all ${selectedUser?.id === user.id
+                              ? 'bg-[#4FA59C] text-white'
+                              : 'bg-muted/50 hover:bg-muted text-foreground'
+                              }`}
+                          >
+                            <div className="flex items-center space-x-3">
+                              <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${selectedUser?.id === user.id
+                                ? 'bg-white/20'
+                                : 'bg-[#4FA59C]/10'
                                 }`}>
-                                {user.email}
-                              </p>
-                              <p className={`text-xs mt-1 ${selectedUser?.id === user.id
-                                ? 'text-white/70'
-                                : 'text-muted-foreground'
-                                }`}>
-                                Role: {user.role}
-                              </p>
+                                <UserIcon className={`h-5 w-5 ${selectedUser?.id === user.id
+                                  ? 'text-white'
+                                  : 'text-[#4FA59C]'
+                                  }`} />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium truncate">
+                                  {user.firstName} {user.lastName}
+                                </p>
+                                <p className={`text-xs truncate ${selectedUser?.id === user.id
+                                  ? 'text-white/80'
+                                  : 'text-muted-foreground'
+                                  }`}>
+                                  {user.email}
+                                </p>
+                                <p className={`text-xs mt-1 ${selectedUser?.id === user.id
+                                  ? 'text-white/70'
+                                  : 'text-muted-foreground'
+                                  }`}>
+                                  Role: {user.role}
+                                </p>
+                              </div>
                             </div>
-                          </div>
-                        </button>
-                      ))}
-                      {filteredUsers.length === 0 && (
-                        <p className="text-center text-muted-foreground py-8">No users found</p>
-                      )}
-                    </div>
+                          </button>
+                        ))}
+                        {filteredUsers.length === 0 && (
+                          <p className="text-center text-muted-foreground py-8">No users found</p>
+                        )}
+                      </div>
+                    )
                   )}
                 </CardContent>
               </Card>
 
-              {/* User Details & Subscription Settings */}
+              {/* Right Panel */}
+              {roleFilter === 'medical_company' ? (
+                // Medical Company Details
+                <Card className="lg:col-span-2">
+                  <CardHeader>
+                    <CardTitle>Medical Company Settings</CardTitle>
+                    <CardDescription>
+                      View and edit medical company details
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {selectedMedicalCompany ? (
+                      <div className="space-y-6">
+                        <div className="bg-muted/50 rounded-lg p-4 border border-border">
+                          <h3 className="font-semibold text-foreground mb-4">Company Information</h3>
+                          <div className="space-y-4">
+                            <div>
+                              <label className="block text-sm text-muted-foreground mb-1">Name</label>
+                              <Input
+                                value={medicalCompanyForm.name}
+                                onChange={(e) => setMedicalCompanyForm({ ...medicalCompanyForm, name: e.target.value })}
+                                placeholder="Company name"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm text-muted-foreground mb-1">Slug</label>
+                              <Input
+                                value={medicalCompanyForm.slug}
+                                onChange={(e) => setMedicalCompanyForm({ ...medicalCompanyForm, slug: e.target.value })}
+                                placeholder="company-slug"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm text-muted-foreground mb-1">API URL</label>
+                              <Input
+                                value={medicalCompanyForm.apiUrl}
+                                onChange={(e) => setMedicalCompanyForm({ ...medicalCompanyForm, apiUrl: e.target.value })}
+                                placeholder="https://api.example.com"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm text-muted-foreground mb-1">Dashboard URL</label>
+                              <Input
+                                value={medicalCompanyForm.dashboardUrl}
+                                onChange={(e) => setMedicalCompanyForm({ ...medicalCompanyForm, dashboardUrl: e.target.value })}
+                                placeholder="https://dashboard.example.com"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm text-muted-foreground mb-1">Documentation URL</label>
+                              <Input
+                                value={medicalCompanyForm.documentationUrl}
+                                onChange={(e) => setMedicalCompanyForm({ ...medicalCompanyForm, documentationUrl: e.target.value })}
+                                placeholder="https://docs.example.com"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                        <Button
+                          onClick={handleSaveMedicalCompany}
+                          disabled={savingMedicalCompany}
+                          className="bg-[#4FA59C] hover:bg-[#3d8a82] text-white"
+                        >
+                          {savingMedicalCompany ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          ) : (
+                            <Save className="h-4 w-4 mr-2" />
+                          )}
+                          {savingMedicalCompany ? 'Saving...' : 'Save Changes'}
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                        <Building2 className="h-12 w-12 mb-4" />
+                        <p className="text-lg font-medium">No Medical Company Selected</p>
+                        <p className="text-sm mt-2">Select a medical company from the list to view and edit its settings</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ) : (
               <Card className="lg:col-span-2">
                 <CardHeader>
                   <CardTitle>Brand Subscription Settings</CardTitle>
@@ -1306,6 +1524,7 @@ export default function ClientManagement() {
                   )}
                 </CardContent>
               </Card>
+              )}
             </div>
           </div>
         </main>

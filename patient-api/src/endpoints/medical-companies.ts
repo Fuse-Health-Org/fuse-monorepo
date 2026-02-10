@@ -50,4 +50,39 @@ router.get('/:slug', async (req: Request, res: Response) => {
   }
 });
 
+// PUT /medical-companies/:id - Update a medical company by ID
+router.put('/:id', async (req: Request, res: Response) => {
+  try {
+    const company = await MedicalCompany.findByPk(req.params.id);
+
+    if (!company) {
+      return res.status(404).json({
+        success: false,
+        message: 'Medical company not found',
+      });
+    }
+
+    const { name, slug, apiUrl, dashboardUrl, documentationUrl } = req.body;
+
+    await company.update({
+      ...(name !== undefined && { name }),
+      ...(slug !== undefined && { slug }),
+      ...(apiUrl !== undefined && { apiUrl }),
+      ...(dashboardUrl !== undefined && { dashboardUrl }),
+      ...(documentationUrl !== undefined && { documentationUrl }),
+    });
+
+    res.json({
+      success: true,
+      data: company,
+    });
+  } catch (error) {
+    console.error('Error updating medical company:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update medical company',
+    });
+  }
+});
+
 export default router;
