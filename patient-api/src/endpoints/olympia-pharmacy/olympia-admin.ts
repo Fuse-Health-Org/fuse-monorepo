@@ -118,6 +118,14 @@ export function registerOlympiaAdminEndpoints(
   // Create Prescription
   app.post("/olympia/prescriptions", authenticateJWT, async (req, res) => {
     try {
+      // Validate vendor_order_id is present
+      if (!req.body.vendor_order_id) {
+        return res.status(400).json({
+          success: false,
+          message: "vendor_order_id is required for every Olympia prescription order",
+        });
+      }
+
       console.log("📥 [Olympia] Create Prescription - Request:", JSON.stringify(req.body, null, 2));
       const result = await olympiaPharmacyApiService.createPrescription(req.body);
       console.log("📤 [Olympia] Create Prescription - Response:", JSON.stringify(result, null, 2));

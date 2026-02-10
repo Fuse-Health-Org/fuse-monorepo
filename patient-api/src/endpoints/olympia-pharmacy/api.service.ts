@@ -83,14 +83,13 @@ interface CreatePrescriptionRequest {
   patient_id: string; // Olympia patient UUID (13 characters)
   physician: PrescriptionPhysician;
   products: PrescriptionProduct[];
-  allergies?: string;
-  med_cond?: string; // Medical conditions
+  allergies?: string; // Defaults to "NKDA" if not provided
+  med_cond?: string; // Defaults to "N/A" if not provided
   p_last_visit?: string; // Format: YYYY-MM-DD
-  ship_method: string; // e.g., "overnight", "standard"
+  ship_method?: string; // Always "overnight" for this integration (hardcoded)
   ship_to: string; // e.g., "patient", "physician"
-  bill_to: string; // e.g., "patient", "physician"
-  vendor_order_id?: string; // Your internal order ID for tracking
-  pt_team_username?: string;
+  bill_to?: string; // Always "physician" for this integration (hardcoded)
+  vendor_order_id: string; // REQUIRED - Your internal order ID for tracking
   
   // Optional patient override fields
   pt_fname?: string;
@@ -251,12 +250,39 @@ class OlympiaPharmacyApiService {
 
   /**
    * Create a new prescription order in Olympia Pharmacy
+   * 
+   * Integration defaults (per Olympia dev guidance):
+   * - ship_method: always "overnight"
+   * - bill_to: always "physician"
+   * - allergies: defaults to "NKDA" if not provided
+   * - med_cond: defaults to "N/A" if not provided
+   * - vendor_order_id: REQUIRED on every order
+   * - pt_team_username: excluded from requests
+   * 
    * @param data Prescription data including patient ID, physician, and products
    * @returns Prescription ID
    */
   async createPrescription(data: CreatePrescriptionRequest): Promise<CreatePrescriptionResponse> {
     try {
-      console.log('💊 Creating prescription in Olympia Pharmacy for patient:', data.patient_id);
+      // Enforce required vendor_order_id
+      if (!data.vendor_order_id) {
+        throw new Error('vendor_order_id is required for every Olympia prescription order');
+      }
+
+      // Apply integration defaults
+      const payload: CreatePrescriptionRequest = {
+        ...data,
+        ship_method: 'overnight', // Always overnight for this integration
+        bill_to: 'physician', // Always bill to physician for this integration
+        allergies: data.allergies?.trim() || 'NKDA', // Default to NKDA
+        med_cond: data.med_cond?.trim() || 'N/A', // Default to N/A
+      };
+
+      // Remove pt_team_username if it slips through - not needed for this integration
+      delete (payload as any).pt_team_username;
+
+      console.log('💊 Creating prescription in Olympia Pharmacy for patient:', payload.patient_id);
+      console.log('💊 Enforced defaults - ship_method: overnight, bill_to: physician, allergies:', payload.allergies, ', med_cond:', payload.med_cond);
 
       // Get authenticated axios client
       const client = await olympiaPharmacyAuthService.getAuthenticatedClient();
@@ -264,7 +290,7 @@ class OlympiaPharmacyApiService {
       // Make API request
       const response = await client.post<CreatePrescriptionResponse>(
         '/api/v2/createPrescription',
-        data
+        payload
       );
 
       console.log('✅ Prescription created successfully, ID:', response.data.prescriptionID);
@@ -279,9 +305,18 @@ class OlympiaPharmacyApiService {
         await olympiaPharmacyAuthService.refreshToken();
         const client = await olympiaPharmacyAuthService.getAuthenticatedClient();
         
+        const payload = {
+          ...data,
+          ship_method: 'overnight',
+          bill_to: 'physician',
+          allergies: data.allergies?.trim() || 'NKDA',
+          med_cond: data.med_cond?.trim() || 'N/A',
+        };
+        delete (payload as any).pt_team_username;
+        
         const response = await client.post<CreatePrescriptionResponse>(
           '/api/v2/createPrescription',
-          data
+          payload
         );
         
         return response.data;

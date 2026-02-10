@@ -140,15 +140,15 @@ export default function OlympiaAdmin() {
     physician_lname: "",
     physician_phone: "",
     physician_npi: "",
-    allergies: "",
-    med_cond: "",
+    allergies: "", // Defaults to "NKDA" on backend if empty
+    med_cond: "", // Defaults to "N/A" on backend if empty
     p_last_visit: "",
-    ship_method: "standard",
     ship_to: "patient",
-    bill_to: "physician",
-    vendor_order_id: "",
-    pt_team_username: "",
+    vendor_order_id: "", // REQUIRED
     notes: "",
+    // ship_method: hardcoded to "overnight" on backend
+    // bill_to: hardcoded to "physician" on backend
+    // pt_team_username: excluded per Olympia dev guidance
   })
   const [prescriptionProducts, setPrescriptionProducts] = useState<PrescriptionProduct[]>([
     { prod_id: "", qty: "1", sig: "Use as directed.", doc_note: "", refills: "0" },
@@ -279,8 +279,8 @@ export default function OlympiaAdmin() {
   }
 
   const handleCreatePrescription = async () => {
-    if (!prescriptionForm.patient_id || !prescriptionForm.physician_fname || !prescriptionForm.physician_lname || !prescriptionForm.physician_npi || !prescriptionForm.ship_method || !prescriptionForm.ship_to || !prescriptionForm.bill_to) {
-      toast.error("Please fill in all required fields")
+    if (!prescriptionForm.patient_id || !prescriptionForm.physician_fname || !prescriptionForm.physician_lname || !prescriptionForm.physician_npi || !prescriptionForm.vendor_order_id) {
+      toast.error("Please fill in all required fields (Patient UUID, Physician info, Vendor Order ID)")
       return
     }
 
@@ -307,15 +307,13 @@ export default function OlympiaAdmin() {
           doc_note: p.doc_note || undefined,
           refills: parseInt(p.refills) || 0,
         })),
-        allergies: prescriptionForm.allergies || undefined,
-        med_cond: prescriptionForm.med_cond || undefined,
+        allergies: prescriptionForm.allergies || undefined, // Backend defaults to "NKDA"
+        med_cond: prescriptionForm.med_cond || undefined, // Backend defaults to "N/A"
         p_last_visit: prescriptionForm.p_last_visit || undefined,
-        ship_method: prescriptionForm.ship_method,
         ship_to: prescriptionForm.ship_to,
-        bill_to: prescriptionForm.bill_to,
-        vendor_order_id: prescriptionForm.vendor_order_id || undefined,
-        pt_team_username: prescriptionForm.pt_team_username || undefined,
+        vendor_order_id: prescriptionForm.vendor_order_id, // Required
         notes: prescriptionForm.notes || undefined,
+        // ship_method, bill_to, pt_team_username are handled/excluded by backend
       }
 
       const res = await fetch(`${baseUrl}/olympia/prescriptions`, {
@@ -992,7 +990,7 @@ export default function OlympiaAdmin() {
                   {/* Patient & Order Info */}
                   <div>
                     <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">Patient & Order</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label className="text-sm font-medium mb-1.5 block">Patient UUID <span className="text-red-500">*</span></label>
                         <Input
@@ -1002,19 +1000,11 @@ export default function OlympiaAdmin() {
                         />
                       </div>
                       <div>
-                        <label className="text-sm font-medium mb-1.5 block">Vendor Order ID</label>
+                        <label className="text-sm font-medium mb-1.5 block">Vendor Order ID <span className="text-red-500">*</span></label>
                         <Input
-                          placeholder="Your internal order ID"
+                          placeholder="Your internal order ID (required)"
                           value={prescriptionForm.vendor_order_id}
                           onChange={(e) => setPrescriptionForm(prev => ({ ...prev, vendor_order_id: e.target.value }))}
-                        />
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium mb-1.5 block">Team Username</label>
-                        <Input
-                          placeholder="johndoe"
-                          value={prescriptionForm.pt_team_username}
-                          onChange={(e) => setPrescriptionForm(prev => ({ ...prev, pt_team_username: e.target.value }))}
                         />
                       </div>
                     </div>
@@ -1066,18 +1056,20 @@ export default function OlympiaAdmin() {
                       <div>
                         <label className="text-sm font-medium mb-1.5 block">Allergies</label>
                         <Input
-                          placeholder="nkda"
+                          placeholder="NKDA (default if empty)"
                           value={prescriptionForm.allergies}
                           onChange={(e) => setPrescriptionForm(prev => ({ ...prev, allergies: e.target.value }))}
                         />
+                        <p className="text-xs text-gray-500 mt-1">Defaults to &quot;NKDA&quot; if left empty</p>
                       </div>
                       <div>
                         <label className="text-sm font-medium mb-1.5 block">Medical Conditions</label>
                         <Input
-                          placeholder="diabetic"
+                          placeholder="N/A (default if empty)"
                           value={prescriptionForm.med_cond}
                           onChange={(e) => setPrescriptionForm(prev => ({ ...prev, med_cond: e.target.value }))}
                         />
+                        <p className="text-xs text-gray-500 mt-1">Defaults to &quot;N/A&quot; if left empty</p>
                       </div>
                       <div>
                         <label className="text-sm font-medium mb-1.5 block">Last Visit Date</label>
@@ -1095,20 +1087,14 @@ export default function OlympiaAdmin() {
                     <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">Shipping & Billing</h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
-                        <label className="text-sm font-medium mb-1.5 block">Ship Method <span className="text-red-500">*</span></label>
-                        <select
-                          className="w-full border rounded-md px-3 py-2 text-sm bg-white"
-                          value={prescriptionForm.ship_method}
-                          onChange={(e) => setPrescriptionForm(prev => ({ ...prev, ship_method: e.target.value }))}
-                        >
-                          <option value="standard">Standard</option>
-                          <option value="overnight">Overnight</option>
-                          <option value="priority">Priority</option>
-                          <option value="2day">2-Day</option>
-                        </select>
+                        <label className="text-sm font-medium mb-1.5 block">Ship Method</label>
+                        <div className="w-full border rounded-md px-3 py-2 text-sm bg-gray-100 text-gray-700 font-medium">
+                          Overnight
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">Hardcoded for this integration</p>
                       </div>
                       <div>
-                        <label className="text-sm font-medium mb-1.5 block">Ship To <span className="text-red-500">*</span></label>
+                        <label className="text-sm font-medium mb-1.5 block">Ship To</label>
                         <select
                           className="w-full border rounded-md px-3 py-2 text-sm bg-white"
                           value={prescriptionForm.ship_to}
@@ -1119,15 +1105,11 @@ export default function OlympiaAdmin() {
                         </select>
                       </div>
                       <div>
-                        <label className="text-sm font-medium mb-1.5 block">Bill To <span className="text-red-500">*</span></label>
-                        <select
-                          className="w-full border rounded-md px-3 py-2 text-sm bg-white"
-                          value={prescriptionForm.bill_to}
-                          onChange={(e) => setPrescriptionForm(prev => ({ ...prev, bill_to: e.target.value }))}
-                        >
-                          <option value="physician">Physician</option>
-                          <option value="patient">Patient</option>
-                        </select>
+                        <label className="text-sm font-medium mb-1.5 block">Bill To</label>
+                        <div className="w-full border rounded-md px-3 py-2 text-sm bg-gray-100 text-gray-700 font-medium">
+                          Physician
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">Always billed to physician</p>
                       </div>
                     </div>
                   </div>
