@@ -119,6 +119,18 @@ export default function ClientManagement() {
     documentationUrl: '',
   })
 
+  interface PharmacyApproval {
+    id: string
+    name: string
+    slug: string
+    isActive: boolean
+    associationId: string | null
+    doctorCompanyApprovedByPharmacy: 'pending' | 'approved' | 'rejected' | null
+  }
+  const [pharmacyApprovals, setPharmacyApprovals] = useState<PharmacyApproval[]>([])
+  const [loadingPharmacies, setLoadingPharmacies] = useState(false)
+  const [togglingPharmacy, setTogglingPharmacy] = useState<string | null>(null)
+
   // BrandSubscription form state
   const [formData, setFormData] = useState({
     productsChangedAmountOnCurrentCycle: 0,
@@ -182,6 +194,53 @@ export default function ClientManagement() {
       dashboardUrl: company.dashboardUrl || '',
       documentationUrl: company.documentationUrl || '',
     })
+    fetchPharmacyApprovals(company.id)
+  }
+
+  const fetchPharmacyApprovals = async (companyId: string) => {
+    setLoadingPharmacies(true)
+    try {
+      const response = await fetch(`${baseUrl}/medical-companies/${companyId}/pharmacies`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      })
+      if (!response.ok) throw new Error('Failed to fetch pharmacies')
+      const result = await response.json()
+      setPharmacyApprovals(result.data || [])
+    } catch (error) {
+      console.error('Error fetching pharmacy approvals:', error)
+    } finally {
+      setLoadingPharmacies(false)
+    }
+  }
+
+  const handleTogglePharmacyApproval = async (pharmacyId: string, newStatus: 'pending' | 'approved' | 'rejected') => {
+    if (!selectedMedicalCompany) return
+    setTogglingPharmacy(pharmacyId)
+    try {
+      const response = await fetch(
+        `${baseUrl}/medical-companies/${selectedMedicalCompany.id}/pharmacies/${pharmacyId}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ doctorCompanyApprovedByPharmacy: newStatus }),
+        }
+      )
+      if (!response.ok) throw new Error('Failed to update pharmacy approval')
+      setPharmacyApprovals(prev =>
+        prev.map(p =>
+          p.id === pharmacyId
+            ? { ...p, doctorCompanyApprovedByPharmacy: newStatus }
+            : p
+        )
+      )
+    } catch (error) {
+      console.error('Error updating pharmacy approval:', error)
+    } finally {
+      setTogglingPharmacy(null)
+    }
   }
 
   const handleSaveMedicalCompany = async () => {
@@ -874,6 +933,64 @@ export default function ClientManagement() {
                           )}
                           {savingMedicalCompany ? 'Saving...' : 'Save Changes'}
                         </Button>
+
+                        {/* Pharmacy Approvals */}
+                        <div className="bg-muted/50 rounded-lg p-4 border border-border">
+                          <h3 className="font-semibold text-foreground mb-4">Pharmacy Approvals</h3>
+                          <p className="text-xs text-muted-foreground mb-4">
+                            Toggle whether each pharmacy has approved this medical company.
+                          </p>
+                          {loadingPharmacies ? (
+                            <div className="flex items-center justify-center py-6">
+                              <Loader2 className="h-6 w-6 animate-spin text-[#4FA59C]" />
+                            </div>
+                          ) : pharmacyApprovals.length === 0 ? (
+                            <p className="text-sm text-muted-foreground text-center py-4">No pharmacies found</p>
+                          ) : (
+                            <div className="space-y-3">
+                              {pharmacyApprovals.map((pharmacy) => {
+                                const currentStatus = pharmacy.doctorCompanyApprovedByPharmacy || 'pending'
+                                const isUpdating = togglingPharmacy === pharmacy.id
+                                return (
+                                  <div
+                                    key={pharmacy.id}
+                                    className="flex items-center justify-between p-3 rounded-lg border border-border bg-background"
+                                  >
+                                    <div className="flex-1 min-w-0 mr-3">
+                                      <p className="font-medium text-sm text-foreground">{pharmacy.name}</p>
+                                      <p className="text-xs text-muted-foreground">{pharmacy.slug}</p>
+                                    </div>
+                                    <div className={`flex rounded-lg border border-border overflow-hidden ${isUpdating ? 'opacity-50 pointer-events-none' : ''}`}>
+                                      {([
+                                        { value: 'pending', label: 'Pending', activeClass: 'bg-yellow-500 text-white border-yellow-500' },
+                                        { value: 'approved', label: 'Approved', activeClass: 'bg-[#4FA59C] text-white border-[#4FA59C]' },
+                                        { value: 'rejected', label: 'Rejected', activeClass: 'bg-red-500 text-white border-red-500' },
+                                      ] as const).map((option) => (
+                                        <button
+                                          key={option.value}
+                                          type="button"
+                                          disabled={isUpdating}
+                                          onClick={() => {
+                                            if (currentStatus !== option.value) {
+                                              handleTogglePharmacyApproval(pharmacy.id, option.value)
+                                            }
+                                          }}
+                                          className={`px-2.5 py-1 text-xs font-medium transition-all ${
+                                            currentStatus === option.value
+                                              ? option.activeClass
+                                              : 'bg-background text-muted-foreground hover:bg-muted'
+                                          }`}
+                                        >
+                                          {option.label}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     ) : (
                       <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
