@@ -422,6 +422,9 @@ importers:
       '@types/react-dom':
         specifier: catalog:react18
         version: 18.3.7(@types/react@18.3.25)
+      cross-env:
+        specifier: ^7.0.3
+        version: 7.0.3
       dotenv-cli:
         specifier: 'catalog:'
         version: 8.0.0
@@ -468,6 +471,9 @@ importers:
       autoprefixer:
         specifier: 'catalog:'
         version: 10.4.21(postcss@8.5.6)
+      cross-env:
+        specifier: ^7.0.3
+        version: 7.0.3
       dotenv-cli:
         specifier: 'catalog:'
         version: 8.0.0
@@ -652,6 +658,9 @@ importers:
       '@types/react-dom':
         specifier: catalog:react18
         version: 18.3.7(@types/react@18.3.25)
+      cross-env:
+        specifier: ^7.0.3
+        version: 7.0.3
       dotenv-cli:
         specifier: 'catalog:'
         version: 8.0.0
@@ -842,6 +851,9 @@ importers:
       '@types/react-dom':
         specifier: catalog:react18
         version: 18.3.7(@types/react@18.3.25)
+      cross-env:
+        specifier: ^7.0.3
+        version: 7.0.3
       dotenv-cli:
         specifier: 'catalog:'
         version: 8.0.0
@@ -1084,6 +1096,9 @@ importers:
       autoprefixer:
         specifier: 'catalog:'
         version: 10.4.21(postcss@8.5.6)
+      cross-env:
+        specifier: ^7.0.3
+        version: 7.0.3
       dotenv-cli:
         specifier: 'catalog:'
         version: 8.0.0
@@ -4914,6 +4929,11 @@ packages:
   croner@4.1.97:
     resolution: {integrity: sha512-/f6gpQuxDaqXu+1kwQYSckUglPaOrHdbIlBAu0YuW8/Cdb45XwXYNUBXg3r/9Mo6n540Kn/smKcZWko5x99KrQ==}
 
+  cross-env@7.0.3:
+    resolution: {integrity: sha512-+/HKd6EgcQCJGh2PSjZuUitQBQynKor4wrFbRg4DtAgS1aWO+gU52xpH7M9ScGgXSYmAVS9bIJ8EzuaGw0oNAw==}
+    engines: {node: '>=10.14', npm: '>=6', yarn: '>=1'}
+    hasBin: true
+
   cross-spawn@7.0.6:
     resolution: {integrity: sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA==}
     engines: {node: '>= 8'}
@@ -5710,11 +5730,11 @@ packages:
 
   glob@7.2.0:
     resolution: {integrity: sha512-lmLf6gtyrPq8tTjSmrO94wBeQbFR3HbLHbuyD69wuyQkImp2hWqMGB47OX65FBkPffO641IP9jWa1z4ivqG26Q==}
-    deprecated: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+    deprecated: Glob versions prior to v9 are no longer supported
 
   glob@7.2.3:
     resolution: {integrity: sha512-nFR0zLpU2YCaRxwoCJvL6UvCH2JFyFVIvwTLsIf21AuHlMskA1hhTdk+LlYJtOlYt9v6dvszD2BGRqBL+iQK9Q==}
-    deprecated: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+    deprecated: Glob versions prior to v9 are no longer supported
 
   global-directory@4.0.1:
     resolution: {integrity: sha512-wHTUcDUoZ1H5/0iVqEudYW4/kAlN5cZ3j/bXn0Dpbizl9iaUVeWSHqiOjsgk6OW2bkLclbBjzewBz6weQ1zA2Q==}
@@ -13127,6 +13147,10 @@ snapshots:
   create-require@1.1.1: {}
 
   croner@4.1.97: {}
+
+  cross-env@7.0.3:
+    dependencies:
+      cross-spawn: 7.0.6
 
   cross-spawn@7.0.6:
     dependencies:
