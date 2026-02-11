@@ -106,6 +106,10 @@ export default function ClientManagement() {
     apiUrl?: string
     dashboardUrl?: string
     documentationUrl?: string
+    visitTypeFees?: {
+      synchronous: number
+      asynchronous: number
+    }
   }
   const [medicalCompanies, setMedicalCompanies] = useState<MedicalCompanyItem[]>([])
   const [selectedMedicalCompany, setSelectedMedicalCompany] = useState<MedicalCompanyItem | null>(null)
@@ -117,6 +121,10 @@ export default function ClientManagement() {
     apiUrl: '',
     dashboardUrl: '',
     documentationUrl: '',
+    visitTypeFees: {
+      synchronous: 0,
+      asynchronous: 0,
+    },
   })
 
   interface PharmacyApproval {
@@ -226,6 +234,10 @@ export default function ClientManagement() {
       apiUrl: company.apiUrl || '',
       dashboardUrl: company.dashboardUrl || '',
       documentationUrl: company.documentationUrl || '',
+      visitTypeFees: {
+        synchronous: company.visitTypeFees?.synchronous || 0,
+        asynchronous: company.visitTypeFees?.asynchronous || 0,
+      },
     })
     fetchPharmacyApprovals(company.id)
   }
@@ -1047,6 +1059,54 @@ export default function ClientManagement() {
                             </div>
                           </div>
                         </div>
+
+                        <div className="bg-muted/50 rounded-lg p-4 border border-border">
+                          <h3 className="font-semibold text-foreground mb-4">Visit Type Fees</h3>
+                          <p className="text-xs text-muted-foreground mb-4">
+                            These fees are used platform-wide for this medical company (Fuse, MDI, or Beluga).
+                          </p>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-sm text-muted-foreground mb-1">Synchronous Visit Fee (USD)</label>
+                              <Input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={medicalCompanyForm.visitTypeFees.synchronous}
+                                onChange={(e) =>
+                                  setMedicalCompanyForm({
+                                    ...medicalCompanyForm,
+                                    visitTypeFees: {
+                                      ...medicalCompanyForm.visitTypeFees,
+                                      synchronous: Number(e.target.value) || 0,
+                                    },
+                                  })
+                                }
+                                placeholder="0.00"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm text-muted-foreground mb-1">Asynchronous Visit Fee (USD)</label>
+                              <Input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={medicalCompanyForm.visitTypeFees.asynchronous}
+                                onChange={(e) =>
+                                  setMedicalCompanyForm({
+                                    ...medicalCompanyForm,
+                                    visitTypeFees: {
+                                      ...medicalCompanyForm.visitTypeFees,
+                                      asynchronous: Number(e.target.value) || 0,
+                                    },
+                                  })
+                                }
+                                placeholder="0.00"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
                         <Button
                           onClick={handleSaveMedicalCompany}
                           disabled={savingMedicalCompany}
@@ -1975,11 +2035,14 @@ export default function ClientManagement() {
                                 >
                                   <option value="fuse">Fuse Dashboard</option>
                                   <option value="md-integrations">MD Integrations</option>
+                                  <option value="beluga">Beluga</option>
                                 </select>
                                 <p className="text-xs text-muted-foreground mt-1">
                                   Fuse Dashboard: Internal messaging, treatments, and subscription management.
                                   <br />
                                   MD Integrations: Connects with external medical systems.
+                                  <br />
+                                  Beluga: Uses Beluga-specific platform integrations.
                                 </p>
                                 {clinicDataCheck?.hasData && (
                                   <div className="mt-2 p-3 bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800 rounded-md">

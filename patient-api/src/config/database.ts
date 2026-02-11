@@ -194,6 +194,23 @@ async function ensureVisitTypeColumns() {
       }
     }
 
+    // 2b. Ensure visit_type_fees column exists on MedicalCompany
+    const medicalCompanyTable = await queryInterface.describeTable('MedicalCompany');
+    if (!Object.prototype.hasOwnProperty.call(medicalCompanyTable, 'visitTypeFees') &&
+        !Object.prototype.hasOwnProperty.call(medicalCompanyTable, 'visit_type_fees')) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('⚙️  Adding visit_type_fees column to MedicalCompany table...');
+      }
+      await queryInterface.addColumn('MedicalCompany', 'visitTypeFees', {
+        type: DataTypes.JSONB,
+        allowNull: false,
+        defaultValue: { synchronous: 0, asynchronous: 0 },
+      });
+      if (process.env.NODE_ENV === 'development') {
+        console.log('✅ visit_type_fees column added to MedicalCompany');
+      }
+    }
+
     // 3. Ensure visit_type column exists on Order
     const orderTable = await queryInterface.describeTable('Order');
     if (!Object.prototype.hasOwnProperty.call(orderTable, 'visitType') && 

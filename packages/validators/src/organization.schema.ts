@@ -11,9 +11,5 @@ export const organizationUpdateSchema = z.object({
   isCustomDomain: z.boolean().optional(),
   customDomain: z.string().optional(),
   defaultFormColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Color must be a valid hex code (e.g. #1A2B3C)').optional().or(z.literal('')),
-  patientPortalDashboardFormat: z.enum(['fuse', 'md-integrations']).optional(),
-  visitTypeFees: z.object({
-    synchronous: z.number().min(0, 'Synchronous fee must be non-negative'),
-    asynchronous: z.number().min(0, 'Asynchronous fee must be non-negative'),
-  }).optional(),
+  patientPortalDashboardFormat: z.enum(['fuse', 'md-integrations', 'beluga']).optional(),
 });

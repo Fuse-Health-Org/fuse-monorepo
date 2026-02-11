@@ -6,6 +6,7 @@ import Product from '../models/Product';
 import TenantProduct from '../models/TenantProduct';
 import TenantProductForm from '../models/TenantProductForm';
 import Clinic from '../models/Clinic';
+import MedicalCompany from '../models/MedicalCompany';
 import { authenticateJWT, getCurrentUser } from '../config/jwt';
 
 const router = Router();
@@ -1291,27 +1292,43 @@ router.post('/calculate-visit-fee', async (req: Request, res: Response) => {
           visitType = (questionnaire.visitTypeByState as any)[patientState] || 'asynchronous';
           console.log("✅ [CALC VISIT FEE] Visit type for state:", { patientState, visitType });
           
-          // Get clinic's visit type fees
+          // Resolve fees by medical company (platform) with clinic fallback
           const clinic = await Clinic.findByPk(program.clinicId, {
-            attributes: ['id', 'visitTypeFees'],
+            attributes: ['id', 'visitTypeFees', 'patientPortalDashboardFormat'],
           });
+
+          const medicalCompany = clinic?.patientPortalDashboardFormat
+            ? await MedicalCompany.findOne({
+                where: { slug: clinic.patientPortalDashboardFormat },
+                attributes: ['id', 'slug', 'visitTypeFees'],
+              })
+            : null;
 
           console.log("🔍 [CALC VISIT FEE] Clinic found:", {
             id: clinic?.id,
+            patientPortalDashboardFormat: clinic?.patientPortalDashboardFormat,
+            medicalCompanySlug: medicalCompany?.slug,
+            medicalCompanyVisitTypeFees: medicalCompany?.visitTypeFees,
             hasVisitTypeFees: !!clinic?.visitTypeFees,
             visitTypeFees: clinic?.visitTypeFees,
           });
 
-          if (clinic && clinic.visitTypeFees && visitType) {
-            visitFeeAmount = Number((clinic.visitTypeFees as any)[visitType]) || 0;
+          if (visitType) {
+            const medicalCompanyFee = Number((medicalCompany?.visitTypeFees as any)?.[visitType]) || 0;
+            const clinicFallbackFee = Number((clinic?.visitTypeFees as any)?.[visitType]) || 0;
+            visitFeeAmount = medicalCompanyFee || clinicFallbackFee;
             console.log("✅ [CALC VISIT FEE] Final calculation:", {
               visitType,
               visitFeeAmount,
-              rawValue: (clinic.visitTypeFees as any)[visitType],
+              source: medicalCompanyFee ? 'medical-company' : 'clinic-fallback',
+              rawMedicalCompanyValue: (medicalCompany?.visitTypeFees as any)?.[visitType],
+              rawClinicValue: (clinic?.visitTypeFees as any)?.[visitType],
             });
           } else {
             console.warn("⚠️ [CALC VISIT FEE] Missing data:", {
               hasClinic: !!clinic,
+              hasMedicalCompany: !!medicalCompany,
+              hasMedicalCompanyFees: !!medicalCompany?.visitTypeFees,
               hasVisitTypeFees: !!clinic?.visitTypeFees,
               visitType,
             });

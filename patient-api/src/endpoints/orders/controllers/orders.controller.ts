@@ -1,5 +1,6 @@
 import { getCurrentUser } from "@/config/jwt";
 import Clinic from "@models/Clinic";
+import MedicalCompany from "@models/MedicalCompany";
 import Order from "@models/Order";
 import OrderItem from "@models/OrderItem";
 import Payment from "@models/Payment";
@@ -264,13 +265,22 @@ export const createPaymentIntent = async (req: Request, res: Response) => {
                     // Determine visit type required for this state
                     visitType = (questionnaire.visitTypeByState as any)[patientState] || 'asynchronous';
                     
-                    // Get clinic's visit type fees
+                    // Resolve fees by medical company (platform) with clinic fallback
                     const clinic = await Clinic.findByPk(clinicId, {
-                        attributes: ['id', 'visitTypeFees'],
+                        attributes: ['id', 'visitTypeFees', 'patientPortalDashboardFormat'],
                     });
 
-                    if (clinic && clinic.visitTypeFees && visitType) {
-                        visitFeeAmount = Number(clinic.visitTypeFees[visitType]) || 0;
+                    const medicalCompany = clinic?.patientPortalDashboardFormat
+                        ? await MedicalCompany.findOne({
+                            where: { slug: clinic.patientPortalDashboardFormat },
+                            attributes: ['id', 'slug', 'visitTypeFees'],
+                        })
+                        : null;
+
+                    if (visitType) {
+                        const medicalCompanyFee = Number((medicalCompany?.visitTypeFees as any)?.[visitType]) || 0;
+                        const clinicFallbackFee = Number((clinic?.visitTypeFees as any)?.[visitType]) || 0;
+                        visitFeeAmount = medicalCompanyFee || clinicFallbackFee;
                         
                         if (visitFeeAmount > 0) {
                             console.log(`✅ Visit fee calculated:`, {
@@ -279,7 +289,9 @@ export const createPaymentIntent = async (req: Request, res: Response) => {
                                 visitType,
                                 visitFeeAmount,
                                 clinicId,
-                                source: questionnaireIdFromProgram ? 'Program' : 'Treatment',
+                                feeSource: medicalCompanyFee ? 'medical-company' : 'clinic-fallback',
+                                medicalCompanySlug: medicalCompany?.slug,
+                                flowSource: questionnaireIdFromProgram ? 'Program' : 'Treatment',
                             });
                         }
                     } else {
