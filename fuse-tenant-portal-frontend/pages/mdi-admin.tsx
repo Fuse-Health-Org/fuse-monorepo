@@ -18,7 +18,11 @@ import {
   Search,
   AlertCircle,
   Link2,
-  Copy
+  Copy,
+  ClipboardList,
+  ChevronDown,
+  ChevronRight,
+  FileQuestion
 } from "lucide-react"
 import { useAuth } from "@/contexts/AuthContext"
 import { toast } from "sonner"
@@ -39,12 +43,62 @@ interface MDIProduct {
   type?: string
 }
 
+interface MDIQuestionOption {
+  option: string
+  is_important: boolean
+  is_show_additional_field: boolean
+}
+
+interface MDIQuestion {
+  partner_questionnaire_question_id: string
+  title: string
+  description?: string
+  label?: string
+  placeholder?: string
+  is_important: boolean
+  is_critical: boolean
+  display_in_pdf: boolean
+  is_optional: boolean
+  is_visible: boolean
+  order: number
+  type: string
+  default_value?: string | null
+  options?: MDIQuestionOption[] | null
+  feed_ads: boolean
+}
+
+interface MDIQuestionnaire {
+  _normalizedId?: string
+  partner_questionnaire_id?: string
+  id?: string
+  questionnaire_id?: string
+  uuid?: string
+  name?: string
+  title?: string
+  description?: string
+  intro_title?: string
+  intro_description?: string
+  status?: string
+  active?: boolean
+  enabled?: boolean
+  has_pharmacy?: boolean
+  offerings?: any[]
+  [key: string]: any
+}
+
 export default function MDIAdmin() {
   const { token } = useAuth()
   const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
 
-  const [activeTab, setActiveTab] = useState<"offerings" | "pharmacies" | "utils" | "invitation">("offerings")
+  const [activeTab, setActiveTab] = useState<"offerings" | "pharmacies" | "questionnaires" | "utils" | "invitation">("offerings")
   
+  // Questionnaires state
+  const [questionnaires, setQuestionnaires] = useState<MDIQuestionnaire[]>([])
+  const [loadingQuestionnaires, setLoadingQuestionnaires] = useState(false)
+  const [expandedQuestionnaire, setExpandedQuestionnaire] = useState<string | null>(null)
+  const [questionnaireQuestions, setQuestionnaireQuestions] = useState<Record<string, MDIQuestion[]>>({})
+  const [loadingQuestions, setLoadingQuestions] = useState<string | null>(null)
+
   // Offerings state
   const [offerings, setOfferings] = useState<Offering[]>([])
   const [loadingOfferings, setLoadingOfferings] = useState(false)
@@ -69,7 +123,68 @@ export default function MDIAdmin() {
     if (activeTab === "offerings") {
       fetchOfferings()
     }
+    if (activeTab === "questionnaires") {
+      fetchQuestionnaires()
+    }
   }, [activeTab])
+
+  const fetchQuestionnaires = async () => {
+    setLoadingQuestionnaires(true)
+    try {
+      const res = await fetch(`${baseUrl}/md/admin/questionnaires`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      const data = await res.json()
+      if (data.success) {
+        setQuestionnaires(data.data || [])
+        toast.success(`Loaded ${data.count || 0} questionnaires`)
+      } else {
+        toast.error(data.message || "Failed to load questionnaires")
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to load questionnaires")
+      console.error(err)
+    } finally {
+      setLoadingQuestionnaires(false)
+    }
+  }
+
+  const fetchQuestionnaireQuestions = async (questionnaireId: string) => {
+    setLoadingQuestions(questionnaireId)
+    try {
+      const res = await fetch(`${baseUrl}/md/admin/questionnaires/${questionnaireId}/questions`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      const data = await res.json()
+      if (data.success) {
+        setQuestionnaireQuestions(prev => ({ ...prev, [questionnaireId]: data.data || [] }))
+        toast.success(`Loaded ${data.count || 0} questions`)
+      } else {
+        toast.error(data.message || "Failed to load questions")
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to load questions")
+      console.error(err)
+    } finally {
+      setLoadingQuestions(null)
+    }
+  }
+
+  const toggleQuestionnaire = (questionnaireId: string) => {
+    if (questionnaireId === "N/A") {
+      toast.error("Questionnaire ID not available")
+      return
+    }
+    if (expandedQuestionnaire === questionnaireId) {
+      setExpandedQuestionnaire(null)
+    } else {
+      setExpandedQuestionnaire(questionnaireId)
+      // Fetch questions if not already loaded
+      if (!questionnaireQuestions[questionnaireId]) {
+        fetchQuestionnaireQuestions(questionnaireId)
+      }
+    }
+  }
 
   const fetchOfferings = async () => {
     setLoadingOfferings(true)
@@ -238,6 +353,19 @@ export default function MDIAdmin() {
               <div className="flex items-center gap-2">
                 <Database className="h-4 w-4" />
                 Pharmacies
+              </div>
+            </button>
+            <button
+              onClick={() => setActiveTab("questionnaires")}
+              className={`px-4 py-2 font-medium transition-colors ${
+                activeTab === "questionnaires"
+                  ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <ClipboardList className="h-4 w-4" />
+                Questionnaires
               </div>
             </button>
             <button
@@ -521,6 +649,278 @@ export default function MDIAdmin() {
                       <p className="text-blue-700 dark:text-blue-400">
                         Search the DoseSpot pharmacy network to find pharmacies for prescriptions. 
                         This searches the same database clinicians use when prescribing medications through MD Integrations.
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* Questionnaires Tab */}
+          {activeTab === "questionnaires" && (
+            <div className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="flex items-center gap-2">
+                        <ClipboardList className="h-5 w-5" />
+                        MDI Questionnaires
+                      </CardTitle>
+                      <CardDescription>
+                        Questionnaires configured in MD Integrations for your partner account
+                      </CardDescription>
+                    </div>
+                    <Button
+                      onClick={fetchQuestionnaires}
+                      disabled={loadingQuestionnaires}
+                      variant="outline"
+                      size="sm"
+                    >
+                      {loadingQuestionnaires ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {loadingQuestionnaires ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : questionnaires.length === 0 ? (
+                    <div className="text-center py-12">
+                      <ClipboardList className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                      <p className="text-foreground">No questionnaires found</p>
+                      <Button onClick={fetchQuestionnaires} variant="outline" className="mt-4">
+                        Load Questionnaires
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {questionnaires.map((questionnaire) => {
+                        const id = questionnaire._normalizedId || questionnaire.partner_questionnaire_id || questionnaire.questionnaire_id || questionnaire.id || questionnaire.uuid || "N/A"
+                        const name = questionnaire.name || questionnaire.title || "Unnamed Questionnaire"
+                        const isExpanded = expandedQuestionnaire === id
+                        const questions = questionnaireQuestions[id]
+                        const isLoadingThisQuestions = loadingQuestions === id
+
+                        return (
+                          <div
+                            key={id}
+                            className="border border-border rounded-lg hover:border-blue-300 dark:hover:border-blue-600 transition-colors overflow-hidden"
+                          >
+                            {/* Questionnaire Header */}
+                            <button
+                              onClick={() => toggleQuestionnaire(id)}
+                              className="w-full p-4 text-left hover:bg-muted/50 transition-colors"
+                            >
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-3 mb-2">
+                                    {isExpanded ? (
+                                      <ChevronDown className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                                    ) : (
+                                      <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                                    )}
+                                    <h3 className="font-semibold text-lg text-foreground">{name}</h3>
+                                    {questionnaire.active !== undefined && (
+                                      <Badge variant={questionnaire.active ? "default" : "secondary"}>
+                                        {questionnaire.active ? "Active" : "Inactive"}
+                                      </Badge>
+                                    )}
+                                    {questionnaire.status && (
+                                      <Badge
+                                        variant={
+                                          questionnaire.status === "active"
+                                            ? "default"
+                                            : "secondary"
+                                        }
+                                      >
+                                        {questionnaire.status}
+                                      </Badge>
+                                    )}
+                                    {questionnaire.offerings && questionnaire.offerings.length > 0 && (
+                                      <Badge variant="outline" className="text-xs">
+                                        {questionnaire.offerings.length} offering{questionnaire.offerings.length !== 1 ? "s" : ""}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  {questionnaire.description && (
+                                    <p className="text-sm text-muted-foreground ml-7 mb-2">
+                                      {questionnaire.description}
+                                    </p>
+                                  )}
+                                  <div className="flex items-center gap-2 ml-7">
+                                    <code className="px-2 py-1 bg-muted rounded text-xs font-mono text-foreground">
+                                      {id}
+                                    </code>
+                                    <Button
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        copyToClipboard(id, "Questionnaire ID")
+                                      }}
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 text-xs"
+                                    >
+                                      Copy ID
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
+                            </button>
+
+                            {/* Expanded Questions Section */}
+                            {isExpanded && (
+                              <div className="border-t border-border bg-muted/30 p-4">
+                                {isLoadingThisQuestions ? (
+                                  <div className="flex items-center justify-center py-8">
+                                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                                    <span className="ml-2 text-sm text-muted-foreground">Loading questions...</span>
+                                  </div>
+                                ) : !questions || questions.length === 0 ? (
+                                  <div className="text-center py-8">
+                                    <FileQuestion className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                                    <p className="text-sm text-muted-foreground">No questions found for this questionnaire</p>
+                                  </div>
+                                ) : (
+                                  <div className="space-y-3">
+                                    <div className="flex items-center justify-between mb-2">
+                                      <p className="text-sm font-medium text-foreground">
+                                        {questions.length} Question{questions.length !== 1 ? "s" : ""}
+                                      </p>
+                                      <Button
+                                        onClick={() => fetchQuestionnaireQuestions(id)}
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-7 text-xs"
+                                      >
+                                        <RefreshCw className="h-3 w-3 mr-1" />
+                                        Refresh
+                                      </Button>
+                                    </div>
+                                    {questions
+                                      .sort((a, b) => (a.order || 0) - (b.order || 0))
+                                      .map((question, idx) => (
+                                        <div
+                                          key={question.partner_questionnaire_question_id || idx}
+                                          className="p-3 bg-background border border-border rounded-lg"
+                                        >
+                                          <div className="flex items-start justify-between gap-3">
+                                            <div className="flex-1">
+                                              <div className="flex items-center gap-2 mb-1">
+                                                <span className="text-xs font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                                                  #{question.order || idx + 1}
+                                                </span>
+                                                <Badge variant="outline" className="text-xs">
+                                                  {question.type}
+                                                </Badge>
+                                                {question.is_important && (
+                                                  <Badge variant="default" className="text-xs bg-amber-500 hover:bg-amber-600">
+                                                    Important
+                                                  </Badge>
+                                                )}
+                                                {question.is_critical && (
+                                                  <Badge variant="destructive" className="text-xs">
+                                                    Critical
+                                                  </Badge>
+                                                )}
+                                                {question.is_optional && (
+                                                  <Badge variant="secondary" className="text-xs">
+                                                    Optional
+                                                  </Badge>
+                                                )}
+                                              </div>
+                                              <h4 className="font-medium text-foreground text-sm">
+                                                {question.title}
+                                              </h4>
+                                              {question.description && (
+                                                <p className="text-xs text-muted-foreground mt-1">
+                                                  {question.description}
+                                                </p>
+                                              )}
+                                              {question.label && (
+                                                <p className="text-xs text-muted-foreground mt-1">
+                                                  <span className="font-medium">Label:</span> {question.label}
+                                                </p>
+                                              )}
+                                              {question.placeholder && (
+                                                <p className="text-xs text-muted-foreground mt-0.5">
+                                                  <span className="font-medium">Placeholder:</span> {question.placeholder}
+                                                </p>
+                                              )}
+
+                                              {/* Options for multiple_option / boolean types */}
+                                              {question.options && question.options.length > 0 && (
+                                                <div className="mt-2">
+                                                  <p className="text-xs font-medium text-muted-foreground mb-1">Options:</p>
+                                                  <div className="flex flex-wrap gap-1.5">
+                                                    {question.options.map((opt, optIdx) => (
+                                                      <span
+                                                        key={optIdx}
+                                                        className={`text-xs px-2 py-1 rounded-md border ${
+                                                          opt.is_important
+                                                            ? "bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300"
+                                                            : "bg-muted border-border text-foreground"
+                                                        }`}
+                                                      >
+                                                        {opt.option}
+                                                        {opt.is_important && " *"}
+                                                      </span>
+                                                    ))}
+                                                  </div>
+                                                </div>
+                                              )}
+
+                                              {/* Metadata flags */}
+                                              <div className="flex flex-wrap gap-2 mt-2">
+                                                {question.display_in_pdf && (
+                                                  <span className="text-xs text-muted-foreground">
+                                                    Shown in PDF
+                                                  </span>
+                                                )}
+                                                {!question.is_visible && (
+                                                  <span className="text-xs text-muted-foreground">
+                                                    Hidden
+                                                  </span>
+                                                )}
+                                                {question.feed_ads && (
+                                                  <span className="text-xs text-muted-foreground">
+                                                    Feed Ads
+                                                  </span>
+                                                )}
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      ))}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Info Card */}
+              <Card className="bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800">
+                <CardContent className="pt-6">
+                  <div className="flex gap-3">
+                    <AlertCircle className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5" />
+                    <div className="text-sm text-blue-900 dark:text-blue-300">
+                      <p className="font-medium mb-1">About Questionnaires</p>
+                      <p className="text-blue-700 dark:text-blue-400">
+                        Questionnaires are sets of medical questions configured in your MD Integrations partner account. 
+                        Click on a questionnaire to view its questions. Use the questionnaire ID to pull questions 
+                        programmatically via the Partner API when creating patient cases.
                       </p>
                     </div>
                   </div>
