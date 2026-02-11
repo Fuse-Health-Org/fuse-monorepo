@@ -13,8 +13,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(401).json({ message: 'No authorization token provided' })
     }
 
-    if (!planType || amount === undefined) {
-      return res.status(400).json({ message: 'Missing required fields: planType, amount' })
+    if (!brandSubscriptionPlanId) {
+      return res.status(400).json({ message: 'Missing required field: brandSubscriptionPlanId' })
     }
 
     // Forward to backend API
@@ -37,7 +37,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (response.ok && data.success) {
       res.status(200).json({
         clientSecret: data.clientSecret,
-        paymentIntentId: data.paymentIntentId
+        paymentIntentId: data.paymentIntentId,
+        type: data.type || 'payment_intent',
+        brandSubscriptionId: data.brandSubscriptionId,
       })
     } else {
       res.status(response.status).json({ message: data.message || 'Failed to create payment intent' })
