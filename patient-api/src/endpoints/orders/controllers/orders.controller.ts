@@ -425,8 +425,8 @@ export const createPaymentIntent = async (req: Request, res: Response) => {
         try {
             // Total amount including visit fee
             const totalAmount = Number(amount) + visitFeeAmount;
-            
-            paymentIntent = await stripe.paymentIntents.create({
+
+            const paymentIntentParams: any = {
                 amount: Math.round(totalAmount * 100), // Convert to cents
                 currency,
                 metadata: {
@@ -448,8 +448,17 @@ export const createPaymentIntent = async (req: Request, res: Response) => {
                 },
                 // HIPAA: Use generic description only; do not include treatment/product names (Payment Processing Exemption)
                 description: `Order ${orderNumber} - Service`,
-                ...(transferData ? { transfer_data: transferData } : {}),
-            });
+            };
+
+            // Add transfer_data to automatically transfer brandAmount to clinic
+            if (transferData) {
+                paymentIntentParams.transfer_data = transferData;
+                console.log(
+                    `💸 Adding transfer_data: $${brandAmountUsd.toFixed(2)} to destination ${transferData.destination}`
+                );
+            }
+
+            paymentIntent = await stripe.paymentIntents.create(paymentIntentParams);
         } catch (stripeError: any) {
             if (process.env.NODE_ENV === "development") {
                 console.error("❌ Stripe payment intent creation failed:", stripeError);

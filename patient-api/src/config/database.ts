@@ -65,6 +65,7 @@ import MedicalCompany from '../models/MedicalCompany';
 import MedicalCompanyPharmacy from '../models/MedicalCompanyPharmacy';
 import DoctorPharmacy from '../models/DoctorPharmacy';
 import { MedicalCompanySlug } from '@fuse/enums';
+import ClinicBalance from '../models/ClinicBalance';
 import { MigrationService } from '../services/migration.service';
 
 // Load environment variables from .env.local
@@ -152,7 +153,7 @@ export const sequelize = new Sequelize(databaseUrl, {
     TenantCustomFeatures, TierConfiguration, TenantAnalyticsEvents, FormAnalyticsDaily,
     MessageTemplate, Sequence, SequenceRun, Tag, UserTag, GlobalFees, WebsiteBuilderConfigs, UserRoles,
     SupportTicket, TicketMessage, AuditLog, MfaToken, CustomWebsite, Like, BrandFavoritedProduct, Program, AffiliateProductImage, BrandInvitation,
-    MedicalCompany, MedicalCompanyPharmacy, DoctorPharmacy
+    MedicalCompany, MedicalCompanyPharmacy, DoctorPharmacy, ClinicBalance
   ],
 });
 
@@ -865,6 +866,104 @@ export async function initializeDatabase() {
     } catch (e) {
       if (process.env.NODE_ENV === 'development') {
         console.error('❌ Error creating IronSail pharmacy:', e);
+      }
+      // ignore - don't fail startup
+    }
+
+    // Ensure ClinicBalance table exists
+    try {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔍 Checking if ClinicBalance table exists...');
+      }
+      const queryInterface = sequelize.getQueryInterface();
+      const tables = await queryInterface.showAllTables();
+      
+      if (!tables.includes('ClinicBalance')) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('🔄 Creating ClinicBalance table...');
+        }
+        
+        await queryInterface.createTable('ClinicBalance', {
+          id: {
+            type: DataTypes.UUID,
+            defaultValue: DataTypes.UUIDV4,
+            primaryKey: true,
+          },
+          clinicId: {
+            type: DataTypes.UUID,
+            allowNull: false,
+            references: {
+              model: 'Clinic',
+              key: 'id',
+            },
+            onUpdate: 'CASCADE',
+            onDelete: 'CASCADE',
+          },
+          orderId: {
+            type: DataTypes.UUID,
+            allowNull: true,
+            references: {
+              model: 'Order',
+              key: 'id',
+            },
+            onUpdate: 'CASCADE',
+            onDelete: 'SET NULL',
+          },
+          amount: {
+            type: DataTypes.DECIMAL(10, 2),
+            allowNull: false,
+          },
+          type: {
+            type: DataTypes.ENUM('refund_debt', 'payment', 'adjustment'),
+            allowNull: false,
+            defaultValue: 'refund_debt',
+          },
+          status: {
+            type: DataTypes.ENUM('pending', 'paid', 'cancelled'),
+            allowNull: false,
+            defaultValue: 'pending',
+          },
+          stripeTransferId: {
+            type: DataTypes.STRING,
+            allowNull: true,
+          },
+          stripeRefundId: {
+            type: DataTypes.STRING,
+            allowNull: true,
+          },
+          description: {
+            type: DataTypes.TEXT,
+            allowNull: true,
+          },
+          notes: {
+            type: DataTypes.TEXT,
+            allowNull: true,
+          },
+          paidAt: {
+            type: DataTypes.DATE,
+            allowNull: true,
+          },
+          createdAt: {
+            type: DataTypes.DATE,
+            allowNull: false,
+          },
+          updatedAt: {
+            type: DataTypes.DATE,
+            allowNull: false,
+          },
+        });
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.log('✅ ClinicBalance table created successfully');
+        }
+      } else {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('✅ ClinicBalance table already exists');
+        }
+      }
+    } catch (e) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('❌ Error creating ClinicBalance table:', e);
       }
       // ignore - don't fail startup
     }

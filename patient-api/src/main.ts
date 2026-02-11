@@ -125,6 +125,7 @@ import { tagRoutes } from "@endpoints/tags";
 import ordersRoutes from "@endpoints/orders/routes/orders.routes";
 import payoutsRoutes from "@endpoints/payouts/routes/payouts.routes";
 import { tenantRoutes } from "@endpoints/tenant";
+import refundsRoutes from "@endpoints/refunds";
 import { stripeRoutes, webhookRoutes as stripeWebhookRoutes } from "@endpoints/stripe";
 import { GlobalFees } from "./models/GlobalFees";
 import { WebsiteBuilderConfigs, DEFAULT_FOOTER_DISCLAIMER } from "@models/WebsiteBuilderConfigs";
@@ -389,6 +390,7 @@ app.use("/", stripeRoutes);
 app.use("/", stripeWebhookRoutes);
 app.use("/", payoutsRoutes);
 app.use("/", tenantRoutes);
+app.use("/", refundsRoutes);
 // Clone 'doctor' steps from master_template into a target questionnaire (preserve order)
 app.post(
   "/questionnaires/clone-doctor-from-master",
@@ -2896,6 +2898,7 @@ app.get("/products/:id", async (req, res) => {
 
     // Fetch full user data from database to get role
     const user = await User.findByPk(payload.userId);
+    console.log("user", user);
     if (!user) {
       return res.status(401).json({
         success: false,
@@ -5408,12 +5411,28 @@ app.post(
           orderId: order.id,
           orderNumber: orderNumber,
           orderType: "product_subscription_initial_authorization",
+          brandAmountUsd: brandAmountUsd.toFixed(2),
+          platformFeePercent: String(platformFeePercent),
+          platformFeeUsd: platformFeeUsd.toFixed(2),
+          doctorFlatUsd: doctorUsd.toFixed(2),
+          pharmacyWholesaleUsd: pharmacyWholesaleUsd.toFixed(2),
         },
         // HIPAA: Generic description only; no product/treatment names (Payment Processing Exemption)
         description: `Subscription Authorization ${orderNumber}`,
         automatic_payment_methods: { enabled: true, allow_redirects: "never" },
         setup_future_usage: "off_session",
       };
+
+      // Add transfer_data to automatically transfer brandAmount to clinic
+      if (tenantProduct.clinic?.stripeAccountId && brandAmountUsd > 0) {
+        authPaymentIntentParams.transfer_data = {
+          destination: tenantProduct.clinic.stripeAccountId,
+          amount: Math.round(brandAmountUsd * 100), // Only brand's portion
+        };
+        console.log(
+          `💸 Adding transfer_data: $${brandAmountUsd.toFixed(2)} to clinic Stripe account ${tenantProduct.clinic.stripeAccountId}`
+        );
+      }
 
       // Add on_behalf_of if clinic is merchant of record
       if (useOnBehalfOf && tenantProduct.clinic?.stripeAccountId) {
@@ -5943,12 +5962,28 @@ app.post("/payments/product/sub", async (req, res) => {
         orderId: order.id,
         orderNumber: orderNumber,
         orderType: "product_subscription_initial_authorization",
+        brandAmountUsd: brandAmountUsd.toFixed(2),
+        platformFeePercent: String(platformFeePercent),
+        platformFeeUsd: platformFeeUsd.toFixed(2),
+        doctorFlatUsd: doctorUsd.toFixed(2),
+        pharmacyWholesaleUsd: pharmacyWholesaleUsd.toFixed(2),
       },
       // HIPAA: Generic description only; no product/treatment names (Payment Processing Exemption)
       description: `Subscription Authorization ${orderNumber}`,
       automatic_payment_methods: { enabled: true, allow_redirects: "never" },
       setup_future_usage: "off_session",
     };
+
+    // Add transfer_data to automatically transfer brandAmount to clinic
+    if ((tenantProduct as any).clinic?.stripeAccountId && brandAmountUsd > 0) {
+      paymentIntentParams.transfer_data = {
+        destination: (tenantProduct as any).clinic.stripeAccountId,
+        amount: Math.round(brandAmountUsd * 100), // Only brand's portion
+      };
+      console.log(
+        `💸 Adding transfer_data: $${brandAmountUsd.toFixed(2)} to clinic Stripe account ${(tenantProduct as any).clinic.stripeAccountId}`
+      );
+    }
 
     // Add on_behalf_of if clinic is merchant of record
     if (useOnBehalfOf && (tenantProduct as any).clinic?.stripeAccountId) {
@@ -6297,12 +6332,28 @@ app.post("/payments/program/sub", async (req, res) => {
         orderType: "program_subscription_initial_authorization",
         visitType: visitType || 'none',
         visitFeeAmount: visitFeeAmount.toFixed(2),
+        brandAmountUsd: brandAmountUsd.toFixed(2),
+        platformFeePercent: String(platformFeePercent),
+        platformFeeUsd: platformFeeUsd.toFixed(2),
+        doctorFlatUsd: doctorUsd.toFixed(2),
+        productsTotal: productsTotal.toFixed(2),
       },
       // HIPAA: Generic description only; no program/treatment names (Payment Processing Exemption)
       description: `Program Subscription ${orderNumber}`,
       automatic_payment_methods: { enabled: true, allow_redirects: "never" },
       setup_future_usage: "off_session",
     };
+
+    // Add transfer_data to automatically transfer brandAmount to clinic
+    if (clinic?.stripeAccountId && brandAmountUsd > 0) {
+      paymentIntentParams.transfer_data = {
+        destination: clinic.stripeAccountId,
+        amount: Math.round(brandAmountUsd * 100), // Only brand's portion
+      };
+      console.log(
+        `💸 Adding transfer_data: $${brandAmountUsd.toFixed(2)} to clinic Stripe account ${clinic.stripeAccountId}`
+      );
+    }
 
     // Add statement descriptor with Peptides suffix
     if (clinicName || clinic?.name) {
