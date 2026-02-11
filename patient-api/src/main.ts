@@ -12165,36 +12165,16 @@ const PORT = process.env.PORT || 3001;
 
 // Initialize database connection and start server
 async function startServer() {
-  // const dbConnected = await initializeDatabase();
+  const dbConnected = await initializeDatabase();
 
-  // if (!dbConnected) {
-  //   console.error("❌ Failed to connect to database. Exiting...");
-  //   process.exit(1);
-  // }
+  if (!dbConnected) {
+    console.error("❌ Failed to connect to database. Exiting...");
+    process.exit(1);
+  }
 
-  const httpServer = app.listen(PORT, () => {
-    console.log(`🚀 API listening on :${PORT}`);
-    console.log("📊 Database connected successfully");
-    console.log("🔒 HIPAA-compliant security features enabled");
-  });
-
-  // Initialize WebSocket server
+  // Import WebSocket service early so route handlers can reference it
   const WebSocketService = (await import("./services/websocket.service"))
     .default;
-  WebSocketService.initialize(httpServer);
-  console.log("🔌 WebSocket server initialized");
-
-  // Initialize all cron jobs from centralized registry
-  const cronJobRegistry = (await import('./cronJobs')).default;
-  await cronJobRegistry.registerAll();
-
-  // Start auto-approval service
-  const AutoApprovalService = (await import("./services/autoApproval.service"))
-    .default;
-  AutoApprovalService.start();
-  console.log("🤖 Auto-approval service started");
-
-
 
   // ============= QUALIPHY INTEGRATION ENDPOINTS =============
 
@@ -13453,7 +13433,30 @@ async function startServer() {
     }
   );
 
+  // ============================================
+  // Start server & initialize services
+  // (AFTER all routes are registered)
+  // ============================================
 
+  const httpServer = app.listen(PORT, () => {
+    console.log(`🚀 API listening on :${PORT}`);
+    console.log("📊 Database connected successfully");
+    console.log("🔒 HIPAA-compliant security features enabled");
+  });
+
+  // Initialize WebSocket server (imported above, initialize with httpServer now)
+  WebSocketService.initialize(httpServer);
+  console.log("🔌 WebSocket server initialized");
+
+  // Initialize all cron jobs from centralized registry
+  const cronJobRegistry = (await import('./cronJobs')).default;
+  await cronJobRegistry.registerAll();
+
+  // Start auto-approval service
+  const AutoApprovalService = (await import("./services/autoApproval.service"))
+    .default;
+  AutoApprovalService.start();
+  console.log("🤖 Auto-approval service started");
 }
 
 startServer();
