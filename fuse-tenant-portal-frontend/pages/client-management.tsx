@@ -566,6 +566,13 @@ export default function ClientManagement() {
         body: JSON.stringify(doctorForm),
       })
       if (!response.ok) throw new Error('Failed to update doctor profile')
+      // Update local users state so re-selecting the doctor shows the saved values
+      setUsers(prev => prev.map(u =>
+        u.id === selectedUser.id ? { ...u, ...doctorForm } as any : u
+      ))
+      setSelectedUser({ ...selectedUser, ...doctorForm } as any)
+      // Re-fetch pharmacy approvals in case medicalCompanyId changed
+      fetchDoctorPharmacyApprovals(selectedUser.id)
       alert('Doctor profile updated successfully!')
     } catch (error) {
       console.error('Error saving doctor profile:', error)
