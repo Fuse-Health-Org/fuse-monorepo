@@ -12165,12 +12165,12 @@ const PORT = process.env.PORT || 3001;
 
 // Initialize database connection and start server
 async function startServer() {
-  const dbConnected = await initializeDatabase();
+  // const dbConnected = await initializeDatabase();
 
-  if (!dbConnected) {
-    console.error("❌ Failed to connect to database. Exiting...");
-    process.exit(1);
-  }
+  // if (!dbConnected) {
+  //   console.error("❌ Failed to connect to database. Exiting...");
+  //   process.exit(1);
+  // }
 
   // Import WebSocket service early so route handlers can reference it
   const WebSocketService = (await import("./services/websocket.service"))
@@ -12437,19 +12437,20 @@ async function startServer() {
         order: [["lastMessageAt", "DESC"]],
       });
 
-      // Manually load patient data for each chat
-      const chatsWithPatients = await Promise.all(
-        chats.map(async (chat) => {
-          const patient = await User.findByPk(chat.patientId, {
-            attributes: ["id", "firstName", "lastName", "email"],
-          });
+      // FIX: Previously used Promise.all(chats.map(...)) with a User.findByPk per chat (N+1 pattern).
+      // This fired N concurrent queries which could spike Postgres connections and cause
+      // "out of shared memory" errors. Replaced with a single bulk query + Map lookup.
+      const patientIds = [...new Set(chats.map((c) => c.patientId))];
+      const patients = await User.findAll({
+        where: { id: patientIds },
+        attributes: ["id", "firstName", "lastName", "email"],
+      });
+      const patientById = new Map(patients.map((p) => [p.id, p]));
 
-          return {
-            ...chat.toJSON(),
-            patient: patient ? patient.toJSON() : null,
-          };
-        })
-      );
+      const chatsWithPatients = chats.map((chat) => ({
+        ...chat.toJSON(),
+        patient: patientById.get(chat.patientId)?.toJSON() || null,
+      }));
 
       // HIPAA Audit: Log PHI access (doctor viewing all patient chats)
       await AuditService.logFromRequest(req, {
