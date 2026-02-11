@@ -12172,29 +12172,9 @@ async function startServer() {
   //   process.exit(1);
   // }
 
-  const httpServer = app.listen(PORT, () => {
-    console.log(`🚀 API listening on :${PORT}`);
-    console.log("📊 Database connected successfully");
-    console.log("🔒 HIPAA-compliant security features enabled");
-  });
-
-  // Initialize WebSocket server
+  // Import WebSocket service early so route handlers can reference it
   const WebSocketService = (await import("./services/websocket.service"))
     .default;
-  WebSocketService.initialize(httpServer);
-  console.log("🔌 WebSocket server initialized");
-
-  // Initialize all cron jobs from centralized registry
-  const cronJobRegistry = (await import('./cronJobs')).default;
-  await cronJobRegistry.registerAll();
-
-  // Start auto-approval service
-  const AutoApprovalService = (await import("./services/autoApproval.service"))
-    .default;
-  AutoApprovalService.start();
-  console.log("🤖 Auto-approval service started");
-
-
 
   // ============= QUALIPHY INTEGRATION ENDPOINTS =============
 
@@ -12457,19 +12437,20 @@ async function startServer() {
         order: [["lastMessageAt", "DESC"]],
       });
 
-      // Manually load patient data for each chat
-      const chatsWithPatients = await Promise.all(
-        chats.map(async (chat) => {
-          const patient = await User.findByPk(chat.patientId, {
-            attributes: ["id", "firstName", "lastName", "email"],
-          });
+      // FIX: Previously used Promise.all(chats.map(...)) with a User.findByPk per chat (N+1 pattern).
+      // This fired N concurrent queries which could spike Postgres connections and cause
+      // "out of shared memory" errors. Replaced with a single bulk query + Map lookup.
+      const patientIds = [...new Set(chats.map((c) => c.patientId))];
+      const patients = await User.findAll({
+        where: { id: patientIds },
+        attributes: ["id", "firstName", "lastName", "email"],
+      });
+      const patientById = new Map(patients.map((p) => [p.id, p]));
 
-          return {
-            ...chat.toJSON(),
-            patient: patient ? patient.toJSON() : null,
-          };
-        })
-      );
+      const chatsWithPatients = chats.map((chat) => ({
+        ...chat.toJSON(),
+        patient: patientById.get(chat.patientId)?.toJSON() || null,
+      }));
 
       // HIPAA Audit: Log PHI access (doctor viewing all patient chats)
       await AuditService.logFromRequest(req, {
@@ -13453,7 +13434,30 @@ async function startServer() {
     }
   );
 
+  // ============================================
+  // Start server & initialize services
+  // (AFTER all routes are registered)
+  // ============================================
 
+  const httpServer = app.listen(PORT, () => {
+    console.log(`🚀 API listening on :${PORT}`);
+    console.log("📊 Database connected successfully");
+    console.log("🔒 HIPAA-compliant security features enabled");
+  });
+
+  // Initialize WebSocket server (imported above, initialize with httpServer now)
+  WebSocketService.initialize(httpServer);
+  console.log("🔌 WebSocket server initialized");
+
+  // Initialize all cron jobs from centralized registry
+  const cronJobRegistry = (await import('./cronJobs')).default;
+  await cronJobRegistry.registerAll();
+
+  // Start auto-approval service
+  const AutoApprovalService = (await import("./services/autoApproval.service"))
+    .default;
+  AutoApprovalService.start();
+  console.log("🤖 Auto-approval service started");
 }
 
 startServer();
