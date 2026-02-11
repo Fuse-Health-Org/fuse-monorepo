@@ -169,8 +169,8 @@ class BrandSubscriptionService {
         ? new Date(currentPeriodEndUnix * 1000)
         : null;
 
-      // 9. Create BrandSubscription
-      brandSubscription.update({
+      // 9. Activate and link BrandSubscription
+      await brandSubscription.update({
         userId: user.id,
         status: BrandSubscriptionStatus.ACTIVE,
         stripeSubscriptionId: subscription.id,

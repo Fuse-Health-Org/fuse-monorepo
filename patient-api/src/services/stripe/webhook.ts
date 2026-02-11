@@ -1,4 +1,5 @@
 import Stripe from 'stripe';
+import { Op } from 'sequelize';
 import { MedicalCompanySlug } from '@fuse/enums';
 import Payment, { PaymentGoesTo } from '../../models/Payment';
 import Order, { OrderStatus } from '../../models/Order';
@@ -385,7 +386,7 @@ export const handleInvoicePaid = async (invoice: Stripe.Invoice): Promise<void> 
 
     if (subscriptionId && typeof subscriptionId === 'string') {
         // Check for brand subscription first
-        const brandSub = await BrandSubscription.findOne({
+        let brandSub = await BrandSubscription.findOne({
             where: {
                 stripeSubscriptionId: subscriptionId
             }
@@ -397,6 +398,28 @@ export const handleInvoicePaid = async (invoice: Stripe.Invoice): Promise<void> 
             status: brandSub.status,
             userId: brandSub.userId
         } : 'None');
+
+        // Fallback: if stripeSubscriptionId is not linked yet, try latest pending/processing record by customer
+        if (!brandSub && invoice.customer) {
+            const customerId = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer.id;
+            brandSub = await BrandSubscription.findOne({
+                where: {
+                    stripeCustomerId: customerId,
+                    status: {
+                        [Op.in]: [BrandSubscriptionStatus.PENDING, BrandSubscriptionStatus.PROCESSING],
+                    },
+                },
+                order: [['createdAt', 'DESC']],
+            });
+
+            if (brandSub) {
+                console.log('🧩 Fallback matched brand subscription by customer:', {
+                    id: brandSub.id,
+                    status: brandSub.status,
+                    stripeCustomerId: brandSub.stripeCustomerId,
+                });
+            }
+        }
 
         if (brandSub) {
             // Handle brand subscription payment

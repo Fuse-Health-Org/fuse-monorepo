@@ -56,10 +56,98 @@ export default function VerifyEmail() {
           
           setIsLoggingIn(true)
           
-          // Auto-login successful, redirect to dashboard
+          // Redirect to checkout after verification using the same logic as /plans
+          const selectedPlanType = localStorage.getItem('selectedPlanType')
+          setMessage('Redirecting to checkout...')
+
+          const redirectToCheckout = async () => {
+            if (!selectedPlanType) {
+              window.location.href = '/checkout'
+              return
+            }
+
+            try {
+              const plansResponse = await fetch(`${apiUrl}/brand-subscriptions/plans`, {
+                headers: {
+                  Authorization: `Bearer ${data.token}`,
+                },
+              })
+
+              const plansData = await plansResponse.json()
+              const selectedPlan = plansData?.success && Array.isArray(plansData?.plans)
+                ? plansData.plans.find(
+                    (plan: any) =>
+                      String(plan.planType || '').toLowerCase() === selectedPlanType.toLowerCase(),
+                  )
+                : null
+
+              if (!selectedPlan) {
+                console.error('Selected plan not found for checkout redirect:', selectedPlanType)
+                window.location.href = '/checkout'
+                return
+              }
+
+              const hasIntroPricing =
+                selectedPlan.introMonthlyPrice != null &&
+                selectedPlan.introMonthlyPriceDurationMonths &&
+                selectedPlan.introMonthlyPriceStripeId
+
+              const downpaymentAmount = hasIntroPricing
+                ? Number(selectedPlan.introMonthlyPrice)
+                : Number(selectedPlan.monthlyPrice || 0)
+
+              // Keep /plans behavior: save selected plan profile payload before checkout
+              const payload = {
+                selectedPlanCategory: selectedPlan.planType,
+                selectedPlanType: selectedPlan.planType,
+                selectedPlanName: selectedPlan.name,
+                selectedPlanPrice: downpaymentAmount,
+                selectedDownpaymentType: `downpayment_${selectedPlan.planType}`,
+                selectedDownpaymentName: `${selectedPlan.name} First Month`,
+                selectedDownpaymentPrice: downpaymentAmount,
+                planSelectionTimestamp: new Date().toISOString(),
+              }
+
+              await fetch(`${apiUrl}/auth/profile`, {
+                method: 'PUT',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${data.token}`,
+                },
+                body: JSON.stringify(payload),
+              })
+
+              const queryParams = new URLSearchParams({
+                planCategory: selectedPlan.planType,
+                subscriptionPlanType: selectedPlan.planType,
+                subscriptionPlanName: selectedPlan.name,
+                subscriptionMonthlyPrice: String(Number(selectedPlan.monthlyPrice || 0)),
+                downpaymentPlanType: `downpayment_${selectedPlan.planType}`,
+                downpaymentName: `${selectedPlan.name} First Month`,
+                downpaymentAmount: String(downpaymentAmount),
+                brandSubscriptionPlanId: String(selectedPlan.id || ''),
+                stripePriceId: String(selectedPlan.stripePriceId || ''),
+              })
+
+              if (hasIntroPricing) {
+                queryParams.set('introMonthlyPrice', String(Number(selectedPlan.introMonthlyPrice)))
+                queryParams.set(
+                  'introMonthlyPriceDurationMonths',
+                  String(Number(selectedPlan.introMonthlyPriceDurationMonths)),
+                )
+                queryParams.set('introMonthlyPriceStripeId', String(selectedPlan.introMonthlyPriceStripeId))
+              }
+
+              window.location.href = `/checkout?${queryParams.toString()}`
+            } catch (error) {
+              console.error('Failed to build checkout redirect from selected plan:', error)
+              window.location.href = '/checkout'
+            }
+          }
+
           setTimeout(() => {
-            window.location.href = '/'
-          }, 2000)
+            void redirectToCheckout()
+          }, 1500)
         }
       } else {
         setStatus('error')
@@ -207,7 +295,7 @@ export default function VerifyEmail() {
                         <span className="flex-shrink-0 w-6 h-6 bg-primary text-primary-foreground rounded-full flex items-center justify-center font-semibold text-xs">
                           3
                         </span>
-                        <span>You'll be automatically logged in and redirected to your dashboard</span>
+                        <span>You'll be automatically logged in and redirected to checkout</span>
                       </li>
                     </ol>
                   </div>
@@ -221,7 +309,7 @@ export default function VerifyEmail() {
               <div className="space-y-3">
                 {status === 'success' && isLoggingIn && (
                   <div className="text-sm text-muted-foreground">
-                    Logging you in and redirecting to dashboard...
+                    Logging you in and redirecting to checkout...
                   </div>
                 )}
 

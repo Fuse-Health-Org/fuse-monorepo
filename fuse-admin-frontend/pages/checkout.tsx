@@ -25,7 +25,6 @@ import {
   useStripe,
   useElements
 } from '@stripe/react-stripe-js'
-import Layout from '@/components/Layout'
 
 // Initialize Stripe
 const stripePublishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || 'pk_test_...'
@@ -663,6 +662,7 @@ export default function CheckoutPage() {
   const { user, token, isLoading, refreshSubscription, subscription } = useAuth()
   const [checkoutData, setCheckoutData] = useState<CheckoutData | null>(null)
   const [clientSecret, setClientSecret] = useState('')
+  const [initError, setInitError] = useState<string | null>(null)
   const [intentType, setIntentType] = useState<'payment_intent' | 'setup_intent'>('payment_intent')
   const [brandSubscriptionId, setBrandSubscriptionId] = useState<string | undefined>()
 
@@ -697,6 +697,8 @@ export default function CheckoutPage() {
 
     // Get checkout data from query params
     const {
+      planType,
+      planName,
       planCategory,
       downpaymentPlanType,
       downpaymentName,
@@ -710,6 +712,89 @@ export default function CheckoutPage() {
       introMonthlyPriceDurationMonths: introMonthlyPriceDurationMonthsParam,
       introMonthlyPriceStripeId: introMonthlyPriceStripeIdParam,
     } = router.query
+
+    // New simplified flow: if only planType and planName are provided, fetch plan data from backend
+    const queryPlanType = Array.isArray(planType) ? planType[0] : planType
+    const queryPlanName = Array.isArray(planName) ? planName[0] : planName
+    if (queryPlanType && queryPlanName && !subscriptionMonthlyPrice) {
+      // Fetch plan data from backend
+      const fetchPlanData = async () => {
+        try {
+          const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+          const authToken = token || localStorage.getItem('admin_token')
+          const requestOptions: RequestInit = authToken
+            ? { headers: { Authorization: `Bearer ${authToken}` } }
+            : {}
+
+          // Try public endpoint first, then auth endpoint used by other flows
+          let data: any = null
+          let plans: any[] | null = null
+
+          try {
+            const response = await fetch(`${apiUrl}/subscriptions/plans`, requestOptions)
+            data = await response.json()
+            plans = data?.success && Array.isArray(data?.plans) ? data.plans : null
+          } catch {
+            plans = null
+          }
+
+          if (!plans) {
+            const response = await fetch(`${apiUrl}/brand-subscriptions/plans`, requestOptions)
+            data = await response.json()
+            plans = data?.success && Array.isArray(data?.plans) ? data.plans : null
+          }
+
+          if (plans) {
+            const selectedPlan = plans.find(
+              (p: any) =>
+                String(p.planType || '').toLowerCase() === String(queryPlanType).toLowerCase()
+            )
+            
+            if (selectedPlan) {
+              const introMonthsMatch = String(selectedPlan.promotionalPriceText || '').match(/(\d+)\s+months?/i)
+              const introMonths = introMonthsMatch ? parseInt(introMonthsMatch[1], 10) : 2
+              const hasIntroPricing =
+                selectedPlan.introductoryStripePriceId &&
+                Number(selectedPlan.monthlyPrice) < Number(selectedPlan.regularPrice || selectedPlan.monthlyPrice)
+
+              // Build URL with complete data and redirect
+              const params = new URLSearchParams({
+                planCategory: selectedPlan.planType,
+                subscriptionPlanType: selectedPlan.planType,
+                subscriptionPlanName: selectedPlan.name,
+                subscriptionMonthlyPrice: Number(selectedPlan.regularPrice || selectedPlan.monthlyPrice).toString(),
+                downpaymentPlanType: `downpayment_${selectedPlan.planType}`,
+                downpaymentName: `${selectedPlan.name} First Month`,
+                downpaymentAmount: Number(selectedPlan.monthlyPrice).toString(),
+                brandSubscriptionPlanId: selectedPlan.id,
+                stripePriceId: selectedPlan.stripePriceId || '',
+                ...(hasIntroPricing
+                  ? {
+                      introMonthlyPrice: Number(selectedPlan.monthlyPrice).toString(),
+                      introMonthlyPriceDurationMonths: introMonths.toString(),
+                      introMonthlyPriceStripeId: String(selectedPlan.introductoryStripePriceId),
+                    }
+                  : {}),
+              })
+              
+              router.replace(`/checkout?${params.toString()}`)
+            } else {
+              console.error('Plan not found from checkout query:', queryPlanType)
+              setInitError('We could not find your selected plan. Please sign in again and retry.')
+            }
+          } else {
+            console.error('Plans endpoint returned unexpected response')
+            setInitError('Unable to load plans for checkout. Please refresh and try again.')
+          }
+        } catch (error) {
+          console.error('Error fetching plan data:', error)
+          setInitError('Unable to initialize checkout. Please refresh and try again.')
+        }
+      }
+      
+      fetchPlanData()
+      return
+    }
 
     if (
       planCategory &&
@@ -762,8 +847,18 @@ export default function CheckoutPage() {
         createPaymentIntent(subscriptionPlanType as string, downpaymentAmountNum, brandSubscriptionPlanId as string)
       }
     } else {
-      // Redirect back if missing data
-      router.push('/plans')
+      // Missing query params: try localStorage fallback first, do not leave checkout flow
+      const storedPlanType = localStorage.getItem('selectedPlanType')
+      const storedPlanName = localStorage.getItem('selectedPlanName')
+
+      if (storedPlanType && storedPlanName) {
+        router.replace(
+          `/checkout?planType=${encodeURIComponent(storedPlanType)}&planName=${encodeURIComponent(storedPlanName)}`
+        )
+        return
+      }
+
+      setInitError('Missing checkout plan data. Please select a plan and try again.')
     }
   }, [router.isReady, router.query, user, isLoading, subscription])
 
@@ -896,6 +991,28 @@ export default function CheckoutPage() {
     // You could show a toast notification here
   }
 
+  // Enable scroll for this standalone page (override global overflow-hidden)
+  useEffect(() => {
+    const htmlOverflow = document.documentElement.style.overflow
+    const bodyOverflow = document.body.style.overflow
+    const nextOverflow = document.getElementById('__next')?.style.overflow
+    
+    document.documentElement.style.overflow = 'auto'
+    document.body.style.overflow = 'auto'
+    const nextElement = document.getElementById('__next')
+    if (nextElement) {
+      nextElement.style.overflow = 'auto'
+    }
+    
+    return () => {
+      document.documentElement.style.overflow = htmlOverflow
+      document.body.style.overflow = bodyOverflow
+      if (nextElement) {
+        nextElement.style.overflow = nextOverflow || ''
+      }
+    }
+  }, [])
+
   // Auto-populate user data when user is available
   useEffect(() => {
     if (user) {
@@ -914,11 +1031,37 @@ export default function CheckoutPage() {
   }, [user])
 
 
+  if (initError) {
+    return (
+      <>
+        <Head>
+          <title>Checkout - Fuse Health</title>
+        </Head>
+        <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex items-center justify-center">
+          <Card className="max-w-md w-full mx-4">
+            <CardHeader>
+              <CardTitle>Checkout</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">{initError}</p>
+              <Button onClick={() => router.push('/signin')} className="w-full">
+                Go to Sign In
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </>
+    )
+  }
+
   // Show loading if auth is loading or if we don't have checkout data yet
   if (isLoading || !checkoutData || !clientSecret) {
     return (
-      <Layout>
-        <div className="min-h-screen bg-background flex items-center justify-center">
+      <>
+        <Head>
+          <title>Loading Checkout - Fuse Health</title>
+        </Head>
+        <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex items-center justify-center">
           <div className="text-center">
             <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
             <p className="text-muted-foreground">
@@ -926,29 +1069,30 @@ export default function CheckoutPage() {
             </p>
           </div>
         </div>
-      </Layout>
+      </>
     )
   }
 
   return (
-    <Layout>
+    <>
       <Head>
         <title>Checkout - Fuse Health</title>
         <meta name="description" content="Complete your Fuse Health setup" />
       </Head>
 
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
         <div className="max-w-4xl mx-auto p-6">
           {/* Header */}
           <div className="flex items-center justify-between mb-8">
-            <Button
-              variant="ghost"
-              onClick={() => router.back()}
-              className="flex items-center gap-2"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Back
-            </Button>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
+                <Building2 className="w-5 h-5 text-primary-foreground" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-foreground">Fuse Health</h1>
+                <p className="text-xs text-muted-foreground">Complete your subscription</p>
+              </div>
+            </div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Lock className="w-4 h-4" />
               <span>Secure checkout</span>
@@ -1123,6 +1267,6 @@ export default function CheckoutPage() {
           </div>
         </div>
       </div>
-    </Layout>
+    </>
   )
 }

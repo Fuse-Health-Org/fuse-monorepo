@@ -49,6 +49,7 @@ export default function PricingPlansModal({
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -59,21 +60,38 @@ export default function PricingPlansModal({
   const fetchPlans = async () => {
     try {
       setLoading(true);
+      setError(null);
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/subscriptions/plans`,
+        `${process.env.NEXT_PUBLIC_API_URL}/brand-subscriptions/plans`,
       );
       const data = await response.json();
 
       if (data.success) {
+        if (!data.plans || data.plans.length === 0) {
+          setError("No subscription plans available at the moment.");
+          setPlans([]);
+          return;
+        }
+
         // Show only the main pricing plans (entry, standard, premium)
         // Filter out supercheap and other test plans
         const filteredPlans = data.plans.filter((plan: Plan) =>
           ["entry", "standard", "premium"].includes(plan.planType),
         );
-        setPlans(filteredPlans);
+
+        if (filteredPlans.length === 0) {
+          // If no plans match the filter, show all active plans
+          console.log("No plans matched filter, showing all plans:", data.plans.map((p: Plan) => p.planType));
+          setPlans(data.plans.filter((plan: Plan) => plan.planType !== "supercheap"));
+        } else {
+          setPlans(filteredPlans);
+        }
+      } else {
+        setError(data.message || "Failed to load subscription plans.");
       }
     } catch (error) {
       console.error("Error fetching plans:", error);
+      setError("Failed to connect to the server. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -84,6 +102,19 @@ export default function PricingPlansModal({
     // Save selected plan to localStorage
     localStorage.setItem("selectedPlanType", plan.planType);
     localStorage.setItem("selectedPlanName", plan.name);
+    localStorage.setItem(
+      "selectedPlanData",
+      JSON.stringify({
+        id: plan.id,
+        planType: plan.planType,
+        planName: plan.name,
+        monthlyPrice: Number(plan.monthlyPrice || 0),
+        regularPrice: Number(plan.regularPrice || plan.monthlyPrice || 0),
+        stripePriceId: plan.stripePriceId || "",
+        introductoryStripePriceId: plan.introductoryStripePriceId || null,
+        promotionalPriceText: plan.promotionalPriceText || "",
+      }),
+    );
     onSelectPlan(plan);
   };
 
@@ -176,6 +207,25 @@ export default function PricingPlansModal({
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            </div>
+          ) : error ? (
+            <div className="flex flex-col items-center justify-center py-12 px-4">
+              <div className="text-red-500 text-center mb-4">
+                <svg className="h-12 w-12 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p className="text-lg font-semibold">{error}</p>
+              </div>
+              <button
+                onClick={fetchPlans}
+                className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+              >
+                Try Again
+              </button>
+            </div>
+          ) : plans.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 px-4">
+              <p className="text-muted-foreground text-center">No plans available</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
