@@ -2,7 +2,7 @@ import { Table, Column, DataType, ForeignKey, BelongsTo } from 'sequelize-typesc
 import Entity from './Entity';
 import User from './User';
 import Clinic from './Clinic';
-import { PatientPortalDashboardFormat } from '@fuse/enums';
+import { MedicalCompanySlug } from '@fuse/enums';
 
 export enum InvitationType {
   DOCTOR = 'doctor',
@@ -66,11 +66,11 @@ export default class BrandInvitation extends Entity {
   declare invitationType: InvitationType;
 
   @Column({
-    type: DataType.ENUM(...Object.values(PatientPortalDashboardFormat)),
+    type: DataType.STRING,
     allowNull: false,
-    defaultValue: PatientPortalDashboardFormat.FUSE,
+    defaultValue: MedicalCompanySlug.FUSE,
   })
-  declare patientPortalDashboardFormat: PatientPortalDashboardFormat;
+  declare patientPortalDashboardFormat: string;
 
   @Column({
     type: DataType.BOOLEAN,

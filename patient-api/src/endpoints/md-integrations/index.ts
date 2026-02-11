@@ -1,4 +1,5 @@
 import { Express } from "express";
+import { MedicalCompanySlug } from "@fuse/enums";
 
 // ============= MD INTEGRATIONS ENDPOINTS =============
 // All MD Integrations (MDI) related endpoints for patient portal and admin
@@ -458,7 +459,7 @@ export function registerMDIntegrationsEndpoints(
             }
 
             // Skip MDI if clinic doesn't use md-integrations format
-            if (!clinic || (clinic as any).patientPortalDashboardFormat !== 'md-integrations') {
+            if (!clinic || (clinic as any).patientPortalDashboardFormat !== MedicalCompanySlug.MD_INTEGRATIONS) {
                 console.log('ℹ️ Skipping MD Integrations - clinic uses fuse dashboard format');
                 return res.json({
                     success: true,

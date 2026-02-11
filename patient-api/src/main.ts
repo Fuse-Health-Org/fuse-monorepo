@@ -6,6 +6,7 @@ import multer from "multer";
 import dns from "dns/promises";
 import jwt from "jsonwebtoken";
 import { initializeDatabase } from "./config/database";
+import { MedicalCompanySlug } from "@fuse/enums";
 import { MailsSender } from "@services/mailsSender";
 import Treatment from "@models/Treatment";
 import Product from "@models/Product";
@@ -1242,9 +1243,9 @@ app.get("/clinic/by-slug/:slug", async (req, res) => {
 
     // Normalize patientPortalDashboardFormat to ensure it's always a string value
     const dashboardFormat = clinicData.patientPortalDashboardFormat;
-    const normalizedFormat = dashboardFormat === 'md-integrations' || dashboardFormat === 'MD_INTEGRATIONS'
-      ? 'md-integrations'
-      : 'fuse';
+    const normalizedFormat = dashboardFormat === MedicalCompanySlug.MD_INTEGRATIONS || dashboardFormat === 'MD_INTEGRATIONS'
+      ? MedicalCompanySlug.MD_INTEGRATIONS
+      : MedicalCompanySlug.FUSE;
 
     if (process.env.NODE_ENV === 'development') {
       console.log('[CLINIC] GET /clinic/by-slug/:slug response:', {
@@ -1253,7 +1254,7 @@ app.get("/clinic/by-slug/:slug", async (req, res) => {
         clinicName: clinic.name,
         rawFormat: dashboardFormat,
         normalizedFormat: normalizedFormat,
-        willRedirectTo: normalizedFormat === 'md-integrations' ? '/mdi-dashboard?tab=messages' : '/fuse-dashboard',
+        willRedirectTo: normalizedFormat === MedicalCompanySlug.MD_INTEGRATIONS ? '/mdi-dashboard?tab=messages' : '/fuse-dashboard',
       });
     }
 
@@ -1422,9 +1423,9 @@ app.get("/clinic/:id", authenticateJWT, async (req, res) => {
 
     // Normalize patientPortalDashboardFormat to ensure it's always a string value
     const dashboardFormat = (clinic as any).patientPortalDashboardFormat;
-    const normalizedFormat = dashboardFormat === 'md-integrations' || dashboardFormat === 'MD_INTEGRATIONS'
-      ? 'md-integrations'
-      : 'fuse';
+    const normalizedFormat = dashboardFormat === MedicalCompanySlug.MD_INTEGRATIONS || dashboardFormat === 'MD_INTEGRATIONS'
+      ? MedicalCompanySlug.MD_INTEGRATIONS
+      : MedicalCompanySlug.FUSE;
 
     if (process.env.NODE_ENV === 'development') {
       console.log('[CLINIC] GET /clinic/:id response:', {
@@ -1432,7 +1433,7 @@ app.get("/clinic/:id", authenticateJWT, async (req, res) => {
         clinicName: clinic.name,
         rawFormat: dashboardFormat,
         normalizedFormat: normalizedFormat,
-        willRedirectTo: normalizedFormat === 'md-integrations' ? '/mdi-dashboard?tab=messages' : '/fuse-dashboard',
+        willRedirectTo: normalizedFormat === MedicalCompanySlug.MD_INTEGRATIONS ? '/mdi-dashboard?tab=messages' : '/fuse-dashboard',
       });
     }
 
@@ -11534,7 +11535,7 @@ app.put("/organization/update", authenticateJWT, async (req, res) => {
 
         // Update patient portal dashboard format if provided
         if (patientPortalDashboardFormat !== undefined) {
-          if (!["fuse", "md-integrations"].includes(patientPortalDashboardFormat)) {
+          if (!(Object.values(MedicalCompanySlug) as string[]).includes(patientPortalDashboardFormat)) {
             return res.status(400).json({
               success: false,
               message: "Patient portal dashboard format must be 'fuse' or 'md-integrations'",
@@ -11981,12 +11982,12 @@ const PORT = process.env.PORT || 3001;
 
 // Initialize database connection and start server
 async function startServer() {
-  const dbConnected = await initializeDatabase();
+  // const dbConnected = await initializeDatabase();
 
-  if (!dbConnected) {
-    console.error("❌ Failed to connect to database. Exiting...");
-    process.exit(1);
-  }
+  // if (!dbConnected) {
+  //   console.error("❌ Failed to connect to database. Exiting...");
+  //   process.exit(1);
+  // }
 
   const httpServer = app.listen(PORT, () => {
     console.log(`🚀 API listening on :${PORT}`);
@@ -12207,6 +12208,10 @@ async function startServer() {
   // ============= PROGRAMS ENDPOINTS =============
   const programsRouter = (await import("./endpoints/programs")).default;
   app.use("/", programsRouter);
+
+  // ============= MEDICAL COMPANIES ENDPOINTS =============
+  const medicalCompaniesRouter = (await import("./endpoints/medical-companies")).default;
+  app.use("/medical-companies", medicalCompaniesRouter);
 
   // ============= SUPPORT TICKETS ENDPOINTS =============
   const { registerSupportEndpoints } = await import('./endpoints/support');

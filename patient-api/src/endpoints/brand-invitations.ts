@@ -1,7 +1,7 @@
 import { Express } from "express";
 import User from "../models/User";
 import Clinic from "../models/Clinic";
-import { PatientPortalDashboardFormat } from "@fuse/enums";
+import { MedicalCompanySlug } from "@fuse/enums";
 import BrandInvitation, { InvitationType } from "../models/BrandInvitation";
 import UserRoles from "../models/UserRoles";
 
@@ -104,9 +104,9 @@ export function registerBrandInvitationEndpoints(
       }
 
       // Determine patient portal dashboard format
-      let dashboardFormat = PatientPortalDashboardFormat.FUSE;
+      let dashboardFormat: string = MedicalCompanySlug.FUSE;
       if (invitationType === InvitationType.MDI) {
-        dashboardFormat = PatientPortalDashboardFormat.MD_INTEGRATIONS;
+        dashboardFormat = MedicalCompanySlug.MD_INTEGRATIONS;
       } else if (invitationType === InvitationType.DOCTOR) {
         const clinic = await Clinic.findByPk(user.clinicId!);
         if (clinic) {

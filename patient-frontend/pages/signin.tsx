@@ -7,14 +7,13 @@ import { useRouter } from "next/router";
 import { authApi, apiCall } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
 import { extractClinicSlugFromDomain, getDashboardPrefix } from "../lib/clinic-utils";
-import { PatientPortalDashboardFormat } from "@fuse/enums";
 
 interface Clinic {
   id: string;
   name: string;
   slug: string;
   logo: string;
-  patientPortalDashboardFormat?: PatientPortalDashboardFormat;
+  patientPortalDashboardFormat?: string;
 }
 
 interface MfaState {

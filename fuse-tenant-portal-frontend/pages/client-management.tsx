@@ -5,8 +5,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useAuth } from "@/contexts/AuthContext"
-import { Search, Loader2, User as UserIcon, Save, Eye } from "lucide-react"
+import { Search, Loader2, User as UserIcon, Save, Eye, Building2 } from "lucide-react"
 import { toast } from "sonner"
+import { MedicalCompanySlug } from "@fuse/enums"
 
 interface BrandSubscriptionPlan {
   id: string
@@ -80,13 +81,14 @@ export default function ClientManagement() {
   const [loading, setLoading] = useState(false)
   const [users, setUsers] = useState<User[]>([])
   const [searchTerm, setSearchTerm] = useState("")
+  const [roleFilter, setRoleFilter] = useState<string>('brand')
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [saving, setSaving] = useState(false)
   const [previewing, setPreviewing] = useState(false)
   const [availablePlans, setAvailablePlans] = useState<BrandSubscriptionPlan[]>([])
   const [updatingRole, setUpdatingRole] = useState(false)
-  const [patientPortalDashboardFormat, setPatientPortalDashboardFormat] = useState<string>('fuse')
-  const [originalPatientPortalDashboardFormat, setOriginalPatientPortalDashboardFormat] = useState<string>('fuse')
+  const [patientPortalDashboardFormat, setPatientPortalDashboardFormat] = useState<string>(MedicalCompanySlug.FUSE)
+  const [originalPatientPortalDashboardFormat, setOriginalPatientPortalDashboardFormat] = useState<string>(MedicalCompanySlug.FUSE)
   const [showWarningModal, setShowWarningModal] = useState(false)
   const [pendingFormatChange, setPendingFormatChange] = useState<string | null>(null)
   const [checkingData, setCheckingData] = useState(false)
@@ -95,6 +97,72 @@ export default function ClientManagement() {
   const [mainDoctorId, setMainDoctorId] = useState<string | null>(null)
   const [doctors, setDoctors] = useState<User[]>([])
   const [loadingDoctors, setLoadingDoctors] = useState(false)
+
+  // Medical companies state
+  interface MedicalCompanyItem {
+    id: string
+    name: string
+    slug: string
+    apiUrl?: string
+    dashboardUrl?: string
+    documentationUrl?: string
+  }
+  const [medicalCompanies, setMedicalCompanies] = useState<MedicalCompanyItem[]>([])
+  const [selectedMedicalCompany, setSelectedMedicalCompany] = useState<MedicalCompanyItem | null>(null)
+  const [loadingMedicalCompanies, setLoadingMedicalCompanies] = useState(false)
+  const [savingMedicalCompany, setSavingMedicalCompany] = useState(false)
+  const [medicalCompanyForm, setMedicalCompanyForm] = useState({
+    name: '',
+    slug: '',
+    apiUrl: '',
+    dashboardUrl: '',
+    documentationUrl: '',
+  })
+
+  interface PharmacyApproval {
+    id: string
+    name: string
+    slug: string
+    isActive: boolean
+    associationId: string | null
+    doctorCompanyApprovedByPharmacy: 'pending' | 'approved' | 'rejected' | null
+  }
+  const [pharmacyApprovals, setPharmacyApprovals] = useState<PharmacyApproval[]>([])
+  const [loadingPharmacies, setLoadingPharmacies] = useState(false)
+  const [togglingPharmacy, setTogglingPharmacy] = useState<string | null>(null)
+
+  // Doctor profile form state
+  const [savingDoctorProfile, setSavingDoctorProfile] = useState(false)
+  const [doctorForm, setDoctorForm] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phoneNumber: '',
+    dob: '',
+    gender: '',
+    address: '',
+    city: '',
+    state: '',
+    zipCode: '',
+    npiNumber: '',
+    isApprovedDoctor: false,
+    doctorLicenseStatesCoverage: [] as string[],
+    medicalCompanyId: '',
+  })
+
+  interface DoctorPharmacyApproval {
+    id: string
+    name: string
+    slug: string
+    isActive: boolean
+    companyStatus: 'pending' | 'approved' | 'rejected' | null
+    doctorOverride: 'pending' | 'approved' | 'rejected' | null
+    effectiveStatus: 'pending' | 'approved' | 'rejected'
+    hasOverride: boolean
+  }
+  const [doctorPharmacyApprovals, setDoctorPharmacyApprovals] = useState<DoctorPharmacyApproval[]>([])
+  const [loadingDoctorPharmacies, setLoadingDoctorPharmacies] = useState(false)
+  const [togglingDoctorPharmacy, setTogglingDoctorPharmacy] = useState<string | null>(null)
 
   // BrandSubscription form state
   const [formData, setFormData] = useState({
@@ -128,7 +196,111 @@ export default function ClientManagement() {
     fetchUsers()
     fetchAvailablePlans()
     fetchDoctors()
+    fetchMedicalCompanies()
   }, [])
+
+  const fetchMedicalCompanies = async () => {
+    setLoadingMedicalCompanies(true)
+    try {
+      const response = await fetch(`${baseUrl}/medical-companies`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+      if (!response.ok) throw new Error('Failed to fetch medical companies')
+      const result = await response.json()
+      setMedicalCompanies(result.data || [])
+    } catch (error) {
+      console.error('Error fetching medical companies:', error)
+    } finally {
+      setLoadingMedicalCompanies(false)
+    }
+  }
+
+  const handleSelectMedicalCompany = (company: MedicalCompanyItem) => {
+    setSelectedMedicalCompany(company)
+    setSelectedUser(null)
+    setMedicalCompanyForm({
+      name: company.name || '',
+      slug: company.slug || '',
+      apiUrl: company.apiUrl || '',
+      dashboardUrl: company.dashboardUrl || '',
+      documentationUrl: company.documentationUrl || '',
+    })
+    fetchPharmacyApprovals(company.id)
+  }
+
+  const fetchPharmacyApprovals = async (companyId: string) => {
+    setLoadingPharmacies(true)
+    try {
+      const response = await fetch(`${baseUrl}/medical-companies/${companyId}/pharmacies`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      })
+      if (!response.ok) throw new Error('Failed to fetch pharmacies')
+      const result = await response.json()
+      setPharmacyApprovals(result.data || [])
+    } catch (error) {
+      console.error('Error fetching pharmacy approvals:', error)
+    } finally {
+      setLoadingPharmacies(false)
+    }
+  }
+
+  const handleTogglePharmacyApproval = async (pharmacyId: string, newStatus: 'pending' | 'approved' | 'rejected') => {
+    if (!selectedMedicalCompany) return
+    setTogglingPharmacy(pharmacyId)
+    try {
+      const response = await fetch(
+        `${baseUrl}/medical-companies/${selectedMedicalCompany.id}/pharmacies/${pharmacyId}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ doctorCompanyApprovedByPharmacy: newStatus }),
+        }
+      )
+      if (!response.ok) throw new Error('Failed to update pharmacy approval')
+      setPharmacyApprovals(prev =>
+        prev.map(p =>
+          p.id === pharmacyId
+            ? { ...p, doctorCompanyApprovedByPharmacy: newStatus }
+            : p
+        )
+      )
+    } catch (error) {
+      console.error('Error updating pharmacy approval:', error)
+    } finally {
+      setTogglingPharmacy(null)
+    }
+  }
+
+  const handleSaveMedicalCompany = async () => {
+    if (!selectedMedicalCompany) return
+    setSavingMedicalCompany(true)
+    try {
+      const response = await fetch(`${baseUrl}/medical-companies/${selectedMedicalCompany.id}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(medicalCompanyForm),
+      })
+      if (!response.ok) throw new Error('Failed to update medical company')
+      const result = await response.json()
+      // Update local state
+      setMedicalCompanies(prev => prev.map(c => c.id === selectedMedicalCompany.id ? { ...c, ...medicalCompanyForm } : c))
+      setSelectedMedicalCompany({ ...selectedMedicalCompany, ...medicalCompanyForm })
+      alert('Medical company updated successfully!')
+    } catch (error) {
+      console.error('Error saving medical company:', error)
+      alert('Failed to save medical company')
+    } finally {
+      setSavingMedicalCompany(false)
+    }
+  }
 
   const fetchAvailablePlans = async () => {
     try {
@@ -184,7 +356,7 @@ export default function ClientManagement() {
 
       if (response.ok) {
         const result = await response.json()
-        const format = result.data?.patientPortalDashboardFormat || 'fuse'
+        const format = result.data?.patientPortalDashboardFormat || MedicalCompanySlug.FUSE
         setPatientPortalDashboardFormat(format)
         setOriginalPatientPortalDashboardFormat(format)
         setMainDoctorId(result.data?.mainDoctorId || result.data?.mainDoctor?.id || null)
@@ -233,6 +405,7 @@ export default function ClientManagement() {
   }
 
   const handleSelectUser = async (user: User) => {
+    setSelectedMedicalCompany(null)
     console.log('👤 [Client Mgmt Frontend] Selected user:', user)
     console.log('📋 [Client Mgmt Frontend] User subscription:', user.brandSubscriptions?.[0])
     console.log('📦 [Client Mgmt Frontend] Subscription plan:', user.brandSubscriptions?.[0]?.plan)
@@ -313,6 +486,99 @@ export default function ClientManagement() {
         brand: user.role === 'brand',
         superAdmin: false,
       })
+    }
+
+    // Load doctor profile fields
+    setDoctorForm({
+      firstName: user.firstName || '',
+      lastName: user.lastName || '',
+      email: user.email || '',
+      phoneNumber: (user as any).phoneNumber || '',
+      dob: (user as any).dob || '',
+      gender: (user as any).gender || '',
+      address: (user as any).address || '',
+      city: (user as any).city || '',
+      state: (user as any).state || '',
+      zipCode: (user as any).zipCode || '',
+      npiNumber: (user as any).npiNumber || '',
+      isApprovedDoctor: (user as any).isApprovedDoctor || false,
+      doctorLicenseStatesCoverage: (user as any).doctorLicenseStatesCoverage || [],
+      medicalCompanyId: (user as any).medicalCompanyId || '',
+    })
+
+    // Fetch doctor pharmacy approvals if doctor filter is active
+    if (roleFilter === 'doctor') {
+      fetchDoctorPharmacyApprovals(user.id)
+    }
+  }
+
+  const fetchDoctorPharmacyApprovals = async (doctorUserId: string) => {
+    setLoadingDoctorPharmacies(true)
+    try {
+      const response = await fetch(`${baseUrl}/medical-companies/doctor/${doctorUserId}/pharmacies`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      })
+      if (!response.ok) throw new Error('Failed to fetch doctor pharmacy approvals')
+      const result = await response.json()
+      setDoctorPharmacyApprovals(result.data || [])
+    } catch (error) {
+      console.error('Error fetching doctor pharmacy approvals:', error)
+    } finally {
+      setLoadingDoctorPharmacies(false)
+    }
+  }
+
+  const handleDoctorPharmacyOverride = async (pharmacyId: string, newStatus: 'pending' | 'approved' | 'rejected' | 'inherit') => {
+    if (!selectedUser) return
+    setTogglingDoctorPharmacy(pharmacyId)
+    try {
+      const response = await fetch(
+        `${baseUrl}/medical-companies/doctor/${selectedUser.id}/pharmacies/${pharmacyId}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ doctorApprovedByPharmacy: newStatus }),
+        }
+      )
+      if (!response.ok) throw new Error('Failed to update doctor pharmacy override')
+      // Re-fetch to get updated effective statuses
+      await fetchDoctorPharmacyApprovals(selectedUser.id)
+    } catch (error) {
+      console.error('Error updating doctor pharmacy override:', error)
+    } finally {
+      setTogglingDoctorPharmacy(null)
+    }
+  }
+
+  const handleSaveDoctorProfile = async () => {
+    if (!selectedUser) return
+    setSavingDoctorProfile(true)
+    try {
+      const response = await fetch(`${baseUrl}/admin/users/${selectedUser.id}/doctor-profile`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(doctorForm),
+      })
+      if (!response.ok) throw new Error('Failed to update doctor profile')
+      // Update local users state so re-selecting the doctor shows the saved values
+      setUsers(prev => prev.map(u =>
+        u.id === selectedUser.id ? { ...u, ...doctorForm } as any : u
+      ))
+      setSelectedUser({ ...selectedUser, ...doctorForm } as any)
+      // Re-fetch pharmacy approvals in case medicalCompanyId changed
+      fetchDoctorPharmacyApprovals(selectedUser.id)
+      alert('Doctor profile updated successfully!')
+    } catch (error) {
+      console.error('Error saving doctor profile:', error)
+      alert('Failed to save doctor profile')
+    } finally {
+      setSavingDoctorProfile(false)
     }
   }
 
@@ -489,7 +755,7 @@ export default function ClientManagement() {
       }
 
       // Update main doctor if patientPortalDashboardFormat is FUSE
-      if (patientPortalDashboardFormat === 'fuse') {
+      if (patientPortalDashboardFormat === MedicalCompanySlug.FUSE) {
         const mainDoctorResponse = await fetch(`${baseUrl}/admin/users/${selectedUser.id}/clinic/main-doctor`, {
           method: 'PATCH',
           headers: {
@@ -550,6 +816,10 @@ export default function ClientManagement() {
   }
 
   const filteredUsers = users.filter(user => {
+    // Role filter
+    if (user.role !== roleFilter) return false
+
+    // Search filter
     const search = searchTerm.toLowerCase()
     return (
       user.firstName.toLowerCase().includes(search) ||
@@ -580,62 +850,593 @@ export default function ClientManagement() {
                       className="pl-10"
                     />
                   </div>
+                  <div className="flex flex-wrap gap-1.5 mt-3">
+                    {[
+                      { value: 'brand', label: 'Brands' },
+                      { value: 'doctor', label: 'Doctors' },
+                      { value: 'patient', label: 'Patients' },
+                      { value: 'affiliate', label: 'Affiliates' },
+                      { value: 'admin', label: 'Admins' },
+                      { value: 'medical_company', label: 'Medical Companies' },
+                    ].map((role) => (
+                      <button
+                        key={role.value}
+                        type="button"
+                        onClick={() => {
+                          setRoleFilter(role.value)
+                          setSearchTerm('')
+                          if (role.value === 'medical_company') {
+                            setSelectedUser(null)
+                          } else {
+                            setSelectedMedicalCompany(null)
+                          }
+                        }}
+                        className={`px-3 py-1 text-xs font-medium rounded-full border transition-all ${
+                          roleFilter === role.value
+                            ? 'bg-[#4FA59C] text-white border-[#4FA59C]'
+                            : 'bg-muted/50 text-muted-foreground border-border hover:bg-muted hover:text-foreground'
+                        }`}
+                      >
+                        {role.label}
+                      </button>
+                    ))}
+                  </div>
                 </CardHeader>
                 <CardContent>
-                  {loading ? (
-                    <div className="flex items-center justify-center py-8">
-                      <Loader2 className="h-8 w-8 animate-spin text-[#4FA59C]" />
-                    </div>
+                  {roleFilter === 'medical_company' ? (
+                    // Medical Companies list
+                    loadingMedicalCompanies ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="h-8 w-8 animate-spin text-[#4FA59C]" />
+                      </div>
+                    ) : (
+                      <div className="space-y-2 max-h-[600px] overflow-y-auto">
+                        {medicalCompanies
+                          .filter(c => {
+                            if (!searchTerm) return true
+                            const search = searchTerm.toLowerCase()
+                            return c.name.toLowerCase().includes(search) || c.slug.toLowerCase().includes(search)
+                          })
+                          .map((company) => (
+                          <button
+                            key={company.id}
+                            onClick={() => handleSelectMedicalCompany(company)}
+                            className={`w-full text-left p-3 rounded-lg transition-all ${selectedMedicalCompany?.id === company.id
+                              ? 'bg-[#4FA59C] text-white'
+                              : 'bg-muted/50 hover:bg-muted text-foreground'
+                              }`}
+                          >
+                            <div className="flex items-center space-x-3">
+                              <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${selectedMedicalCompany?.id === company.id
+                                ? 'bg-white/20'
+                                : 'bg-[#4FA59C]/10'
+                                }`}>
+                                <Building2 className={`h-5 w-5 ${selectedMedicalCompany?.id === company.id
+                                  ? 'text-white'
+                                  : 'text-[#4FA59C]'
+                                  }`} />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium truncate">{company.name}</p>
+                                <p className={`text-xs truncate ${selectedMedicalCompany?.id === company.id
+                                  ? 'text-white/80'
+                                  : 'text-muted-foreground'
+                                  }`}>
+                                  {company.slug}
+                                </p>
+                              </div>
+                            </div>
+                          </button>
+                        ))}
+                        {medicalCompanies.length === 0 && (
+                          <p className="text-center text-muted-foreground py-8">No medical companies found</p>
+                        )}
+                      </div>
+                    )
                   ) : (
-                    <div className="space-y-2 max-h-[600px] overflow-y-auto">
-                      {filteredUsers.map((user) => (
-                        <button
-                          key={user.id}
-                          onClick={() => handleSelectUser(user)}
-                          className={`w-full text-left p-3 rounded-lg transition-all ${selectedUser?.id === user.id
-                            ? 'bg-[#4FA59C] text-white'
-                            : 'bg-muted/50 hover:bg-muted text-foreground'
-                            }`}
-                        >
-                          <div className="flex items-center space-x-3">
-                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${selectedUser?.id === user.id
-                              ? 'bg-white/20'
-                              : 'bg-[#4FA59C]/10'
-                              }`}>
-                              <UserIcon className={`h-5 w-5 ${selectedUser?.id === user.id
-                                ? 'text-white'
-                                : 'text-[#4FA59C]'
-                                }`} />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium truncate">
-                                {user.firstName} {user.lastName}
-                              </p>
-                              <p className={`text-xs truncate ${selectedUser?.id === user.id
-                                ? 'text-white/80'
-                                : 'text-muted-foreground'
+                    // Users list
+                    loading ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="h-8 w-8 animate-spin text-[#4FA59C]" />
+                      </div>
+                    ) : (
+                      <div className="space-y-2 max-h-[600px] overflow-y-auto">
+                        {filteredUsers.map((user) => (
+                          <button
+                            key={user.id}
+                            onClick={() => handleSelectUser(user)}
+                            className={`w-full text-left p-3 rounded-lg transition-all ${selectedUser?.id === user.id
+                              ? 'bg-[#4FA59C] text-white'
+                              : 'bg-muted/50 hover:bg-muted text-foreground'
+                              }`}
+                          >
+                            <div className="flex items-center space-x-3">
+                              <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${selectedUser?.id === user.id
+                                ? 'bg-white/20'
+                                : 'bg-[#4FA59C]/10'
                                 }`}>
-                                {user.email}
-                              </p>
-                              <p className={`text-xs mt-1 ${selectedUser?.id === user.id
-                                ? 'text-white/70'
-                                : 'text-muted-foreground'
-                                }`}>
-                                Role: {user.role}
-                              </p>
+                                <UserIcon className={`h-5 w-5 ${selectedUser?.id === user.id
+                                  ? 'text-white'
+                                  : 'text-[#4FA59C]'
+                                  }`} />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium truncate">
+                                  {user.firstName} {user.lastName}
+                                </p>
+                                <p className={`text-xs truncate ${selectedUser?.id === user.id
+                                  ? 'text-white/80'
+                                  : 'text-muted-foreground'
+                                  }`}>
+                                  {user.email}
+                                </p>
+                                <p className={`text-xs mt-1 ${selectedUser?.id === user.id
+                                  ? 'text-white/70'
+                                  : 'text-muted-foreground'
+                                  }`}>
+                                  Role: {user.role}
+                                </p>
+                              </div>
                             </div>
-                          </div>
-                        </button>
-                      ))}
-                      {filteredUsers.length === 0 && (
-                        <p className="text-center text-muted-foreground py-8">No users found</p>
-                      )}
-                    </div>
+                          </button>
+                        ))}
+                        {filteredUsers.length === 0 && (
+                          <p className="text-center text-muted-foreground py-8">No users found</p>
+                        )}
+                      </div>
+                    )
                   )}
                 </CardContent>
               </Card>
 
-              {/* User Details & Subscription Settings */}
+              {/* Right Panel */}
+              {roleFilter === 'medical_company' ? (
+                // Medical Company Details
+                <Card className="lg:col-span-2">
+                  <CardHeader>
+                    <CardTitle>Medical Company Settings</CardTitle>
+                    <CardDescription>
+                      View and edit medical company details
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {selectedMedicalCompany ? (
+                      <div className="space-y-6">
+                        <div className="bg-muted/50 rounded-lg p-4 border border-border">
+                          <h3 className="font-semibold text-foreground mb-4">Company Information</h3>
+                          <div className="space-y-4">
+                            <div>
+                              <label className="block text-sm text-muted-foreground mb-1">Name</label>
+                              <Input
+                                value={medicalCompanyForm.name}
+                                onChange={(e) => setMedicalCompanyForm({ ...medicalCompanyForm, name: e.target.value })}
+                                placeholder="Company name"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm text-muted-foreground mb-1">Slug</label>
+                              <Input
+                                value={medicalCompanyForm.slug}
+                                onChange={(e) => setMedicalCompanyForm({ ...medicalCompanyForm, slug: e.target.value })}
+                                placeholder="company-slug"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm text-muted-foreground mb-1">API URL</label>
+                              <Input
+                                value={medicalCompanyForm.apiUrl}
+                                onChange={(e) => setMedicalCompanyForm({ ...medicalCompanyForm, apiUrl: e.target.value })}
+                                placeholder="https://api.example.com"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm text-muted-foreground mb-1">Dashboard URL</label>
+                              <Input
+                                value={medicalCompanyForm.dashboardUrl}
+                                onChange={(e) => setMedicalCompanyForm({ ...medicalCompanyForm, dashboardUrl: e.target.value })}
+                                placeholder="https://dashboard.example.com"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm text-muted-foreground mb-1">Documentation URL</label>
+                              <Input
+                                value={medicalCompanyForm.documentationUrl}
+                                onChange={(e) => setMedicalCompanyForm({ ...medicalCompanyForm, documentationUrl: e.target.value })}
+                                placeholder="https://docs.example.com"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                        <Button
+                          onClick={handleSaveMedicalCompany}
+                          disabled={savingMedicalCompany}
+                          className="bg-[#4FA59C] hover:bg-[#3d8a82] text-white"
+                        >
+                          {savingMedicalCompany ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          ) : (
+                            <Save className="h-4 w-4 mr-2" />
+                          )}
+                          {savingMedicalCompany ? 'Saving...' : 'Save Changes'}
+                        </Button>
+
+                        {/* Pharmacy Approvals */}
+                        <div className="bg-muted/50 rounded-lg p-4 border border-border">
+                          <h3 className="font-semibold text-foreground mb-4">Pharmacy Approvals</h3>
+                          <p className="text-xs text-muted-foreground mb-4">
+                            Toggle whether each pharmacy has approved this medical company.
+                          </p>
+                          {loadingPharmacies ? (
+                            <div className="flex items-center justify-center py-6">
+                              <Loader2 className="h-6 w-6 animate-spin text-[#4FA59C]" />
+                            </div>
+                          ) : pharmacyApprovals.length === 0 ? (
+                            <p className="text-sm text-muted-foreground text-center py-4">No pharmacies found</p>
+                          ) : (
+                            <div className="space-y-3">
+                              {pharmacyApprovals.map((pharmacy) => {
+                                const currentStatus = pharmacy.doctorCompanyApprovedByPharmacy || 'pending'
+                                const isUpdating = togglingPharmacy === pharmacy.id
+                                return (
+                                  <div
+                                    key={pharmacy.id}
+                                    className="flex items-center justify-between p-3 rounded-lg border border-border bg-background"
+                                  >
+                                    <div className="flex-1 min-w-0 mr-3">
+                                      <p className="font-medium text-sm text-foreground">{pharmacy.name}</p>
+                                      <p className="text-xs text-muted-foreground">{pharmacy.slug}</p>
+                                    </div>
+                                    <div className={`flex rounded-lg border border-border overflow-hidden ${isUpdating ? 'opacity-50 pointer-events-none' : ''}`}>
+                                      {([
+                                        { value: 'pending', label: 'Pending', activeClass: 'bg-yellow-500 text-white border-yellow-500' },
+                                        { value: 'approved', label: 'Approved', activeClass: 'bg-[#4FA59C] text-white border-[#4FA59C]' },
+                                        { value: 'rejected', label: 'Rejected', activeClass: 'bg-red-500 text-white border-red-500' },
+                                      ] as const).map((option) => (
+                                        <button
+                                          key={option.value}
+                                          type="button"
+                                          disabled={isUpdating}
+                                          onClick={() => {
+                                            if (currentStatus !== option.value) {
+                                              handleTogglePharmacyApproval(pharmacy.id, option.value)
+                                            }
+                                          }}
+                                          className={`px-2.5 py-1 text-xs font-medium transition-all ${
+                                            currentStatus === option.value
+                                              ? option.activeClass
+                                              : 'bg-background text-muted-foreground hover:bg-muted'
+                                          }`}
+                                        >
+                                          {option.label}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                        <Building2 className="h-12 w-12 mb-4" />
+                        <p className="text-lg font-medium">No Medical Company Selected</p>
+                        <p className="text-sm mt-2">Select a medical company from the list to view and edit its settings</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ) : roleFilter === 'doctor' ? (
+                // Doctor Profile Details
+                <Card className="lg:col-span-2">
+                  <CardHeader>
+                    <CardTitle>Doctor Profile</CardTitle>
+                    <CardDescription>
+                      View and edit doctor information
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {selectedUser ? (
+                      <div className="space-y-6">
+                        {/* Basic Info */}
+                        <div className="bg-muted/50 rounded-lg p-4 border border-border">
+                          <h3 className="font-semibold text-foreground mb-4">Basic Information</h3>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-sm text-muted-foreground mb-1">First Name</label>
+                              <Input
+                                value={doctorForm.firstName}
+                                onChange={(e) => setDoctorForm({ ...doctorForm, firstName: e.target.value })}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm text-muted-foreground mb-1">Last Name</label>
+                              <Input
+                                value={doctorForm.lastName}
+                                onChange={(e) => setDoctorForm({ ...doctorForm, lastName: e.target.value })}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm text-muted-foreground mb-1">Email</label>
+                              <Input
+                                value={doctorForm.email}
+                                onChange={(e) => setDoctorForm({ ...doctorForm, email: e.target.value })}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm text-muted-foreground mb-1">Phone Number</label>
+                              <Input
+                                value={doctorForm.phoneNumber}
+                                onChange={(e) => setDoctorForm({ ...doctorForm, phoneNumber: e.target.value })}
+                                placeholder="(555) 123-4567"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm text-muted-foreground mb-1">Date of Birth</label>
+                              <Input
+                                type="date"
+                                value={doctorForm.dob}
+                                onChange={(e) => setDoctorForm({ ...doctorForm, dob: e.target.value })}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm text-muted-foreground mb-1">Gender</label>
+                              <select
+                                value={doctorForm.gender}
+                                onChange={(e) => setDoctorForm({ ...doctorForm, gender: e.target.value })}
+                                className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              >
+                                <option value="">Select...</option>
+                                <option value="male">Male</option>
+                                <option value="female">Female</option>
+                                <option value="other">Other</option>
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Address */}
+                        <div className="bg-muted/50 rounded-lg p-4 border border-border">
+                          <h3 className="font-semibold text-foreground mb-4">Address</h3>
+                          <div className="space-y-4">
+                            <div>
+                              <label className="block text-sm text-muted-foreground mb-1">Street Address</label>
+                              <Input
+                                value={doctorForm.address}
+                                onChange={(e) => setDoctorForm({ ...doctorForm, address: e.target.value })}
+                              />
+                            </div>
+                            <div className="grid grid-cols-3 gap-4">
+                              <div>
+                                <label className="block text-sm text-muted-foreground mb-1">City</label>
+                                <Input
+                                  value={doctorForm.city}
+                                  onChange={(e) => setDoctorForm({ ...doctorForm, city: e.target.value })}
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm text-muted-foreground mb-1">State</label>
+                                <Input
+                                  value={doctorForm.state}
+                                  onChange={(e) => setDoctorForm({ ...doctorForm, state: e.target.value })}
+                                  placeholder="e.g. CA"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm text-muted-foreground mb-1">Zip Code</label>
+                                <Input
+                                  value={doctorForm.zipCode}
+                                  onChange={(e) => setDoctorForm({ ...doctorForm, zipCode: e.target.value })}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Medical Credentials */}
+                        <div className="bg-muted/50 rounded-lg p-4 border border-border">
+                          <h3 className="font-semibold text-foreground mb-4">Medical Credentials</h3>
+                          <div className="space-y-4">
+                            <div>
+                              <label className="block text-sm text-muted-foreground mb-1">NPI Number</label>
+                              <Input
+                                value={doctorForm.npiNumber}
+                                onChange={(e) => setDoctorForm({ ...doctorForm, npiNumber: e.target.value })}
+                                placeholder="10-digit NPI"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm text-muted-foreground mb-1">
+                                License States Coverage
+                              </label>
+                              <Input
+                                value={doctorForm.doctorLicenseStatesCoverage.join(', ')}
+                                onChange={(e) => setDoctorForm({
+                                  ...doctorForm,
+                                  doctorLicenseStatesCoverage: e.target.value
+                                    .split(',')
+                                    .map(s => s.trim().toUpperCase())
+                                    .filter(s => s.length > 0),
+                                })}
+                                placeholder="CA, NY, TX (comma separated)"
+                              />
+                              <p className="text-xs text-muted-foreground mt-1">Enter state codes separated by commas</p>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <label className="block text-sm font-medium text-foreground">Approved Doctor</label>
+                                <p className="text-xs text-muted-foreground">Whether this doctor is approved to practice on the platform</p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setDoctorForm({ ...doctorForm, isApprovedDoctor: !doctorForm.isApprovedDoctor })}
+                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-offset-2 ${
+                                  doctorForm.isApprovedDoctor ? 'bg-[#4FA59C]' : 'bg-gray-300 dark:bg-gray-600'
+                                }`}
+                              >
+                                <span
+                                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                    doctorForm.isApprovedDoctor ? 'translate-x-6' : 'translate-x-1'
+                                  }`}
+                                />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Medical Company */}
+                        <div className="bg-muted/50 rounded-lg p-4 border border-border">
+                          <h3 className="font-semibold text-foreground mb-4">Medical Company</h3>
+                          <div>
+                            <label className="block text-sm text-muted-foreground mb-1">Assigned Medical Company</label>
+                            <select
+                              value={doctorForm.medicalCompanyId}
+                              onChange={(e) => setDoctorForm({ ...doctorForm, medicalCompanyId: e.target.value })}
+                              className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            >
+                              <option value="">None</option>
+                              {medicalCompanies.map((company) => (
+                                <option key={company.id} value={company.id}>
+                                  {company.name} ({company.slug})
+                                </option>
+                              ))}
+                            </select>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              The doctor inherits pharmacy approvals from their medical company. Save the profile to apply changes.
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Pharmacy Approvals */}
+                        <div className="bg-muted/50 rounded-lg p-4 border border-border">
+                          <h3 className="font-semibold text-foreground mb-2">Pharmacy Approvals</h3>
+                          <p className="text-xs text-muted-foreground mb-4">
+                            By default, the doctor inherits the approval status from their medical company.
+                            You can override per pharmacy.
+                          </p>
+                          {loadingDoctorPharmacies ? (
+                            <div className="flex items-center justify-center py-6">
+                              <Loader2 className="h-6 w-6 animate-spin text-[#4FA59C]" />
+                            </div>
+                          ) : doctorPharmacyApprovals.length === 0 ? (
+                            <p className="text-sm text-muted-foreground text-center py-4">No pharmacies found</p>
+                          ) : (
+                            <div className="space-y-3">
+                              {doctorPharmacyApprovals.map((pharmacy) => {
+                                const isUpdating = togglingDoctorPharmacy === pharmacy.id
+                                return (
+                                  <div
+                                    key={pharmacy.id}
+                                    className="p-3 rounded-lg border border-border bg-background"
+                                  >
+                                    <div className="flex items-center justify-between mb-2">
+                                      <div className="flex-1 min-w-0 mr-3">
+                                        <p className="font-medium text-sm text-foreground">{pharmacy.name}</p>
+                                        <p className="text-xs text-muted-foreground">{pharmacy.slug}</p>
+                                      </div>
+                                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                                        pharmacy.effectiveStatus === 'approved'
+                                          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                          : pharmacy.effectiveStatus === 'pending'
+                                            ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                                            : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                                      }`}>
+                                        {pharmacy.effectiveStatus.charAt(0).toUpperCase() + pharmacy.effectiveStatus.slice(1)}
+                                        {pharmacy.hasOverride ? ' (Override)' : ' (Inherited)'}
+                                      </span>
+                                    </div>
+                                    <div className={`flex rounded-lg border border-border overflow-hidden ${isUpdating ? 'opacity-50 pointer-events-none' : ''}`}>
+                                      {([
+                                        { value: 'inherit' as const, label: `Inherit${pharmacy.companyStatus ? ` (${pharmacy.companyStatus})` : ''}`, activeClass: 'bg-blue-500 text-white border-blue-500' },
+                                        { value: 'pending' as const, label: 'Pending', activeClass: 'bg-yellow-500 text-white border-yellow-500' },
+                                        { value: 'approved' as const, label: 'Approved', activeClass: 'bg-[#4FA59C] text-white border-[#4FA59C]' },
+                                        { value: 'rejected' as const, label: 'Rejected', activeClass: 'bg-red-500 text-white border-red-500' },
+                                      ]).map((option) => {
+                                        const isActive = option.value === 'inherit'
+                                          ? !pharmacy.hasOverride
+                                          : pharmacy.hasOverride && pharmacy.doctorOverride === option.value
+                                        return (
+                                          <button
+                                            key={option.value}
+                                            type="button"
+                                            disabled={isUpdating}
+                                            onClick={() => handleDoctorPharmacyOverride(pharmacy.id, option.value)}
+                                            className={`flex-1 px-2 py-1.5 text-xs font-medium transition-all ${
+                                              isActive
+                                                ? option.activeClass
+                                                : 'bg-background text-muted-foreground hover:bg-muted'
+                                            }`}
+                                          >
+                                            {option.label}
+                                          </button>
+                                        )
+                                      })}
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Roles */}
+                        <div className="bg-muted/50 rounded-lg p-4 border border-border">
+                          <h3 className="font-semibold text-foreground mb-2">Roles</h3>
+                          <p className="text-xs text-muted-foreground mb-3">Select all that apply</p>
+                          <div className="space-y-2">
+                            {[
+                              { key: 'patient', label: 'Patient' },
+                              { key: 'doctor', label: 'Doctor' },
+                              { key: 'admin', label: 'Admin' },
+                              { key: 'brand', label: 'Brand' },
+                              { key: 'superAdmin', label: 'Super Admin' },
+                            ].map(({ key, label }) => (
+                              <label key={key} className="flex items-center space-x-3 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={(userRolesData as any)[key]}
+                                  onChange={(e) => setUserRolesData({ ...userRolesData, [key]: e.target.checked })}
+                                  disabled={updatingRole}
+                                  className="w-4 h-4 text-[#4FA59C] border-input rounded focus:ring-[#4FA59C] bg-background"
+                                />
+                                <span className="text-sm text-foreground">{label}</span>
+                              </label>
+                            ))}
+                          </div>
+                          <Button
+                            onClick={handleRolesChange}
+                            disabled={updatingRole}
+                            className="mt-3 bg-[#4FA59C] hover:bg-[#3d8a82] text-white text-xs"
+                            size="sm"
+                          >
+                            {updatingRole ? 'Updating...' : 'Update Roles'}
+                          </Button>
+                        </div>
+
+                        <Button
+                          onClick={handleSaveDoctorProfile}
+                          disabled={savingDoctorProfile}
+                          className="bg-[#4FA59C] hover:bg-[#3d8a82] text-white"
+                        >
+                          {savingDoctorProfile ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          ) : (
+                            <Save className="h-4 w-4 mr-2" />
+                          )}
+                          {savingDoctorProfile ? 'Saving...' : 'Save Doctor Profile'}
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                        <UserIcon className="h-12 w-12 mb-4" />
+                        <p className="text-lg font-medium">No Doctor Selected</p>
+                        <p className="text-sm mt-2">Select a doctor from the list to view and edit their profile</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ) : (
               <Card className="lg:col-span-2">
                 <CardHeader>
                   <CardTitle>Brand Subscription Settings</CardTitle>
@@ -1165,7 +1966,7 @@ export default function ClientManagement() {
                                   onChange={(e) => {
                                     setPatientPortalDashboardFormat(e.target.value)
                                     // Reset mainDoctorId if switching away from FUSE
-                                    if (e.target.value !== 'fuse') {
+                                    if (e.target.value !== MedicalCompanySlug.FUSE) {
                                       setMainDoctorId(null)
                                     }
                                   }}
@@ -1199,7 +2000,7 @@ export default function ClientManagement() {
                             </div>
 
                             {/* Main Doctor (only for FUSE format) */}
-                            {patientPortalDashboardFormat === 'fuse' && (
+                            {patientPortalDashboardFormat === MedicalCompanySlug.FUSE && (
                               <div className="space-y-4 pt-6 border-t border-border">
                                 <h3 className="font-semibold text-foreground">Responsible Doctor</h3>
                                 <p className="text-sm text-muted-foreground">
@@ -1275,6 +2076,7 @@ export default function ClientManagement() {
                   )}
                 </CardContent>
               </Card>
+              )}
             </div>
           </div>
         </main>

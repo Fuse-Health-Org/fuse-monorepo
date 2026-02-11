@@ -3,6 +3,7 @@ import { useRouter } from 'next/router'
 import { Sidebar } from '@/components/sidebar'
 import { Header } from '@/components/header'
 import { useAuth } from '@/contexts/AuthContext'
+import { MedicalCompanySlug } from '@fuse/enums'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -38,7 +39,7 @@ interface MedicalTemplate {
     title: string
     description?: string
     formTemplateType: string
-    medicalCompanySource?: 'fuse' | 'md-integrations' | 'beluga'
+    medicalCompanySource?: MedicalCompanySlug
     medicalTemplateApprovedByFuseAdmin?: 'pending' | 'approved' | 'rejected'
     formProducts?: FormProduct[]
 }
@@ -385,9 +386,9 @@ export default function ProgramTemplateEditor() {
                                             </p>
                                         </div>
                                     )
-                                    const config = source === 'fuse'
+                                    const config = source === MedicalCompanySlug.FUSE
                                         ? { label: 'Fuse Health', color: 'bg-blue-500', bgColor: 'bg-blue-50 dark:bg-blue-900/20', borderColor: 'border-blue-200 dark:border-blue-800', textColor: 'text-blue-700 dark:text-blue-300', icon: '💙' }
-                                        : source === 'md-integrations'
+                                        : source === MedicalCompanySlug.MD_INTEGRATIONS
                                             ? { label: 'MD Integrations', color: 'bg-purple-500', bgColor: 'bg-purple-50 dark:bg-purple-900/20', borderColor: 'border-purple-200 dark:border-purple-800', textColor: 'text-purple-700 dark:text-purple-300', icon: '🩺' }
                                             : { label: 'Beluga Health', color: 'bg-teal-500', bgColor: 'bg-teal-50 dark:bg-teal-900/20', borderColor: 'border-teal-200 dark:border-teal-800', textColor: 'text-teal-700 dark:text-teal-300', icon: '⚡' }
                                     return (
@@ -463,13 +464,13 @@ export default function ProgramTemplateEditor() {
                                                                     {/* Medical Company Source Badge */}
                                                                     {template.medicalCompanySource && (
                                                                         <span className={`px-2 py-0.5 text-[10px] font-medium rounded ${
-                                                                            template.medicalCompanySource === 'fuse' 
+                                                                            template.medicalCompanySource === MedicalCompanySlug.FUSE 
                                                                                 ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
-                                                                                : template.medicalCompanySource === 'md-integrations'
+                                                                                : template.medicalCompanySource === MedicalCompanySlug.MD_INTEGRATIONS
                                                                                 ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400'
                                                                                 : 'bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400'
                                                                         }`}>
-                                                                            {template.medicalCompanySource === 'md-integrations' ? 'MDI' : template.medicalCompanySource === 'beluga' ? 'Beluga' : 'Fuse'}
+                                                                            {template.medicalCompanySource === MedicalCompanySlug.MD_INTEGRATIONS ? 'MDI' : template.medicalCompanySource === MedicalCompanySlug.BELUGA ? 'Beluga' : 'Fuse'}
                                                                         </span>
                                                                     )}
                                                                     {/* Approved Badge */}

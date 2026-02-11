@@ -13,7 +13,7 @@ import { useQuestionnairePlans } from "./useQuestionnairePlans";
 import { useQuestionnaireTheme } from "./useQuestionnaireTheme";
 import { usePharmacyCoverages } from "./usePharmacyCoverages";
 import { getDashboardPrefix, getDashboardPrefixByMedicalCompany } from "../../../lib/clinic-utils";
-import { PatientPortalDashboardFormat } from "@fuse/enums";
+import { MedicalCompanySlug } from "@fuse/enums";
 
 export function useQuestionnaireModal(
   props: QuestionnaireModalProps,
@@ -738,7 +738,7 @@ export function useQuestionnaireModal(
     const medicalCompany = questionnaire?.medicalCompanySource;
     console.log('🔵 [MDI] Medical company source:', medicalCompany);
 
-    if (medicalCompany !== PatientPortalDashboardFormat.MD_INTEGRATIONS) {
+    if (medicalCompany !== MedicalCompanySlug.MD_INTEGRATIONS) {
       console.log('ℹ️ [MDI] Questionnaire uses "' + medicalCompany + '" medical company - skipping MDI case creation');
       console.log('🔵 [MDI] ========== END (SKIPPED) ==========');
       return;
@@ -826,7 +826,7 @@ export function useQuestionnaireModal(
 
       // Create MD Integrations case if questionnaire uses md-integrations as medical company source
       const medicalCompany = questionnaire?.medicalCompanySource;
-      const needsMDCase = medicalCompany === PatientPortalDashboardFormat.MD_INTEGRATIONS;
+      const needsMDCase = medicalCompany === MedicalCompanySlug.MD_INTEGRATIONS;
 
       if (needsMDCase && finalOrderId) {
         console.log('🎉 [CHECKOUT] Questionnaire uses MD Integrations, creating case...');
@@ -865,7 +865,7 @@ export function useQuestionnaireModal(
   const handleSuccessModalContinue = useCallback(async () => {
     try {
       // Use questionnaire's medicalCompanySource to determine dashboard redirect
-      const medicalCompany = questionnaire?.medicalCompanySource || PatientPortalDashboardFormat.FUSE;
+      const medicalCompany = questionnaire?.medicalCompanySource || MedicalCompanySlug.FUSE;
       
       console.log('🔍 [CHECKOUT] Determining redirect based on questionnaire:', {
         questionnaireId: questionnaire?.id,
@@ -877,7 +877,7 @@ export function useQuestionnaireModal(
       let dashboardPrefix = getDashboardPrefixByMedicalCompany(medicalCompany);
 
       // For MD Integrations, redirect to messages tab after checkout
-      if (medicalCompany === PatientPortalDashboardFormat.MD_INTEGRATIONS) {
+      if (medicalCompany === MedicalCompanySlug.MD_INTEGRATIONS) {
         dashboardPrefix = `${dashboardPrefix}?tab=messages`;
       }
 
@@ -946,11 +946,11 @@ export function useQuestionnaireModal(
     } catch (error) {
       console.error('❌ [CHECKOUT] Error in handleSuccessModalContinue:', error);
       // Fallback to questionnaire's medicalCompanySource or default to fuse
-      const fallbackMedicalCompany = questionnaire?.medicalCompanySource || PatientPortalDashboardFormat.FUSE;
+      const fallbackMedicalCompany = questionnaire?.medicalCompanySource || MedicalCompanySlug.FUSE;
       let dashboardPrefix = getDashboardPrefixByMedicalCompany(fallbackMedicalCompany);
 
       // For MD Integrations, redirect to messages tab after checkout
-      if (fallbackMedicalCompany === PatientPortalDashboardFormat.MD_INTEGRATIONS) {
+      if (fallbackMedicalCompany === MedicalCompanySlug.MD_INTEGRATIONS) {
         dashboardPrefix = `${dashboardPrefix}?tab=messages`;
       }
 

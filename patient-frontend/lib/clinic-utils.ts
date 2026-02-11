@@ -1,13 +1,13 @@
 // Utility functions for clinic subdomain handling
 import { apiCall } from './api';
-import { PatientPortalDashboardFormat } from '@fuse/enums';
+import { MedicalCompanySlug } from '@fuse/enums';
 
 export interface Clinic {
   id: string;
   slug: string;
   name: string;
   logo?: string;
-  patientPortalDashboardFormat?: PatientPortalDashboardFormat;
+  patientPortalDashboardFormat?: string;
   // ... other fields
 }
 
@@ -18,11 +18,11 @@ export interface Clinic {
  * @param medicalCompanySource - The medical company source from the questionnaire
  * @returns '/fuse-dashboard', '/mdi-dashboard', or '/beluga-dashboard'
  */
-export function getDashboardPrefixByMedicalCompany(medicalCompanySource?: PatientPortalDashboardFormat | null): string {
-  if (medicalCompanySource === 'md-integrations') {
+export function getDashboardPrefixByMedicalCompany(medicalCompanySource?: string | null): string {
+  if (medicalCompanySource === MedicalCompanySlug.MD_INTEGRATIONS) {
     return '/mdi-dashboard';
   }
-  if (medicalCompanySource === 'beluga') {
+  if (medicalCompanySource === MedicalCompanySlug.BELUGA) {
     return '/beluga-dashboard';
   }
   return '/fuse-dashboard';
@@ -38,10 +38,10 @@ export function getDashboardPrefixByMedicalCompany(medicalCompanySource?: Patien
 export function getDashboardPrefix(clinic?: Clinic | null): string {
   // Normalize the format value to handle both enum and string formats
   const format = clinic?.patientPortalDashboardFormat;
-  if (format === 'md-integrations') {
+  if (format === MedicalCompanySlug.MD_INTEGRATIONS) {
     return '/mdi-dashboard';
   }
-  if (format === 'beluga') {
+  if (format === MedicalCompanySlug.BELUGA) {
     return '/beluga-dashboard';
   }
   return '/fuse-dashboard';

@@ -3,6 +3,7 @@ import { useRouter } from "next/router"
 import { Sidebar } from "@/components/sidebar"
 import { Header } from "@/components/header"
 import { Loader2, RefreshCcw, Search, Edit3, Plus, Trash2, CheckCircle2, List, ShieldCheck, ShieldX } from "lucide-react"
+import { MedicalCompanySlug } from "@fuse/enums"
 import { useAuth } from "@/contexts/AuthContext"
 import { SORT_OPTIONS } from "@fuse/enums"
 
@@ -345,7 +346,7 @@ export default function Teleforms() {
                       </span>
                       {template.medicalCompanySource && (
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground border border-border">
-                          {template.medicalCompanySource === 'md-integrations' ? 'MDI' : template.medicalCompanySource === 'beluga' ? 'Beluga' : 'Fuse'}
+                          {template.medicalCompanySource === MedicalCompanySlug.MD_INTEGRATIONS ? 'MDI' : template.medicalCompanySource === MedicalCompanySlug.BELUGA ? 'Beluga' : 'Fuse'}
                         </span>
                       )}
                     </div>

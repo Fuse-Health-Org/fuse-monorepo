@@ -6,7 +6,7 @@ import BrandSubscriptionPlans from "../models/BrandSubscriptionPlans";
 import TenantCustomFeatures from "../models/TenantCustomFeatures";
 import UserRoles from "../models/UserRoles";
 import Clinic from "../models/Clinic";
-import { PatientPortalDashboardFormat } from "@fuse/enums";
+import { MedicalCompanySlug } from "@fuse/enums";
 import Order from "../models/Order";
 import Payment from "../models/Payment";
 import Prescription from "../models/Prescription";
@@ -146,6 +146,17 @@ export function registerClientManagementEndpoints(
           "createdAt",
           "updatedAt",
           "clinicId",
+          "phoneNumber",
+          "dob",
+          "gender",
+          "address",
+          "city",
+          "state",
+          "zipCode",
+          "npiNumber",
+          "isApprovedDoctor",
+          "doctorLicenseStatesCoverage",
+          "medicalCompanyId",
         ],
         include: [
           {
@@ -748,6 +759,59 @@ export function registerClientManagementEndpoints(
     }
   });
 
+  // Update doctor profile fields
+  app.patch("/admin/users/:userId/doctor-profile", authenticateJWT, async (req, res) => {
+    try {
+      const currentUser = getCurrentUser(req);
+      if (!currentUser) {
+        return res.status(401).json({ success: false, message: "Not authenticated" });
+      }
+
+      const { userId } = req.params;
+      const targetUser = await User.findByPk(userId);
+      if (!targetUser) {
+        return res.status(404).json({ success: false, message: "User not found" });
+      }
+
+      const {
+        firstName, lastName, email, phoneNumber, dob, gender,
+        address, city, state, zipCode, npiNumber,
+        isApprovedDoctor, doctorLicenseStatesCoverage, medicalCompanyId,
+      } = req.body;
+
+      // Sanitize dob: empty string or "Invalid date" should become null
+      const sanitizedDob = dob && dob !== '' && dob !== 'Invalid date' ? dob : null;
+
+      await targetUser.update({
+        ...(firstName !== undefined && { firstName }),
+        ...(lastName !== undefined && { lastName }),
+        ...(email !== undefined && { email }),
+        ...(phoneNumber !== undefined && { phoneNumber: phoneNumber || null }),
+        ...(dob !== undefined && { dob: sanitizedDob }),
+        ...(gender !== undefined && { gender: gender || null }),
+        ...(address !== undefined && { address: address || null }),
+        ...(city !== undefined && { city: city || null }),
+        ...(state !== undefined && { state: state || null }),
+        ...(zipCode !== undefined && { zipCode: zipCode || null }),
+        ...(npiNumber !== undefined && { npiNumber: npiNumber || null }),
+        ...(isApprovedDoctor !== undefined && { isApprovedDoctor }),
+        ...(doctorLicenseStatesCoverage !== undefined && { doctorLicenseStatesCoverage }),
+        ...(medicalCompanyId !== undefined && { medicalCompanyId: medicalCompanyId || null }),
+      });
+
+      console.log(`✅ [Client Mgmt] Updated doctor profile for user ${userId}`);
+
+      res.status(200).json({
+        success: true,
+        message: "Doctor profile updated successfully",
+        data: targetUser,
+      });
+    } catch (error) {
+      console.error("❌ Error updating doctor profile:", error);
+      res.status(500).json({ success: false, message: "Failed to update doctor profile" });
+    }
+  });
+
   // Impersonate user (generate token for preview)
   app.post(
     "/admin/users/:userId/impersonate",
@@ -1088,7 +1152,7 @@ export function registerClientManagementEndpoints(
         const { patientPortalDashboardFormat, forceUpdate } = req.body;
 
         // Validate patientPortalDashboardFormat
-        if (!patientPortalDashboardFormat || !['fuse', 'md-integrations'].includes(patientPortalDashboardFormat)) {
+        if (!patientPortalDashboardFormat || !Object.values(MedicalCompanySlug).includes(patientPortalDashboardFormat)) {
           return res.status(400).json({
             success: false,
             message: "Invalid patientPortalDashboardFormat. Must be 'fuse' or 'md-integrations'",
@@ -1115,9 +1179,7 @@ export function registerClientManagementEndpoints(
 
         // Check if format is changing
         const currentFormat = clinic.patientPortalDashboardFormat;
-        const newFormat = patientPortalDashboardFormat === 'md-integrations' 
-          ? PatientPortalDashboardFormat.MD_INTEGRATIONS 
-          : PatientPortalDashboardFormat.FUSE;
+        const newFormat = patientPortalDashboardFormat;
 
         if (currentFormat === newFormat) {
           return res.status(200).json({
@@ -1239,7 +1301,7 @@ export function registerClientManagementEndpoints(
         }
 
         // Validate that patientPortalDashboardFormat is FUSE
-        if (clinic.patientPortalDashboardFormat !== PatientPortalDashboardFormat.FUSE) {
+        if (clinic.patientPortalDashboardFormat !== MedicalCompanySlug.FUSE) {
           return res.status(400).json({
             success: false,
             message: "Cannot change main doctor. This feature is only available when patientPortalDashboardFormat is 'fuse'",

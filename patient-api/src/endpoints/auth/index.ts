@@ -5,7 +5,7 @@ import {
     AuditResourceType,
 } from "../../services/audit.service";
 import Clinic from "../../models/Clinic";
-import { PatientPortalDashboardFormat } from "@fuse/enums";
+import { MedicalCompanySlug } from "@fuse/enums";
 import BrandInvitation, { InvitationType } from "../../models/BrandInvitation";
 import {
     createJWTToken,
@@ -1187,8 +1187,9 @@ export function registerAuthEndpoints(
                 invitationSlug,
             } = validation.data;
 
-            // Extract doctorLicenseStatesCoverage separately to avoid TypeScript issues
+            // Extract doctorLicenseStatesCoverage and medicalCompanyId separately to avoid TypeScript issues
             const doctorLicenseStatesCoverage = (validation.data as any).doctorLicenseStatesCoverage;
+            const medicalCompanyId = (validation.data as any).medicalCompanyId;
 
             // Validate required fields for doctor role
             if (role === "doctor") {
@@ -1299,10 +1300,10 @@ export function registerAuthEndpoints(
                 const slug = await generateUniqueSlug(clinicName.trim());
 
                 // Determine dashboard format based on invitation or default
-                let dashboardFormat: PatientPortalDashboardFormat;
+                let dashboardFormat: string;
                 if (isFixedMDILink) {
                     // Fixed MDI link - always use MD_INTEGRATIONS
-                    dashboardFormat = PatientPortalDashboardFormat.MD_INTEGRATIONS;
+                    dashboardFormat = MedicalCompanySlug.MD_INTEGRATIONS;
                 } else if (brandInvitation) {
                     // Use format from invitation (doctor invitation)
                     dashboardFormat = brandInvitation.patientPortalDashboardFormat;
@@ -1310,9 +1311,9 @@ export function registerAuthEndpoints(
                     // For brand signup, default to MD_INTEGRATIONS format
                     // (can be changed later in Tenant Management portal if needed)
                     dashboardFormat =
-                        patientPortalDashboardFormat === 'fuse'
-                            ? PatientPortalDashboardFormat.FUSE
-                            : PatientPortalDashboardFormat.MD_INTEGRATIONS;
+                        patientPortalDashboardFormat === MedicalCompanySlug.FUSE
+                            ? MedicalCompanySlug.FUSE
+                            : MedicalCompanySlug.MD_INTEGRATIONS;
                 }
 
                 clinic = await Clinic.create({
@@ -1382,13 +1383,16 @@ export function registerAuthEndpoints(
                 businessType,
             });
 
-            // Set NPI number and license coverage for doctors if provided
+            // Set NPI number, license coverage, and medical company for doctors if provided
             if (mappedRole === "doctor") {
                 if (npiNumber) {
                     user.npiNumber = npiNumber;
                 }
                 if (doctorLicenseStatesCoverage && Array.isArray(doctorLicenseStatesCoverage)) {
                     user.doctorLicenseStatesCoverage = doctorLicenseStatesCoverage;
+                }
+                if (medicalCompanyId) {
+                    user.medicalCompanyId = medicalCompanyId;
                 }
                 await user.save();
             }

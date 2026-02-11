@@ -1,4 +1,3 @@
-import { PatientPortalDashboardFormat } from '@fuse/enums';
 
 export interface QuestionOption {
     id: string;
@@ -65,7 +64,7 @@ export interface QuestionnaireData {
     description?: string;
     checkoutStepPosition: number;
     color?: string | null;
-    medicalCompanySource?: PatientPortalDashboardFormat;
+    medicalCompanySource?: string;
     steps: QuestionnaireStep[];
     treatment?: {
         products: Product[];

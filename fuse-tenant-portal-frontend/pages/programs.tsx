@@ -3,6 +3,7 @@ import { useRouter } from 'next/router'
 import { Sidebar } from '@/components/sidebar'
 import { Header } from '@/components/header'
 import { useAuth } from '@/contexts/AuthContext'
+import { MedicalCompanySlug } from '@fuse/enums'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -17,12 +18,10 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-type MedicalCompanySource = 'fuse' | 'md-integrations' | 'beluga'
-
-const COMPANY_CONFIG: Record<MedicalCompanySource, { label: string; icon: string; color: string; bgColor: string; borderColor: string; textColor: string }> = {
-    'fuse': { label: 'Fuse', icon: '💙', color: 'bg-blue-500', bgColor: 'bg-blue-50 dark:bg-blue-900/20', borderColor: 'border-blue-200 dark:border-blue-700', textColor: 'text-blue-700 dark:text-blue-300' },
-    'md-integrations': { label: 'MDI', icon: '🩺', color: 'bg-purple-500', bgColor: 'bg-purple-50 dark:bg-purple-900/20', borderColor: 'border-purple-200 dark:border-purple-700', textColor: 'text-purple-700 dark:text-purple-300' },
-    'beluga': { label: 'Beluga', icon: '⚡', color: 'bg-teal-500', bgColor: 'bg-teal-50 dark:bg-teal-900/20', borderColor: 'border-teal-200 dark:border-teal-700', textColor: 'text-teal-700 dark:text-teal-300' },
+const COMPANY_CONFIG: Record<MedicalCompanySlug, { label: string; icon: string; color: string; bgColor: string; borderColor: string; textColor: string }> = {
+    [MedicalCompanySlug.FUSE]: { label: 'Fuse', icon: '💙', color: 'bg-blue-500', bgColor: 'bg-blue-50 dark:bg-blue-900/20', borderColor: 'border-blue-200 dark:border-blue-700', textColor: 'text-blue-700 dark:text-blue-300' },
+    [MedicalCompanySlug.MD_INTEGRATIONS]: { label: 'MDI', icon: '🩺', color: 'bg-purple-500', bgColor: 'bg-purple-50 dark:bg-purple-900/20', borderColor: 'border-purple-200 dark:border-purple-700', textColor: 'text-purple-700 dark:text-purple-300' },
+    [MedicalCompanySlug.BELUGA]: { label: 'Beluga', icon: '⚡', color: 'bg-teal-500', bgColor: 'bg-teal-50 dark:bg-teal-900/20', borderColor: 'border-teal-200 dark:border-teal-700', textColor: 'text-teal-700 dark:text-teal-300' },
 }
 
 interface ProgramTemplate {
@@ -39,7 +38,7 @@ interface ProgramTemplate {
         title: string
         description?: string
         formTemplateType: string
-        medicalCompanySource?: MedicalCompanySource
+        medicalCompanySource?: MedicalCompanySlug
     }
 }
 
@@ -49,7 +48,7 @@ export default function ProgramTemplates() {
     const [templates, setTemplates] = useState<ProgramTemplate[]>([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
-    const [companyFilter, setCompanyFilter] = useState<MedicalCompanySource | 'all'>('all')
+    const [companyFilter, setCompanyFilter] = useState<MedicalCompanySlug | 'all'>('all')
     const { token } = useAuth()
     const router = useRouter()
 
@@ -59,7 +58,7 @@ export default function ProgramTemplates() {
     }, [templates, companyFilter])
 
     const companyCounts = useMemo(() => {
-        const counts: Record<string, number> = { all: templates.length, fuse: 0, 'md-integrations': 0, beluga: 0 }
+        const counts: Record<string, number> = { all: templates.length, [MedicalCompanySlug.FUSE]: 0, [MedicalCompanySlug.MD_INTEGRATIONS]: 0, [MedicalCompanySlug.BELUGA]: 0 }
         templates.forEach(t => {
             const source = t.medicalTemplate?.medicalCompanySource
             if (source && counts[source] !== undefined) counts[source]++
@@ -196,7 +195,7 @@ export default function ProgramTemplates() {
                             >
                                 All ({companyCounts.all})
                             </Button>
-                            {(Object.entries(COMPANY_CONFIG) as [MedicalCompanySource, typeof COMPANY_CONFIG[MedicalCompanySource]][]).map(([key, config]) => (
+                            {(Object.entries(COMPANY_CONFIG) as [MedicalCompanySlug, typeof COMPANY_CONFIG[MedicalCompanySlug]][]).map(([key, config]) => (
                                 <Button
                                     key={key}
                                     size="sm"
@@ -321,7 +320,7 @@ export default function ProgramTemplates() {
                                 <div className='flex flex-col justify-center items-center'>
                                     <h3 className="text-lg font-semibold mb-1">No templates for this filter</h3>
                                     <p className="text-sm text-muted-foreground mb-4 max-w-md">
-                                        No program templates found for {COMPANY_CONFIG[companyFilter]?.label || companyFilter}. Try a different filter.
+                                        No program templates found for {COMPANY_CONFIG[companyFilter as MedicalCompanySlug]?.label || companyFilter}. Try a different filter.
                                     </p>
                                     <Button
                                         onClick={() => setCompanyFilter('all')}

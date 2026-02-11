@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react"
 import { X, Search, Package, Check, ToggleLeft, ToggleRight } from "lucide-react"
+import { MedicalCompanySlug } from "@fuse/enums"
 
 interface Product {
     id: string
@@ -22,7 +23,7 @@ interface ProductAssignmentModalProps {
     products: Product[]
     assignedProductIds: string[]
     initialProductOfferType?: ProductOfferType
-    medicalCompanySource?: 'fuse' | 'md-integrations' | 'beluga'
+    medicalCompanySource?: MedicalCompanySlug
     onSave: (productIds: string[], productOfferType: ProductOfferType) => Promise<void>
 }
 
@@ -34,7 +35,7 @@ export function ProductAssignmentModal({
     products,
     assignedProductIds,
     initialProductOfferType = 'single_choice',
-    medicalCompanySource = 'md-integrations',
+    medicalCompanySource = MedicalCompanySlug.MD_INTEGRATIONS,
     onSave,
 }: ProductAssignmentModalProps) {
     const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set(assignedProductIds))
@@ -88,17 +89,17 @@ export function ProductAssignmentModal({
             if (isInactive && !isSelected) return false
             
             // Filter by medical company source - only show products with the corresponding ID
-            if (medicalCompanySource === 'fuse') {
+            if (medicalCompanySource === MedicalCompanySlug.FUSE) {
                 // For Fuse, only show products that DON'T have platform-specific IDs
                 if (product.mdOfferingId || product.belugaProductId) {
                     return false
                 }
-            } else if (medicalCompanySource === 'md-integrations') {
+            } else if (medicalCompanySource === MedicalCompanySlug.MD_INTEGRATIONS) {
                 // For MDI, only show products that have an MDI offering linked
                 if (!product.mdOfferingId) {
                     return false
                 }
-            } else if (medicalCompanySource === 'beluga') {
+            } else if (medicalCompanySource === MedicalCompanySlug.BELUGA) {
                 // For Beluga, only show products that have a Beluga product ID
                 if (!product.belugaProductId) {
                     return false
