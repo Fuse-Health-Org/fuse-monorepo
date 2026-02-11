@@ -71,11 +71,15 @@ interface PaymentModalProps {
   errorMessage?: string
   planName?: string
   amount?: number
+  hasIntroPricing?: boolean
+  introMonthlyPrice?: number | null
+  introMonthlyPriceDurationMonths?: number | null
+  regularMonthlyPrice?: number
   onClose: () => void
   onRedirect: () => void
 }
 
-function PaymentModal({ isOpen, state, errorMessage, planName, amount, onClose, onRedirect }: PaymentModalProps) {
+function PaymentModal({ isOpen, state, errorMessage, planName, amount, hasIntroPricing, introMonthlyPrice, introMonthlyPriceDurationMonths, regularMonthlyPrice, onClose, onRedirect }: PaymentModalProps) {
   if (!isOpen) return null
 
   return (
@@ -108,8 +112,18 @@ function PaymentModal({ isOpen, state, errorMessage, planName, amount, onClose, 
               <div className="bg-blue-50 rounded-lg p-4 mb-4">
                 <p className="text-sm text-blue-800 font-medium">
                   {planName && `${planName} Plan`}
-                  {amount !== undefined && ` • $${amount.toLocaleString()}`}
                 </p>
+                {hasIntroPricing && introMonthlyPrice != null ? (
+                  <p className="text-sm text-blue-700 mt-1">
+                    {introMonthlyPrice === 0 ? 'Free' : `$${introMonthlyPrice.toLocaleString()}/mo`} for {introMonthlyPriceDurationMonths} months, then ${regularMonthlyPrice?.toLocaleString()}/mo
+                  </p>
+                ) : (
+                  amount !== undefined && (
+                    <p className="text-sm text-blue-700 mt-1">
+                      ${amount.toLocaleString()}/month
+                    </p>
+                  )
+                )}
               </div>
               <div className="flex items-center justify-center gap-2 text-sm text-gray-500">
                 <Lock className="w-4 h-4" />
@@ -134,11 +148,30 @@ function PaymentModal({ isOpen, state, errorMessage, planName, amount, onClose, 
               <div className="bg-green-50 rounded-lg p-4 mb-6">
                 <p className="text-sm text-green-800 font-medium">
                   {planName && `${planName} Plan`}
-                  {amount !== undefined && ` • $${amount.toLocaleString()}/month`}
                 </p>
-                <p className="text-xs text-green-600 mt-1">
-                  Your first charge of ${amount?.toLocaleString()} has been processed
-                </p>
+                {hasIntroPricing && introMonthlyPrice != null ? (
+                  <>
+                    <p className="text-sm text-green-700 mt-1">
+                      {introMonthlyPrice === 0 ? 'Free' : `$${introMonthlyPrice.toLocaleString()}/mo`} for {introMonthlyPriceDurationMonths} months, then ${regularMonthlyPrice?.toLocaleString()}/mo
+                    </p>
+                    <p className="text-xs text-green-600 mt-1">
+                      {introMonthlyPrice === 0
+                        ? 'Your subscription has been activated — no charge today'
+                        : `Your first charge of $${introMonthlyPrice.toLocaleString()} has been processed`}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    {amount !== undefined && (
+                      <p className="text-sm text-green-700 mt-1">
+                        ${amount.toLocaleString()}/month
+                      </p>
+                    )}
+                    <p className="text-xs text-green-600 mt-1">
+                      Your first charge of ${amount?.toLocaleString()} has been processed
+                    </p>
+                  </>
+                )}
               </div>
               <Button
                 onClick={onRedirect}
@@ -476,7 +509,7 @@ function CheckoutForm({ checkoutData, paymentData, token, intentClientSecret, in
   }
 
   const handleModalRedirect = () => {
-    router.push('/plans?success=true&payment_intent=completed')
+    router.push('/settings?message=Subscription activated successfully!')
   }
 
   return (
@@ -488,6 +521,10 @@ function CheckoutForm({ checkoutData, paymentData, token, intentClientSecret, in
         errorMessage={modalError}
         planName={checkoutData.planName}
         amount={checkoutData.subscriptionMonthlyPrice || checkoutData.planPrice}
+        hasIntroPricing={checkoutData.hasIntroPricing}
+        introMonthlyPrice={checkoutData.introMonthlyPrice}
+        introMonthlyPriceDurationMonths={checkoutData.introMonthlyPriceDurationMonths}
+        regularMonthlyPrice={checkoutData.subscriptionMonthlyPrice}
         onClose={handleModalClose}
         onRedirect={handleModalRedirect}
       />
@@ -850,9 +887,8 @@ export default function CheckoutPage() {
       
     } catch (error) {
       console.error('Error refreshing subscription after payment:', error)
-    } finally {
-      router.push('/plans?success=true&payment_intent=completed')
     }
+    // Don't auto-redirect here — let the user click "Go to Dashboard" in the success modal
   }
 
   const handlePaymentError = (error: string) => {
