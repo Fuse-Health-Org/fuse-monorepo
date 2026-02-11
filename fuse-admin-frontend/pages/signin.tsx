@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
-import Link from 'next/link'
 import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Eye, EyeOff, Shield, Mail, ArrowLeft, RefreshCw } from 'lucide-react'
+import PricingPlansModal from '@/components/PricingPlansModal'
 
 export default function SignIn() {
   const [email, setEmail] = useState('')
@@ -13,6 +13,7 @@ export default function SignIn() {
   const [showPassword, setShowPassword] = useState(false)
   const [mfaCode, setMfaCode] = useState(['', '', '', '', '', ''])
   const [resendCooldown, setResendCooldown] = useState(0)
+  const [isPricingModalOpen, setIsPricingModalOpen] = useState(false)
   const { login, verifyMfa, resendMfaCode, cancelMfa, mfa, isLoading, error, user } = useAuth()
   const router = useRouter()
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
@@ -124,6 +125,12 @@ export default function SignIn() {
     cancelMfa()
     setMfaCode(['', '', '', '', '', ''])
     setPassword('')
+  }
+
+  const handleSelectPlan = (plan: any) => {
+    setIsPricingModalOpen(false)
+    // Redirect to signup page
+    router.push('/signup')
   }
 
   // MFA Verification Form
@@ -357,9 +364,13 @@ export default function SignIn() {
               <div className="mt-6 text-center">
                 <p className="text-sm text-muted-foreground">
                   Don't have an account?{' '}
-                  <Link href="/signup" className="text-primary hover:underline">
+                  <button
+                    type="button"
+                    onClick={() => setIsPricingModalOpen(true)}
+                    className="text-primary hover:underline font-medium"
+                  >
                     Sign up
-                  </Link>
+                  </button>
                 </p>
               </div>
             </CardContent>
@@ -367,6 +378,13 @@ export default function SignIn() {
           </div>
         </div>
       </div>
+
+      {/* Pricing Plans Modal */}
+      <PricingPlansModal
+        isOpen={isPricingModalOpen}
+        onClose={() => setIsPricingModalOpen(false)}
+        onSelectPlan={handleSelectPlan}
+      />
     </>
   )
 }

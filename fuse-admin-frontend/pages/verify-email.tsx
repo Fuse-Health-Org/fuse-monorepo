@@ -9,28 +9,33 @@ import { Input } from '@/components/ui/input'
 import { CheckCircle, XCircle, Loader2, Building2, Mail } from 'lucide-react'
 
 export default function VerifyEmail() {
-  const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'invalid'>('loading')
+  const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'invalid' | 'awaiting'>('loading')
   const [message, setMessage] = useState('')
   const [isLoggingIn, setIsLoggingIn] = useState(false)
   const [showResendForm, setShowResendForm] = useState(false)
   const [resendEmail, setResendEmail] = useState('')
   const [resendStatus, setResendStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
   const [resendMessage, setResendMessage] = useState('')
+  const [userEmail, setUserEmail] = useState<string>('')
   const router = useRouter()
-  const { token: queryToken } = router.query
+  const { token: queryToken, email: queryEmail } = router.query
 
   useEffect(() => {
     // Wait for router to be ready before checking query params
     if (!router.isReady) return
 
+    // If no token, show awaiting verification screen
     if (!queryToken || typeof queryToken !== 'string') {
-      setStatus('invalid')
-      setMessage('Invalid verification link')
+      setStatus('awaiting')
+      if (queryEmail && typeof queryEmail === 'string') {
+        setUserEmail(queryEmail)
+        setResendEmail(queryEmail)
+      }
       return
     }
 
     verifyEmail(queryToken)
-  }, [router.isReady, queryToken])
+  }, [router.isReady, queryToken, queryEmail])
 
   const verifyEmail = async (token: string) => {
     try {
@@ -51,7 +56,7 @@ export default function VerifyEmail() {
           
           setIsLoggingIn(true)
           
-          // Redirect to dashboard after a short delay with full page reload to refresh auth context
+          // Auto-login successful, redirect to dashboard
           setTimeout(() => {
             window.location.href = '/'
           }, 2000)
@@ -67,7 +72,9 @@ export default function VerifyEmail() {
   }
 
   const handleResendEmail = async () => {
-    if (!resendEmail) {
+    const emailToUse = resendEmail || userEmail
+    
+    if (!emailToUse) {
       setShowResendForm(true)
       return
     }
@@ -80,7 +87,7 @@ export default function VerifyEmail() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email: resendEmail }),
+        body: JSON.stringify({ email: emailToUse }),
       })
       
       const data = await response.json()
@@ -104,6 +111,8 @@ export default function VerifyEmail() {
         return <Loader2 className="h-16 w-16 text-blue-600 animate-spin" />
       case 'success':
         return <CheckCircle className="h-16 w-16 text-green-600" />
+      case 'awaiting':
+        return <Mail className="h-16 w-16 text-primary" />
       case 'error':
       case 'invalid':
         return <XCircle className="h-16 w-16 text-red-600" />
@@ -118,6 +127,8 @@ export default function VerifyEmail() {
         return 'text-blue-600'
       case 'success':
         return 'text-green-600'
+      case 'awaiting':
+        return 'text-primary'
       case 'error':
       case 'invalid':
         return 'text-red-600'
@@ -163,13 +174,48 @@ export default function VerifyEmail() {
                 <h3 className={`text-lg font-semibold ${getStatusColor()}`}>
                   {status === 'loading' && 'Verifying your email...'}
                   {status === 'success' && 'Account Activated!'}
+                  {status === 'awaiting' && 'Check Your Email'}
                   {status === 'error' && 'Verification Failed'}
                   {status === 'invalid' && 'Invalid Link'}
                 </h3>
                 <p className="text-muted-foreground">
-                  {message}
+                  {status === 'awaiting' && userEmail 
+                    ? `We sent a verification email to ${userEmail}`
+                    : message}
                 </p>
               </div>
+
+              {/* Verification Steps */}
+              {status === 'awaiting' && (
+                <div className="text-left space-y-4">
+                  <div className="bg-primary/10 border border-primary/20 rounded-lg p-4">
+                    <h4 className="font-semibold text-foreground mb-3">Next Steps:</h4>
+                    <ol className="space-y-3 text-sm text-foreground">
+                      <li className="flex gap-3">
+                        <span className="flex-shrink-0 w-6 h-6 bg-primary text-primary-foreground rounded-full flex items-center justify-center font-semibold text-xs">
+                          1
+                        </span>
+                        <span>Check your email inbox (and spam folder)</span>
+                      </li>
+                      <li className="flex gap-3">
+                        <span className="flex-shrink-0 w-6 h-6 bg-primary text-primary-foreground rounded-full flex items-center justify-center font-semibold text-xs">
+                          2
+                        </span>
+                        <span>Click the verification link in the email</span>
+                      </li>
+                      <li className="flex gap-3">
+                        <span className="flex-shrink-0 w-6 h-6 bg-primary text-primary-foreground rounded-full flex items-center justify-center font-semibold text-xs">
+                          3
+                        </span>
+                        <span>You'll be automatically logged in and redirected to your dashboard</span>
+                      </li>
+                    </ol>
+                  </div>
+                  <p className="text-xs text-muted-foreground text-center">
+                    The verification link will expire in 24 hours
+                  </p>
+                </div>
+              )}
 
               {/* Action Buttons */}
               <div className="space-y-3">
@@ -186,6 +232,41 @@ export default function VerifyEmail() {
                   >
                     Go to Dashboard
                   </Button>
+                )}
+
+                {status === 'awaiting' && (
+                  <div className="space-y-3">
+                    {resendStatus === 'sent' ? (
+                      <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                        <div className="flex items-center gap-2 text-green-700">
+                          <CheckCircle className="w-5 h-5" />
+                          <span className="font-medium">Verification email resent! Please check your inbox.</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <Button 
+                        onClick={handleResendEmail}
+                        variant="outline"
+                        className="w-full"
+                        disabled={resendStatus === 'sending'}
+                      >
+                        {resendStatus === 'sending' ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Resending...
+                          </>
+                        ) : (
+                          <>
+                            <Mail className="w-4 h-4 mr-2" />
+                            Resend Verification Email
+                          </>
+                        )}
+                      </Button>
+                    )}
+                    {resendStatus === 'error' && (
+                      <p className="text-sm text-red-600 text-center">{resendMessage}</p>
+                    )}
+                  </div>
                 )}
 
                 {(status === 'error' || status === 'invalid') && (
@@ -252,6 +333,18 @@ export default function VerifyEmail() {
                 {status === 'loading' && (
                   <p className="text-xs text-muted-foreground">
                     Please wait while we verify your email address...
+                  </p>
+                )}
+
+                {status === 'awaiting' && (
+                  <p className="text-xs text-muted-foreground text-center">
+                    Can't find the email?{' '}
+                    <button 
+                      onClick={() => router.push('/signin')}
+                      className="text-primary hover:underline"
+                    >
+                      Back to sign in
+                    </button>
                   </p>
                 )}
               </div>
