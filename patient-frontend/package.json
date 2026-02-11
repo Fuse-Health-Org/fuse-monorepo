@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "pnpm with-env next dev -p 3000 -H 0.0.0.0",
     "build": "NODE_ENV=production pnpm with-env next build",
+    "build:windows": "cross-env NODE_ENV=production pnpm with-env next build",
     "start": "next start",
     "lint": "next lint",
     "print2": "node print-structure.js",
@@ -34,6 +35,7 @@
     "@types/node": "catalog:",
     "@types/react": "catalog:react18",
     "autoprefixer": "catalog:",
+    "cross-env": "^7.0.3",
     "dotenv-cli": "catalog:",
     "eslint": "catalog:",
     "postcss": "catalog:",
