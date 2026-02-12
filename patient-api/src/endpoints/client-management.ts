@@ -1012,7 +1012,7 @@ export function registerClientManagementEndpoints(
         }
 
         const clinic = await Clinic.findByPk(targetUser.clinicId, {
-          attributes: ["id", "name", "slug", "patientPortalDashboardFormat", "mainDoctorId"],
+          attributes: ["id", "name", "slug", "patientPortalDashboardFormat", "mainDoctorId", "visitTypeFees"],
           include: [
             {
               model: User,
@@ -1155,7 +1155,7 @@ export function registerClientManagementEndpoints(
         if (!patientPortalDashboardFormat || !Object.values(MedicalCompanySlug).includes(patientPortalDashboardFormat)) {
           return res.status(400).json({
             success: false,
-            message: "Invalid patientPortalDashboardFormat. Must be 'fuse' or 'md-integrations'",
+            message: "Invalid patientPortalDashboardFormat. Must be 'fuse', 'md-integrations', or 'beluga'",
           });
         }
 

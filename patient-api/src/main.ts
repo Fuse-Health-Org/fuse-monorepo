@@ -106,6 +106,7 @@ import TenantProduct from "@models/TenantProduct";
 import FormProducts from "@models/FormProducts";
 import GlobalFormStructure from "@models/GlobalFormStructure";
 import Program from "@models/Program";
+import MedicalCompany from "@models/MedicalCompany";
 import Question from "@models/Question";
 import QuestionOption from "@models/QuestionOption";
 import { assignTemplatesSchema } from "./validators/formTemplates";
@@ -6217,20 +6218,34 @@ app.post("/payments/program/sub", async (req, res) => {
       if (patientState && program.medicalTemplateId && program.clinicId) {
         // Get questionnaire with visit type configuration
         const questionnaire = await Questionnaire.findByPk(program.medicalTemplateId, {
-          attributes: ['id', 'visitTypeByState'],
+          attributes: ['id', 'visitTypeByState', 'medicalCompanySource'],
         });
 
         if (questionnaire && questionnaire.visitTypeByState) {
           // Determine visit type required for this state
           visitType = (questionnaire.visitTypeByState as any)[patientState] || 'asynchronous';
           
-          // Get clinic's visit type fees
+          // Resolve fees by medical company (platform) with clinic fallback
           const clinicWithFees = await Clinic.findByPk(program.clinicId, {
-            attributes: ['id', 'visitTypeFees'],
+            attributes: ['id', 'visitTypeFees', 'patientPortalDashboardFormat'],
           });
 
-          if (clinicWithFees && clinicWithFees.visitTypeFees && visitType) {
-            visitFeeAmount = Number((clinicWithFees.visitTypeFees as any)[visitType]) || 0;
+          const medicalCompanySlug =
+            (questionnaire as any)?.medicalCompanySource ||
+            clinicWithFees?.patientPortalDashboardFormat;
+          const medicalCompany = medicalCompanySlug
+            ? await MedicalCompany.findOne({
+                where: { slug: medicalCompanySlug },
+                attributes: ['id', 'slug', 'visitTypeFees'],
+              })
+            : null;
+
+          if (visitType) {
+            const medicalCompanyFee =
+              Number((medicalCompany?.visitTypeFees as any)?.[visitType]) || 0;
+            const clinicFallbackFee =
+              Number((clinicWithFees?.visitTypeFees as any)?.[visitType]) || 0;
+            visitFeeAmount = medicalCompanyFee || clinicFallbackFee;
             
             if (visitFeeAmount > 0) {
               console.log(`✅ Visit fee calculated for program:`, {
@@ -6238,6 +6253,9 @@ app.post("/payments/program/sub", async (req, res) => {
                 patientState,
                 visitType,
                 visitFeeAmount,
+                source: medicalCompanyFee ? 'medical-company' : 'clinic-fallback',
+                resolvedMedicalCompanySlug: medicalCompanySlug,
+                medicalCompanySlug: medicalCompany?.slug,
                 clinicId: program.clinicId,
               });
             }
@@ -11682,13 +11700,8 @@ app.put("/organization/update", authenticateJWT, async (req, res) => {
       | "fuse"
       | "md-integrations"
       | undefined;
-    const visitTypeFees = (validation.data as any).visitTypeFees as
-      | { synchronous: number; asynchronous: number }
-      | undefined;
-
     console.log('📥 Received organization update:', {
       businessName,
-      visitTypeFees,
       defaultFormColor,
       patientPortalDashboardFormat
     });
@@ -11778,43 +11791,9 @@ app.put("/organization/update", authenticateJWT, async (req, res) => {
           updateData.patientPortalDashboardFormat = patientPortalDashboardFormat;
         }
 
-        // Update visit type fees if provided
-        if (visitTypeFees !== undefined) {
-          console.log('💰 Updating visit type fees:', visitTypeFees);
-          
-          // Validate visit type fees structure
-          if (
-            typeof visitTypeFees !== "object" ||
-            typeof visitTypeFees.synchronous !== "number" ||
-            typeof visitTypeFees.asynchronous !== "number"
-          ) {
-            console.error('❌ Invalid visit type fees structure:', visitTypeFees);
-            return res.status(400).json({
-              success: false,
-              message:
-                "Visit type fees must be an object with 'synchronous' and 'asynchronous' number values",
-            });
-          }
-
-          // Validate non-negative values
-          if (
-            visitTypeFees.synchronous < 0 ||
-            visitTypeFees.asynchronous < 0
-          ) {
-            console.error('❌ Negative visit type fees:', visitTypeFees);
-            return res.status(400).json({
-              success: false,
-              message: "Visit type fees must be non-negative",
-            });
-          }
-
-          updateData.visitTypeFees = visitTypeFees;
-          console.log('✅ Visit type fees added to updateData');
-        }
-
         console.log('💾 Updating clinic with data:', updateData);
         await clinic.update(updateData);
-        console.log('✅ Clinic updated successfully. New visitTypeFees:', clinic.visitTypeFees);
+        console.log('✅ Clinic updated successfully.');
         updatedClinic = clinic;
       }
     }

@@ -6,6 +6,7 @@ import Product from '../models/Product';
 import TenantProduct from '../models/TenantProduct';
 import TenantProductForm from '../models/TenantProductForm';
 import Clinic from '../models/Clinic';
+import MedicalCompany from '../models/MedicalCompany';
 import { authenticateJWT, getCurrentUser } from '../config/jwt';
 
 const router = Router();
@@ -1233,11 +1234,7 @@ router.delete('/programs/:id', authenticateJWT, async (req: Request, res: Respon
   }
 });
 
-/**
- * Calculate visit fee for a program based on patient's state
- * POST /programs/calculate-visit-fee
- */
-router.post('/calculate-visit-fee', async (req: Request, res: Response) => {
+const calculateVisitFeeHandler = async (req: Request, res: Response) => {
   try {
     const { programId, state } = req.body || {};
 
@@ -1277,7 +1274,7 @@ router.post('/calculate-visit-fee', async (req: Request, res: Response) => {
       if (program.medicalTemplateId && program.clinicId) {
         // Get questionnaire with visit type configuration
         const questionnaire = await Questionnaire.findByPk(program.medicalTemplateId, {
-          attributes: ['id', 'visitTypeByState'],
+          attributes: ['id', 'visitTypeByState', 'medicalCompanySource'],
         });
 
         console.log("🔍 [CALC VISIT FEE] Questionnaire found:", {
@@ -1291,27 +1288,46 @@ router.post('/calculate-visit-fee', async (req: Request, res: Response) => {
           visitType = (questionnaire.visitTypeByState as any)[patientState] || 'asynchronous';
           console.log("✅ [CALC VISIT FEE] Visit type for state:", { patientState, visitType });
           
-          // Get clinic's visit type fees
+          // Resolve fees by medical company (platform) with clinic fallback
           const clinic = await Clinic.findByPk(program.clinicId, {
-            attributes: ['id', 'visitTypeFees'],
+            attributes: ['id', 'visitTypeFees', 'patientPortalDashboardFormat'],
           });
+
+          const medicalCompanySlug = (questionnaire as any)?.medicalCompanySource || clinic?.patientPortalDashboardFormat;
+          const medicalCompany = medicalCompanySlug
+            ? await MedicalCompany.findOne({
+                where: { slug: medicalCompanySlug },
+                attributes: ['id', 'slug', 'visitTypeFees'],
+              })
+            : null;
 
           console.log("🔍 [CALC VISIT FEE] Clinic found:", {
             id: clinic?.id,
+            patientPortalDashboardFormat: clinic?.patientPortalDashboardFormat,
+            questionnaireMedicalCompanySource: (questionnaire as any)?.medicalCompanySource,
+            resolvedMedicalCompanySlug: medicalCompanySlug,
+            medicalCompanySlug: medicalCompany?.slug,
+            medicalCompanyVisitTypeFees: medicalCompany?.visitTypeFees,
             hasVisitTypeFees: !!clinic?.visitTypeFees,
             visitTypeFees: clinic?.visitTypeFees,
           });
 
-          if (clinic && clinic.visitTypeFees && visitType) {
-            visitFeeAmount = Number((clinic.visitTypeFees as any)[visitType]) || 0;
+          if (visitType) {
+            const medicalCompanyFee = Number((medicalCompany?.visitTypeFees as any)?.[visitType]) || 0;
+            const clinicFallbackFee = Number((clinic?.visitTypeFees as any)?.[visitType]) || 0;
+            visitFeeAmount = medicalCompanyFee || clinicFallbackFee;
             console.log("✅ [CALC VISIT FEE] Final calculation:", {
               visitType,
               visitFeeAmount,
-              rawValue: (clinic.visitTypeFees as any)[visitType],
+              source: medicalCompanyFee ? 'medical-company' : 'clinic-fallback',
+              rawMedicalCompanyValue: (medicalCompany?.visitTypeFees as any)?.[visitType],
+              rawClinicValue: (clinic?.visitTypeFees as any)?.[visitType],
             });
           } else {
             console.warn("⚠️ [CALC VISIT FEE] Missing data:", {
               hasClinic: !!clinic,
+              hasMedicalCompany: !!medicalCompany,
+              hasMedicalCompanyFees: !!medicalCompany?.visitTypeFees,
               hasVisitTypeFees: !!clinic?.visitTypeFees,
               visitType,
             });
@@ -1350,6 +1366,13 @@ router.post('/calculate-visit-fee', async (req: Request, res: Response) => {
       message: "Failed to calculate visit fee",
     });
   }
-});
+};
+
+/**
+ * Calculate visit fee for a program based on patient's state
+ * Supports both legacy and namespaced paths for compatibility.
+ */
+router.post('/calculate-visit-fee', calculateVisitFeeHandler);
+router.post('/programs/calculate-visit-fee', calculateVisitFeeHandler);
 
 export default router;

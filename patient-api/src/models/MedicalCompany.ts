@@ -37,6 +37,13 @@ export default class MedicalCompany extends Entity {
     })
     declare documentationUrl?: string;
 
+    @Column({
+        type: DataType.JSONB,
+        allowNull: false,
+        defaultValue: { synchronous: 0, asynchronous: 0 },
+    })
+    declare visitTypeFees: { synchronous: number; asynchronous: number };
+
     @HasMany(() => require('./MedicalCompanyPharmacy').default)
     declare pharmacies: any[];
 }

@@ -66,7 +66,29 @@ router.put('/:id', async (req: Request, res: Response) => {
       });
     }
 
-    const { name, slug, apiUrl, dashboardUrl, documentationUrl } = req.body;
+    const { name, slug, apiUrl, dashboardUrl, documentationUrl, visitTypeFees } = req.body;
+
+    if (visitTypeFees !== undefined) {
+      const isObject = typeof visitTypeFees === 'object' && visitTypeFees !== null;
+      const hasValidKeys =
+        isObject &&
+        typeof visitTypeFees.synchronous === 'number' &&
+        typeof visitTypeFees.asynchronous === 'number';
+
+      if (!hasValidKeys) {
+        return res.status(400).json({
+          success: false,
+          message: "visitTypeFees must include numeric 'synchronous' and 'asynchronous' values",
+        });
+      }
+
+      if (visitTypeFees.synchronous < 0 || visitTypeFees.asynchronous < 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'visitTypeFees must be non-negative',
+        });
+      }
+    }
 
     await company.update({
       ...(name !== undefined && { name }),
@@ -74,6 +96,7 @@ router.put('/:id', async (req: Request, res: Response) => {
       ...(apiUrl !== undefined && { apiUrl }),
       ...(dashboardUrl !== undefined && { dashboardUrl }),
       ...(documentationUrl !== undefined && { documentationUrl }),
+      ...(visitTypeFees !== undefined && { visitTypeFees }),
     });
 
     res.json({

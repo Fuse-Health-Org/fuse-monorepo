@@ -149,7 +149,6 @@ export default function Settings({
     customDomain: "",
     defaultFormColor: "",
     patientPortalDashboardFormat: "fuse" as "fuse" | "md-integrations",
-    visitTypeFees: { synchronous: 0, asynchronous: 0 },
   });
   const [organizationErrors, setOrganizationErrors] = useState<Record<string, string>>({});
   const [logoFile, setLogoFile] = useState<File | null>(null);
@@ -312,7 +311,6 @@ export default function Settings({
           customDomain: data.customDomain || "",
           defaultFormColor: data.defaultFormColor || "",
           patientPortalDashboardFormat: data.patientPortalDashboardFormat || "fuse",
-          visitTypeFees: data.visitTypeFees || { synchronous: 0, asynchronous: 0 },
         });
         if (data.logo) {
           setLogoPreview(data.logo);
@@ -821,7 +819,6 @@ export default function Settings({
     setLoading(true);
 
     console.log('💾 Saving organization data:', organizationData);
-    console.log('💰 Visit Type Fees:', organizationData.visitTypeFees);
 
     try {
       const response = await fetch(`${API_URL}/organization/update`, {
@@ -1066,15 +1063,6 @@ export default function Settings({
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="h-32 bg-muted rounded"></div>
                             <div className="h-32 bg-muted rounded"></div>
-                          </div>
-                        </div>
-
-                        {/* Visit Type Fees Skeleton */}
-                        <div className="pt-8 border-t space-y-4">
-                          <div className="h-6 bg-muted rounded w-40"></div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="h-24 bg-muted rounded"></div>
-                            <div className="h-24 bg-muted rounded"></div>
                           </div>
                         </div>
 
@@ -1710,100 +1698,6 @@ export default function Settings({
                                   Reset
                                 </Button>
                               )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Visit Type Fees Section */}
-                      <div className="pt-8 border-t">
-                        <h3 className="text-lg font-medium mb-2">Visit Type Fees</h3>
-                        <p className="text-sm text-muted-foreground mb-4">
-                          Set the fees your organization charges for different types of doctor visits
-                        </p>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {/* Synchronous Visit Fee */}
-                          <div className="space-y-2">
-                            <label className="text-sm font-medium flex items-center gap-2">
-                              <div className="p-1.5 rounded bg-blue-100 dark:bg-blue-900/30">
-                                <svg className="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                </svg>
-                              </div>
-                              Synchronous Visit Fee
-                            </label>
-                            <div className="relative">
-                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
-                              <input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={organizationData.visitTypeFees.synchronous}
-                                onChange={(e) =>
-                                  setOrganizationData({
-                                    ...organizationData,
-                                    visitTypeFees: {
-                                      ...organizationData.visitTypeFees,
-                                      synchronous: parseFloat(e.target.value) || 0
-                                    }
-                                  })
-                                }
-                                className="w-full pl-8 pr-3 py-2 border border-input rounded-md bg-background"
-                                placeholder="0.00"
-                              />
-                            </div>
-                            <p className="text-xs text-muted-foreground">
-                              Real-time visits (video calls, phone consultations)
-                            </p>
-                          </div>
-
-                          {/* Asynchronous Visit Fee */}
-                          <div className="space-y-2">
-                            <label className="text-sm font-medium flex items-center gap-2">
-                              <div className="p-1.5 rounded bg-green-100 dark:bg-green-900/30">
-                                <svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-                                </svg>
-                              </div>
-                              Asynchronous Visit Fee
-                            </label>
-                            <div className="relative">
-                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
-                              <input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={organizationData.visitTypeFees.asynchronous}
-                                onChange={(e) =>
-                                  setOrganizationData({
-                                    ...organizationData,
-                                    visitTypeFees: {
-                                      ...organizationData.visitTypeFees,
-                                      asynchronous: parseFloat(e.target.value) || 0
-                                    }
-                                  })
-                                }
-                                className="w-full pl-8 pr-3 py-2 border border-input rounded-md bg-background"
-                                placeholder="0.00"
-                              />
-                            </div>
-                            <p className="text-xs text-muted-foreground">
-                              Non-real-time visits (messaging, form-based consultations)
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Info Box */}
-                        <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                          <div className="flex gap-3">
-                            <AlertCircle className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-                            <div className="text-sm text-blue-900 dark:text-blue-100">
-                              <p className="font-medium mb-1">How visit type fees work:</p>
-                              <ul className="list-disc list-inside space-y-1 text-blue-800 dark:text-blue-200">
-                                <li>These fees are added to each order based on the required visit type</li>
-                                <li>Visit type requirements are configured per medical form in the Doctor Portal</li>
-                                <li>The system automatically selects the visit type based on the patient's state</li>
-                              </ul>
                             </div>
                           </div>
                         </div>
