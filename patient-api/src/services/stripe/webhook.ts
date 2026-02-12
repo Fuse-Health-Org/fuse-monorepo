@@ -23,6 +23,8 @@ import StripeConnectService from './connect.service';
 import Sequence from '../../models/Sequence';
 import SequenceRun from '../../models/SequenceRun';
 import SequenceTriggerService from '../sequence/SequenceTriggerService';
+import ClinicBalance from '../../models/ClinicBalance';
+import { stripe } from '@fuse/stripe';
 
 // Helper function to trigger checkout sequence
 async function triggerCheckoutSequence(order: Order): Promise<void> {
@@ -312,22 +314,268 @@ export const handlePaymentIntentCanceled = async (cancelledPayment: Stripe.Payme
     }
 };
 
+export const handleChargeRefunded = async (charge: Stripe.Charge): Promise<void> => {
+    console.log('💸 Charge refunded:', charge.id);
+
+    // Find payment by charge ID or payment intent ID
+    const refundedPayment = await Payment.findOne({
+        where: { 
+            stripeChargeId: charge.id 
+        },
+        include: [
+            { 
+                model: Order, 
+                as: 'order',
+                include: [
+                    { model: Clinic, as: 'clinic' }
+                ]
+            }
+        ]
+    });
+
+    if (!refundedPayment || !refundedPayment.order) {
+        console.log('⚠️ No order found for refunded charge:', charge.id);
+        return;
+    }
+
+    const order = refundedPayment.order;
+    
+    // Check if this was already processed by our manual refund endpoint
+    const existingDebtRecord = await ClinicBalance.findOne({
+        where: {
+            orderId: order.id,
+            type: 'refund_debt'
+        },
+        order: [['createdAt', 'DESC']]
+    });
+
+    if (existingDebtRecord) {
+        console.log('ℹ️ Refund already processed for this order:', order.orderNumber);
+        return;
+    }
+
+    // This is a refund that wasn't initiated by our manual endpoint
+    // (could be from Stripe dashboard or a chargeback)
+    const refundAmount = charge.amount_refunded / 100;
+    const brandAmount = Number(order.brandAmount) || 0;
+    const fuseCoverage = refundAmount - brandAmount;
+
+    console.log(`💰 Refund breakdown (webhook):`, {
+        totalRefund: refundAmount,
+        brandAmount: brandAmount,
+        fuseCoverage: fuseCoverage,
+    });
+
+    // Update payment and order status
+    await refundedPayment.update({
+        status: 'refunded',
+        refundedAmount: refundAmount,
+        refundedAt: new Date(),
+    });
+
+    await order.updateStatus(OrderStatus.REFUNDED);
+    console.log('✅ Order and payment updated to refunded status:', order.orderNumber);
+
+    // If FUSE covered any amount, try to recover it from the brand
+    if (fuseCoverage > 0 && (order as any).clinic?.stripeAccountId) {
+        try {
+            // Attempt instant transfer from brand to FUSE
+            const recoveryTransfer = await stripe.transfers.create({
+                amount: Math.round(fuseCoverage * 100),
+                currency: 'usd',
+                destination: process.env.STRIPE_PLATFORM_ACCOUNT_ID || 'acct_1S56nzELzhgYQXTR',
+                metadata: {
+                    orderId: order.id,
+                    orderNumber: order.orderNumber,
+                    chargeId: charge.id,
+                    type: 'refund_coverage_webhook',
+                },
+                description: `Refund coverage recovery for order ${order.orderNumber}`,
+            }, {
+                stripeAccount: (order as any).clinic.stripeAccountId,
+            });
+
+            console.log(`✅ Brand paid refund coverage instantly: ${recoveryTransfer.id}`);
+
+            // Record successful payment
+            await ClinicBalance.create({
+                clinicId: order.clinicId!,
+                orderId: order.id,
+                amount: fuseCoverage,
+                type: 'refund_debt',
+                status: 'paid',
+                stripeTransferId: recoveryTransfer.id,
+                description: `Refund coverage for order ${order.orderNumber} (via webhook)`,
+                notes: `Charge ID: ${charge.id}`,
+                paidAt: new Date(),
+            });
+
+        } catch (transferError: any) {
+            console.log(`⚠️ Brand transfer failed, registering as pending debt:`, transferError.message);
+
+            // Record as pending debt
+            await ClinicBalance.create({
+                clinicId: order.clinicId!,
+                orderId: order.id,
+                amount: -fuseCoverage,
+                type: 'refund_debt',
+                status: 'pending',
+                description: `Pending refund coverage for order ${order.orderNumber} (via webhook)`,
+                notes: `Transfer failed: ${transferError.message}. Charge ID: ${charge.id}`,
+            });
+        }
+    }
+};
+
+export const handleChargeDisputeClosed = async (dispute: Stripe.Dispute): Promise<void> => {
+    console.log('🔒 Dispute closed:', dispute.id, 'Status:', dispute.status);
+
+    // If dispute was won, we may need to reverse the debt tracking
+    if (dispute.status === 'won') {
+        console.log('✅ Dispute won! Checking if we need to reverse any debt records...');
+        
+        // Find any pending debt records for this dispute
+        const debtRecords = await ClinicBalance.findAll({
+            where: {
+                stripeRefundId: dispute.id,
+                status: 'pending'
+            }
+        });
+
+        if (debtRecords.length > 0) {
+            console.log(`✅ Found ${debtRecords.length} pending debt record(s) to cancel`);
+            
+            for (const debt of debtRecords) {
+                await debt.update({
+                    status: 'cancelled',
+                    notes: `${debt.notes || ''}\nDispute won on ${new Date().toISOString()}. Debt cancelled.`
+                });
+            }
+            
+            console.log('✅ Cancelled debt records for won dispute');
+        } else {
+            console.log('ℹ️ No pending debt records found for this dispute');
+        }
+    } else if (dispute.status === 'lost') {
+        console.log('❌ Dispute lost. Brand coverage debt remains active.');
+        // Debt records should remain as pending or paid - no action needed
+    }
+};
+
 export const handleChargeDisputeCreated = async (dispute: Stripe.Dispute): Promise<void> => {
-    console.log('⚠️ Dispute created:', dispute.id);
+    console.log('⚠️ Chargeback/Dispute created:', dispute.id);
 
     // Find payment by charge ID
     const disputedPayment = await Payment.findOne({
         where: { stripeChargeId: dispute.charge },
         include: [
-            { model: Order, as: 'order' },
+            { 
+                model: Order, 
+                as: 'order',
+                include: [
+                    { model: Clinic, as: 'clinic' }
+                ]
+            },
             { model: BrandSubscription, as: 'brandSubscription' }
         ]
     });
 
-    if (disputedPayment && disputedPayment.order) {
-        // Update order status to refunded (dispute handling)
-        await disputedPayment.order.updateStatus(OrderStatus.REFUNDED);
-        console.log('⚠️ Order marked as disputed:', disputedPayment.order.orderNumber);
+    if (!disputedPayment || !disputedPayment.order) {
+        console.log('⚠️ No order found for disputed charge:', dispute.charge);
+        return;
+    }
+
+    const order = disputedPayment.order;
+    const chargebackAmount = dispute.amount / 100; // Convert from cents to dollars
+
+    console.log(`💰 Chargeback amount: $${chargebackAmount} for order ${order.orderNumber}`);
+
+    // Update order status to refunded (dispute handling)
+    await order.updateStatus(OrderStatus.REFUNDED);
+    await disputedPayment.update({
+        status: 'refunded',
+        refundedAmount: chargebackAmount,
+        refundedAt: new Date(),
+    });
+    console.log('⚠️ Order marked as disputed/refunded:', order.orderNumber);
+
+    // Calculate what FUSE covered (difference between total and brand's portion)
+    const brandAmount = Number(order.brandAmount) || 0;
+    const fuseCoverage = chargebackAmount - brandAmount;
+
+    console.log(`💸 Chargeback breakdown:`, {
+        totalChargeback: chargebackAmount,
+        brandAmount: brandAmount,
+        fuseCoverage: fuseCoverage,
+    });
+
+    // If FUSE covered any amount, try to recover it from the brand
+    if (fuseCoverage > 0 && (order as any).clinic?.stripeAccountId) {
+        try {
+            // Attempt instant transfer from brand to FUSE to recover the coverage
+            const recoveryTransfer = await stripe.transfers.create({
+                amount: Math.round(fuseCoverage * 100), // Convert to cents
+                currency: 'usd',
+                destination: process.env.STRIPE_PLATFORM_ACCOUNT_ID || 'acct_1S56nzELzhgYQXTR',
+                metadata: {
+                    orderId: order.id,
+                    orderNumber: order.orderNumber,
+                    disputeId: dispute.id,
+                    chargeId: dispute.charge as string,
+                    type: 'chargeback_coverage',
+                },
+                description: `Chargeback coverage recovery for order ${order.orderNumber}`,
+            }, {
+                stripeAccount: (order as any).clinic.stripeAccountId,
+            });
+
+            console.log(`✅ Brand paid chargeback coverage instantly via transfer: ${recoveryTransfer.id}`);
+
+            // Record successful payment
+            await ClinicBalance.create({
+                clinicId: order.clinicId!,
+                orderId: order.id,
+                amount: fuseCoverage,
+                type: 'refund_debt',
+                status: 'paid',
+                stripeTransferId: recoveryTransfer.id,
+                stripeRefundId: dispute.id,
+                description: `Chargeback coverage for order ${order.orderNumber}`,
+                notes: `Chargeback ID: ${dispute.id}, Charge ID: ${dispute.charge}`,
+                paidAt: new Date(),
+            });
+
+        } catch (transferError: any) {
+            console.log(`⚠️ Brand transfer failed for chargeback coverage, registering as pending debt:`, transferError.message);
+
+            // Record as pending debt if transfer fails
+            await ClinicBalance.create({
+                clinicId: order.clinicId!,
+                orderId: order.id,
+                amount: -fuseCoverage, // Negative = brand owes money
+                type: 'refund_debt',
+                status: 'pending',
+                stripeRefundId: dispute.id,
+                description: `Pending chargeback coverage for order ${order.orderNumber}`,
+                notes: `Transfer failed: ${transferError.message}. Chargeback ID: ${dispute.id}, Charge ID: ${dispute.charge}`,
+            });
+        }
+    } else if (fuseCoverage <= 0) {
+        console.log(`ℹ️ No FUSE coverage needed - brand amount (${brandAmount}) covers full chargeback (${chargebackAmount})`);
+    } else {
+        console.log(`⚠️ Brand has no Stripe account connected - cannot recover chargeback coverage`);
+        
+        // Still record the debt even if we can't collect it immediately
+        await ClinicBalance.create({
+            clinicId: order.clinicId!,
+            orderId: order.id,
+            amount: -fuseCoverage,
+            type: 'refund_debt',
+            status: 'pending',
+            stripeRefundId: dispute.id,
+            description: `Pending chargeback coverage for order ${order.orderNumber} (no Stripe account)`,
+            notes: `Brand has no connected Stripe account. Chargeback ID: ${dispute.id}, Charge ID: ${dispute.charge}`,
+        });
     }
 };
 
@@ -1120,6 +1368,14 @@ export const processStripeWebhook = async (event: Stripe.Event): Promise<void> =
 
         case 'charge.dispute.created':
             await handleChargeDisputeCreated(event.data.object as Stripe.Dispute);
+            break;
+
+        case 'charge.dispute.closed':
+            await handleChargeDisputeClosed(event.data.object as Stripe.Dispute);
+            break;
+
+        case 'charge.refunded':
+            await handleChargeRefunded(event.data.object as Stripe.Charge);
             break;
 
         case 'checkout.session.completed':

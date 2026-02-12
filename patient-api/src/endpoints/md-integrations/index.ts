@@ -1526,5 +1526,134 @@ export function registerMDIntegrationsEndpoints(
         }
     });
 
+    // ============= QUESTIONNAIRE ENDPOINTS =============
+
+    // List all enabled partner questionnaires
+    app.get("/md/admin/questionnaires", authenticateJWT, async (req, res) => {
+        try {
+            const currentUser = getCurrentUser(req);
+            if (!currentUser) {
+                return res.status(401).json({ success: false, message: "Unauthorized" });
+            }
+
+            const MDAuthService = (
+                await import("../../services/mdIntegration/MDAuth.service")
+            ).default;
+            const { resolveMdIntegrationsBaseUrl } = await import("../../services/mdIntegration/config");
+
+            const tokenResponse = await MDAuthService.generateToken();
+
+            const url = resolveMdIntegrationsBaseUrl('/partner/questionnaires');
+
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${tokenResponse.access_token}`,
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const data: any = await response.json();
+
+            if (!response.ok) {
+                console.error("❌ Error listing MDI questionnaires:", data);
+                return res.status(response.status).json({
+                    success: false,
+                    message: "Failed to list MDI questionnaires",
+                    error: data
+                });
+            }
+
+            const rawQuestionnaires = Array.isArray(data) ? data : (data?.data || []);
+
+            console.log(`[MD-ADMIN] Listed ${rawQuestionnaires.length} questionnaires`);
+
+            // Normalize questionnaire data - MDI may use various field names for the ID
+            const questionnaires = rawQuestionnaires.map((q: any) => ({
+                ...q,
+                // Normalize the ID to a consistent field
+                _normalizedId: q.partner_questionnaire_id || q.questionnaire_id || q.id || q.uuid || null,
+            }));
+
+            return res.json({
+                success: true,
+                data: questionnaires,
+                count: questionnaires.length,
+                hint: "Use the questionnaire ID to fetch questions for a specific questionnaire"
+            });
+        } catch (error: any) {
+            console.error("❌ Error listing MDI questionnaires:", error?.response?.data || error?.message || error);
+            return res.status(500).json({
+                success: false,
+                message: "Failed to list MDI questionnaires",
+                error: error?.response?.data?.message || error?.message
+            });
+        }
+    });
+
+    // Get questions for a specific questionnaire
+    app.get("/md/admin/questionnaires/:questionnaireId/questions", authenticateJWT, async (req, res) => {
+        try {
+            const currentUser = getCurrentUser(req);
+            if (!currentUser) {
+                return res.status(401).json({ success: false, message: "Unauthorized" });
+            }
+
+            const { questionnaireId } = req.params;
+            if (!questionnaireId) {
+                return res.status(400).json({ success: false, message: "questionnaireId is required" });
+            }
+
+            const MDAuthService = (
+                await import("../../services/mdIntegration/MDAuth.service")
+            ).default;
+            const { resolveMdIntegrationsBaseUrl } = await import("../../services/mdIntegration/config");
+
+            const tokenResponse = await MDAuthService.generateToken();
+
+            const url = resolveMdIntegrationsBaseUrl(`/partner/questionnaires/${questionnaireId}/questions`);
+
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${tokenResponse.access_token}`,
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const data: any = await response.json();
+
+            if (!response.ok) {
+                console.error("❌ Error fetching questionnaire questions:", data);
+                return res.status(response.status).json({
+                    success: false,
+                    message: "Failed to fetch questionnaire questions",
+                    error: data
+                });
+            }
+
+            const questions = Array.isArray(data) ? data : (data?.data || []);
+
+            console.log(`[MD-ADMIN] Fetched ${questions.length} questions for questionnaire ${questionnaireId}`);
+
+            return res.json({
+                success: true,
+                data: questions,
+                count: questions.length,
+                questionnaireId,
+                hint: "These are the questions configured for this questionnaire in MDI"
+            });
+        } catch (error: any) {
+            console.error("❌ Error fetching questionnaire questions:", error?.response?.data || error?.message || error);
+            return res.status(500).json({
+                success: false,
+                message: "Failed to fetch questionnaire questions",
+                error: error?.response?.data?.message || error?.message
+            });
+        }
+    });
+
     console.log("✅ MD Integrations endpoints registered");
 }

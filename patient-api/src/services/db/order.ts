@@ -37,6 +37,11 @@ export const listOrdersByClinic = async (
             'discountAmount',
             'taxAmount',
             'shippingAmount',
+            'brandAmount',
+            'platformFeeAmount',
+            'doctorAmount',
+            'pharmacyWholesaleAmount',
+            'stripeAmount',
             'createdAt', 
             'shippedAt', 
             'deliveredAt'
