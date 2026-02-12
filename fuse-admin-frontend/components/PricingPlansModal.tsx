@@ -19,8 +19,9 @@ interface Plan {
   name: string;
   description: string;
   monthlyPrice: number;
-  regularPrice?: number;
-  promotionalPriceText?: string;
+  introMonthlyPrice?: number | null;
+  introMonthlyPriceDurationMonths?: number | null;
+  introMonthlyPriceStripeId?: string | null;
   stripePriceId: string;
   introductoryStripePriceId?: string | null;
   maxProducts: number;
@@ -109,10 +110,14 @@ export default function PricingPlansModal({
         planType: plan.planType,
         planName: plan.name,
         monthlyPrice: Number(plan.monthlyPrice || 0),
-        regularPrice: Number(plan.regularPrice || plan.monthlyPrice || 0),
+        regularPrice: Number(plan.monthlyPrice || 0),
         stripePriceId: plan.stripePriceId || "",
-        introductoryStripePriceId: plan.introductoryStripePriceId || null,
-        promotionalPriceText: plan.promotionalPriceText || "",
+        introductoryStripePriceId:
+          plan.introductoryStripePriceId || plan.introMonthlyPriceStripeId || null,
+        promotionalPriceText:
+          plan.introMonthlyPrice != null && plan.introMonthlyPriceDurationMonths
+            ? `for first ${plan.introMonthlyPriceDurationMonths} months`
+            : "",
       }),
     );
     onSelectPlan(plan);
@@ -232,7 +237,8 @@ export default function PricingPlansModal({
               {plans.map((plan) => {
                 const features = getPlanFeatures(plan);
                 const transactionFee = getTransactionFee(plan);
-                const isPopular = plan.sortOrder === 2; // Middle plan is typically popular
+                const isPopular =
+                  plan.planType === "standard" || plan.sortOrder === 2; // Growth should stay highlighted
 
                 return (
                   <div
@@ -260,11 +266,31 @@ export default function PricingPlansModal({
 
                       {/* Price */}
                       <div className="mb-8">
+                        {(() => {
+                          const hasIntroPricing =
+                            plan.introMonthlyPrice != null &&
+                            !!plan.introMonthlyPriceDurationMonths;
+                          const introPrice = Number(plan.introMonthlyPrice ?? 0);
+                          const regularPrice = Number(plan.monthlyPrice ?? 0);
+                          const introMonths = Number(
+                            plan.introMonthlyPriceDurationMonths ?? 0,
+                          );
+                          const currentDisplayPrice = hasIntroPricing
+                            ? introPrice
+                            : regularPrice;
+                          const currentDisplayText = hasIntroPricing
+                            ? introPrice === 0
+                              ? `for first ${introMonths} months`
+                              : `/month for first ${introMonths} months`
+                            : "/month";
+
+                          return (
+                            <>
                         {/* Regular Price (strikethrough) */}
-                        {plan.regularPrice ? (
+                        {hasIntroPricing ? (
                           <div className="flex items-baseline mb-0.5 h-3">
                             <span className="text-sm text-muted-foreground/70 line-through">
-                              ${Number(plan.regularPrice).toLocaleString()}
+                              ${regularPrice.toLocaleString()}
                             </span>
                             <span className="text-sm text-muted-foreground/70 ml-1">
                               /month
@@ -277,12 +303,15 @@ export default function PricingPlansModal({
                         {/* Current Price */}
                         <div className="flex items-baseline flex-wrap">
                           <span className="text-4xl font-bold text-foreground">
-                            ${Number(plan.monthlyPrice).toLocaleString()}
+                            ${currentDisplayPrice.toLocaleString()}
                           </span>
                           <span className="text-base text-foreground ml-1">
-                            {plan.promotionalPriceText || "/month"}
+                            {currentDisplayText}
                           </span>
                         </div>
+                            </>
+                          );
+                        })()}
 
                         {/* Transaction Fee */}
                         {transactionFee && (
