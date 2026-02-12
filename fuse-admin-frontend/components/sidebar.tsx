@@ -118,6 +118,15 @@ export function Sidebar() {
           const needsTutorial = data.data.tutorialFinished === false && data.data.status === "active" && data.data.stripeCustomerId !== null;
           console.log("needsTutorial", needsTutorial);
 
+          const skipTutorialRedirect =
+            typeof window !== "undefined" &&
+            localStorage.getItem("skipTutorialRedirectOnce") === "1";
+          if (skipTutorialRedirect) {
+            localStorage.removeItem("skipTutorialRedirectOnce");
+            setRunTutorial(false);
+            return;
+          }
+
           // Set tutorial step from DB, default to 0 if not set
           const step = data.data.tutorialStep || 0;
           console.log("📍 Tutorial step from DB:", step);

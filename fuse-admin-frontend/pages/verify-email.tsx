@@ -56,13 +56,13 @@ export default function VerifyEmail() {
           
           setIsLoggingIn(true)
           
-          // Redirect to checkout after verification using the same logic as /plans
+          // Redirect to dashboard after verification.
           const selectedPlanType = localStorage.getItem('selectedPlanType')
-          setMessage('Redirecting to checkout...')
+          setMessage('Redirecting to dashboard...')
 
           const redirectToCheckout = async () => {
             if (!selectedPlanType) {
-              window.location.href = '/checkout'
+              window.location.href = '/'
               return
             }
 
@@ -83,7 +83,7 @@ export default function VerifyEmail() {
 
               if (!selectedPlan) {
                 console.error('Selected plan not found for checkout redirect:', selectedPlanType)
-                window.location.href = '/checkout'
+                window.location.href = '/'
                 return
               }
 
@@ -138,10 +138,10 @@ export default function VerifyEmail() {
                 queryParams.set('introMonthlyPriceStripeId', String(selectedPlan.introMonthlyPriceStripeId))
               }
 
-              window.location.href = `/checkout?${queryParams.toString()}`
+              window.location.href = `/?openCheckout=1&${queryParams.toString()}`
             } catch (error) {
               console.error('Failed to build checkout redirect from selected plan:', error)
-              window.location.href = '/checkout'
+              window.location.href = '/'
             }
           }
 
@@ -295,7 +295,7 @@ export default function VerifyEmail() {
                         <span className="flex-shrink-0 w-6 h-6 bg-primary text-primary-foreground rounded-full flex items-center justify-center font-semibold text-xs">
                           3
                         </span>
-                        <span>You'll be automatically logged in and redirected to checkout</span>
+                        <span>You'll be automatically logged in and redirected to your dashboard</span>
                       </li>
                     </ol>
                   </div>
@@ -309,7 +309,7 @@ export default function VerifyEmail() {
               <div className="space-y-3">
                 {status === 'success' && isLoggingIn && (
                   <div className="text-sm text-muted-foreground">
-                    Logging you in and redirecting to checkout...
+                    Logging you in and redirecting to your dashboard...
                   </div>
                 )}
 

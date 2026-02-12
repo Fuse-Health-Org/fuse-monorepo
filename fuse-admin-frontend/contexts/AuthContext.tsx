@@ -10,6 +10,7 @@ interface User {
   lastName?: string
   companyName?: string
   phone?: string
+  phoneNumber?: string
   website?: string
   clinicId?: string
 }

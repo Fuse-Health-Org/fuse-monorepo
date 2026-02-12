@@ -7,7 +7,7 @@ BEGIN;
 UPDATE public."BrandSubscriptionPlans"
 SET
   "name" = CASE
-    WHEN "planType" = 'entry' THEN 'Starter'
+    WHEN "planType" = 'entry' THEN 'Trial'
     WHEN "planType" = 'standard' THEN 'Growth'
     WHEN "planType" = 'premium' THEN 'Pro'
     ELSE "name"
