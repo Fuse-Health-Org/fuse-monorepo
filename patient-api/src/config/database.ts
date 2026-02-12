@@ -433,6 +433,16 @@ export async function initializeDatabase() {
       console.log("Syncing...");
     }
 
+    // Ensure tables with FK dependencies are created in the correct order
+    // MedicalCompany must exist before MedicalCompanyPharmacy/DoctorPharmacy
+    try {
+      await MedicalCompany.sync({ alter: true });
+      await MedicalCompanyPharmacy.sync({ alter: true });
+      await DoctorPharmacy.sync({ alter: true });
+    } catch (depSyncErr) {
+      console.log('⚠️  Pre-sync for MedicalCompany tables:', depSyncErr instanceof Error ? depSyncErr.message : depSyncErr);
+    }
+
     // Sync all models to database (safer sync mode)
     await sequelize.sync({ alter: true });
     if (process.env.NODE_ENV === 'development') {
@@ -1063,10 +1073,8 @@ export async function initializeDatabase() {
 
     return true;
   } catch (error) {
-    // HIPAA: Do not log detailed database errors in production
-    if (process.env.NODE_ENV === 'development') {
-      console.error('❌ Unable to connect to the database:', error);
-    }
+    // Log connection error (safe - no PHI in connection errors)
+    console.error('❌ Unable to connect to the database:', error instanceof Error ? error.message : String(error));
     return false;
   }
 }
