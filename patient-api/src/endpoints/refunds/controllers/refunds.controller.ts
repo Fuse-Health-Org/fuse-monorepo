@@ -4,7 +4,7 @@ import Order from "@/models/Order";
 import Payment from "@/models/Payment";
 import Clinic from "@/models/Clinic";
 import ClinicBalance from "@/models/ClinicBalance";
-import { stripe } from "@fuse/stripe/src/config";
+import { stripe } from "@fuse/stripe";
 
 export const createRefund = async (req: Request, res: Response) => {
   try {

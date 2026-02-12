@@ -393,4 +393,5 @@ class StripeService {
 
 }
 
+export { stripe, stripeConfig } from './config';
 export { type CheckoutSubParams, StripeService };

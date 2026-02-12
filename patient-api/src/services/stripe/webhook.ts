@@ -23,7 +23,7 @@ import Sequence from '../../models/Sequence';
 import SequenceRun from '../../models/SequenceRun';
 import SequenceTriggerService from '../sequence/SequenceTriggerService';
 import ClinicBalance from '../../models/ClinicBalance';
-import { stripe } from '@fuse/stripe/src/config';
+import { stripe } from '@fuse/stripe';
 
 // Helper function to trigger checkout sequence
 async function triggerCheckoutSequence(order: Order): Promise<void> {
