@@ -11,6 +11,16 @@
         ".next/**"
       ]
     },
+    "build:windows": {
+      "dependsOn": [
+        "^build:windows"
+      ],
+      "outputs": [
+        "dist/**",
+        "bundle/**",
+        ".next/**"
+      ]
+    },
     "dev": {
       "cache": false,
       "dependsOn": [

@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "pnpm with-env next dev -p 3030",
     "build": "NODE_ENV=production pnpm with-env next build",
+    "build:windows": "cross-env NODE_ENV=production pnpm with-env next build",
     "start": "next start -p 3030",
     "lint": "next lint",
     "pm2:start": "pnpm with-env pm2 start npm --name tenant-portal-frontend --node-args='--max-old-space-size=1024 --no-warnings' -- start",
@@ -75,6 +76,7 @@
     "@types/node": "catalog:",
     "@types/react": "catalog:react18",
     "@types/react-dom": "catalog:react18",
+    "cross-env": "^7.0.3",
     "dotenv-cli": "catalog:",
     "eslint-config-next": "16.0.1",
     "postcss": "catalog:",
