@@ -6183,7 +6183,7 @@ app.post("/payments/program/sub", async (req, res) => {
       if (patientState && program.medicalTemplateId && program.clinicId) {
         // Get questionnaire with visit type configuration
         const questionnaire = await Questionnaire.findByPk(program.medicalTemplateId, {
-          attributes: ['id', 'visitTypeByState'],
+          attributes: ['id', 'visitTypeByState', 'medicalCompanySource'],
         });
 
         if (questionnaire && questionnaire.visitTypeByState) {
@@ -6195,9 +6195,12 @@ app.post("/payments/program/sub", async (req, res) => {
             attributes: ['id', 'visitTypeFees', 'patientPortalDashboardFormat'],
           });
 
-          const medicalCompany = clinicWithFees?.patientPortalDashboardFormat
+          const medicalCompanySlug =
+            (questionnaire as any)?.medicalCompanySource ||
+            clinicWithFees?.patientPortalDashboardFormat;
+          const medicalCompany = medicalCompanySlug
             ? await MedicalCompany.findOne({
-                where: { slug: clinicWithFees.patientPortalDashboardFormat },
+                where: { slug: medicalCompanySlug },
                 attributes: ['id', 'slug', 'visitTypeFees'],
               })
             : null;
@@ -6216,6 +6219,7 @@ app.post("/payments/program/sub", async (req, res) => {
                 visitType,
                 visitFeeAmount,
                 source: medicalCompanyFee ? 'medical-company' : 'clinic-fallback',
+                resolvedMedicalCompanySlug: medicalCompanySlug,
                 medicalCompanySlug: medicalCompany?.slug,
                 clinicId: program.clinicId,
               });

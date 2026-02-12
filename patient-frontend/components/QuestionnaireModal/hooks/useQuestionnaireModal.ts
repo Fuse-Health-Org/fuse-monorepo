@@ -1142,7 +1142,8 @@ export function useQuestionnaireModal(
             }),
           });
           if (feeResult.success && feeResult.data) {
-            calculatedVisitFee = feeResult.data.visitFeeAmount || 0;
+            const feeData = feeResult.data.data || feeResult.data;
+            calculatedVisitFee = feeData.visitFeeAmount || 0;
             console.log('💰 Visit fee recalculated before payment:', calculatedVisitFee);
           }
         } catch (error) {

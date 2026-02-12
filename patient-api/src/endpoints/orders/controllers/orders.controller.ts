@@ -258,7 +258,7 @@ export const createPaymentIntent = async (req: Request, res: Response) => {
             if (patientState && questionnaireId && clinicId) {
                 // Get questionnaire with visit type configuration
                 const questionnaire = await Questionnaire.findByPk(questionnaireId, {
-                    attributes: ['id', 'visitTypeByState'],
+                    attributes: ['id', 'visitTypeByState', 'medicalCompanySource'],
                 });
 
                 if (questionnaire && questionnaire.visitTypeByState) {
@@ -270,9 +270,12 @@ export const createPaymentIntent = async (req: Request, res: Response) => {
                         attributes: ['id', 'visitTypeFees', 'patientPortalDashboardFormat'],
                     });
 
-                    const medicalCompany = clinic?.patientPortalDashboardFormat
+                    const medicalCompanySlug =
+                        (questionnaire as any)?.medicalCompanySource ||
+                        clinic?.patientPortalDashboardFormat;
+                    const medicalCompany = medicalCompanySlug
                         ? await MedicalCompany.findOne({
-                            where: { slug: clinic.patientPortalDashboardFormat },
+                            where: { slug: medicalCompanySlug },
                             attributes: ['id', 'slug', 'visitTypeFees'],
                         })
                         : null;
@@ -290,6 +293,7 @@ export const createPaymentIntent = async (req: Request, res: Response) => {
                                 visitFeeAmount,
                                 clinicId,
                                 feeSource: medicalCompanyFee ? 'medical-company' : 'clinic-fallback',
+                                resolvedMedicalCompanySlug: medicalCompanySlug,
                                 medicalCompanySlug: medicalCompany?.slug,
                                 flowSource: questionnaireIdFromProgram ? 'Program' : 'Treatment',
                             });
