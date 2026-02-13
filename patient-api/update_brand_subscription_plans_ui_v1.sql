@@ -28,13 +28,13 @@ SET
   -- Intro pricing (used by modal and checkout flow)
   "introMonthlyPrice" = CASE
     WHEN "planType" = 'entry' THEN 0
-    WHEN "planType" = 'standard' THEN 275
+    WHEN "planType" = 'standard' THEN NULL
     WHEN "planType" = 'premium' THEN NULL
     ELSE "introMonthlyPrice"
   END,
   "introMonthlyPriceDurationMonths" = CASE
     WHEN "planType" = 'entry' THEN 2
-    WHEN "planType" = 'standard' THEN 2
+    WHEN "planType" = 'standard' THEN NULL
     WHEN "planType" = 'premium' THEN NULL
     ELSE "introMonthlyPriceDurationMonths"
   END,
@@ -74,8 +74,8 @@ SELECT
   '[]'::jsonb,
   true,
   CASE
-    WHEN bsp."planType" = 'entry' THEN 40
-    WHEN bsp."planType" = 'standard' THEN 17
+    WHEN bsp."planType" = 'entry' THEN 5
+    WHEN bsp."planType" = 'standard' THEN 5
     WHEN bsp."planType" = 'premium' THEN 5
     ELSE NULL
   END,
@@ -118,8 +118,8 @@ SET
   END,
   "isCustomTierCardTextActive" = true,
   "fuseFeePercent" = CASE
-    WHEN bsp."planType" = 'entry' THEN 40
-    WHEN bsp."planType" = 'standard' THEN 17
+    WHEN bsp."planType" = 'entry' THEN 5
+    WHEN bsp."planType" = 'standard' THEN 5
     WHEN bsp."planType" = 'premium' THEN 5
     ELSE tc."fuseFeePercent"
   END,
