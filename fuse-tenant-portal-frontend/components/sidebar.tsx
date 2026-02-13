@@ -32,7 +32,7 @@ const navigation = [
   { name: "Doctor Applications", icon: UserCheck, href: "/doctor-applications" },
   { name: "Tier Management", icon: Settings, href: "/tier-management" },
   { name: "Website Builder", icon: Palette, href: "/website-builder" },
-  { name: "Global Fees", icon: DollarSign, href: "/global-fees" },
+  { name: "Global Fees & Refunds", icon: DollarSign, href: "/global-fees" },
   { name: "Payouts Tracking", icon: CreditCard, href: "/payouts" },
   { name: "Audit Logs", icon: Shield, href: "/audit-logs" },
   { name: "Support", icon: MessageSquare, href: "/support" },

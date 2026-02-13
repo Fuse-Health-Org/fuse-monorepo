@@ -13,39 +13,54 @@ const router = Router();
  */
 router.get("/fees", authenticateJWT, async (req, res) => {
   try {
+    console.log("[GET /config/fees] Request received");
     const currentUser = (req as any).user;
     if (!currentUser) {
+      console.log("[GET /config/fees] No current user - returning 401");
       return res
         .status(401)
         .json({ success: false, message: "Not authenticated" });
     }
+    console.log("[GET /config/fees] User ID:", currentUser.userId);
 
-    const user = await User.findByPk(currentUser.id, {
+    const user = await User.findByPk(currentUser.userId, {
       include: [{ model: UserRoles, as: "userRoles", required: false }],
     });
 
     if (!user || !user.hasRoleSync("admin")) {
+      console.log("[GET /config/fees] User not admin - returning 403");
       return res.status(403).json({ success: false, message: "Forbidden" });
     }
+    console.log("[GET /config/fees] User is admin, fetching global fees...");
 
-    const globalFees = await GlobalFees.findOne();
+    let globalFees = await GlobalFees.findOne();
+    console.log("[GET /config/fees] GlobalFees row found:", !!globalFees);
 
     if (!globalFees) {
-      return res.status(404).json({
-        success: false,
-        message: "Global fees configuration not found. Please contact support.",
+      console.log("[GET /config/fees] Creating default GlobalFees row...");
+      globalFees = await GlobalFees.create({
+        fuseTransactionFeePercent: 0,
+        stripeTransactionFeePercent: 0,
+        fuseTransactionDoctorFeeUsd: 0,
+        refundProcessingDelayDays: 0,
       });
+      console.log("[GET /config/fees] Default row created with ID:", globalFees.id);
     }
+
+    const data = {
+      platformFeePercent: Number(globalFees.fuseTransactionFeePercent),
+      stripeFeePercent: Number(globalFees.stripeTransactionFeePercent),
+      doctorFlatFeeUsd: Number(globalFees.fuseTransactionDoctorFeeUsd),
+      refundProcessingDelayDays: Number(globalFees.refundProcessingDelayDays),
+    };
+    console.log("[GET /config/fees] Returning data:", data);
 
     return res.status(200).json({
       success: true,
-      data: {
-        platformFeePercent: Number(globalFees.fuseTransactionFeePercent),
-        stripeFeePercent: Number(globalFees.stripeTransactionFeePercent),
-        doctorFlatFeeUsd: Number(globalFees.fuseTransactionDoctorFeeUsd),
-      },
+      data,
     });
-  } catch {
+  } catch (error) {
+    console.error("[GET /config/fees] Error:", error);
     return res.status(500).json({
       success: false,
       message: "Failed to fetch fee configuration",
@@ -67,7 +82,7 @@ router.put("/fees", authenticateJWT, async (req, res) => {
         .json({ success: false, message: "Not authenticated" });
     }
 
-    const user = await User.findByPk(currentUser.id, {
+    const user = await User.findByPk(currentUser.userId, {
       include: [{ model: UserRoles, as: "userRoles", required: false }],
     });
 
@@ -75,18 +90,29 @@ router.put("/fees", authenticateJWT, async (req, res) => {
       return res.status(403).json({ success: false, message: "Forbidden" });
     }
 
-    const { platformFeePercent, stripeFeePercent, doctorFlatFeeUsd } = req.body;
+    const { platformFeePercent, stripeFeePercent, doctorFlatFeeUsd, refundProcessingDelayDays } = req.body;
 
     if (
       (platformFeePercent !== undefined &&
         typeof platformFeePercent !== "number") ||
       (stripeFeePercent !== undefined &&
         typeof stripeFeePercent !== "number") ||
-      (doctorFlatFeeUsd !== undefined && typeof doctorFlatFeeUsd !== "number")
+      (doctorFlatFeeUsd !== undefined && typeof doctorFlatFeeUsd !== "number") ||
+      (refundProcessingDelayDays !== undefined && typeof refundProcessingDelayDays !== "number")
     ) {
       return res.status(400).json({
         success: false,
         message: "Fee values must be numeric",
+      });
+    }
+
+    if (
+      refundProcessingDelayDays !== undefined &&
+      (!Number.isInteger(refundProcessingDelayDays) || refundProcessingDelayDays < 0)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Refund processing delay must be a non-negative integer",
       });
     }
 
@@ -97,6 +123,7 @@ router.put("/fees", authenticateJWT, async (req, res) => {
         fuseTransactionFeePercent: platformFeePercent ?? 0,
         stripeTransactionFeePercent: stripeFeePercent ?? 0,
         fuseTransactionDoctorFeeUsd: doctorFlatFeeUsd ?? 0,
+        refundProcessingDelayDays: refundProcessingDelayDays ?? 0,
       });
     } else {
       if (platformFeePercent !== undefined) {
@@ -108,6 +135,9 @@ router.put("/fees", authenticateJWT, async (req, res) => {
       if (doctorFlatFeeUsd !== undefined) {
         globalFees.fuseTransactionDoctorFeeUsd = doctorFlatFeeUsd;
       }
+      if (refundProcessingDelayDays !== undefined) {
+        globalFees.refundProcessingDelayDays = refundProcessingDelayDays;
+      }
       await globalFees.save();
     }
 
@@ -118,6 +148,7 @@ router.put("/fees", authenticateJWT, async (req, res) => {
         platformFeePercent: Number(globalFees.fuseTransactionFeePercent),
         stripeFeePercent: Number(globalFees.stripeTransactionFeePercent),
         doctorFlatFeeUsd: Number(globalFees.fuseTransactionDoctorFeeUsd),
+        refundProcessingDelayDays: Number(globalFees.refundProcessingDelayDays),
       },
     });
   } catch {

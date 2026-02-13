@@ -3,12 +3,13 @@ import { Header } from "@/components/header";
 import { Sidebar } from "@/components/sidebar";
 import { Card } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
-import { DollarSign, Save, AlertCircle } from 'lucide-react';
+import { DollarSign, Save, AlertCircle, RotateCcw } from 'lucide-react';
 
 interface GlobalFees {
   platformFeePercent: number;
   stripeFeePercent: number;
   doctorFlatFeeUsd: number;
+  refundProcessingDelayDays: number;
 }
 
 export default function GlobalFees() {
@@ -17,6 +18,7 @@ export default function GlobalFees() {
     platformFeePercent: 0,
     stripeFeePercent: 0,
     doctorFlatFeeUsd: 0,
+    refundProcessingDelayDays: 0,
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -47,7 +49,7 @@ export default function GlobalFees() {
       }
     } catch (error) {
       console.error('Error fetching global fees:', error);
-      setMessage({ type: 'error', text: 'Failed to load global fees configuration' });
+      setMessage({ type: 'error', text: 'Failed to load global fees & refunds configuration' });
     } finally {
       setLoading(false);
     }
@@ -76,7 +78,7 @@ export default function GlobalFees() {
       const result = await response.json();
       console.log('✅ Updated global fees:', result.data);
       
-      setMessage({ type: 'success', text: 'Global fees updated successfully!' });
+      setMessage({ type: 'success', text: 'Global fees & refunds updated successfully!' });
       
       // Clear success message after 3 seconds
       setTimeout(() => {
@@ -84,14 +86,16 @@ export default function GlobalFees() {
       }, 3000);
     } catch (error) {
       console.error('Error updating global fees:', error);
-      setMessage({ type: 'error', text: 'Failed to update global fees. Please try again.' });
+      setMessage({ type: 'error', text: 'Failed to update global fees & refunds. Please try again.' });
     } finally {
       setSaving(false);
     }
   };
 
   const handleInputChange = (field: keyof GlobalFees, value: string) => {
-    const numValue = parseFloat(value) || 0;
+    const numValue = field === 'refundProcessingDelayDays'
+      ? Math.max(0, Math.floor(parseFloat(value) || 0))
+      : parseFloat(value) || 0;
     setFees(prev => ({
       ...prev,
       [field]: numValue,
@@ -113,8 +117,8 @@ export default function GlobalFees() {
                   <DollarSign className="h-5 w-5 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-2xl font-bold text-foreground">Global Fees Configuration</h1>
-                  <p className="text-sm text-muted-foreground">Manage platform-wide transaction fees</p>
+                  <h1 className="text-2xl font-bold text-foreground">Global Fees & Refunds</h1>
+                  <p className="text-sm text-muted-foreground">Manage platform-wide transaction fees and refund settings</p>
                 </div>
               </div>
             </div>
@@ -150,7 +154,7 @@ export default function GlobalFees() {
                           Important: Platform-Wide Configuration
                         </p>
                         <p className="text-sm text-amber-700 dark:text-amber-400">
-                          Changes to these fees will affect all new transactions across the entire platform. 
+                          Changes to these fees and refund settings will affect all new transactions across the entire platform. 
                           Existing orders will not be affected.
                         </p>
                       </div>
@@ -229,6 +233,38 @@ export default function GlobalFees() {
                       <span className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
                         USD
                       </span>
+                    </div>
+                  </div>
+
+                  {/* Refund Settings Divider */}
+                  <div className="border-t border-border pt-2">
+                    <div className="flex items-center space-x-2 mb-6">
+                      <RotateCcw className="h-5 w-5 text-[#4FA59C]" />
+                      <h2 className="text-lg font-semibold text-foreground">Refund Settings</h2>
+                    </div>
+
+                    {/* Refund Processing Delay */}
+                    <div>
+                      <label className="block text-sm font-semibold text-foreground mb-2">
+                        Refund Processing Delay (Days)
+                      </label>
+                      <p className="text-sm text-muted-foreground mb-3">
+                        Number of days to wait before processing a refund after it is initiated
+                      </p>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          step="1"
+                          min="0"
+                          value={fees.refundProcessingDelayDays}
+                          onChange={(e) => handleInputChange('refundProcessingDelayDays', e.target.value)}
+                          className="w-full px-4 py-3 border border-input rounded-xl focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:border-transparent text-foreground text-base bg-background"
+                          placeholder="e.g., 7"
+                        />
+                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
+                          days
+                        </span>
+                      </div>
                     </div>
                   </div>
 
