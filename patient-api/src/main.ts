@@ -11766,16 +11766,18 @@ app.put("/organization/update", authenticateJWT, async (req, res) => {
 
         // Update default form color if provided
         if (defaultFormColor !== undefined) {
-          // Validate color format if not empty
-          if (
-            defaultFormColor &&
-            !/^#([0-9a-fA-F]{6})$/.test(defaultFormColor)
-          ) {
-            return res.status(400).json({
-              success: false,
-              message:
-                "Default form color must be a valid hex code (e.g. #1A2B3C)",
-            });
+          // Validate color format if not empty - allow hex codes or linear-gradient CSS
+          if (defaultFormColor) {
+            const isHexColor = /^#([0-9a-fA-F]{6})$/.test(defaultFormColor);
+            const isGradient = /^linear-gradient\(/.test(defaultFormColor);
+            
+            if (!isHexColor && !isGradient) {
+              return res.status(400).json({
+                success: false,
+                message:
+                  "Default form color must be a valid hex code (e.g. #1A2B3C) or linear gradient (e.g. linear-gradient(90deg, #FF751F 0%, #B11FFF 100%))",
+              });
+            }
           }
           updateData.defaultFormColor = defaultFormColor || null;
         }

@@ -8,12 +8,16 @@ import { rateLimit } from 'express-rate-limit';
  * - API abuse and scraping
  * - DDoS at application level
  * - Excessive resource consumption
+ * 
+ * In development, limits are more lenient to allow for testing and hot-reloading
  */
+
+const isDevelopment = process.env.NODE_ENV === 'development';
 
 // CRITICAL: Authentication endpoints (login, signup, password reset, MFA)
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  limit: 5, // 5 attempts per window
+  limit: isDevelopment ? 50 : 5, // 50 in dev, 5 in production
   message: {
     success: false,
     message: 'Too many authentication attempts from this IP, please try again after 15 minutes.',
@@ -32,7 +36,7 @@ export const authLimiter = rateLimit({
 // MODERATE: Public endpoints (products, treatments, clinics)
 export const publicLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  limit: 100, // 100 requests per window
+  limit: isDevelopment ? 10000 : 100, // 10000 in dev, 100 in production
   message: {
     success: false,
     message: 'Too many requests from this IP, please try again later.',

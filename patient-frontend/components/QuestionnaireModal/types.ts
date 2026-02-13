@@ -159,6 +159,7 @@ export interface ThemePalette {
     primaryLight: string;
     primaryLighter: string;
     text: string;
+    gradient?: string; // Optional gradient for linear-gradient support
 }
 
 export interface PlanOption {

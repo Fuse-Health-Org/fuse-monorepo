@@ -78,14 +78,22 @@ export function useQuestionnaireTheme(
   }, [themeColor]);
 
   const themeVars = useMemo(
-    () => ({
-      "--q-primary": theme.primary,
-      "--q-primary-dark": theme.primaryDark,
-      "--q-primary-darker": theme.primaryDarker,
-      "--q-primary-light": theme.primaryLight,
-      "--q-primary-lighter": theme.primaryLighter,
-      "--q-primary-text": theme.text,
-    } as React.CSSProperties),
+    () => {
+      const vars: any = {
+        "--q-primary": theme.primary,
+        "--q-primary-dark": theme.primaryDark,
+        "--q-primary-darker": theme.primaryDarker,
+        "--q-primary-light": theme.primaryLight,
+        "--q-primary-lighter": theme.primaryLighter,
+        "--q-primary-text": theme.text,
+      };
+      
+      if (theme.gradient) {
+        vars["--q-primary-gradient"] = theme.gradient;
+      }
+      
+      return vars as React.CSSProperties;
+    },
     [theme]
   );
 
