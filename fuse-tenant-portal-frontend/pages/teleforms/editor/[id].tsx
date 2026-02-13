@@ -331,6 +331,7 @@ export default function TemplateEditor() {
           const qRes = await fetch(`${baseUrl}/questionnaires/${templateId}`, { headers: { Authorization: `Bearer ${token}` } })
           const qData = await qRes.json().catch(() => ({}))
           if (!qRes.ok || !qData?.success || !qData?.data) {
+            console.error('Failed to load template:', { status: qRes.status, primary: data?.message, fallback: qData?.message })
             throw new Error(qData?.message || data?.message || "Failed to load template")
           }
           data = qData
