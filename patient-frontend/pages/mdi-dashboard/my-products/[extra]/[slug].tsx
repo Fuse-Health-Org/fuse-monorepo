@@ -224,8 +224,23 @@ export default function PublicProductPage() {
 
     const handleModalClose = () => {
         setIsModalOpen(false)
-        // Stay on the current subdomain and go to home page
-        window.location.href = window.location.origin + '/signin'
+        // Save current state to sessionStorage for potential resume
+        if (program) {
+            sessionStorage.setItem('lastViewedProgram', JSON.stringify({
+                id: program.id,
+                name: program.name,
+                timestamp: Date.now()
+            }))
+        } else if (product) {
+            sessionStorage.setItem('lastViewedProduct', JSON.stringify({
+                id: product.id,
+                name: product.name,
+                slug: product.slug,
+                timestamp: Date.now()
+            }))
+        }
+        // Navigate back to home/landing page on the current subdomain
+        router.push('/')
     }
 
     // Determine page title

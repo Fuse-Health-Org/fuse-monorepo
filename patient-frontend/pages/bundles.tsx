@@ -250,7 +250,7 @@ export default function BundlesPage() {
                             style={{
                                 width: "150px",
                                 height: "150px",
-                                backgroundColor: primaryColor,
+                                background: primaryColor,
                                 borderRadius: "12px",
                                 display: "flex",
                                 alignItems: "center",
@@ -328,7 +328,7 @@ export default function BundlesPage() {
                                     style={{
                                         width: "50px",
                                         height: "50px",
-                                        backgroundColor: itemIndex % 2 === 0 ? primaryColor : "#8b7355",
+                                        background: itemIndex % 2 === 0 ? primaryColor : "#8b7355",
                                         borderRadius: "8px",
                                         display: "flex",
                                         alignItems: "center",
@@ -428,7 +428,7 @@ export default function BundlesPage() {
                         <button
                             onClick={() => router.push('/all-products')}
                             style={{
-                                backgroundColor: primaryColor,
+                                background: primaryColor,
                                 color: "#fff",
                                 border: "none",
                                 padding: "0.5rem 1.5rem",
@@ -566,7 +566,7 @@ export default function BundlesPage() {
                     <button
                         style={{
                             padding: "0.5rem 1rem",
-                            backgroundColor: primaryColor,
+                            background: primaryColor,
                             color: "white",
                             border: "none",
                             borderRadius: "0.25rem",
@@ -1074,7 +1074,7 @@ export default function BundlesPage() {
                     <button
                         onClick={() => router.push('/')}
                         style={{
-                            backgroundColor: primaryColor,
+                            background: primaryColor,
                             color: "white",
                             padding: "1rem 3rem",
                             border: "none",

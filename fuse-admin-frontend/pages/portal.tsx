@@ -48,6 +48,7 @@ interface PortalSettings {
   portalTitle: string
   portalDescription: string
   primaryColor: string
+  defaultFormColor?: string
   fontFamily: string
   logo: string
   heroImageUrl: string
@@ -89,6 +90,20 @@ export default function PortalPage() {
   const [heroInputMode, setHeroInputMode] = useState<"file" | "url">("url")
   const logoFileInputRef = useRef<HTMLInputElement | null>(null)
   const heroFileInputRef = useRef<HTMLInputElement | null>(null)
+  
+  // Primary color gradient state
+  const [primaryColorMode, setPrimaryColorMode] = useState<"solid" | "gradient">("solid")
+  const [primaryGradientStops, setPrimaryGradientStops] = useState<Array<{ color: string; position: number }>>([
+    { color: "#FF751F", position: 0 },
+    { color: "#B11FFF", position: 100 },
+  ])
+  
+  // Form color gradient state
+  const [formColorMode, setFormColorMode] = useState<"solid" | "gradient">("solid")
+  const [formGradientStops, setFormGradientStops] = useState<Array<{ color: string; position: number }>>([
+    { color: "#FF751F", position: 0 },
+    { color: "#B11FFF", position: 100 },
+  ])
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -99,6 +114,7 @@ export default function PortalPage() {
     portalTitle: "Welcome to Our Portal",
     portalDescription: "Your trusted healthcare partner. Browse our products and services below.",
     primaryColor: "#000000",
+    defaultFormColor: "",
     fontFamily: "Playfair Display",
     logo: "",
     heroImageUrl: "https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=1920&q=80",
@@ -147,12 +163,64 @@ export default function PortalPage() {
       router.replace('/plans?message=Upgrade to Standard or higher to access Portal customization.')
     }
   }, [subscription, hasPortalAccess, router])
+  
+  // Detect if primaryColor is a gradient and set mode accordingly
+  useEffect(() => {
+    if (settings.primaryColor?.includes("linear-gradient")) {
+      setPrimaryColorMode("gradient")
+      // Parse gradient stops from CSS if possible
+      try {
+        const match = settings.primaryColor.match(/linear-gradient\(90deg,\s*(.+)\)/)
+        if (match && match[1]) {
+          const stops = match[1].split(",").map((stop) => {
+            const parts = stop.trim().split(" ")
+            const color = parts[0]
+            const position = parseFloat(parts[1]) || 0
+            return { color, position }
+          })
+          if (stops.length >= 2) {
+            setPrimaryGradientStops(stops)
+          }
+        }
+      } catch (e) {
+        console.error("Error parsing primary gradient:", e)
+      }
+    } else if (settings.primaryColor) {
+      setPrimaryColorMode("solid")
+    }
+  }, [settings.primaryColor])
+  
+  // Detect if defaultFormColor is a gradient and set mode accordingly
+  useEffect(() => {
+    if (settings.defaultFormColor?.includes("linear-gradient")) {
+      setFormColorMode("gradient")
+      // Parse gradient stops from CSS if possible
+      try {
+        const match = settings.defaultFormColor.match(/linear-gradient\(90deg,\s*(.+)\)/)
+        if (match && match[1]) {
+          const stops = match[1].split(",").map((stop) => {
+            const parts = stop.trim().split(" ")
+            const color = parts[0]
+            const position = parseFloat(parts[1]) || 0
+            return { color, position }
+          })
+          if (stops.length >= 2) {
+            setFormGradientStops(stops)
+          }
+        }
+      } catch (e) {
+        console.error("Error parsing gradient:", e)
+      }
+    } else if (settings.defaultFormColor) {
+      setFormColorMode("solid")
+    }
+  }, [settings.defaultFormColor])
 
   useEffect(() => {
     if (hasPortalAccess) {
       loadSettings()
       loadDefaultDisclaimer()
-      // Fetch clinic slug and custom domain info
+      // Fetch clinic slug, custom domain, and default form color
       const fetchClinicData = async () => {
         if (!user?.clinicId) return
         try {
@@ -166,6 +234,10 @@ export default function PortalPage() {
               if (data.data.isCustomDomain && data.data.customDomain) {
                 setIsCustomDomain(true)
                 setCustomDomain(data.data.customDomain)
+              }
+              // Load defaultFormColor from clinic settings
+              if (data.data.defaultFormColor) {
+                setSettings(prev => ({ ...prev, defaultFormColor: data.data.defaultFormColor }))
               }
             }
           }
@@ -215,6 +287,7 @@ export default function PortalPage() {
             portalTitle: data.data.portalTitle || settings.portalTitle,
             portalDescription: data.data.portalDescription || settings.portalDescription,
             primaryColor: data.data.primaryColor || settings.primaryColor,
+            defaultFormColor: data.data.defaultFormColor || settings.defaultFormColor || "",
             fontFamily: data.data.fontFamily || settings.fontFamily,
             logo: data.data.logo || settings.logo,
             heroImageUrl: data.data.heroImageUrl || settings.heroImageUrl,
@@ -252,9 +325,45 @@ export default function PortalPage() {
   }
 
   const handleSave = async () => {
+    // Validate primary color gradient if using linear gradient
+    if (settings.primaryColor?.includes("linear-gradient")) {
+      const gradientMatch = settings.primaryColor.match(/linear-gradient\(90deg,\s*(.+)\)/)
+      if (gradientMatch && gradientMatch[1]) {
+        const stops = gradientMatch[1].split(",")
+        for (const stop of stops) {
+          const colorMatch = stop.trim().match(/^(#[0-9A-Fa-f]+)/)
+          if (colorMatch) {
+            const hexColor = colorMatch[1]
+            if (!/^#[0-9A-Fa-f]{6}$/.test(hexColor)) {
+              error(`Invalid primary color gradient "${hexColor}". Please ensure all colors are complete 6-character hex codes (e.g., #FF751F)`, "Invalid Color")
+              return
+            }
+          }
+        }
+      }
+    }
+    
+    // Validate form color gradient if using linear gradient
+    if (settings.defaultFormColor?.includes("linear-gradient")) {
+      const gradientMatch = settings.defaultFormColor.match(/linear-gradient\(90deg,\s*(.+)\)/)
+      if (gradientMatch && gradientMatch[1]) {
+        const stops = gradientMatch[1].split(",")
+        for (const stop of stops) {
+          const colorMatch = stop.trim().match(/^(#[0-9A-Fa-f]+)/)
+          if (colorMatch) {
+            const hexColor = colorMatch[1]
+            if (!/^#[0-9A-Fa-f]{6}$/.test(hexColor)) {
+              error(`Invalid form color gradient "${hexColor}". Please ensure all colors are complete 6-character hex codes (e.g., #FF751F)`, "Invalid Color")
+              return
+            }
+          }
+        }
+      }
+    }
+
     setIsSaving(true)
     try {
-      // Convert footerCategories to section1-4 fields
+      // Save portal settings (CustomWebsite)
       const payload = {
         ...settings,
         section1: settings.footerCategories?.[0]?.visible ? settings.footerCategories[0].name : null,
@@ -268,6 +377,15 @@ export default function PortalPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       })
+
+      // Also save defaultFormColor to clinic/organization settings
+      if (settings.defaultFormColor) {
+        await authenticatedFetch(`${API_URL}/organization`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ defaultFormColor: settings.defaultFormColor }),
+        })
+      }
 
       if (response.ok) {
         success("Portal settings saved successfully!", "Settings Saved")
@@ -708,26 +826,337 @@ export default function PortalPage() {
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base font-semibold tracking-tight">Primary Color</CardTitle>
+                <CardDescription>Set the primary brand color for headers and CTAs</CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="color"
-                    value={settings.primaryColor}
-                    onChange={(e) => setSettings({ ...settings, primaryColor: e.target.value })}
-                    className="w-10 h-10 rounded cursor-pointer border-0"
-                  />
-                  <div
-                    className="w-10 h-10 rounded border border-input"
-                    style={{ backgroundColor: settings.primaryColor }}
-                  />
-                  <Input
-                    value={settings.primaryColor}
-                    onChange={(e) => setSettings({ ...settings, primaryColor: e.target.value })}
-                    placeholder="#000000"
-                    className="w-28"
-                  />
+              <CardContent className="space-y-4">
+                {/* Color Mode Toggle */}
+                <div className="flex items-center gap-2 p-1 bg-muted/50 rounded-lg w-fit">
+                  <button
+                    type="button"
+                    onClick={() => setPrimaryColorMode("solid")}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                      primaryColorMode === "solid"
+                        ? "bg-background shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Solid Color
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPrimaryColorMode("gradient")
+                      if (!settings.primaryColor?.includes("linear-gradient")) {
+                        const defaultGradient = `linear-gradient(90deg, ${primaryGradientStops
+                          .map((s) => `${s.color} ${s.position}%`)
+                          .join(", ")})`
+                        setSettings({ ...settings, primaryColor: defaultGradient })
+                      }
+                    }}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                      primaryColorMode === "gradient"
+                        ? "bg-background shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Linear Gradient
+                  </button>
                 </div>
+
+                {/* Solid Color Picker */}
+                {primaryColorMode === "solid" && (
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="color"
+                      value={settings.primaryColor || "#000000"}
+                      onChange={(e) => {
+                        setPrimaryColorMode("solid")
+                        setSettings({ ...settings, primaryColor: e.target.value })
+                      }}
+                      className="w-10 h-10 rounded cursor-pointer border-0"
+                    />
+                    <div
+                      className="w-10 h-10 rounded border border-input"
+                      style={{ backgroundColor: settings.primaryColor || "#000000" }}
+                    />
+                    <Input
+                      value={settings.primaryColor || ""}
+                      onChange={(e) => {
+                        const value = e.target.value
+                        if (value === "" || /^#[0-9A-Fa-f]{0,6}$/.test(value)) {
+                          setSettings({ ...settings, primaryColor: value })
+                        }
+                      }}
+                      placeholder="#000000"
+                      className="w-28 font-mono text-sm"
+                    />
+                  </div>
+                )}
+
+                {/* Gradient Editor */}
+                {primaryColorMode === "gradient" && (
+                  <div className="space-y-3 p-3 bg-muted/30 rounded-lg border border-border">
+                    {/* Gradient Preview */}
+                    <div
+                      className="h-12 rounded-lg border-2 border-border"
+                      style={{
+                        background: `linear-gradient(90deg, ${primaryGradientStops
+                          .sort((a, b) => a.position - b.position)
+                          .map((stop) => `${stop.color} ${stop.position}%`)
+                          .join(", ")})`,
+                      }}
+                    />
+
+                    {/* Gradient Stops */}
+                    <div className="space-y-2">
+                      {primaryGradientStops.map((stop, index) => (
+                        <div key={index} className="flex items-center gap-2 p-2 bg-background rounded border border-border">
+                          <input
+                            type="color"
+                            value={stop.color}
+                            onChange={(e) => {
+                              const newStops = [...primaryGradientStops]
+                              newStops[index].color = e.target.value
+                              setPrimaryGradientStops(newStops)
+                              const gradientCSS = `linear-gradient(90deg, ${newStops
+                                .sort((a, b) => a.position - b.position)
+                                .map((s) => `${s.color} ${s.position}%`)
+                                .join(", ")})`
+                              setSettings({ ...settings, primaryColor: gradientCSS })
+                            }}
+                            className="h-8 w-16 rounded cursor-pointer border-2 border-border"
+                          />
+                          <Input
+                            type="number"
+                            min="0"
+                            max="100"
+                            value={stop.position}
+                            onChange={(e) => {
+                              const value = Math.min(100, Math.max(0, parseInt(e.target.value) || 0))
+                              const newStops = [...primaryGradientStops]
+                              newStops[index].position = value
+                              setPrimaryGradientStops(newStops)
+                              const gradientCSS = `linear-gradient(90deg, ${newStops
+                                .sort((a, b) => a.position - b.position)
+                                .map((s) => `${s.color} ${s.position}%`)
+                                .join(", ")})`
+                              setSettings({ ...settings, primaryColor: gradientCSS })
+                            }}
+                            className="w-16 text-center text-sm"
+                          />
+                          <span className="text-xs text-muted-foreground">%</span>
+                          {primaryGradientStops.length > 2 && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                const newStops = primaryGradientStops.filter((_, i) => i !== index)
+                                setPrimaryGradientStops(newStops)
+                                const gradientCSS = `linear-gradient(90deg, ${newStops
+                                  .sort((a, b) => a.position - b.position)
+                                  .map((s) => `${s.color} ${s.position}%`)
+                                  .join(", ")})`
+                                setSettings({ ...settings, primaryColor: gradientCSS })
+                              }}
+                              className="text-destructive hover:text-destructive ml-auto"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const newStops = [...primaryGradientStops, { color: "#10B981", position: 50 }]
+                          setPrimaryGradientStops(newStops)
+                          const gradientCSS = `linear-gradient(90deg, ${newStops
+                            .sort((a, b) => a.position - b.position)
+                            .map((s) => `${s.color} ${s.position}%`)
+                            .join(", ")})`
+                          setSettings({ ...settings, primaryColor: gradientCSS })
+                        }}
+                        className="w-full"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Stop
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Form Color */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base font-semibold tracking-tight">Form Color</CardTitle>
+                <CardDescription>Set the color for form buttons and CTAs</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Color Mode Toggle */}
+                <div className="flex items-center gap-2 p-1 bg-muted/50 rounded-lg w-fit">
+                  <button
+                    type="button"
+                    onClick={() => setFormColorMode("solid")}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                      formColorMode === "solid"
+                        ? "bg-background shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Solid Color
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormColorMode("gradient")
+                      if (!settings.defaultFormColor?.includes("linear-gradient")) {
+                        const defaultGradient = `linear-gradient(90deg, ${formGradientStops
+                          .map((s) => `${s.color} ${s.position}%`)
+                          .join(", ")})`
+                        setSettings({ ...settings, defaultFormColor: defaultGradient })
+                      }
+                    }}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                      formColorMode === "gradient"
+                        ? "bg-background shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Linear Gradient
+                  </button>
+                </div>
+
+                {/* Solid Color Picker */}
+                {formColorMode === "solid" && (
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="color"
+                      value={settings.defaultFormColor || "#0EA5E9"}
+                      onChange={(e) => {
+                        setFormColorMode("solid")
+                        setSettings({ ...settings, defaultFormColor: e.target.value })
+                      }}
+                      className="w-10 h-10 rounded cursor-pointer border-0"
+                    />
+                    <div
+                      className="w-10 h-10 rounded border border-input"
+                      style={{ backgroundColor: settings.defaultFormColor || "#0EA5E9" }}
+                    />
+                    <Input
+                      value={settings.defaultFormColor || ""}
+                      onChange={(e) => {
+                        const value = e.target.value
+                        if (value === "" || /^#[0-9A-Fa-f]{0,6}$/.test(value)) {
+                          setSettings({ ...settings, defaultFormColor: value })
+                        }
+                      }}
+                      placeholder="#0EA5E9"
+                      className="w-28 font-mono text-sm"
+                    />
+                  </div>
+                )}
+
+                {/* Gradient Editor */}
+                {formColorMode === "gradient" && (
+                  <div className="space-y-3 p-3 bg-muted/30 rounded-lg border border-border">
+                    {/* Gradient Preview */}
+                    <div
+                      className="h-12 rounded-lg border-2 border-border"
+                      style={{
+                        background: `linear-gradient(90deg, ${formGradientStops
+                          .sort((a, b) => a.position - b.position)
+                          .map((stop) => `${stop.color} ${stop.position}%`)
+                          .join(", ")})`,
+                      }}
+                    />
+
+                    {/* Gradient Stops */}
+                    <div className="space-y-2">
+                      {formGradientStops.map((stop, index) => (
+                        <div key={index} className="flex items-center gap-2 p-2 bg-background rounded border border-border">
+                          <input
+                            type="color"
+                            value={stop.color}
+                            onChange={(e) => {
+                              const newStops = [...formGradientStops]
+                              newStops[index].color = e.target.value
+                              setFormGradientStops(newStops)
+                              const gradientCSS = `linear-gradient(90deg, ${newStops
+                                .sort((a, b) => a.position - b.position)
+                                .map((s) => `${s.color} ${s.position}%`)
+                                .join(", ")})`
+                              setSettings({ ...settings, defaultFormColor: gradientCSS })
+                            }}
+                            className="h-8 w-16 rounded cursor-pointer border-2 border-border"
+                          />
+                          <Input
+                            type="number"
+                            min="0"
+                            max="100"
+                            value={stop.position}
+                            onChange={(e) => {
+                              const value = Math.min(100, Math.max(0, parseInt(e.target.value) || 0))
+                              const newStops = [...formGradientStops]
+                              newStops[index].position = value
+                              setFormGradientStops(newStops)
+                              const gradientCSS = `linear-gradient(90deg, ${newStops
+                                .sort((a, b) => a.position - b.position)
+                                .map((s) => `${s.color} ${s.position}%`)
+                                .join(", ")})`
+                              setSettings({ ...settings, defaultFormColor: gradientCSS })
+                            }}
+                            className="w-16 text-center text-sm"
+                          />
+                          <span className="text-xs text-muted-foreground">%</span>
+                          {formGradientStops.length > 2 && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                const newStops = formGradientStops.filter((_, i) => i !== index)
+                                setFormGradientStops(newStops)
+                                const gradientCSS = `linear-gradient(90deg, ${newStops
+                                  .sort((a, b) => a.position - b.position)
+                                  .map((s) => `${s.color} ${s.position}%`)
+                                  .join(", ")})`
+                                setSettings({ ...settings, defaultFormColor: gradientCSS })
+                              }}
+                              className="text-destructive hover:text-destructive ml-auto"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const newStops = [...formGradientStops, { color: "#10B981", position: 50 }]
+                          setFormGradientStops(newStops)
+                          const gradientCSS = `linear-gradient(90deg, ${newStops
+                            .sort((a, b) => a.position - b.position)
+                            .map((s) => `${s.color} ${s.position}%`)
+                            .join(", ")})`
+                          setSettings({ ...settings, defaultFormColor: gradientCSS })
+                        }}
+                        className="w-full"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Stop
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -1633,13 +2062,13 @@ export default function PortalPage() {
                     {settings.logo ? (
                       <img src={settings.logo} alt="Logo" className="h-6 object-contain" />
                     ) : (
-                      <span className="font-bold text-sm" style={{ color: settings.primaryColor }}>
+                      <span className="font-bold text-sm" style={{ color: settings.primaryColor?.includes("linear-gradient") ? "#000000" : settings.primaryColor }}>
                         {settings.portalTitle?.split(" ")[0] || "BRAND"}
                       </span>
                     )}
                     <Button
                       size="sm"
-                      style={{ backgroundColor: settings.primaryColor }}
+                      style={{ background: settings.primaryColor }}
                       className="text-white text-xs"
                     >
                       Apply Now
@@ -1663,7 +2092,7 @@ export default function PortalPage() {
                       <div className="flex gap-2 justify-center">
                         <Button
                           size="sm"
-                          style={{ backgroundColor: settings.primaryColor }}
+                          style={{ background: settings.primaryColor }}
                           className="text-white"
                         >
                           View All Products →
@@ -1686,7 +2115,12 @@ export default function PortalPage() {
                         <div key={i} className="border rounded-lg p-2">
                           <div
                             className="h-20 rounded mb-2"
-                            style={{ backgroundColor: `${settings.primaryColor}20` }}
+                            style={{ 
+                              background: settings.primaryColor?.includes("linear-gradient") 
+                                ? settings.primaryColor 
+                                : `${settings.primaryColor}20`,
+                              opacity: settings.primaryColor?.includes("linear-gradient") ? 0.2 : 1
+                            }}
                           />
                           <div className="h-3 bg-gray-200 rounded w-3/4 mb-1" />
                           <div className="h-2 bg-gray-100 rounded w-1/2" />

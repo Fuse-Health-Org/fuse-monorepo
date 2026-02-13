@@ -151,6 +151,39 @@ export default function Settings({
     patientPortalDashboardFormat: "fuse" as "fuse" | "md-integrations",
   });
   const [organizationErrors, setOrganizationErrors] = useState<Record<string, string>>({});
+  
+  // Gradient state
+  const [colorMode, setColorMode] = useState<"solid" | "gradient">("solid");
+  const [gradientStops, setGradientStops] = useState<Array<{ color: string; position: number }>>([
+    { color: "#FF751F", position: 0 },
+    { color: "#B11FFF", position: 100 },
+  ]);
+
+  // Detect if defaultFormColor is a gradient and set mode accordingly
+  useEffect(() => {
+    if (organizationData.defaultFormColor?.includes("linear-gradient")) {
+      setColorMode("gradient");
+      // Parse gradient stops from CSS if possible (basic parsing)
+      try {
+        const match = organizationData.defaultFormColor.match(/linear-gradient\(90deg,\s*(.+)\)/);
+        if (match && match[1]) {
+          const stops = match[1].split(",").map((stop) => {
+            const parts = stop.trim().split(" ");
+            const color = parts[0];
+            const position = parseFloat(parts[1]) || 0;
+            return { color, position };
+          });
+          if (stops.length >= 2) {
+            setGradientStops(stops);
+          }
+        }
+      } catch (e) {
+        console.error("Error parsing gradient:", e);
+      }
+    } else if (organizationData.defaultFormColor) {
+      setColorMode("solid");
+    }
+  }, [organizationData.defaultFormColor]);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [isHoveringLogo, setIsHoveringLogo] = useState(false);
@@ -813,6 +846,24 @@ export default function Settings({
       if (trimmedDomain.startsWith("app.") && trimmedDomain.substring(4).trim() === "") {
         showToast("error", "Please enter a valid domain after 'app.' (e.g., app.yourdomain.com)");
         return;
+      }
+    }
+
+    // Validate gradient colors if using linear gradient
+    if (organizationData.defaultFormColor?.includes("linear-gradient")) {
+      const gradientMatch = organizationData.defaultFormColor.match(/linear-gradient\(90deg,\s*(.+)\)/);
+      if (gradientMatch && gradientMatch[1]) {
+        const stops = gradientMatch[1].split(",");
+        for (const stop of stops) {
+          const colorMatch = stop.trim().match(/^(#[0-9A-Fa-f]+)/);
+          if (colorMatch) {
+            const hexColor = colorMatch[1];
+            if (!/^#[0-9A-Fa-f]{6}$/.test(hexColor)) {
+              showToast("error", `Invalid gradient color "${hexColor}". Please ensure all colors are complete 6-character hex codes (e.g., #FF751F)`);
+              return;
+            }
+          }
+        }
       }
     }
 
@@ -1631,7 +1682,43 @@ export default function Settings({
                           Choose a default color for all your forms. This color will be used as the primary theme color for buttons and accents.
                         </p>
                         <div className="space-y-4">
-                          {/* Predefined Color Palette */}
+                          {/* Color Mode Toggle */}
+                          <div className="flex items-center gap-2 p-1 bg-muted/50 rounded-lg w-fit">
+                            <button
+                              type="button"
+                              onClick={() => setColorMode("solid")}
+                              className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                                colorMode === "solid"
+                                  ? "bg-background shadow-sm"
+                                  : "text-muted-foreground hover:text-foreground"
+                              }`}
+                            >
+                              Solid Color
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setColorMode("gradient");
+                                // If switching to gradient mode and no gradient is set, initialize with default
+                                if (!organizationData.defaultFormColor?.includes("linear-gradient")) {
+                                  const defaultGradient = `linear-gradient(90deg, ${gradientStops
+                                    .map((s) => `${s.color} ${s.position}%`)
+                                    .join(", ")})`;
+                                  setOrganizationData((prev) => ({ ...prev, defaultFormColor: defaultGradient }));
+                                }
+                              }}
+                              className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                                colorMode === "gradient"
+                                  ? "bg-background shadow-sm"
+                                  : "text-muted-foreground hover:text-foreground"
+                              }`}
+                            >
+                              Linear Gradient
+                            </button>
+                          </div>
+
+                          {/* Predefined Color Palette - Only show for solid */}
+                          {colorMode === "solid" && (
                           <div className="grid grid-cols-4 md:grid-cols-8 gap-3">
                             {[
                               { name: "Ocean Blue", color: "#0EA5E9" },
@@ -1647,6 +1734,7 @@ export default function Settings({
                                 key={preset.color}
                                 type="button"
                                 onClick={() => {
+                                  setColorMode("solid");
                                   setOrganizationData((prev) => ({ ...prev, defaultFormColor: preset.color }));
                                 }}
                                 className={`relative group h-16 rounded-lg transition-all ${organizationData.defaultFormColor === preset.color
@@ -1667,14 +1755,231 @@ export default function Settings({
                               </button>
                             ))}
                           </div>
+                          )}
+
+                          {/* Gradient Editor - Only show for gradient mode */}
+                          {colorMode === "gradient" && (
+                            <div className="space-y-4 p-4 bg-muted/30 rounded-lg border border-border">
+                              {/* Preset Gradients */}
+                              <div className="space-y-2">
+                                <label className="text-sm font-medium">Preset Gradients</label>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                  {[
+                                    { name: "Sunset", stops: [{ color: "#FF751F", position: 0 }, { color: "#B11FFF", position: 100 }] },
+                                    { name: "Ocean", stops: [{ color: "#0EA5E9", position: 0 }, { color: "#14B8A6", position: 100 }] },
+                                    { name: "Forest", stops: [{ color: "#10B981", position: 0 }, { color: "#059669", position: 100 }] },
+                                    { name: "Fire", stops: [{ color: "#F43F5E", position: 0 }, { color: "#F59E0B", position: 100 }] },
+                                  ].map((preset) => (
+                                    <button
+                                      key={preset.name}
+                                      type="button"
+                                      onClick={() => {
+                                        setGradientStops(preset.stops);
+                                        const gradientCSS = `linear-gradient(90deg, ${preset.stops
+                                          .map((s) => `${s.color} ${s.position}%`)
+                                          .join(", ")})`;
+                                        setOrganizationData((prev) => ({ ...prev, defaultFormColor: gradientCSS }));
+                                      }}
+                                      className="relative group h-16 rounded-lg transition-all hover:scale-105 hover:shadow-lg border-2 border-border"
+                                      style={{
+                                        background: `linear-gradient(90deg, ${preset.stops
+                                          .map((s) => `${s.color} ${s.position}%`)
+                                          .join(", ")})`,
+                                      }}
+                                      title={preset.name}
+                                    >
+                                      <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                                        {preset.name}
+                                      </span>
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+
+                              <div className="space-y-3">
+                                <label className="text-sm font-medium">Custom Gradient Stops</label>
+                                
+                                {/* Gradient Preview Bar */}
+                                <div className="relative h-16 rounded-lg border-2 border-border overflow-hidden">
+                                  <div
+                                    className="absolute inset-0"
+                                    style={{
+                                      background: `linear-gradient(90deg, ${gradientStops
+                                        .sort((a, b) => a.position - b.position)
+                                        .map((stop) => `${stop.color} ${stop.position}%`)
+                                        .join(", ")})`,
+                                    }}
+                                  />
+                                </div>
+
+                                {/* Gradient Stops Editor */}
+                                <div className="space-y-3">
+                                  {gradientStops.map((stop, index) => (
+                                    <div key={index} className="flex items-center gap-3 p-3 bg-background rounded-lg border border-border">
+                                      <div className="flex items-center gap-2 flex-1">
+                                        <input
+                                          type="color"
+                                          value={stop.color.length === 7 ? stop.color : "#000000"}
+                                          onChange={(e) => {
+                                            const newStops = [...gradientStops];
+                                            newStops[index].color = e.target.value;
+                                            setGradientStops(newStops);
+                                            // Update the form color with gradient CSS
+                                            const gradientCSS = `linear-gradient(90deg, ${newStops
+                                              .sort((a, b) => a.position - b.position)
+                                              .map((s) => `${s.color} ${s.position}%`)
+                                              .join(", ")})`;
+                                            setOrganizationData((prev) => ({ ...prev, defaultFormColor: gradientCSS }));
+                                          }}
+                                          className="h-10 w-20 rounded cursor-pointer border-2 border-border"
+                                        />
+                                        <div className="flex-1 relative">
+                                          <input
+                                            type="text"
+                                            value={stop.color}
+                                            onChange={(e) => {
+                                              const value = e.target.value;
+                                              // Allow typing partial hex codes but only update if complete (6 chars) or empty
+                                              if (/^#[0-9A-Fa-f]{0,6}$/.test(value)) {
+                                                const newStops = [...gradientStops];
+                                                newStops[index].color = value;
+                                                setGradientStops(newStops);
+                                                // Only update organizationData if hex code is complete (6 chars) or empty
+                                                if (value === "" || /^#[0-9A-Fa-f]{6}$/.test(value)) {
+                                                  const gradientCSS = `linear-gradient(90deg, ${newStops
+                                                    .sort((a, b) => a.position - b.position)
+                                                    .map((s) => `${s.color} ${s.position}%`)
+                                                    .join(", ")})`;
+                                                  setOrganizationData((prev) => ({ ...prev, defaultFormColor: gradientCSS }));
+                                                }
+                                              }
+                                            }}
+                                            placeholder="#FF751F"
+                                            className={`w-full px-3 py-2 rounded border bg-background focus:outline-none focus:ring-2 font-mono text-sm ${
+                                              stop.color && !/^#[0-9A-Fa-f]{6}$/.test(stop.color)
+                                                ? "border-destructive focus:ring-destructive"
+                                                : "border-border focus:ring-primary"
+                                            }`}
+                                          />
+                                          {stop.color && !/^#[0-9A-Fa-f]{6}$/.test(stop.color) && (
+                                            <div className="absolute -bottom-5 left-0 text-xs text-destructive whitespace-nowrap">
+                                              Must be exactly 6 hex characters
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <input
+                                          type="number"
+                                          min="0"
+                                          max="100"
+                                          value={stop.position}
+                                          onChange={(e) => {
+                                            const value = Math.min(100, Math.max(0, parseInt(e.target.value) || 0));
+                                            const newStops = [...gradientStops];
+                                            newStops[index].position = value;
+                                            setGradientStops(newStops);
+                                            const gradientCSS = `linear-gradient(90deg, ${newStops
+                                              .sort((a, b) => a.position - b.position)
+                                              .map((s) => `${s.color} ${s.position}%`)
+                                              .join(", ")})`;
+                                            setOrganizationData((prev) => ({ ...prev, defaultFormColor: gradientCSS }));
+                                          }}
+                                          className="w-16 px-2 py-2 rounded border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary text-sm text-center"
+                                        />
+                                        <span className="text-xs text-muted-foreground">%</span>
+                                      </div>
+                                      {gradientStops.length > 2 && (
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => {
+                                            const newStops = gradientStops.filter((_, i) => i !== index);
+                                            setGradientStops(newStops);
+                                            const gradientCSS = `linear-gradient(90deg, ${newStops
+                                              .sort((a, b) => a.position - b.position)
+                                              .map((s) => `${s.color} ${s.position}%`)
+                                              .join(", ")})`;
+                                            setOrganizationData((prev) => ({ ...prev, defaultFormColor: gradientCSS }));
+                                          }}
+                                          className="text-destructive hover:text-destructive"
+                                        >
+                                          <X className="h-4 w-4" />
+                                        </Button>
+                                      )}
+                                    </div>
+                                  ))}
+
+                                  {/* Add Stop Button */}
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      const newPosition = 50; // Default to middle
+                                      const newStops = [...gradientStops, { color: "#10B981", position: newPosition }];
+                                      setGradientStops(newStops);
+                                      const gradientCSS = `linear-gradient(90deg, ${newStops
+                                        .sort((a, b) => a.position - b.position)
+                                        .map((s) => `${s.color} ${s.position}%`)
+                                        .join(", ")})`;
+                                      setOrganizationData((prev) => ({ ...prev, defaultFormColor: gradientCSS }));
+                                    }}
+                                    className="w-full"
+                                  >
+                                    + Add Stop
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Custom Color Picker - Only show for solid */}
+                          {colorMode === "solid" && (
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium">Custom Color</label>
+                            <p className="text-xs text-muted-foreground mb-2">
+                              Or choose a custom color using the color picker
+                            </p>
+                            <div className="flex items-center gap-3">
+                              <input
+                                type="color"
+                                value={organizationData.defaultFormColor || "#0EA5E9"}
+                                onChange={(e) => {
+                                  setColorMode("solid");
+                                  setOrganizationData((prev) => ({ ...prev, defaultFormColor: e.target.value }));
+                                }}
+                                className="h-12 w-24 rounded-lg cursor-pointer border-2 border-border"
+                                title="Pick a custom color"
+                              />
+                              <div className="flex-1">
+                                <input
+                                  type="text"
+                                  value={organizationData.defaultFormColor || ""}
+                                  onChange={(e) => {
+                                    const value = e.target.value;
+                                    if (value === "" || /^#[0-9A-Fa-f]{0,6}$/.test(value)) {
+                                      setOrganizationData((prev) => ({ ...prev, defaultFormColor: value }));
+                                    }
+                                  }}
+                                  placeholder="#0EA5E9"
+                                  className="w-full px-4 py-2 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary font-mono text-sm"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                          )}
 
                           {/* Selected Color Display */}
                           <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg border border-border">
                             <div className="flex items-center gap-3">
                               <Palette className="h-5 w-5 text-muted-foreground" />
                               <div>
-                                <div className="text-sm font-medium">Selected Color</div>
-                                <div className="text-xs text-muted-foreground font-mono">
+                                <div className="text-sm font-medium">
+                                  Selected {colorMode === "gradient" ? "Gradient" : "Color"}
+                                </div>
+                                <div className="text-xs text-muted-foreground font-mono max-w-md truncate">
                                   {organizationData.defaultFormColor || "No color selected"}
                                 </div>
                               </div>
@@ -1683,7 +1988,11 @@ export default function Settings({
                               {organizationData.defaultFormColor && (
                                 <div
                                   className="w-12 h-12 rounded-lg border-2 border-white shadow-sm"
-                                  style={{ backgroundColor: organizationData.defaultFormColor }}
+                                  style={
+                                    colorMode === "gradient"
+                                      ? { background: organizationData.defaultFormColor }
+                                      : { backgroundColor: organizationData.defaultFormColor }
+                                  }
                                 />
                               )}
                               {organizationData.defaultFormColor && (
@@ -1693,6 +2002,7 @@ export default function Settings({
                                   size="sm"
                                   onClick={() => {
                                     setOrganizationData((prev) => ({ ...prev, defaultFormColor: "" }));
+                                    setColorMode("solid");
                                   }}
                                 >
                                   Reset

@@ -28,7 +28,7 @@ export default class CustomWebsite extends Entity {
     declare portalDescription?: string;
 
     @Column({
-        type: DataType.STRING(7), // Hex color format #RRGGBB
+        type: DataType.STRING(255), // Hex color format #RRGGBB or linear gradient
         allowNull: true,
         defaultValue: '#000000',
     })
@@ -73,7 +73,7 @@ export default class CustomWebsite extends Entity {
     declare isActive: boolean;
 
     @Column({
-        type: DataType.STRING(7), // Hex color format #RRGGBB
+        type: DataType.STRING(255), // Hex color format #RRGGBB or linear gradient
         allowNull: true,
         defaultValue: '#000000',
     })

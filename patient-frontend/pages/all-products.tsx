@@ -455,7 +455,7 @@ export default function AllProducts() {
                             fontSize: "0.875rem",
                             fontWeight: 600,
                             textDecoration: "none",
-                            backgroundColor: primaryColor,
+                            background: primaryColor,
                             color: "white",
                             cursor: "pointer",
                             border: "none",
@@ -612,7 +612,7 @@ export default function AllProducts() {
                     <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
                         <button
                             style={{
-                                backgroundColor: primaryColor,
+                                background: primaryColor,
                                 color: "white",
                                 padding: "0.5rem 1.5rem",
                                 border: "none",
@@ -689,7 +689,7 @@ export default function AllProducts() {
                     </p>
                     <button
                         style={{
-                            backgroundColor: primaryColor,
+                            background: primaryColor,
                             color: "white",
                             padding: "1rem 3rem",
                             border: "none",
@@ -820,7 +820,7 @@ export default function AllProducts() {
                             <button
                                 onClick={() => router.push('/')}
                                 style={{
-                                    backgroundColor: primaryColor,
+                                    background: primaryColor,
                                     color: "white",
                                     padding: "1rem 3rem",
                                     border: "none",

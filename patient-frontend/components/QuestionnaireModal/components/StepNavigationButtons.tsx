@@ -108,7 +108,7 @@ export const StepNavigationButtons: React.FC<StepNavigationButtonsProps> = ({
       disabled={isCheckoutStep() && paymentStatus !== 'succeeded'}
       className="w-full text-white font-medium py-4 px-6 rounded-2xl text-base h-auto flex items-center justify-center transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
       style={{
-        backgroundColor: theme.primary,
+        background: theme.primary,
         ...(isCheckoutStep() && paymentStatus !== 'succeeded' ? {} : { boxShadow: `0 10px 20px -10px ${theme.primaryDark}` })
       }}
     >

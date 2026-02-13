@@ -14,7 +14,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
     <div className="w-full rounded-full h-2 mb-8" style={{ backgroundColor }}>
         <div
             className="h-2 rounded-full transition-all duration-300"
-            style={{ width: `${progressPercent}%`, backgroundColor: color }}
+            style={{ width: `${progressPercent}%`, background: color }}
         />
     </div>
 );

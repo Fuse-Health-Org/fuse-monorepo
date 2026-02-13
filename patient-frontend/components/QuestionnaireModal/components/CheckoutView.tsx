@@ -253,14 +253,14 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
             <div className="lg:col-span-2 space-y-8">
                 {/* Medication Reserved Timer */}
                 <div className="flex items-center gap-2 p-4 rounded-lg" style={{ backgroundColor: theme.primaryLighter }}>
-                    <div className="w-5 h-5 rounded-full flex items-center justify-center" style={{ backgroundColor: theme.primary }}>
+                    <div className="w-5 h-5 rounded-full flex items-center justify-center" style={{ backgroundColor: theme.primaryDark }}>
                         <Icon icon="lucide:check" className="w-3 h-3 text-white" />
                     </div>
                     <div className="flex-1">
-                        <div className="text-sm font-medium" style={{ color: theme.primary }}>
+                        <div className="text-sm font-medium" style={{ color: theme.primaryDark }}>
                             Your medication is reserved
                         </div>
-                        <div className="text-xs" style={{ color: theme.primary }}>
+                        <div className="text-xs" style={{ color: theme.primaryDark }}>
                             Complete checkout to secure your prescription
                         </div>
                     </div>
@@ -471,7 +471,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                 <Card>
                     <CardBody className="p-6">
                         <div className="flex items-center gap-2 mb-6">
-                            <div className="w-6 h-6 rounded-full" style={{ backgroundColor: theme.primary }}>
+                            <div className="w-6 h-6 rounded-full" style={{ backgroundColor: theme.primaryDark }}>
                                 <div className="w-full h-full flex items-center justify-center">
                                     <Icon icon="lucide:check" className="w-4 h-4 text-white" />
                                 </div>

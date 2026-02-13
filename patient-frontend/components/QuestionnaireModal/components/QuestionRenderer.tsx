@@ -486,7 +486,7 @@ export const QuestionRenderer: React.FC<QuestionRendererProps> = ({
                                 <label
                                     key={option.id}
                                     className={`block w-full p-4 rounded-2xl border-2 cursor-pointer transition-all ${isSelected ? "" : "bg-white border-gray-200 hover:border-gray-300"}`}
-                                    style={isSelected ? { backgroundColor: theme.primaryLight, borderColor: theme.primary } : undefined}
+                                    style={isSelected ? { backgroundColor: theme.primaryLight, borderColor: theme.primaryDark } : undefined}
                                 >
                                     <div className="flex items-center">
                                         <div className="relative">
@@ -500,7 +500,7 @@ export const QuestionRenderer: React.FC<QuestionRendererProps> = ({
                                             />
                                             <div
                                                 className="w-5 h-5 rounded-full border-2 flex items-center justify-center"
-                                                style={isSelected ? { borderColor: theme.primary, backgroundColor: theme.primary } : undefined}
+                                                style={isSelected ? { borderColor: theme.primaryDark, backgroundColor: theme.primaryDark } : undefined}
                                             >
                                                 {isSelected && <div className="w-2 h-2 bg-white rounded-full"></div>}
                                             </div>
@@ -541,7 +541,7 @@ export const QuestionRenderer: React.FC<QuestionRendererProps> = ({
                                         key={option.value}
                                         type="button"
                                         className={`p-6 rounded-2xl border-2 text-center transition-all ${isSelected ? "" : "bg-white border-gray-200 hover:border-gray-300"}`}
-                                        style={isSelected ? { backgroundColor: theme.primaryLight, borderColor: theme.primary } : undefined}
+                                        style={isSelected ? { backgroundColor: theme.primaryLight, borderColor: theme.primaryDark } : undefined}
                                         onClick={() => onRadioChange(question.id, option.value)}
                                     >
                                         <div className="text-4xl mb-3">{option.emoji}</div>
@@ -595,7 +595,7 @@ export const QuestionRenderer: React.FC<QuestionRendererProps> = ({
                                             />
                                             <div
                                                 className="w-5 h-5 rounded-full border-2 flex items-center justify-center"
-                                                style={isChecked ? { borderColor: theme.primary, backgroundColor: theme.primary } : undefined}
+                                                style={isChecked ? { borderColor: theme.primaryDark, backgroundColor: theme.primaryDark } : undefined}
                                             >
                                                 {isChecked && <Icon icon="lucide:check" className="w-3 h-3 text-white" />}
                                             </div>
@@ -650,7 +650,7 @@ export const QuestionRenderer: React.FC<QuestionRendererProps> = ({
                                         key={option.id}
                                         type="button"
                                         className={`block w-full p-4 rounded-2xl border-2 text-left transition-all ${isSelected ? "" : "bg-white border-gray-200 hover:border-gray-300"}`}
-                                        style={isSelected ? { backgroundColor: theme.primaryLight, borderColor: theme.primary } : undefined}
+                                        style={isSelected ? { backgroundColor: theme.primaryLight, borderColor: theme.primaryDark } : undefined}
                                         onClick={() => onRadioChange(question.id, option.optionValue)}
                                     >
                                         <div className="flex items-center">
@@ -696,7 +696,7 @@ export const QuestionRenderer: React.FC<QuestionRendererProps> = ({
                                 <label
                                     key={option.id}
                                     className={`block w-full p-4 rounded-2xl border-2 cursor-pointer transition-all ${isSelected ? "" : "bg-white border-gray-200 hover:border-gray-300"}`}
-                                    style={isSelected ? { backgroundColor: theme.primaryLight, borderColor: theme.primary } : undefined}
+                                    style={isSelected ? { backgroundColor: theme.primaryLight, borderColor: theme.primaryDark } : undefined}
                                 >
                                     <div className="flex items-center">
                                         <div className="relative">
@@ -710,7 +710,7 @@ export const QuestionRenderer: React.FC<QuestionRendererProps> = ({
                                             />
                                             <div
                                                 className="w-5 h-5 rounded-full border-2 flex items-center justify-center"
-                                                style={isSelected ? { borderColor: theme.primary, backgroundColor: theme.primary } : undefined}
+                                                style={isSelected ? { borderColor: theme.primaryDark, backgroundColor: theme.primaryDark } : undefined}
                                             >
                                                 {isSelected && <div className="w-2 h-2 bg-white rounded-full"></div>}
                                             </div>
