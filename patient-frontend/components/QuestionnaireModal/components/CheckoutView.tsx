@@ -16,6 +16,7 @@ import { Elements } from "@stripe/react-stripe-js";
 import { StripeDeferredPaymentForm } from "../../StripeDeferredPaymentForm";
 import { CheckoutViewProps } from "../types";
 import { US_STATES } from "@fuse/enums";
+import { hasPOBox } from "../addressValidation";
 
 
 export const CheckoutView: React.FC<CheckoutViewProps> = ({
@@ -239,13 +240,16 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
         return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     };
 
+    const hasPOBoxAddress = hasPOBox(shippingInfo.address, shippingInfo.apartment);
+
     // Require shipping fields before enabling payment setup
     const canContinue = Boolean(
         selectedPlan &&
         (shippingInfo.address || '').trim() &&
         (shippingInfo.city || '').trim() &&
         (shippingInfo.state || '').trim() &&
-        (shippingInfo.zipCode || '').trim()
+        (shippingInfo.zipCode || '').trim() &&
+        !hasPOBoxAddress
     );
 
     return (
@@ -495,6 +499,11 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                                 onValueChange={(value) => onShippingInfoChange('apartment', value)}
                                 variant="bordered"
                             />
+                            {hasPOBoxAddress && (
+                                <p className="text-sm text-danger">
+                                    We cannot ship to P.O. boxes. Please enter a valid street address.
+                                </p>
+                            )}
 
                             <div className="grid grid-cols-2 gap-4">
                                 <Input
@@ -627,6 +636,9 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                                     return isProgramCheckout 
                                         ? 'Please select a product above'
                                         : 'Please select a plan above';
+                                }
+                                if (hasPOBoxAddress) {
+                                    return 'We cannot ship to P.O. boxes. Please enter a valid street address.';
                                 }
                                 if (!canContinue) {
                                     return 'Please fill out shipping address';
