@@ -169,8 +169,8 @@ class BrandSubscriptionService {
         ? new Date(currentPeriodEndUnix * 1000)
         : null;
 
-      // 9. Create BrandSubscription
-      brandSubscription.update({
+      // 9. Activate and link BrandSubscription
+      await brandSubscription.update({
         userId: user.id,
         status: BrandSubscriptionStatus.ACTIVE,
         stripeSubscriptionId: subscription.id,
@@ -500,9 +500,22 @@ class BrandSubscriptionService {
    */
   async markTutorialFinished(userId: string, step?: number): Promise<boolean> {
     try {
-      const subscription = await BrandSubscription.findOne({
-        where: { userId },
+      // Prefer marking the latest active subscription to match basic-info lookup logic.
+      let subscription = await BrandSubscription.findOne({
+        where: {
+          userId,
+          status: BrandSubscriptionStatus.ACTIVE,
+        },
+        order: [["createdAt", "DESC"]],
       });
+
+      // Fallback to latest subscription regardless of status.
+      if (!subscription) {
+        subscription = await BrandSubscription.findOne({
+          where: { userId },
+          order: [["createdAt", "DESC"]],
+        });
+      }
 
       if (!subscription) {
         return false;

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 import { useAuth } from '@/contexts/AuthContext'
@@ -25,7 +25,6 @@ import {
   useStripe,
   useElements
 } from '@stripe/react-stripe-js'
-import Layout from '@/components/Layout'
 
 // Initialize Stripe
 const stripePublishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || 'pk_test_...'
@@ -76,10 +75,11 @@ interface PaymentModalProps {
   introMonthlyPriceDurationMonths?: number | null
   regularMonthlyPrice?: number
   onClose: () => void
-  onRedirect: () => void
+  onGoToDashboard: () => void
+  onStartTutorial: () => void
 }
 
-function PaymentModal({ isOpen, state, errorMessage, planName, amount, hasIntroPricing, introMonthlyPrice, introMonthlyPriceDurationMonths, regularMonthlyPrice, onClose, onRedirect }: PaymentModalProps) {
+function PaymentModal({ isOpen, state, errorMessage, planName, amount, hasIntroPricing, introMonthlyPrice, introMonthlyPriceDurationMonths, regularMonthlyPrice, onClose, onGoToDashboard, onStartTutorial }: PaymentModalProps) {
   if (!isOpen) return null
 
   return (
@@ -173,13 +173,23 @@ function PaymentModal({ isOpen, state, errorMessage, planName, amount, hasIntroP
                   </>
                 )}
               </div>
-              <Button
-                onClick={onRedirect}
-                className="w-full bg-green-600 hover:bg-green-700 text-white py-3 text-lg font-semibold rounded-xl"
-              >
-                <Check className="w-5 h-5 mr-2" />
-                Go to Dashboard
-              </Button>
+              <div className="space-y-3">
+                <Button
+                  onClick={onGoToDashboard}
+                  className="w-full bg-green-600 hover:bg-green-700 text-white py-3 text-lg font-semibold rounded-xl"
+                >
+                  <Check className="w-5 h-5 mr-2" />
+                  Go to Dashboard
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={onStartTutorial}
+                  className="w-full py-3 text-base font-semibold rounded-xl"
+                >
+                  Start Tutorial
+                </Button>
+              </div>
             </div>
           )}
 
@@ -214,8 +224,75 @@ function PaymentModal({ isOpen, state, errorMessage, planName, amount, hasIntroP
   )
 }
 
+function ContactInformationCard({ paymentData }: { paymentData: any }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-xl font-semibold">Contact information</CardTitle>
+        <p className="text-sm text-muted-foreground">
+          Confirm the details associated with this account.
+        </p>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-2">Email address</label>
+            <Input
+              type="email"
+              placeholder="Enter your email"
+              value={paymentData.email}
+              onChange={(e) => paymentData.setEmail(e.target.value)}
+              autoComplete="email"
+              className="w-full"
+              required
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-2">First name</label>
+              <Input
+                type="text"
+                placeholder="First name"
+                value={paymentData.firstName}
+                onChange={(e) => paymentData.setFirstName(e.target.value)}
+                autoComplete="given-name"
+                className="w-full"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">Last name</label>
+              <Input
+                type="text"
+                placeholder="Last name"
+                value={paymentData.lastName}
+                onChange={(e) => paymentData.setLastName(e.target.value)}
+                autoComplete="family-name"
+                className="w-full"
+                required
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-2">Phone number</label>
+            <Input
+              type="tel"
+              placeholder="(555) 123-4567"
+              value={paymentData.phone}
+              onChange={(e) => paymentData.setPhone(e.target.value)}
+              autoComplete="tel"
+              className="w-full"
+              required
+            />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
 // Checkout form component that uses Stripe hooks
-function CheckoutForm({ checkoutData, paymentData, token, intentClientSecret, intentType, brandSubscriptionId, onSuccess, onError }: {
+function CheckoutForm({ checkoutData, paymentData, token, intentClientSecret, intentType, brandSubscriptionId, onSuccess, onError, isEmbedded, authenticatedFetch }: {
   checkoutData: CheckoutData
   paymentData: any
   token: string | null
@@ -224,6 +301,8 @@ function CheckoutForm({ checkoutData, paymentData, token, intentClientSecret, in
   brandSubscriptionId?: string
   onSuccess: () => void
   onError: (error: string) => void
+  isEmbedded: boolean
+  authenticatedFetch: (input: RequestInfo | URL, init?: RequestInit & { skipLogoutOn401?: boolean }) => Promise<Response>
 }) {
   const router = useRouter()
   const stripe = useStripe()
@@ -244,6 +323,13 @@ function CheckoutForm({ checkoutData, paymentData, token, intentClientSecret, in
     console.log('🔍 Elements loaded:', !!elements)
     console.log('🔍 Token available:', !!token)
     console.log('🔍 Intent type:', intentType)
+
+    if (!paymentData.email || !paymentData.firstName || !paymentData.lastName || !paymentData.phone) {
+      const errorMsg = 'Please complete your contact information before proceeding.'
+      setCardError(errorMsg)
+      onError(errorMsg)
+      return
+    }
 
     if (!stripe || !elements) {
       const errorMsg = 'Stripe has not loaded yet.'
@@ -508,8 +594,42 @@ function CheckoutForm({ checkoutData, paymentData, token, intentClientSecret, in
     setModalError('')
   }
 
-  const handleModalRedirect = () => {
-    router.push('/settings?message=Subscription activated successfully!')
+  const markOnboardingAsCompleted = async () => {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+    try {
+      await authenticatedFetch(`${apiUrl}/brand-subscriptions/mark-tutorial-finished`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({}),
+      })
+    } catch (error) {
+      console.error('Failed to mark onboarding as completed:', error)
+    }
+  }
+
+  const handleGoToDashboard = async () => {
+    await markOnboardingAsCompleted()
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('skipTutorialRedirectOnce', '1')
+    }
+    if (isEmbedded && typeof window !== 'undefined' && window.top) {
+      window.top.location.href = '/?message=Subscription activated successfully!'
+      return
+    }
+    router.push('/?message=Subscription activated successfully!')
+  }
+
+  const handleStartTutorial = () => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('skipTutorialRedirectOnce')
+    }
+    if (isEmbedded && typeof window !== 'undefined' && window.top) {
+      window.top.location.href = '/settings?message=Let%27s%20start%20your%20onboarding%20tutorial.'
+      return
+    }
+    router.push('/settings?message=Let%27s%20start%20your%20onboarding%20tutorial.')
   }
 
   return (
@@ -526,71 +646,12 @@ function CheckoutForm({ checkoutData, paymentData, token, intentClientSecret, in
         introMonthlyPriceDurationMonths={checkoutData.introMonthlyPriceDurationMonths}
         regularMonthlyPrice={checkoutData.subscriptionMonthlyPrice}
         onClose={handleModalClose}
-        onRedirect={handleModalRedirect}
+        onGoToDashboard={handleGoToDashboard}
+        onStartTutorial={handleStartTutorial}
       />
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Contact Information */}
         <fieldset disabled={isProcessing} className={isProcessing ? 'opacity-50 pointer-events-none' : ''}>
-        <div>
-          <h3 className="font-semibold mb-4 flex items-center gap-2">
-            <CreditCard className="w-5 h-5 text-blue-600" />
-            Contact information
-          </h3>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">Email address</label>
-              <Input
-                type="email"
-                placeholder="Enter your email"
-                value={paymentData.email}
-                onChange={(e) => paymentData.setEmail(e.target.value)}
-                autoComplete="email"
-                className="w-full"
-                required
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">First name</label>
-                <Input
-                  type="text"
-                  placeholder="First name"
-                  value={paymentData.firstName}
-                  onChange={(e) => paymentData.setFirstName(e.target.value)}
-                  autoComplete="given-name"
-                  className="w-full"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-2">Last name</label>
-                <Input
-                  type="text"
-                  placeholder="Last name"
-                  value={paymentData.lastName}
-                  onChange={(e) => paymentData.setLastName(e.target.value)}
-                  autoComplete="family-name"
-                  className="w-full"
-                  required
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-2">Phone number</label>
-              <Input
-                type="tel"
-                placeholder="(555) 123-4567"
-                value={paymentData.phone}
-                onChange={(e) => paymentData.setPhone(e.target.value)}
-                autoComplete="tel"
-                className="w-full"
-                required
-              />
-            </div>
-          </div>
-        </div>
-
         {/* Stripe Payment Element */}
         <div className="mt-6">
           <h3 className="font-semibold mb-4 flex items-center gap-2">
@@ -608,13 +669,18 @@ function CheckoutForm({ checkoutData, paymentData, token, intentClientSecret, in
         </div>
 
         {/* Terms and Conditions */}
-        <div className="flex items-center justify-center gap-6 text-sm text-muted-foreground py-4">
-          <div className="flex items-center gap-2">
-            <span>By proceeding, you agree to our</span>
-            <a href="/terms" className="text-blue-600 hover:text-blue-700 underline">Terms & Conditions</a>
-            <span>and</span>
-            <a href="/privacy" className="text-blue-600 hover:text-blue-700 underline">Privacy Policy</a>
-          </div>
+        <div className="text-center text-sm text-muted-foreground py-4">
+          <p className="leading-relaxed">
+            By proceeding, you agree to our{" "}
+            <a href="/terms" className="text-blue-600 hover:text-blue-700 underline">
+              Terms & Conditions
+            </a>{" "}
+            and{" "}
+            <a href="/privacy" className="text-blue-600 hover:text-blue-700 underline">
+              Privacy Policy
+            </a>
+            .
+          </p>
         </div>
 
         {/* CTA Button */}
@@ -644,7 +710,7 @@ function CheckoutForm({ checkoutData, paymentData, token, intentClientSecret, in
           )}
         </Button>
 
-        <div className="text-center space-y-2">
+        <div className="text-center space-y-2 mt-5">
           <p className="text-sm font-medium">
             ✅ Subscription activates immediately after payment
           </p>
@@ -660,11 +726,28 @@ function CheckoutForm({ checkoutData, paymentData, token, intentClientSecret, in
 
 export default function CheckoutPage() {
   const router = useRouter()
-  const { user, token, isLoading, refreshSubscription, subscription } = useAuth()
+  const { user, token, isLoading, refreshSubscription, subscription, authenticatedFetch } = useAuth()
+  const embedQueryParam = Array.isArray(router.query.embed) ? router.query.embed[0] : router.query.embed
+  const isEmbedded = embedQueryParam === '1'
   const [checkoutData, setCheckoutData] = useState<CheckoutData | null>(null)
   const [clientSecret, setClientSecret] = useState('')
+  const [initError, setInitError] = useState<string | null>(null)
   const [intentType, setIntentType] = useState<'payment_intent' | 'setup_intent'>('payment_intent')
   const [brandSubscriptionId, setBrandSubscriptionId] = useState<string | undefined>()
+  const introPricingEndsAt = useMemo(() => {
+    if (!checkoutData?.hasIntroPricing || !checkoutData?.introMonthlyPriceDurationMonths) {
+      return null
+    }
+
+    const endDate = new Date()
+    endDate.setMonth(endDate.getMonth() + Number(checkoutData.introMonthlyPriceDurationMonths))
+
+    return new Intl.DateTimeFormat('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    }).format(endDate)
+  }, [checkoutData?.hasIntroPricing, checkoutData?.introMonthlyPriceDurationMonths])
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -672,6 +755,60 @@ export default function CheckoutPage() {
       router.push('/signin?redirect=' + encodeURIComponent(router.asPath))
     }
   }, [user, isLoading, router])
+
+  // Report embedded checkout height to parent modal for better fit.
+  useEffect(() => {
+    if (!isEmbedded || typeof window === 'undefined' || !window.parent) return
+
+    const reportHeight = () => {
+      const bodyHeight = document.body?.scrollHeight || 0
+      const docHeight = document.documentElement?.scrollHeight || 0
+      const contentHeight = Math.max(bodyHeight, docHeight, 600)
+
+      window.parent.postMessage(
+        {
+          type: 'checkout-embed-height',
+          height: contentHeight,
+        },
+        window.location.origin
+      )
+    }
+
+    reportHeight()
+
+    const resizeObserver = new ResizeObserver(() => {
+      reportHeight()
+    })
+
+    resizeObserver.observe(document.body)
+    window.addEventListener('resize', reportHeight)
+
+    return () => {
+      resizeObserver.disconnect()
+      window.removeEventListener('resize', reportHeight)
+    }
+  }, [isEmbedded, checkoutData, clientSecret, isLoading])
+
+  // Bridge route: /checkout is no longer a standalone page.
+  // If not embedded, redirect to dashboard and open checkout modal there.
+  useEffect(() => {
+    if (!router.isReady || isEmbedded) return
+
+    const params = new URLSearchParams()
+    Object.entries(router.query).forEach(([key, value]) => {
+      if (key === 'embed') return
+      if (Array.isArray(value)) {
+        value.forEach((entry) => params.append(key, entry))
+        return
+      }
+      if (value != null) {
+        params.set(key, String(value))
+      }
+    })
+
+    params.set('openCheckout', '1')
+    void router.replace(`/?${params.toString()}`)
+  }, [router.isReady, router.query, router, isEmbedded])
   const [paymentData, setPaymentData] = useState({
     email: '',
     firstName: '',
@@ -684,6 +821,8 @@ export default function CheckoutPage() {
   })
 
   useEffect(() => {
+    if (!isEmbedded && router.isReady) return
+
     // Wait for router to be ready (query params are empty on first render in production)
     if (!router.isReady) return
 
@@ -697,6 +836,8 @@ export default function CheckoutPage() {
 
     // Get checkout data from query params
     const {
+      planType,
+      planName,
       planCategory,
       downpaymentPlanType,
       downpaymentName,
@@ -710,6 +851,93 @@ export default function CheckoutPage() {
       introMonthlyPriceDurationMonths: introMonthlyPriceDurationMonthsParam,
       introMonthlyPriceStripeId: introMonthlyPriceStripeIdParam,
     } = router.query
+
+    // New simplified flow: if only planType and planName are provided, fetch plan data from backend
+    const queryPlanType = Array.isArray(planType) ? planType[0] : planType
+    const queryPlanName = Array.isArray(planName) ? planName[0] : planName
+    if (queryPlanType && queryPlanName && !subscriptionMonthlyPrice) {
+      // Fetch plan data from backend
+      const fetchPlanData = async () => {
+        try {
+          const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+          const authToken = token || localStorage.getItem('admin_token')
+          const requestOptions: RequestInit = authToken
+            ? { headers: { Authorization: `Bearer ${authToken}` } }
+            : {}
+
+          // Try public endpoint first, then auth endpoint used by other flows
+          let data: any = null
+          let plans: any[] | null = null
+
+          try {
+            const response = await fetch(`${apiUrl}/subscriptions/plans`, requestOptions)
+            data = await response.json()
+            plans = data?.success && Array.isArray(data?.plans) ? data.plans : null
+          } catch {
+            plans = null
+          }
+
+          if (!plans) {
+            const response = await fetch(`${apiUrl}/brand-subscriptions/plans`, requestOptions)
+            data = await response.json()
+            plans = data?.success && Array.isArray(data?.plans) ? data.plans : null
+          }
+
+          if (plans) {
+            const selectedPlan = plans.find(
+              (p: any) =>
+                String(p.planType || '').toLowerCase() === String(queryPlanType).toLowerCase()
+            )
+            
+            if (selectedPlan) {
+              const introMonthsMatch = String(selectedPlan.promotionalPriceText || '').match(/(\d+)\s+months?/i)
+              const introMonths = introMonthsMatch ? parseInt(introMonthsMatch[1], 10) : 2
+              const hasIntroPricing =
+                selectedPlan.introductoryStripePriceId &&
+                Number(selectedPlan.monthlyPrice) < Number(selectedPlan.regularPrice || selectedPlan.monthlyPrice)
+
+              // Build URL with complete data and redirect
+              const params = new URLSearchParams({
+                planCategory: selectedPlan.planType,
+                subscriptionPlanType: selectedPlan.planType,
+                subscriptionPlanName: selectedPlan.name,
+                subscriptionMonthlyPrice: Number(selectedPlan.regularPrice || selectedPlan.monthlyPrice).toString(),
+                downpaymentPlanType: `downpayment_${selectedPlan.planType}`,
+                downpaymentName: `${selectedPlan.name} First Month`,
+                downpaymentAmount: Number(selectedPlan.monthlyPrice).toString(),
+                brandSubscriptionPlanId: selectedPlan.id,
+                stripePriceId: selectedPlan.stripePriceId || '',
+                ...(hasIntroPricing
+                  ? {
+                      introMonthlyPrice: Number(selectedPlan.monthlyPrice).toString(),
+                      introMonthlyPriceDurationMonths: introMonths.toString(),
+                      introMonthlyPriceStripeId: String(selectedPlan.introductoryStripePriceId),
+                    }
+                  : {}),
+              })
+              
+              const targetParams = new URLSearchParams(params)
+              if (isEmbedded) {
+                targetParams.set('embed', '1')
+              }
+              router.replace(`/checkout?${targetParams.toString()}`)
+            } else {
+              console.error('Plan not found from checkout query:', queryPlanType)
+              setInitError('We could not find your selected plan. Please sign in again and retry.')
+            }
+          } else {
+            console.error('Plans endpoint returned unexpected response')
+            setInitError('Unable to load plans for checkout. Please refresh and try again.')
+          }
+        } catch (error) {
+          console.error('Error fetching plan data:', error)
+          setInitError('Unable to initialize checkout. Please refresh and try again.')
+        }
+      }
+      
+      fetchPlanData()
+      return
+    }
 
     if (
       planCategory &&
@@ -762,10 +990,25 @@ export default function CheckoutPage() {
         createPaymentIntent(subscriptionPlanType as string, downpaymentAmountNum, brandSubscriptionPlanId as string)
       }
     } else {
-      // Redirect back if missing data
-      router.push('/plans')
+      // Missing query params: try localStorage fallback first, do not leave checkout flow
+      const storedPlanType = localStorage.getItem('selectedPlanType')
+      const storedPlanName = localStorage.getItem('selectedPlanName')
+
+      if (storedPlanType && storedPlanName) {
+        const fallbackParams = new URLSearchParams({
+          planType: storedPlanType,
+          planName: storedPlanName,
+        })
+        if (isEmbedded) {
+          fallbackParams.set('embed', '1')
+        }
+        router.replace(`/checkout?${fallbackParams.toString()}`)
+        return
+      }
+
+      setInitError('Missing checkout plan data. Please select a plan and try again.')
     }
-  }, [router.isReady, router.query, user, isLoading, subscription])
+  }, [router.isReady, router.query, user, isLoading, subscription, isEmbedded])
 
   const createPaymentIntent = async (planType: string, amount: number, brandSubscriptionPlanId?: string) => {
     try {
@@ -896,6 +1139,28 @@ export default function CheckoutPage() {
     // You could show a toast notification here
   }
 
+  // Enable scroll for checkout view (standalone and embedded)
+  useEffect(() => {
+    const htmlOverflow = document.documentElement.style.overflow
+    const bodyOverflow = document.body.style.overflow
+    const nextOverflow = document.getElementById('__next')?.style.overflow
+    
+    document.documentElement.style.overflow = 'auto'
+    document.body.style.overflow = 'auto'
+    const nextElement = document.getElementById('__next')
+    if (nextElement) {
+      nextElement.style.overflow = 'auto'
+    }
+    
+    return () => {
+      document.documentElement.style.overflow = htmlOverflow
+      document.body.style.overflow = bodyOverflow
+      if (nextElement) {
+        nextElement.style.overflow = nextOverflow || ''
+      }
+    }
+  }, [isEmbedded])
+
   // Auto-populate user data when user is available
   useEffect(() => {
     if (user) {
@@ -904,7 +1169,7 @@ export default function CheckoutPage() {
         email: user.email || '',
         firstName: user.firstName || '',
         lastName: user.lastName || '',
-        phone: user.phone || '',
+        phone: user.phone || user.phoneNumber || '',
         setEmail: (value: string) => setPaymentData(prev => ({ ...prev, email: value })),
         setFirstName: (value: string) => setPaymentData(prev => ({ ...prev, firstName: value })),
         setLastName: (value: string) => setPaymentData(prev => ({ ...prev, lastName: value })),
@@ -914,11 +1179,41 @@ export default function CheckoutPage() {
   }, [user])
 
 
+  if (initError) {
+    return (
+      <>
+        <Head>
+          <title>Checkout - Fuse Health</title>
+        </Head>
+        <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex items-center justify-center">
+          <Card className="max-w-md w-full mx-4">
+            <CardHeader>
+              <CardTitle>Checkout</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">{initError}</p>
+              <Button onClick={() => router.push('/signin')} className="w-full">
+                Go to Sign In
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </>
+    )
+  }
+
   // Show loading if auth is loading or if we don't have checkout data yet
+  if (!isEmbedded && !router.isReady) {
+    return null
+  }
+
   if (isLoading || !checkoutData || !clientSecret) {
     return (
-      <Layout>
-        <div className="min-h-screen bg-background flex items-center justify-center">
+      <>
+        <Head>
+          <title>Loading Checkout - Fuse Health</title>
+        </Head>
+        <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex items-center justify-center">
           <div className="text-center">
             <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
             <p className="text-muted-foreground">
@@ -926,42 +1221,19 @@ export default function CheckoutPage() {
             </p>
           </div>
         </div>
-      </Layout>
+      </>
     )
   }
 
-  return (
-    <Layout>
-      <Head>
-        <title>Checkout - Fuse Health</title>
-        <meta name="description" content="Complete your Fuse Health setup" />
-      </Head>
-
-      <div className="min-h-screen bg-background">
-        <div className="max-w-4xl mx-auto p-6">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-8">
-            <Button
-              variant="ghost"
-              onClick={() => router.back()}
-              className="flex items-center gap-2"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Back
-            </Button>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Lock className="w-4 h-4" />
-              <span>Secure checkout</span>
-            </div>
-          </div>
-
-          <div className="max-w-2xl mx-auto space-y-6">
-            {/* Plan Summary */}
-            <Card>
+  if (isEmbedded) {
+    return (
+      <div className="bg-background">
+        <div className="max-w-6xl mx-auto p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+            <div className="space-y-6">
+              <Card>
               <CardHeader>
-                <CardTitle className="text-xl font-semibold">
-                  Complete your payment
-                </CardTitle>
+                <CardTitle className="text-xl font-semibold">Plan summary</CardTitle>
                 <p className="text-sm text-muted-foreground">
                   Start your subscription with Fuse
                 </p>
@@ -979,7 +1251,187 @@ export default function CheckoutPage() {
                   </div>
                   <div className="text-right">
                     {checkoutData.hasIntroPricing ? (
-                      <div className="text-2xl font-bold">${(checkoutData.introMonthlyPrice ?? 0).toLocaleString()}/mo</div>
+                      <>
+                        <div className="text-2xl font-bold">${(checkoutData.introMonthlyPrice ?? 0).toLocaleString()}</div>
+                        <p className="text-xs text-muted-foreground">
+                          {introPricingEndsAt
+                            ? `Offer price through ${introPricingEndsAt}`
+                            : `Offer price for first ${checkoutData.introMonthlyPriceDurationMonths} months`}
+                        </p>
+                      </>
+                    ) : (
+                      <div className="text-2xl font-bold">${checkoutData.planPrice.toLocaleString()}.00</div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="border-t mt-6 pt-4">
+                  {checkoutData.hasIntroPricing ? (
+                    <>
+                      <div className="flex justify-between items-center py-2">
+                        <span className="text-sm text-muted-foreground">
+                          Intro price ({checkoutData.introMonthlyPriceDurationMonths} months)
+                        </span>
+                        <span className="text-lg font-semibold text-[#825AD1]">
+                          ${(checkoutData.introMonthlyPrice ?? 0).toLocaleString()} / month
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center py-2">
+                        <span className="text-sm text-muted-foreground">
+                          Regular price (after intro)
+                        </span>
+                        <span className="text-lg font-semibold text-[#825AD1]">
+                          ${checkoutData.subscriptionMonthlyPrice?.toLocaleString() || '0'} / month
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center py-2">
+                        <span className="text-sm text-muted-foreground">Due today</span>
+                        <span className="text-lg font-semibold text-[#825AD1]">
+                          ${(checkoutData.introMonthlyPrice ?? 0).toLocaleString()}
+                        </span>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex justify-between items-center py-2">
+                        <span className="text-sm text-muted-foreground">Monthly subscription</span>
+                        <span className="text-lg font-semibold text-[#825AD1]">
+                          ${checkoutData.subscriptionMonthlyPrice?.toLocaleString() || '0'} / month
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center py-2">
+                        <span className="text-sm text-muted-foreground">Previous plan</span>
+                        <span className="text-sm font-medium">
+                          {checkoutData.previousMonthlyPrice ? `$${checkoutData.previousMonthlyPrice.toLocaleString()} / month` : '—'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center py-2">
+                        <span className="text-sm text-muted-foreground">New plan</span>
+                        <span className="text-lg font-semibold text-[#825AD1]">
+                          ${checkoutData.subscriptionMonthlyPrice?.toLocaleString() || '0'} / month
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center py-2">
+                        <span className="text-sm text-muted-foreground">Due today</span>
+                        <span className="text-lg font-semibold text-[#825AD1]">
+                          ${checkoutData.planPrice.toLocaleString()}
+                        </span>
+                      </div>
+                    </>
+                  )}
+                </div>
+                <div className="flex justify-between items-center py-2 mt-4">
+                  <span className="font-bold">Due Today</span>
+                  <div className="text-3xl font-bold text-[#825AD1]">
+                    ${checkoutData.hasIntroPricing
+                      ? (checkoutData.introMonthlyPrice ?? 0).toLocaleString()
+                      : checkoutData.planPrice.toLocaleString()}
+                  </div>
+                </div>
+                {checkoutData.hasIntroPricing ? (
+                  <p className="text-sm text-muted-foreground">
+                    ${(checkoutData.introMonthlyPrice ?? 0).toLocaleString()}/month for {checkoutData.introMonthlyPriceDurationMonths} months
+                    {introPricingEndsAt ? ` (through ${introPricingEndsAt})` : ''}, then ${checkoutData.subscriptionMonthlyPrice?.toLocaleString()}/month.
+                  </p>
+                ) : checkoutData.subscriptionMonthlyPrice ? (
+                  <p className="text-sm text-muted-foreground">
+                    Then ${checkoutData.subscriptionMonthlyPrice.toLocaleString()} billed monthly starting next period.
+                  </p>
+                ) : null}
+              </CardContent>
+              </Card>
+              <ContactInformationCard paymentData={paymentData} />
+            </div>
+
+            <div className="md:sticky md:top-6">
+              <Elements stripe={stripePromise} options={{ clientSecret }}>
+                <Card>
+                  <CardHeader className='pb-0'>
+                    <CardTitle className="text-xl font-semibold">Payment method</CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      Add your payment details to go live
+                    </p>
+                  </CardHeader>
+                  <CardContent>
+                    <CheckoutForm
+                      checkoutData={checkoutData}
+                      paymentData={paymentData}
+                      token={token}
+                      intentClientSecret={clientSecret}
+                      intentType={intentType}
+                      brandSubscriptionId={brandSubscriptionId}
+                      onSuccess={handlePaymentSuccess}
+                      onError={handlePaymentError}
+                      isEmbedded={isEmbedded}
+                    authenticatedFetch={authenticatedFetch}
+                    />
+                  </CardContent>
+                </Card>
+              </Elements>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <>
+      <Head>
+        <title>Checkout - Fuse Health</title>
+        <meta name="description" content="Checkout - Fuse Health" />
+      </Head>
+
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
+        <div className="max-w-4xl mx-auto p-6">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
+                <Building2 className="w-5 h-5 text-primary-foreground" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-foreground">Fuse Health</h1>
+                <p className="text-xs text-muted-foreground">Final Step</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Lock className="w-4 h-4" />
+              <span>Secure checkout</span>
+            </div>
+          </div>
+
+          <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+            <div className="space-y-6">
+              {/* Plan Summary */}
+              <Card>
+              <CardHeader>
+                <CardTitle className="text-xl font-semibold">Plan summary</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Start your subscription with Fuse
+                </p>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <Building2 className="w-6 h-6 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold">{checkoutData.planName} Plan</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {checkoutData.hasIntroPricing ? 'Introductory pricing subscription' : 'Monthly subscription'}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    {checkoutData.hasIntroPricing ? (
+                      <>
+                        <div className="text-2xl font-bold">${(checkoutData.introMonthlyPrice ?? 0).toLocaleString()}</div>
+                        <p className="text-xs text-muted-foreground">
+                          {introPricingEndsAt
+                            ? `Offer price through ${introPricingEndsAt}`
+                            : `Offer price for first ${checkoutData.introMonthlyPriceDurationMonths} months`}
+                        </p>
+                      </>
                     ) : (
                       <div className="text-2xl font-bold">${checkoutData.planPrice.toLocaleString()}.00</div>
                     )}
@@ -1012,10 +1464,6 @@ export default function CheckoutPage() {
                           ${(checkoutData.introMonthlyPrice ?? 0).toLocaleString()}
                         </span>
                       </div>
-                      <div className="flex justify-between items-center py-2">
-                        <span className="text-sm text-muted-foreground">Transaction fee</span>
-                        <span className="text-sm font-medium">1% monthly</span>
-                      </div>
                     </>
                   ) : (
                     <>
@@ -1044,10 +1492,6 @@ export default function CheckoutPage() {
                           ${checkoutData.planPrice.toLocaleString()}
                         </span>
                       </div>
-                      <div className="flex justify-between items-center py-2">
-                        <span className="text-sm text-muted-foreground">Transaction fee</span>
-                        <span className="text-sm font-medium">1% monthly</span>
-                      </div>
                     </>
                   )}
                 </div>
@@ -1061,7 +1505,8 @@ export default function CheckoutPage() {
                 </div>
                 {checkoutData.hasIntroPricing ? (
                   <p className="text-sm text-muted-foreground">
-                    ${(checkoutData.introMonthlyPrice ?? 0).toLocaleString()}/mo for {checkoutData.introMonthlyPriceDurationMonths} months, then ${checkoutData.subscriptionMonthlyPrice?.toLocaleString()}/mo.
+                    ${(checkoutData.introMonthlyPrice ?? 0).toLocaleString()}/month for {checkoutData.introMonthlyPriceDurationMonths} months
+                    {introPricingEndsAt ? ` (through ${introPricingEndsAt})` : ''}, then ${checkoutData.subscriptionMonthlyPrice?.toLocaleString()}/month.
                   </p>
                 ) : checkoutData.subscriptionMonthlyPrice ? (
                   <p className="text-sm text-muted-foreground">
@@ -1069,60 +1514,64 @@ export default function CheckoutPage() {
                   </p>
                 ) : null}
               </CardContent>
-            </Card>
+              </Card>
+              <ContactInformationCard paymentData={paymentData} />
+            </div>
 
             {/* Stripe Elements Provider */}
-            <Elements stripe={stripePromise} options={{ clientSecret }}>
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-xl font-semibold">
-                    Payment Information
-                  </CardTitle>
-                  <p className="text-sm text-muted-foreground">
-                    Enter your payment details to get started
-                  </p>
-                </CardHeader>
-                <CardContent>
-                  {/* Social Proof */}
-                  <div className="bg-blue-50 rounded-xl p-4 border border-blue-200 mb-6">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="flex -space-x-2">
-                          {[1, 2, 3, 4].map((i) => (
-                            <div key={i} className="w-6 h-6 bg-blue-600 rounded-full border-2 border-white flex items-center justify-center">
-                              <Users className="w-3 h-3 text-white" />
-                            </div>
+            <div className="md:sticky md:top-6">
+              <Elements stripe={stripePromise} options={{ clientSecret }}>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-xl font-semibold">Payment method</CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      Add your payment details to go live
+                    </p>
+                  </CardHeader>
+                  <CardContent>
+                    {/* Social Proof */}
+                    <div className="bg-blue-50 rounded-xl p-4 border border-blue-200 mb-6">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="flex -space-x-2">
+                            {[1, 2, 3, 4].map((i) => (
+                              <div key={i} className="w-6 h-6 bg-blue-600 rounded-full border-2 border-white flex items-center justify-center">
+                                <Users className="w-3 h-3 text-white" />
+                              </div>
+                            ))}
+                          </div>
+                          <div className="text-sm font-medium">
+                            50+ clinics launched
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {[1, 2, 3, 4, 5].map((i) => (
+                            <Star key={i} className="w-4 h-4 fill-yellow-400 text-yellow-400" />
                           ))}
+                          <span className="ml-1 text-sm font-medium">4.8/5</span>
                         </div>
-                        <div className="text-sm font-medium">
-                          50+ clinics launched
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        {[1, 2, 3, 4, 5].map((i) => (
-                          <Star key={i} className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                        ))}
-                        <span className="ml-1 text-sm font-medium">4.8/5</span>
                       </div>
                     </div>
-                  </div>
 
-                  <CheckoutForm
-                    checkoutData={checkoutData}
-                    paymentData={paymentData}
-                    token={token}
-                    intentClientSecret={clientSecret}
-                    intentType={intentType}
-                    brandSubscriptionId={brandSubscriptionId}
-                    onSuccess={handlePaymentSuccess}
-                    onError={handlePaymentError}
-                  />
-                </CardContent>
-              </Card>
-            </Elements>
+                    <CheckoutForm
+                      checkoutData={checkoutData}
+                      paymentData={paymentData}
+                      token={token}
+                      intentClientSecret={clientSecret}
+                      intentType={intentType}
+                      brandSubscriptionId={brandSubscriptionId}
+                      onSuccess={handlePaymentSuccess}
+                      onError={handlePaymentError}
+                      isEmbedded={isEmbedded}
+                      authenticatedFetch={authenticatedFetch}
+                    />
+                  </CardContent>
+                </Card>
+              </Elements>
+            </div>
           </div>
         </div>
       </div>
-    </Layout>
+    </>
   )
 }

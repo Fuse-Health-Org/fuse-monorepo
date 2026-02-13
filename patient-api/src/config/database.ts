@@ -141,7 +141,10 @@ if (process.env.NODE_ENV === 'production' && !rdsCaCert) {
 
 export const sequelize = new Sequelize(databaseUrl, {
   ...sequelizeConfig,
-  models: [User, Product,
+  models: [
+    // Medical companies must be created before User due to foreign key relationship
+    MedicalCompany, MedicalCompanyPharmacy, DoctorPharmacy,
+    User, Product,
     Prescription, PrescriptionExtension, Treatment, PrescriptionProducts,
     TreatmentProducts, Clinic, Questionnaire, QuestionnaireCustomization,
     QuestionnaireStep, Question, QuestionOption,
@@ -152,8 +155,7 @@ export const sequelize = new Sequelize(databaseUrl, {
     TenantProductForm, FormProducts, GlobalFormStructure, Sale, DoctorPatientChats, Pharmacy, PharmacyCoverage, PharmacyProduct,
     TenantCustomFeatures, TierConfiguration, TenantAnalyticsEvents, FormAnalyticsDaily,
     MessageTemplate, Sequence, SequenceRun, Tag, UserTag, GlobalFees, WebsiteBuilderConfigs, UserRoles,
-    SupportTicket, TicketMessage, AuditLog, MfaToken, CustomWebsite, Like, BrandFavoritedProduct, Program, AffiliateProductImage, BrandInvitation,
-    MedicalCompany, MedicalCompanyPharmacy, DoctorPharmacy, ClinicBalance
+    SupportTicket, TicketMessage, AuditLog, MfaToken, CustomWebsite, Like, BrandFavoritedProduct, Program, AffiliateProductImage, BrandInvitation, ClinicBalance
   ],
 });
 

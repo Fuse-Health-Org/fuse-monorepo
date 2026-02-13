@@ -46,6 +46,8 @@ export default function SignUp() {
   const [agreedToPrivacy, setAgreedToPrivacy] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [selectedPlanType, setSelectedPlanType] = useState<string | null>(null)
+  const [selectedPlanName, setSelectedPlanName] = useState<string | null>(null)
   const { user } = useAuth()
   const router = useRouter()
   const [invitationInfo, setInvitationInfo] = useState<any>(null)
@@ -57,6 +59,18 @@ export default function SignUp() {
       router.push('/')
     }
   }, [user, router])
+
+  // Load selected plan from localStorage
+  useEffect(() => {
+    const planType = localStorage.getItem('selectedPlanType')
+    const planName = localStorage.getItem('selectedPlanName')
+    if (planType) {
+      setSelectedPlanType(planType)
+    }
+    if (planName) {
+      setSelectedPlanName(planName)
+    }
+  }, [])
 
   // Load invitation information if invitation parameter exists
   useEffect(() => {
@@ -182,7 +196,8 @@ export default function SignUp() {
           clinicName: formData.companyName,
           businessType: formData.businessType,
           website: formData.website,
-          ...(router.query.invitation && { invitationSlug: router.query.invitation as string })
+          ...(router.query.invitation && { invitationSlug: router.query.invitation as string }),
+          ...(selectedPlanType && { selectedPlanType })
         }),
       })
 
@@ -191,8 +206,10 @@ export default function SignUp() {
       console.log('Signup response:', { status: response.status, data })
 
       if (response.ok && data.success) {
-        // Show success message and redirect to dashboard
-        router.push('/?message=Account created successfully! Welcome to Fuse.')
+        // Keep selected plan in localStorage - it will be needed after email verification for checkout
+        // Plan will be cleared after successful payment
+        // Redirect to verification page with user email
+        router.push(`/verify-email?email=${encodeURIComponent(formData.email)}`)
       } else {
         // Handle different types of errors
         let errorMessage = 'Signup failed'
@@ -278,6 +295,29 @@ export default function SignUp() {
                   <p className="text-xs text-muted-foreground">
                     Your brand will be automatically configured to use {invitationInfo.patientPortalDashboardFormat === 'md-integrations' ? 'MD Integrations' : 'Fuse'} as the doctor portal.
                   </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Selected Plan Banner */}
+          {selectedPlanType && (
+            <Card className="bg-primary/10 border-primary/20">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
+                      <Building2 className="h-5 w-5 text-primary-foreground" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-foreground">
+                        Selected Plan: <span>{selectedPlanName || selectedPlanType?.replace(/_/g, ' ')}</span>
+                      </h3>
+                      <p className="text-xs text-muted-foreground">
+                        You can change your plan later from your dashboard
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>

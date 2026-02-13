@@ -4,7 +4,7 @@ import Order from "@/models/Order";
 import Payment from "@/models/Payment";
 import Clinic from "@/models/Clinic";
 import ClinicBalance from "@/models/ClinicBalance";
-import { stripe } from "@fuse/stripe";
+import { stripe } from "@/utils/useGetStripeClient";
 
 export const createRefund = async (req: Request, res: Response) => {
   try {
@@ -65,7 +65,6 @@ export const createRefund = async (req: Request, res: Response) => {
       refundAmount,
     });
 
-    // Step 1: Create refund with reverse_transfer
     const refundParams: any = {
       payment_intent: payment.stripePaymentIntentId,
       reverse_transfer: true,
