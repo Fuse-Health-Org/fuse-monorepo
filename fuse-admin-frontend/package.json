@@ -17,7 +17,6 @@
   },
   "dependencies": {
     "@fuse/enums": "workspace:*",
-    "@googlemaps/js-api-loader": "^2.0.1",
     "@hookform/resolvers": "^3.10.0",
     "@radix-ui/react-accordion": "1.2.2",
     "@radix-ui/react-alert-dialog": "1.1.4",
@@ -53,7 +52,6 @@
     "autoprefixer": "catalog:",
     "class-variance-authority": "catalog:",
     "clsx": "catalog:",
-    "cmdk": "catalog:",
     "date-fns": "catalog:",
     "embla-carousel-react": "catalog:",
     "input-otp": "catalog:",
@@ -67,7 +65,6 @@
     "react-hook-form": "catalog:",
     "react-resizable-panels": "catalog:",
     "recharts": "catalog:",
-    "sonner": "catalog:",
     "tailwind-merge": "catalog:",
     "tailwindcss-animate": "catalog:",
     "vaul": "catalog:",
