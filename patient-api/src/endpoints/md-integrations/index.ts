@@ -707,10 +707,7 @@ export function registerMDIntegrationsEndpoints(
             }
 
             // Build case questions from stored questionnaire answers
-            const { extractCaseQuestions } = await import('../../utils/questionnaireAnswers');
-            const caseQuestions = (order as any).questionnaireAnswers
-                ? extractCaseQuestions((order as any).questionnaireAnswers)
-                : [];
+            const { extractCaseQuestions, extractRichCaseQuestions } = await import('../../utils/questionnaireAnswers');
 
             // Step 1: Generate access token (uses cached token if available)
             const MDAuthService = (await import('../../services/mdIntegration/MDAuth.service')).default;
@@ -718,7 +715,8 @@ export function registerMDIntegrationsEndpoints(
 
             const tokenResponse = await MDAuthService.generateToken();
 
-            // Step 3: Create case with minimal payload (patient_id + offering_id + optional questions)
+            // Create case with minimal payload (patient_id + offering_id)
+            // Questions will be posted separately after case creation for md-integrations source
             const casePayload: any = {
                 patient_id: user.mdPatientId, // From step 2 (already synced via syncPatientInMD)
                 metadata: `orderId: ${order.id}`, // Link back to internal order
@@ -726,35 +724,91 @@ export function registerMDIntegrationsEndpoints(
                 case_offerings: [{ offering_id: offeringId }], // Pre-configured offering
             };
 
-            // Add questionnaire answers if available (optional enhancement)
-            if (caseQuestions.length > 0) {
-                casePayload.case_questions = caseQuestions;
-            }
-
             if (process.env.NODE_ENV === 'development') {
                 console.log('[MD-CASE] Creating case with payload:', JSON.stringify(casePayload, null, 2));
             }
 
             const caseResponse = await MDCaseService.createCase(casePayload, tokenResponse.access_token);
+            const caseId = (caseResponse as any).case_id;
 
             // Store case_id in order for future reference and webhook processing
-            await order.update({ mdCaseId: (caseResponse as any).case_id });
+            await order.update({ mdCaseId: caseId });
 
             if (process.env.NODE_ENV === 'development') {
                 console.log('[MD-CASE] ✅ Case created successfully:', {
-                    caseId: (caseResponse as any).case_id,
+                    caseId,
                     orderId: order.id,
                     patientId: user.mdPatientId
                 });
+            }
+
+            // Post case questions individually after case creation
+            // Check if the questionnaire is from md-integrations source
+            let questionsResult: { posted: number; failed: number; errors: string[] } = { posted: 0, failed: 0, errors: [] };
+
+            if ((order as any).questionnaireAnswers) {
+                // Check medicalCompanySource from the questionnaire linked to this order
+                let medicalCompanySource: string | null = null;
+                try {
+                    // Try to find the questionnaire through the order's product/treatment
+                    if ((order as any).questionnaireId) {
+                        const Questionnaire = (await import('../../models/Questionnaire')).default;
+                        const questionnaire = await Questionnaire.findByPk((order as any).questionnaireId);
+                        if (questionnaire) {
+                            medicalCompanySource = questionnaire.medicalCompanySource;
+                        }
+                    }
+                    // If not found via questionnaireId, try through tenantProduct
+                    if (!medicalCompanySource && (order as any).tenantProductId) {
+                        const TenantProduct = (await import('../../models/TenantProduct')).default;
+                        const Questionnaire = (await import('../../models/Questionnaire')).default;
+                        const tp = await TenantProduct.findByPk((order as any).tenantProductId);
+                        if (tp && (tp as any).productId) {
+                            const q = await Questionnaire.findOne({ where: { productId: (tp as any).productId } });
+                            if (q) {
+                                medicalCompanySource = q.medicalCompanySource;
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.warn('[MD-CASE] Could not determine medicalCompanySource:', e);
+                }
+
+                // Default to md-integrations if we can't determine source (clinic already confirmed as MDI)
+                if (!medicalCompanySource) {
+                    medicalCompanySource = 'md-integrations';
+                }
+
+                console.log('[MD-CASE] Questionnaire medicalCompanySource:', medicalCompanySource);
+
+                if (medicalCompanySource === 'md-integrations') {
+                    // Use rich format and post questions individually via POST /v1/partner/cases/:case_id/questions
+                    const richQuestions = extractRichCaseQuestions((order as any).questionnaireAnswers);
+
+                    if (richQuestions.length > 0) {
+                        console.log(`[MD-CASE] Posting ${richQuestions.length} questions to case ${caseId} via individual POST endpoint`);
+                        questionsResult = await MDCaseService.postCaseQuestions(caseId, richQuestions, tokenResponse.access_token);
+                        console.log(`[MD-CASE] Questions posted: ${questionsResult.posted} success, ${questionsResult.failed} failed`);
+                    }
+                } else {
+                    // For non-MDI sources, use the basic format (backward compatible)
+                    const basicQuestions = extractCaseQuestions((order as any).questionnaireAnswers);
+                    if (basicQuestions.length > 0) {
+                        console.log(`[MD-CASE] Posting ${basicQuestions.length} basic questions to case ${caseId}`);
+                        questionsResult = await MDCaseService.postCaseQuestions(caseId, basicQuestions, tokenResponse.access_token);
+                        console.log(`[MD-CASE] Questions posted: ${questionsResult.posted} success, ${questionsResult.failed} failed`);
+                    }
+                }
             }
 
             return res.json({
                 success: true,
                 message: 'MD Integrations case created successfully',
                 data: {
-                    caseId: (caseResponse as any).case_id,
+                    caseId,
                     patientId: user.mdPatientId,
-                    orderId: order.id
+                    orderId: order.id,
+                    questions: questionsResult
                 }
             });
         } catch (error: any) {

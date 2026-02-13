@@ -1120,12 +1120,6 @@ export const handlePaymentIntentAmountCapturableUpdated = async (paymentIntent: 
             return;
         }
 
-        // Build case questions from questionnaire answers (optional)
-        const { extractCaseQuestions } = await import('../../utils/questionnaireAnswers');
-        const caseQuestions = order.questionnaireAnswers
-            ? extractCaseQuestions(order.questionnaireAnswers)
-            : [];
-
         // Step 1: Generate access token (uses cached token if available)
         const MDAuthService = (await import('../mdIntegration/MDAuth.service')).default;
         const MDCaseService = (await import('../mdIntegration/MDCase.service')).default;
@@ -1137,31 +1131,72 @@ export const handlePaymentIntentAmountCapturableUpdated = async (paymentIntent: 
             return;
         }
 
-        // Step 3: Create case with minimal payload
+        // Create case with minimal payload (questions posted separately)
         const caseData = {
-            patient_id: user.mdPatientId, // TypeScript now knows this is string (not undefined)
+            patient_id: user.mdPatientId,
             metadata: `orderId: ${order.id}`,
             hold_status: false,
             case_offerings: [{ offering_id: offeringId }],
         };
 
-        // Add questionnaire answers if available
-        if (caseQuestions.length > 0) {
-            (caseData as any).case_questions = caseQuestions;
-        }
-
         const caseResponse = await MDCaseService.createCase(caseData, tokenResponse.access_token);
+        const caseId = caseResponse.case_id;
 
         // Save the case ID to the order
-        await order.update({
-            mdCaseId: caseResponse.case_id
-        });
+        await order.update({ mdCaseId: caseId });
 
         console.log('[MD-WH] ✅ MD Integration case created and saved to order:', {
             orderId: order.id,
-            caseId: caseResponse.case_id,
+            caseId,
             patientId: user.mdPatientId
         });
+
+        // Post case questions individually after case creation
+        if (order.questionnaireAnswers) {
+            const { extractRichCaseQuestions, extractCaseQuestions } = await import('../../utils/questionnaireAnswers');
+
+            // Determine medicalCompanySource from the questionnaire
+            let medicalCompanySource: string | null = null;
+            try {
+                if ((order as any).questionnaireId) {
+                    const Questionnaire = (await import('../../models/Questionnaire')).default;
+                    const questionnaire = await Questionnaire.findByPk((order as any).questionnaireId);
+                    if (questionnaire) {
+                        medicalCompanySource = questionnaire.medicalCompanySource;
+                    }
+                }
+                if (!medicalCompanySource && tenantProduct && (tenantProduct as any).productId) {
+                    const Questionnaire = (await import('../../models/Questionnaire')).default;
+                    const q = await Questionnaire.findOne({ where: { productId: (tenantProduct as any).productId } });
+                    if (q) {
+                        medicalCompanySource = q.medicalCompanySource;
+                    }
+                }
+            } catch (e) {
+                console.warn('[MD-WH] Could not determine medicalCompanySource:', e);
+            }
+
+            // Default to md-integrations (clinic already confirmed as MDI)
+            if (!medicalCompanySource) {
+                medicalCompanySource = 'md-integrations';
+            }
+
+            if (medicalCompanySource === 'md-integrations') {
+                const richQuestions = extractRichCaseQuestions(order.questionnaireAnswers);
+                if (richQuestions.length > 0) {
+                    console.log(`[MD-WH] Posting ${richQuestions.length} rich questions to case ${caseId}`);
+                    const result = await MDCaseService.postCaseQuestions(caseId, richQuestions, tokenResponse.access_token);
+                    console.log(`[MD-WH] Questions posted: ${result.posted} success, ${result.failed} failed`);
+                }
+            } else {
+                const basicQuestions = extractCaseQuestions(order.questionnaireAnswers);
+                if (basicQuestions.length > 0) {
+                    console.log(`[MD-WH] Posting ${basicQuestions.length} basic questions to case ${caseId}`);
+                    const result = await MDCaseService.postCaseQuestions(caseId, basicQuestions, tokenResponse.access_token);
+                    console.log(`[MD-WH] Questions posted: ${result.posted} success, ${result.failed} failed`);
+                }
+            }
+        }
 
     } catch (error: any) {
         const errorMsg = error?.message || 'Unknown error';
