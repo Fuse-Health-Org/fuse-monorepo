@@ -404,9 +404,9 @@ importers:
         specifier: 'catalog:'
         version: 3.25.67
     devDependencies:
-      '@next/bundle-analyzer':
-        specifier: ^16.1.6
-        version: 16.1.6
+      '@fuse/e2e':
+        specifier: workspace:*
+        version: link:../packages/e2e
       '@types/google.maps':
         specifier: ^3.58.1
         version: 3.58.1
@@ -863,6 +863,19 @@ importers:
       tailwindcss:
         specifier: ^3.3.0
         version: 3.4.17(ts-node@10.9.2(@types/node@24.6.0)(typescript@5.9.2))
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.2
+
+  packages/e2e:
+    dependencies:
+      '@playwright/test':
+        specifier: ^1.54.2
+        version: 1.55.1
+    devDependencies:
+      '@fuse/tsconfig':
+        specifier: workspace:*
+        version: link:../../tooling/typescript
       typescript:
         specifier: 'catalog:'
         version: 5.9.2

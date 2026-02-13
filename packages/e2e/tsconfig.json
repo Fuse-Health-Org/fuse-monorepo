@@ -1,0 +1,14 @@
+{
+  "extends": "@fuse/tsconfig/base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": ".",
+    "declaration": true,
+    "noEmit": true,
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "types": ["node"]
+  },
+  "include": ["src/**/*.ts", "playwright.base.config.ts"],
+  "exclude": ["dist", "node_modules"]
+}
