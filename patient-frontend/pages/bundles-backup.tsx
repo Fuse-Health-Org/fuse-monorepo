@@ -176,7 +176,7 @@ export default function BundlesPage() {
                             }}
                         >
                             <img
-                                src="/ag1-product-box-with-supplements-inside.jpg"
+                                src="/ag1-product-box-with-supplements-inside.webp"
                                 alt="AG1 Bundle Box"
                                 style={{
                                     width: "100%",
@@ -299,7 +299,7 @@ export default function BundlesPage() {
                             }}
                         >
                             <img
-                                src="/ag1-pouch-with-travel-packs-canister-and-shaker.jpg"
+                                src="/ag1-pouch-with-travel-packs-canister-and-shaker.webp"
                                 alt="Customize Bundle"
                                 style={{
                                     maxWidth: "100%",
@@ -391,7 +391,7 @@ export default function BundlesPage() {
                                             flexShrink: 0,
                                         }}
                                     >
-                                        <img src="/ag1-pouch-icon.jpg" alt="AG1 Pouch" style={{ width: "35px" }} />
+                                        <img src="/ag1-pouch-icon.webp" alt="AG1 Pouch" style={{ width: "35px" }} />
                                     </div>
                                     <div style={{ flex: 1 }}>
                                         <div style={{ fontWeight: "600", fontSize: "0.95rem", marginBottom: "0.25rem" }}>AG1: Pouch</div>
@@ -415,7 +415,7 @@ export default function BundlesPage() {
                                             flexShrink: 0,
                                         }}
                                     >
-                                        <img src="/travel-packs-icon.jpg" alt="Travel Packs" style={{ width: "35px" }} />
+                                        <img src="/travel-packs-icon.webp" alt="Travel Packs" style={{ width: "35px" }} />
                                     </div>
                                     <div style={{ flex: 1 }}>
                                         <div style={{ fontWeight: "600", fontSize: "0.95rem", marginBottom: "0.25rem" }}>
@@ -441,7 +441,7 @@ export default function BundlesPage() {
                                             flexShrink: 0,
                                         }}
                                     >
-                                        <img src="/canister-and-shaker-icon.jpg" alt="Welcome Kit" style={{ width: "35px" }} />
+                                        <img src="/canister-and-shaker-icon.webp" alt="Welcome Kit" style={{ width: "35px" }} />
                                     </div>
                                     <div style={{ flex: 1 }}>
                                         <div style={{ fontWeight: "600", fontSize: "0.95rem", marginBottom: "0.25rem" }}>
@@ -490,7 +490,7 @@ export default function BundlesPage() {
                             }}
                         >
                             <img
-                                src="/ag1-pouch-with-ag-omega-bottle-travel-packs-canist.jpg"
+                                src="/ag1-pouch-with-ag-omega-bottle-travel-packs-canist.webp"
                                 alt="Full Foundation Stack"
                                 style={{
                                     maxWidth: "100%",
@@ -582,7 +582,7 @@ export default function BundlesPage() {
                                             flexShrink: 0,
                                         }}
                                     >
-                                        <img src="/ag1-pouch-icon.jpg" alt="AG1 Pouch" style={{ width: "35px" }} />
+                                        <img src="/ag1-pouch-icon.webp" alt="AG1 Pouch" style={{ width: "35px" }} />
                                     </div>
                                     <div style={{ flex: 1 }}>
                                         <div style={{ fontWeight: "600", fontSize: "0.95rem", marginBottom: "0.25rem" }}>AG1: Pouch</div>
@@ -606,7 +606,7 @@ export default function BundlesPage() {
                                             flexShrink: 0,
                                         }}
                                     >
-                                        <img src="/omega3-bottle-icon.jpg" alt="AG Omega3" style={{ width: "35px" }} />
+                                        <img src="/omega3-bottle-icon.webp" alt="AG Omega3" style={{ width: "35px" }} />
                                     </div>
                                     <div style={{ flex: 1 }}>
                                         <div style={{ fontWeight: "600", fontSize: "0.95rem", marginBottom: "0.25rem" }}>AG Omega3</div>
@@ -631,7 +631,7 @@ export default function BundlesPage() {
                                             flexShrink: 0,
                                         }}
                                     >
-                                        <img src="/vitamin-d-dropper-bottle-icon.jpg" alt="Vitamin D3+K2" style={{ width: "35px" }} />
+                                        <img src="/vitamin-d-dropper-bottle-icon.webp" alt="Vitamin D3+K2" style={{ width: "35px" }} />
                                     </div>
                                     <div style={{ flex: 1 }}>
                                         <div style={{ fontWeight: "600", fontSize: "0.95rem", marginBottom: "0.25rem" }}>
@@ -723,7 +723,7 @@ export default function BundlesPage() {
                             }}
                         >
                             <img
-                                src="/ag1-two-pouches-with-travel-packs-canister-shaker-.jpg"
+                                src="/ag1-two-pouches-with-travel-packs-canister-shaker-.webp"
                                 alt="Home & Away Pack"
                                 style={{
                                     maxWidth: "100%",
@@ -815,7 +815,7 @@ export default function BundlesPage() {
                                             flexShrink: 0,
                                         }}
                                     >
-                                        <img src="/ag1-pouch-icon.jpg" alt="AG1 Pouch" style={{ width: "30px" }} />
+                                        <img src="/ag1-pouch-icon.webp" alt="AG1 Pouch" style={{ width: "30px" }} />
                                     </div>
                                     <div style={{ flex: 1 }}>
                                         <div style={{ fontWeight: "600", fontSize: "0.85rem", marginBottom: "0.25rem" }}>AG1: Pouch</div>
@@ -839,7 +839,7 @@ export default function BundlesPage() {
                                             flexShrink: 0,
                                         }}
                                     >
-                                        <img src="/travel-packs-icon.jpg" alt="Travel Packs" style={{ width: "30px" }} />
+                                        <img src="/travel-packs-icon.webp" alt="Travel Packs" style={{ width: "30px" }} />
                                     </div>
                                     <div style={{ flex: 1 }}>
                                         <div style={{ fontWeight: "600", fontSize: "0.85rem", marginBottom: "0.25rem" }}>
@@ -866,7 +866,7 @@ export default function BundlesPage() {
                                             flexShrink: 0,
                                         }}
                                     >
-                                        <img src="/vitamin-d-dropper-bottle-icon.jpg" alt="Vitamin D3+K2" style={{ width: "30px" }} />
+                                        <img src="/vitamin-d-dropper-bottle-icon.webp" alt="Vitamin D3+K2" style={{ width: "30px" }} />
                                     </div>
                                     <div style={{ flex: 1 }}>
                                         <div style={{ fontWeight: "600", fontSize: "0.85rem", marginBottom: "0.25rem" }}>
