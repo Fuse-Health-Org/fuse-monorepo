@@ -166,6 +166,84 @@ class MDCaseService {
 
     return response.data;
   }
+
+  /**
+   * Post a single case question to an existing MDI case
+   * POST /v1/partner/cases/:case_id/questions
+   */
+  async postCaseQuestion(
+    caseId: string,
+    question: {
+      question: string;
+      answer: string;
+      type: string;
+      important?: boolean;
+      is_critical?: boolean;
+      display_in_pdf?: boolean;
+      description?: string;
+      label?: string;
+      metadata?: string;
+      displayed_options?: string[];
+    },
+    accessToken: string
+  ): Promise<any> {
+    const response = await axios.post<any>(
+      resolveMdIntegrationsBaseUrl(`/partner/cases/${caseId}/questions`),
+      question,
+      {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    return response.data;
+  }
+
+  /**
+   * Post multiple case questions to an existing MDI case (one by one)
+   * Uses POST /v1/partner/cases/:case_id/questions for each question
+   */
+  async postCaseQuestions(
+    caseId: string,
+    questions: Array<{
+      question: string;
+      answer: string;
+      type: string;
+      important?: boolean;
+      is_critical?: boolean;
+      display_in_pdf?: boolean;
+      description?: string;
+      label?: string;
+      metadata?: string;
+      displayed_options?: string[];
+    }>,
+    accessToken: string
+  ): Promise<{ posted: number; failed: number; errors: string[] }> {
+    let posted = 0;
+    let failed = 0;
+    const errors: string[] = [];
+
+    for (const question of questions) {
+      try {
+        await this.postCaseQuestion(caseId, question, accessToken);
+        posted++;
+      } catch (error: any) {
+        failed++;
+        const errMsg = error?.response?.data?.message || error?.message || 'Unknown error';
+        errors.push(`Failed to post question "${question.question.substring(0, 50)}...": ${errMsg}`);
+        console.error(`[MD-CASE] ❌ Failed to post case question:`, {
+          caseId,
+          question: question.question.substring(0, 50),
+          error: errMsg
+        });
+      }
+    }
+
+    return { posted, failed, errors };
+  }
 }
 
 export default new MDCaseService();
