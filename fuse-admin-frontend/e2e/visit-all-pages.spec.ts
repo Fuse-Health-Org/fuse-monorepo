@@ -27,28 +27,43 @@ test.describe("Visit all pages (deployed)", () => {
   let authToken: string;
   let userData: string;
 
-  test.beforeAll(async ({ browser }) => {
-    // Log in once and capture the auth token
+  test.beforeAll(async ({ browser }, testInfo) => {
+    testInfo.setTimeout(120_000);
+
     const page = await browser.newPage();
+
+    // Listen for console messages to debug login
+    page.on("console", (msg) => {
+      const text = msg.text();
+      if (text.includes("[Auth")) console.log(`  [browser] ${text}`);
+    });
+
     await page.goto(`${BASE_URL}/signin`);
     await page.waitForLoadState("networkidle");
-    await delay(3000);
+    await delay(2000);
 
-    // Fill in credentials
+    // Fill in credentials and submit
     await page.fill('input[type="email"]', EMAIL);
     await delay(500);
     await page.fill('input[type="password"]', PASSWORD);
-    await delay(1000);
+    await delay(500);
 
-    // Click sign in
-    await page.click('button[type="submit"]');
+    // Wait for the submit button to be enabled
+    const submitBtn = page.locator('button[type="submit"]:not([disabled])');
+    await submitBtn.waitFor({ state: "visible", timeout: 5000 });
+    await submitBtn.click();
 
-    // Wait for navigation away from signin
+    console.log("  Clicked sign in, waiting for redirect...");
+
+    // Wait for navigation away from /signin (handles both direct login and MFA)
     await page.waitForURL((url) => !url.pathname.includes("/signin"), {
-      timeout: 30_000,
+      timeout: 60_000,
     });
+
     await page.waitForLoadState("networkidle");
-    await delay(5000);
+    await delay(3000);
+
+    console.log(`  Landed on: ${page.url()}`);
 
     // Extract auth data from localStorage
     authToken = await page.evaluate(() =>
@@ -59,7 +74,7 @@ test.describe("Visit all pages (deployed)", () => {
     );
 
     expect(authToken).toBeTruthy();
-    console.log("Login successful, token captured");
+    console.log("  Login successful, token captured");
 
     await page.close();
   });
