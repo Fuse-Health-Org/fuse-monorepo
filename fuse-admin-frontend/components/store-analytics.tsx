@@ -10,6 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 interface StoreAnalyticsProps {
   startDate: Date;
   endDate: Date;
+  onMockDataStatusChange?: (isUsingMockData: boolean) => void;
 }
 
 type ViewMode = 'revenue' | 'orders';
@@ -22,12 +23,66 @@ interface ChartDataPoint {
   isProjection?: boolean;
 }
 
-export function StoreAnalytics({ startDate, endDate }: StoreAnalyticsProps) {
+const formatDateToIso = (date: Date) => {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+};
+
+const hasRealChartData = (points: ChartDataPoint[]) => {
+  if (!points.length) return false;
+  return points.some((point) => (point.revenue ?? 0) > 0 || (point.orders ?? 0) > 0 || (point.projectedRevenue ?? 0) > 0);
+};
+
+const buildMockChartData = (startDate: Date, endDate: Date) => {
+  const mockData: ChartDataPoint[] = [];
+  const cursor = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+  const lastDate = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+  let index = 0;
+
+  while (cursor <= lastDate) {
+    const dayOfWeek = cursor.getDay(); // 0=Sun, 6=Sat
+    const dayOfMonth = cursor.getDate();
+
+    // Keep mock values deterministic by deriving pseudo-noise from date/index.
+    const seed = cursor.getFullYear() * 10000 + (cursor.getMonth() + 1) * 100 + dayOfMonth + index * 13;
+    const pseudoNoise = ((Math.sin(seed) + 1) / 2) * 2 - 1; // -1..1
+
+    // Progressive growth plus weekly seasonality.
+    const trend = Math.min(index * 7, 220);
+    const weeklySeasonality = Math.sin((index / 7) * Math.PI * 2) * 110;
+
+    // Weekends are usually softer in this type of store.
+    const weekendFactor = dayOfWeek === 0 || dayOfWeek === 6 ? 0.78 : 1;
+
+    // Small realistic spikes around common purchase/pay cycle dates.
+    const paydaySpike = dayOfMonth === 1 || dayOfMonth === 15 || dayOfMonth === 28 ? 150 : 0;
+
+    const rawRevenue = (680 + trend + weeklySeasonality + pseudoNoise * 95 + paydaySpike) * weekendFactor;
+    const revenue = Math.max(220, Math.round(rawRevenue));
+
+    // Keep orders correlated with revenue, but not perfectly linear.
+    const orderBase = revenue / 125;
+    const orderNoise = ((Math.sin(seed * 0.37) + 1) / 2) * 2.4;
+    const orders = Math.max(3, Math.round(orderBase + orderNoise));
+
+    mockData.push({
+      date: formatDateToIso(cursor),
+      revenue,
+      orders,
+      isProjection: false,
+    });
+    cursor.setDate(cursor.getDate() + 1);
+    index += 1;
+  }
+
+  return mockData;
+};
+
+export function StoreAnalytics({ startDate, endDate, onMockDataStatusChange }: StoreAnalyticsProps) {
   const { user, authenticatedFetch } = useAuth();
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('revenue');
+  const [isUsingMockData, setIsUsingMockData] = useState(false);
   
   // Determine if this is "This Month" view - use today as the end date for historical data
   const { todayEnd, isThisMonth, daysRemainingInMonth } = useMemo(() => {
@@ -61,15 +116,20 @@ export function StoreAnalytics({ startDate, endDate }: StoreAnalyticsProps) {
   const interval = isFullCalendarMonth ? 'daily' : (daysDiff <= 14 ? 'daily' : 'weekly');
 
   useEffect(() => {
+    onMockDataStatusChange?.(isUsingMockData);
+  }, [isUsingMockData, onMockDataStatusChange]);
+
+  useEffect(() => {
     const fetchChartData = async () => {
       if (!user?.clinicId) {
+        setChartData(buildMockChartData(startDate, endDate));
+        setIsUsingMockData(true);
         setLoading(false);
         return;
       }
 
       try {
         setLoading(true);
-        setError(null);
 
         // Fetch historical data (for This Month: from start to today; otherwise full range)
         const fetchEndDate = isThisMonth ? todayEnd : endDate;
@@ -88,7 +148,8 @@ export function StoreAnalytics({ startDate, endDate }: StoreAnalyticsProps) {
         );
 
         if (!response.ok) {
-          setError('Failed to load chart data');
+          setChartData(buildMockChartData(startDate, endDate));
+          setIsUsingMockData(true);
           setLoading(false);
           return;
         }
@@ -96,7 +157,8 @@ export function StoreAnalytics({ startDate, endDate }: StoreAnalyticsProps) {
         const data = await response.json();
         
         if (!data.success) {
-          setError(data.message || 'Failed to load chart data');
+          setChartData(buildMockChartData(startDate, endDate));
+          setIsUsingMockData(true);
           setLoading(false);
           return;
         }
@@ -105,6 +167,13 @@ export function StoreAnalytics({ startDate, endDate }: StoreAnalyticsProps) {
           ...point,
           isProjection: false
         }));
+
+        if (!hasRealChartData(historical)) {
+          setChartData(buildMockChartData(startDate, endDate));
+          setIsUsingMockData(true);
+          setLoading(false);
+          return;
+        }
 
         // Fetch projected subscription renewals for "This Month" future dates
         if (isThisMonth && daysRemainingInMonth > 0) {
@@ -133,14 +202,18 @@ export function StoreAnalytics({ startDate, endDate }: StoreAnalyticsProps) {
               }));
 
               setChartData([...historical, ...projected]);
+              setIsUsingMockData(false);
             } else {
               setChartData(historical);
+              setIsUsingMockData(false);
             }
           } else {
             setChartData(historical);
+            setIsUsingMockData(false);
           }
         } else {
           setChartData(historical);
+          setIsUsingMockData(false);
         }
       } catch (err) {
         // If it's an unauthorized error, the user will be redirected by authenticatedFetch
@@ -148,7 +221,8 @@ export function StoreAnalytics({ startDate, endDate }: StoreAnalyticsProps) {
           return;
         }
         console.error('Error fetching chart data:', err);
-        setError('Failed to load chart data');
+        setChartData(buildMockChartData(startDate, endDate));
+        setIsUsingMockData(true);
       } finally {
         setLoading(false);
       }
@@ -300,10 +374,6 @@ export function StoreAnalytics({ startDate, endDate }: StoreAnalyticsProps) {
         {loading ? (
           <div className="h-80 flex items-center justify-center">
             <div className="animate-pulse text-muted-foreground">Loading chart data...</div>
-          </div>
-        ) : error ? (
-          <div className="h-80 flex items-center justify-center">
-            <div className="text-red-600">{error}</div>
           </div>
         ) : formattedData.length === 0 ? (
           <div className="h-80 flex items-center justify-center">

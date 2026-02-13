@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { useAuth } from '@/contexts/AuthContext';
-import { ShoppingCart, User, CreditCard, Clock, CheckCircle, AlertCircle, Package } from "lucide-react"
+import { User, Clock, CheckCircle, AlertCircle, Package } from "lucide-react"
 import Link from 'next/link';
 
 interface Order {
@@ -32,22 +32,69 @@ interface Order {
   }>
 }
 
-export function RecentOrders() {
+interface RecentOrdersProps {
+  onMockDataStatusChange?: (isUsingMockData: boolean) => void;
+}
+
+const buildMockOrders = (): Order[] => {
+  const now = new Date();
+  const minutesAgo = (mins: number) => new Date(now.getTime() - mins * 60000).toISOString();
+
+  return [
+    {
+      id: 'mock-order-1',
+      orderNumber: 'MOCK-1048',
+      status: 'shipped',
+      totalAmount: 219,
+      createdAt: minutesAgo(35),
+      user: { id: 'mock-user-1', firstName: 'Emma', lastName: 'Brown', email: 'emma@example.com' },
+      payment: { status: 'captured', paymentMethod: 'card' },
+      orderItems: [{ id: 'mock-item-1', quantity: 1, product: { id: 'mock-product-1', name: 'GLP-1 Starter Plan' } }],
+    },
+    {
+      id: 'mock-order-2',
+      orderNumber: 'MOCK-1047',
+      status: 'pending',
+      totalAmount: 149,
+      createdAt: minutesAgo(92),
+      user: { id: 'mock-user-2', firstName: 'James', lastName: 'Walker', email: 'james@example.com' },
+      payment: { status: 'processing', paymentMethod: 'card' },
+      orderItems: [{ id: 'mock-item-2', quantity: 1, product: { id: 'mock-product-2', name: 'Weight Loss Follow-up' } }],
+    },
+    {
+      id: 'mock-order-3',
+      orderNumber: 'MOCK-1046',
+      status: 'delivered',
+      totalAmount: 265,
+      createdAt: minutesAgo(220),
+      user: { id: 'mock-user-3', firstName: 'Sophia', lastName: 'Carter', email: 'sophia@example.com' },
+      payment: { status: 'paid', paymentMethod: 'card' },
+      orderItems: [{ id: 'mock-item-3', quantity: 2, product: { id: 'mock-product-3', name: 'Metabolic Support Kit' } }],
+    },
+  ];
+};
+
+export function RecentOrders({ onMockDataStatusChange }: RecentOrdersProps) {
   const { user, authenticatedFetch } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [isUsingMockData, setIsUsingMockData] = useState(false);
+
+  useEffect(() => {
+    onMockDataStatusChange?.(isUsingMockData);
+  }, [isUsingMockData, onMockDataStatusChange]);
 
   useEffect(() => {
     const fetchRecentOrders = async () => {
       if (!user?.clinicId) {
+        setOrders(buildMockOrders());
+        setIsUsingMockData(true);
         setLoading(false);
         return;
       }
 
       try {
         setLoading(true);
-        setError(null);
 
         const response = await authenticatedFetch(
           `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/orders/by-clinic/${user.clinicId}`,
@@ -63,12 +110,20 @@ export function RecentOrders() {
           if (data.success) {
             // Show only the 10 most recent orders
             const recentOrders = (data.data.orders || []).slice(0, 10);
-            setOrders(recentOrders);
+            if (recentOrders.length > 0) {
+              setOrders(recentOrders);
+              setIsUsingMockData(false);
+            } else {
+              setOrders(buildMockOrders());
+              setIsUsingMockData(true);
+            }
           } else {
-            setError(data.message || 'Failed to load orders');
+            setOrders(buildMockOrders());
+            setIsUsingMockData(true);
           }
         } else {
-          setError('Failed to load orders');
+          setOrders(buildMockOrders());
+          setIsUsingMockData(true);
         }
       } catch (err) {
         // If it's an unauthorized error, the user will be redirected by authenticatedFetch
@@ -76,7 +131,8 @@ export function RecentOrders() {
           return;
         }
         console.error('Error fetching orders:', err);
-        setError('Failed to load orders');
+        setOrders(buildMockOrders());
+        setIsUsingMockData(true);
       } finally {
         setLoading(false);
       }
@@ -219,39 +275,6 @@ export function RecentOrders() {
                 </div>
               </div>
             ))}
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (error) {
-    return (
-      <Card className="bg-card border-border shadow-apple-md">
-        <CardHeader>
-          <CardTitle className="text-xl font-semibold text-foreground">Recent Orders</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="p-6 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-red-600">{error}</p>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (orders.length === 0) {
-    return (
-      <Card className="bg-card border-border shadow-apple-md">
-        <CardHeader>
-          <CardTitle className="text-xl font-semibold text-foreground">Recent Orders</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <div className="w-16 h-16 bg-muted/50 rounded-full flex items-center justify-center mb-4">
-              <ShoppingCart className="h-8 w-8 text-muted-foreground/50" />
-            </div>
-            <p className="text-muted-foreground">No orders yet</p>
           </div>
         </CardContent>
       </Card>
