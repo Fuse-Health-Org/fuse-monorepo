@@ -243,7 +243,7 @@ export const QuestionnaireModal: React.FC<QuestionnaireModalProps> = (props) => 
         isOpen={isOpen}
         onClose={onClose}
         onOpenChange={(open) => { if (!open && modal.showEmailModal) return; }}
-        isDismissable={!modal.showEmailModal}
+        isDismissable={!modal.showEmailModal && !modal.isCheckoutStep()}
         isKeyboardDismissDisabled={modal.showEmailModal}
         size="full"
         classNames={{

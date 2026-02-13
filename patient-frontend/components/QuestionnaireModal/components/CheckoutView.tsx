@@ -17,6 +17,7 @@ import { StripeDeferredPaymentForm } from "../../StripeDeferredPaymentForm";
 import { CheckoutViewProps } from "../types";
 import { US_STATES } from "@fuse/enums";
 import { hasPOBox } from "../addressValidation";
+import { AddressAutocomplete } from "../../AddressAutocomplete";
 
 
 export const CheckoutView: React.FC<CheckoutViewProps> = ({
@@ -484,12 +485,20 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                         </div>
 
                         <div className="space-y-4">
-                            <Input
+                            <AddressAutocomplete
                                 label="Street Address"
-                                placeholder="Enter address"
+                                placeholder="Start typing your address"
                                 value={shippingInfo.address}
                                 onValueChange={(value) => onShippingInfoChange('address', value)}
-                                variant="bordered"
+                                onAddressSelect={(fields) => {
+                                    if (fields.address != null) onShippingInfoChange('address', fields.address);
+                                    if (fields.city != null) onShippingInfoChange('city', fields.city);
+                                    if (fields.state != null) onShippingInfoChange('state', fields.state);
+                                    if (fields.zipCode != null) onShippingInfoChange('zipCode', fields.zipCode);
+                                    if (fields.country != null) onShippingInfoChange('country', fields.country);
+                                    if (fields.state && onCalculateVisitFee) onCalculateVisitFee(fields.state);
+                                }}
+                                country={shippingInfo.country || 'us'}
                                 isRequired
                             />
 

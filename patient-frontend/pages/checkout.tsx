@@ -13,6 +13,7 @@ import {
   Divider
 } from "@heroui/react";
 import { Icon } from "@iconify/react";
+import { AddressAutocomplete } from "../components/AddressAutocomplete";
 
 interface Plan {
   id: string;
@@ -238,12 +239,22 @@ export default function CheckoutPage() {
                 </div>
 
                 <div className="space-y-4">
-                  <Input
+                  <AddressAutocomplete
                     label="Street Address"
-                    placeholder="Enter address"
+                    placeholder="Start typing your address"
                     value={shippingInfo.address}
                     onValueChange={(value) => setShippingInfo(prev => ({ ...prev, address: value }))}
-                    variant="bordered"
+                    onAddressSelect={(fields) => {
+                      setShippingInfo((prev) => ({
+                        ...prev,
+                        ...(fields.address != null && { address: fields.address }),
+                        ...(fields.city != null && { city: fields.city }),
+                        ...(fields.state != null && { state: fields.state }),
+                        ...(fields.zipCode != null && { zipCode: fields.zipCode }),
+                        ...(fields.country != null && { country: fields.country }),
+                      }));
+                    }}
+                    country={shippingInfo.country || "us"}
                     isRequired
                   />
 
