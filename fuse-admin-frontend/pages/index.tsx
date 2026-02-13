@@ -1,14 +1,43 @@
 import { useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import { Sidebar } from "@/components/sidebar";
 import { Header } from "@/components/header";
 import { MetricCards } from "@/components/metric-cards";
-import { StoreAnalytics } from "@/components/store-analytics";
-import { RecentOrders } from "@/components/recent-orders";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/router";
 
+const StoreAnalytics = dynamic(
+  () => import("@/components/store-analytics").then((mod) => mod.StoreAnalytics),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="rounded-xl border border-border bg-card p-6 space-y-4 animate-pulse">
+        <div className="h-5 w-40 bg-muted rounded" />
+        <div className="h-[300px] bg-muted/50 rounded" />
+      </div>
+    ),
+  }
+);
+
+const RecentOrders = dynamic(
+  () => import("@/components/recent-orders").then((mod) => mod.RecentOrders),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="rounded-xl border border-border bg-card p-6 space-y-4 animate-pulse">
+        <div className="h-5 w-36 bg-muted rounded" />
+        <div className="space-y-3">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="h-12 bg-muted/50 rounded" />
+          ))}
+        </div>
+      </div>
+    ),
+  }
+);
+
 export default function Dashboard() {
-  const { user, authenticatedFetch, hasActiveSubscription } = useAuth();
+  const { user, hasActiveSubscription } = useAuth();
   const router = useRouter();
   const [showCheckoutGate, setShowCheckoutGate] = useState(false);
   const [isCheckingSetup, setIsCheckingSetup] = useState(true);
@@ -54,69 +83,38 @@ export default function Dashboard() {
   );
 
   useEffect(() => {
-    const checkAccountSetupGate = async () => {
-      if (typeof window !== "undefined" && window.self !== window.top) {
-        setShowCheckoutGate(false);
-        setCheckoutEmbedUrl("");
-        setIsCheckingSetup(false);
-        return;
+    if (typeof window !== "undefined" && window.self !== window.top) {
+      setShowCheckoutGate(false);
+      setCheckoutEmbedUrl("");
+      setIsCheckingSetup(false);
+      return;
+    }
+
+    if (!router.isReady || !user) {
+      return;
+    }
+
+    if (!hasActiveSubscription) {
+      const params = new URLSearchParams(checkoutQueryFromRouter.toString());
+      const selectedPlanType = localStorage.getItem("selectedPlanType");
+      const selectedPlanName = localStorage.getItem("selectedPlanName");
+
+      if (!params.get("planType") && selectedPlanType) {
+        params.set("planType", selectedPlanType);
+      }
+      if (!params.get("planName") && selectedPlanName) {
+        params.set("planName", selectedPlanName);
       }
 
-      if (!router.isReady || !user) {
-        return;
-      }
-
-      setIsCheckingSetup(true);
-      try {
-        const response = await authenticatedFetch(
-          `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"}/brand-subscriptions/basic-info`,
-          {
-            method: "GET",
-            skipLogoutOn401: true,
-          }
-        );
-
-        let shouldShowCheckout = false;
-        if (response.ok) {
-          const data = await response.json();
-          if (data?.success) {
-            shouldShowCheckout = data?.data?.status !== "active";
-          } else {
-            shouldShowCheckout = !hasActiveSubscription;
-          }
-        } else {
-          shouldShowCheckout = !hasActiveSubscription;
-        }
-
-        if (shouldShowCheckout) {
-          const params = new URLSearchParams(checkoutQueryFromRouter.toString());
-          const selectedPlanType = localStorage.getItem("selectedPlanType");
-          const selectedPlanName = localStorage.getItem("selectedPlanName");
-
-          if (!params.get("planType") && selectedPlanType) {
-            params.set("planType", selectedPlanType);
-          }
-          if (!params.get("planName") && selectedPlanName) {
-            params.set("planName", selectedPlanName);
-          }
-
-          const queryString = params.toString();
-          setCheckoutEmbedUrl(`/checkout?embed=1${queryString ? `&${queryString}` : ""}`);
-          setShowCheckoutGate(true);
-        } else {
-          setShowCheckoutGate(false);
-          setCheckoutEmbedUrl("");
-        }
-      } catch (error) {
-        console.error("Failed to validate account setup gate:", error);
-        setShowCheckoutGate(!hasActiveSubscription);
-      } finally {
-        setIsCheckingSetup(false);
-      }
-    };
-
-    void checkAccountSetupGate();
-  }, [router.isReady, user, authenticatedFetch, hasActiveSubscription, checkoutQueryFromRouter]);
+      const queryString = params.toString();
+      setCheckoutEmbedUrl(`/checkout?embed=1${queryString ? `&${queryString}` : ""}`);
+      setShowCheckoutGate(true);
+    } else {
+      setShowCheckoutGate(false);
+      setCheckoutEmbedUrl("");
+    }
+    setIsCheckingSetup(false);
+  }, [router.isReady, user, hasActiveSubscription, checkoutQueryFromRouter]);
 
   return (
     <div className="flex h-screen bg-background relative">

@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/AuthContext"
 import Link from "next/link"
 import { useRouter } from "next/router"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import {
   BarChart3,
   Users,
@@ -24,7 +24,9 @@ import {
   Globe,
   UserPlus,
 } from "lucide-react"
-import Tutorial from "./ui/tutorial"
+import dynamic from "next/dynamic"
+
+const Tutorial = dynamic(() => import("./ui/tutorial"), { ssr: false })
 
 const navigation = [
   { name: "Overview", icon: BarChart3, current: true, href: "/", id: "tutorial-step-overview" },
@@ -163,8 +165,14 @@ export function Sidebar() {
     }
   };
 
+  const lastSubscriptionFetchRef = useRef<number>(0);
   useEffect(() => {
-    fetchSubscriptionBasicInfo()
+    const now = Date.now();
+    // Only refetch if more than 5 minutes have elapsed since last fetch
+    if (now - lastSubscriptionFetchRef.current > 5 * 60 * 1000) {
+      lastSubscriptionFetchRef.current = now;
+      fetchSubscriptionBasicInfo();
+    }
   }, [router.pathname])
 
   // Fetch clinic/organization information for branding
@@ -391,7 +399,7 @@ export function Sidebar() {
 
   return (
     <div className="w-64 flex-shrink-0 h-full bg-sidebar border-r border-sidebar-border flex flex-col overflow-hidden">
-      <Tutorial runTutorial={runTutorial} setRunTutorial={setRunTutorial} initialStep={tutorialStep} />
+      {runTutorial && <Tutorial runTutorial={runTutorial} setRunTutorial={setRunTutorial} initialStep={tutorialStep} />}
       {/* Logo with Brand Icon */}
       <div className="p-6 flex-shrink-0">
         <div className="flex items-center gap-3">
