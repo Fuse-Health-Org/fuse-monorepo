@@ -133,9 +133,37 @@ export function registerAuthEndpoints(
             // Load UserRoles
             await user.getUserRoles();
 
-            // Check if doctor is approved - ONLY when logging into the Doctor Portal
+            // Check portal context for role-based access control
             const portalContext = req.headers['x-portal-context'];
             const isDoctorPortal = portalContext === 'doctor';
+            const isAdminPortal = portalContext === 'admin';
+            const isTenantPortal = portalContext === 'tenant';
+            
+            // Check if user has admin access (brand, admin, or superAdmin role)
+            if (isAdminPortal) {
+                const hasAdminAccess = user.hasAnyRoleSync(["brand", "admin", "superAdmin"]);
+                if (!hasAdminAccess) {
+                    await mfaRecord.destroy();
+                    return res.status(403).json({
+                        success: false,
+                        message: "You do not have access to the admin portal. Please contact your administrator if you believe this is an error.",
+                        noAdminAccess: true,
+                    });
+                }
+            }
+            
+            // Check if user has tenant/superAdmin access
+            if (isTenantPortal) {
+                const hasTenantAccess = user.hasAnyRoleSync(["superAdmin"]);
+                if (!hasTenantAccess) {
+                    await mfaRecord.destroy();
+                    return res.status(403).json({
+                        success: false,
+                        message: "You do not have access to the tenant management portal. This portal is restricted to system administrators.",
+                        noTenantAccess: true,
+                    });
+                }
+            }
             
             if (isDoctorPortal && user.hasAnyRoleSync(["doctor"]) && !user.isApprovedDoctor) {
                 await mfaRecord.destroy();
@@ -1901,10 +1929,42 @@ export function registerAuthEndpoints(
                 });
             }
 
-            // Check if doctor is approved - ONLY when logging into the Doctor Portal
+            // Check portal context for role-based access control
             // Use X-Portal-Context header to identify the portal
             const portalContext = req.headers['x-portal-context'];
             const isDoctorPortal = portalContext === 'doctor';
+            const isAdminPortal = portalContext === 'admin';
+            const isTenantPortal = portalContext === 'tenant';
+            
+            // Check if user has admin access (brand, admin, or superAdmin role)
+            // This is required for the Admin Portal (fuse-admin-frontend)
+            if (isAdminPortal) {
+                const hasAdminAccess = user.hasAnyRoleSync(["brand", "admin", "superAdmin"]);
+                if (!hasAdminAccess) {
+                    // HIPAA Audit: Log failed login attempt (no admin access)
+                    await AuditService.logLoginFailed(req, email, "No admin portal access - missing required role");
+                    return res.status(403).json({
+                        success: false,
+                        message: "You do not have access to the admin portal. Please contact your administrator if you believe this is an error.",
+                        noAdminAccess: true,
+                    });
+                }
+            }
+            
+            // Check if user has tenant/superAdmin access
+            // This is required for the Tenant Management Portal (fuse-tenant-portal-frontend)
+            if (isTenantPortal) {
+                const hasTenantAccess = user.hasAnyRoleSync(["superAdmin"]);
+                if (!hasTenantAccess) {
+                    // HIPAA Audit: Log failed login attempt (no tenant access)
+                    await AuditService.logLoginFailed(req, email, "No tenant portal access - missing superAdmin role");
+                    return res.status(403).json({
+                        success: false,
+                        message: "You do not have access to the tenant management portal. This portal is restricted to system administrators.",
+                        noTenantAccess: true,
+                    });
+                }
+            }
             
             if (isDoctorPortal && user.hasAnyRoleSync(["doctor"]) && !user.isApprovedDoctor) {
                 // HIPAA Audit: Log failed login attempt (doctor not approved)
