@@ -14,6 +14,7 @@ import { useQuestionnaireTheme } from "./useQuestionnaireTheme";
 import { usePharmacyCoverages } from "./usePharmacyCoverages";
 import { getDashboardPrefix, getDashboardPrefixByMedicalCompany } from "../../../lib/clinic-utils";
 import { MedicalCompanySlug } from "@fuse/enums";
+import { hasPOBox } from "../addressValidation";
 
 export function useQuestionnaireModal(
   props: QuestionnaireModalProps,
@@ -498,6 +499,10 @@ export function useQuestionnaireModal(
           alert(`Please fill in the ${field.replace(/([A-Z])/g, ' $1').toLowerCase()} field.`);
           return false;
         }
+      }
+      if (hasPOBox(shippingInfo.address, shippingInfo.apartment)) {
+        alert('We cannot ship to P.O. boxes. Please enter a valid street address.');
+        return false;
       }
       if (paymentStatus !== 'succeeded') {
         alert('Please complete your payment information before proceeding.');
