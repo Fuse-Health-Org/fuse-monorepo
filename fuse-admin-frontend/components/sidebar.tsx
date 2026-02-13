@@ -427,37 +427,35 @@ export function Sidebar() {
         </div>
 
         {/* CRM Section */}
-        {process.env.NODE_ENV !== 'production' && (
-          <div className="pt-6">
-            <button
-              onClick={() => setIsCrmOpen(!isCrmOpen)}
-              className={cn(
-                "w-full group flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-smooth",
-                isCrmActive || isCrmOpen
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                  : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
-              )}
-            >
-              <div className="flex items-center gap-3">
-                <Users className={cn(
-                  "h-5 w-5 transition-smooth",
-                  isCrmActive || isCrmOpen ? "text-sidebar-accent-foreground" : "text-sidebar-foreground/60"
-                )} />
-                <span className="font-medium">CRM</span>
-              </div>
-              <ChevronDown className={cn(
-                "h-4 w-4 transition-transform",
-                isCrmOpen ? "rotate-180" : ""
-              )} />
-            </button>
-
-            {isCrmOpen && (
-              <div className="mt-1 ml-4 space-y-1 border-l-2 border-sidebar-border pl-3">
-                {crmItems.map((item) => renderSidebarItem(item, 'crm'))}
-              </div>
+        <div className="pt-6">
+          <button
+            onClick={() => setIsCrmOpen(!isCrmOpen)}
+            className={cn(
+              "w-full group flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-smooth",
+              isCrmActive || isCrmOpen
+                ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
             )}
-          </div>
-        )}
+          >
+            <div className="flex items-center gap-3">
+              <Users className={cn(
+                "h-5 w-5 transition-smooth",
+                isCrmActive || isCrmOpen ? "text-sidebar-accent-foreground" : "text-sidebar-foreground/60"
+              )} />
+              <span className="font-medium">CRM</span>
+            </div>
+            <ChevronDown className={cn(
+              "h-4 w-4 transition-transform",
+              isCrmOpen ? "rotate-180" : ""
+            )} />
+          </button>
+
+          {isCrmOpen && (
+            <div className="mt-1 ml-4 space-y-1 border-l-2 border-sidebar-border pl-3">
+              {crmItems.map((item) => renderSidebarItem(item, 'crm'))}
+            </div>
+          )}
+        </div>
 
         {/* Services Section */}
         {/* <div className="pt-6">
