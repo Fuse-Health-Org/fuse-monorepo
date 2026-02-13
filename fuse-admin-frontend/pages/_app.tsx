@@ -7,7 +7,6 @@ import { AuthProvider } from '@/contexts/AuthContext'
 import { ThemeProvider } from '@/contexts/ThemeContext'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import { ToastManager } from '@/components/ui/toast'
-import Script from 'next/script'
 import "../styles/globals.css"
 
 // Pages that don't require authentication
@@ -51,10 +50,6 @@ export default function App({ Component, pageProps }: AppProps & { showToast?: (
         <meta name="description" content="Admin dashboard for managing business operations" />
         <meta name="generator" content="Next.js" />
       </Head>
-      <Script
-        src={`https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places`}
-        strategy="afterInteractive"
-      />
       <ThemeProvider>
         <AuthProvider>
           {content}
