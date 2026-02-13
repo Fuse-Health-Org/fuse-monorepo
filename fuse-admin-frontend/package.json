@@ -13,7 +13,9 @@
     "pm2:reload-no-build": "pnpm with-env pm2 reload admin-frontend --update-env",
     "pm2:stop": "pm2 stop admin-frontend",
     "clean": "git clean -xdf .cache .turbo dist .next node_modules",
-    "with-env": "dotenv -e ../.env.local --"
+    "with-env": "dotenv -e ../.env.local --",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
     "@fuse/enums": "workspace:*",
@@ -71,7 +73,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@next/bundle-analyzer": "^16.1.6",
+    "@fuse/e2e": "workspace:*",
     "@types/google.maps": "^3.58.1",
     "@types/node": "catalog:",
     "@types/react": "catalog:react18",
