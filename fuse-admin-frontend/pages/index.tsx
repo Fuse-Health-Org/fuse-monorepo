@@ -1,10 +1,39 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
+import dynamic from "next/dynamic";
 import Layout from "@/components/Layout";
 import { MetricCards } from "@/components/metric-cards";
-import { StoreAnalytics } from "@/components/store-analytics";
-import { RecentOrders } from "@/components/recent-orders";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/router";
+
+const StoreAnalytics = dynamic(
+  () => import("@/components/store-analytics").then((mod) => mod.StoreAnalytics),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="rounded-xl border border-border bg-card p-6 space-y-4 animate-pulse">
+        <div className="h-5 w-40 bg-muted rounded" />
+        <div className="h-[300px] bg-muted/50 rounded" />
+      </div>
+    ),
+  }
+);
+
+const RecentOrders = dynamic(
+  () => import("@/components/recent-orders").then((mod) => mod.RecentOrders),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="rounded-xl border border-border bg-card p-6 space-y-4 animate-pulse">
+        <div className="h-5 w-36 bg-muted rounded" />
+        <div className="space-y-3">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="h-12 bg-muted/50 rounded" />
+          ))}
+        </div>
+      </div>
+    ),
+  }
+);
 
 export default function Dashboard() {
   const { user, hasActiveSubscription } = useAuth();

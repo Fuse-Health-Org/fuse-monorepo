@@ -24,7 +24,9 @@ import {
   Globe,
   UserPlus,
 } from "lucide-react"
-import Tutorial from "./ui/tutorial"
+import dynamic from "next/dynamic"
+
+const Tutorial = dynamic(() => import("./ui/tutorial"), { ssr: false })
 
 const navigation = [
   { name: "Overview", icon: BarChart3, current: true, href: "/", id: "tutorial-step-overview" },
@@ -384,7 +386,7 @@ export function Sidebar() {
 
   return (
     <div className="w-64 flex-shrink-0 h-full bg-sidebar border-r border-sidebar-border flex flex-col overflow-hidden">
-      <Tutorial runTutorial={runTutorial} setRunTutorial={setRunTutorial} initialStep={tutorialStep} />
+      {runTutorial && <Tutorial runTutorial={runTutorial} setRunTutorial={setRunTutorial} initialStep={tutorialStep} />}
       {/* Logo with Brand Icon */}
       <div className="p-6 flex-shrink-0">
         <div className="flex items-center gap-3">
