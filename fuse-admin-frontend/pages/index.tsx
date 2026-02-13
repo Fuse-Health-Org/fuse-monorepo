@@ -13,6 +13,11 @@ export default function Dashboard() {
   const [showCheckoutGate, setShowCheckoutGate] = useState(false);
   const [isCheckingSetup, setIsCheckingSetup] = useState(true);
   const [checkoutEmbedUrl, setCheckoutEmbedUrl] = useState<string>("");
+  const [mockDataUsage, setMockDataUsage] = useState({
+    metrics: false,
+    analytics: false,
+    orders: false,
+  });
   
   // Default to full current month (1st to last day of month)
   const now = new Date();
@@ -42,6 +47,11 @@ export default function Dashboard() {
     });
     return params;
   }, [router.query]);
+
+  const isUsingAnyMockData = useMemo(
+    () => mockDataUsage.metrics || mockDataUsage.analytics || mockDataUsage.orders,
+    [mockDataUsage]
+  );
 
   useEffect(() => {
     const checkAccountSetupGate = async () => {
@@ -122,14 +132,41 @@ export default function Dashboard() {
             <p className="text-sm text-muted-foreground/70">Monitor your business performance and insights</p>
           </div>
 
+          {isUsingAnyMockData && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+              <p className="text-sm font-medium text-amber-900">
+                Demo data active
+              </p>
+              <p className="text-sm text-amber-800/90 mt-1">
+                You are viewing demo data until your first orders are created.
+              </p>
+            </div>
+          )}
+
           {/* Metric Cards */}
-          <MetricCards startDate={startDate} endDate={endDate} />
+          <MetricCards
+            startDate={startDate}
+            endDate={endDate}
+            onMockDataStatusChange={(isUsingMockData) =>
+              setMockDataUsage((prev) => ({ ...prev, metrics: isUsingMockData }))
+            }
+          />
 
           {/* Analytics Chart */}
-          <StoreAnalytics startDate={startDate} endDate={endDate} />
+          <StoreAnalytics
+            startDate={startDate}
+            endDate={endDate}
+            onMockDataStatusChange={(isUsingMockData) =>
+              setMockDataUsage((prev) => ({ ...prev, analytics: isUsingMockData }))
+            }
+          />
 
           {/* Recent Orders */}
-          <RecentOrders />
+          <RecentOrders
+            onMockDataStatusChange={(isUsingMockData) =>
+              setMockDataUsage((prev) => ({ ...prev, orders: isUsingMockData }))
+            }
+          />
         </main>
       </div>
 
