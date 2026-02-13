@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/AuthContext"
 import Link from "next/link"
 import { useRouter } from "next/router"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import {
   BarChart3,
   Users,
@@ -163,8 +163,14 @@ export function Sidebar() {
     }
   };
 
+  const lastSubscriptionFetchRef = useRef<number>(0);
   useEffect(() => {
-    fetchSubscriptionBasicInfo()
+    const now = Date.now();
+    // Only refetch if more than 5 minutes have elapsed since last fetch
+    if (now - lastSubscriptionFetchRef.current > 5 * 60 * 1000) {
+      lastSubscriptionFetchRef.current = now;
+      fetchSubscriptionBasicInfo();
+    }
   }, [router.pathname])
 
   // Fetch clinic/organization information for branding
