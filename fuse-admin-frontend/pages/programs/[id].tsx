@@ -2223,45 +2223,6 @@ export default function ProgramEditor() {
                     )}
                 </div>
             </div>
-            
-            {/* Warning Dialog for Switching to Unified Mode */}
-            {showUnifiedWarning && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                    <div className="bg-card rounded-2xl shadow-xl border border-border w-full max-w-md mx-4">
-                        <div className="p-6">
-                            <div className="flex items-center gap-3 mb-4">
-                                <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
-                                    <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-                                </div>
-                                <div>
-                                    <h3 className="text-lg font-semibold">Switch to Unified Pricing?</h3>
-                                </div>
-                            </div>
-                            <p className="text-sm text-muted-foreground mb-6">
-                                Switching to unified pricing mode will <span className="font-medium text-foreground">permanently delete</span> all 
-                                individual product programs and their custom pricing configurations. 
-                                The unified non-medical services pricing will apply to all products.
-                            </p>
-                            <div className="flex gap-3">
-                                <Button
-                                    variant="outline"
-                                    onClick={() => setShowUnifiedWarning(false)}
-                                    className="flex-1"
-                                >
-                                    Cancel
-                                </Button>
-                                <Button
-                                    variant="destructive"
-                                    onClick={confirmSwitchToUnified}
-                                    className="flex-1"
-                                >
-                                    Delete & Switch
-                                </Button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
                         </>
                     ) : (
                         <>
@@ -2350,6 +2311,45 @@ export default function ProgramEditor() {
                             )}
                         </>
                     )}
+
+            {/* Warning Dialog for Switching to Unified Mode */}
+            {showUnifiedWarning && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <div className="bg-card rounded-2xl shadow-xl border border-border w-full max-w-md mx-4">
+                        <div className="p-6">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                                    <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-semibold">Switch to Unified Pricing?</h3>
+                                </div>
+                            </div>
+                            <p className="text-sm text-muted-foreground mb-6">
+                                Switching to unified pricing mode will <span className="font-medium text-foreground">permanently delete</span> all 
+                                individual product programs and their custom pricing configurations. 
+                                The unified non-medical services pricing will apply to all products.
+                            </p>
+                            <div className="flex gap-3">
+                                <Button
+                                    variant="outline"
+                                    onClick={() => setShowUnifiedWarning(false)}
+                                    className="flex-1"
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    variant="destructive"
+                                    onClick={confirmSwitchToUnified}
+                                    className="flex-1"
+                                >
+                                    Delete & Switch
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
             
             {/* Individual Product Program Configuration Modal */}
             {configModalOpen && configModalData && (
