@@ -66,6 +66,7 @@ import MedicalCompanyPharmacy from '../models/MedicalCompanyPharmacy';
 import DoctorPharmacy from '../models/DoctorPharmacy';
 import { MedicalCompanySlug } from '@fuse/enums';
 import ClinicBalance from '../models/ClinicBalance';
+import RefundRequest from '../models/RefundRequest';
 import { MigrationService } from '../services/migration.service';
 
 // Load environment variables from .env.local
@@ -155,7 +156,7 @@ export const sequelize = new Sequelize(databaseUrl, {
     TenantProductForm, FormProducts, GlobalFormStructure, Sale, DoctorPatientChats, Pharmacy, PharmacyCoverage, PharmacyProduct,
     TenantCustomFeatures, TierConfiguration, TenantAnalyticsEvents, FormAnalyticsDaily,
     MessageTemplate, Sequence, SequenceRun, Tag, UserTag, GlobalFees, WebsiteBuilderConfigs, UserRoles,
-    SupportTicket, TicketMessage, AuditLog, MfaToken, CustomWebsite, Like, BrandFavoritedProduct, Program, AffiliateProductImage, BrandInvitation, ClinicBalance
+    SupportTicket, TicketMessage, AuditLog, MfaToken, CustomWebsite, Like, BrandFavoritedProduct, Program, AffiliateProductImage, BrandInvitation, ClinicBalance, RefundRequest
   ],
 });
 
