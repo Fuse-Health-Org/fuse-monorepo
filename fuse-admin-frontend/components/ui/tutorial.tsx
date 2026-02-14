@@ -52,18 +52,6 @@ const Tutorial: React.FC<TutorialProps> = ({
   const currentStepData = adaptiveStepOverride || activeSteps[currentStep];
   const totalSteps = activeSteps.length;
 
-  // Debug logging
-  console.log('🔍 Tutorial render:', {
-    runTutorial,
-    mounted,
-    currentStep,
-    initialStep,
-    pathname: router.pathname,
-    targetRect: targetRect ? 'SET' : 'NULL',
-    currentStepData: currentStepData?.target,
-    adaptiveStepOverride: adaptiveStepOverride?.target || 'NONE'
-  });
-
   // Mount check for portal
   useEffect(() => {
     setMounted(true);

@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { Sidebar } from "@/components/sidebar";
-import { Header } from "@/components/header";
+import { useEffect, useMemo, useState, useRef, useCallback } from "react";
+import Layout from "@/components/Layout";
 import { MetricCards } from "@/components/metric-cards";
 import { StoreAnalytics } from "@/components/store-analytics";
 import { RecentOrders } from "@/components/recent-orders";
@@ -18,40 +17,43 @@ export default function Dashboard() {
     analytics: false,
     orders: false,
   });
+  const hasCheckedSetup = useRef(false);
   
   // Default to full current month (1st to last day of month)
-  const now = new Date();
-  const [startDate, setStartDate] = useState<Date>(
-    new Date(now.getFullYear(), now.getMonth(), 1)
-  );
-  const [endDate, setEndDate] = useState<Date>(
-    new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999)
-  );
+  // Use lazy initialization to avoid creating new Date objects on every render
+  const [startDate, setStartDate] = useState<Date>(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
+  const [endDate, setEndDate] = useState<Date>(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+  });
 
-  const handleDateChange = (newStartDate: Date, newEndDate: Date) => {
+  const handleDateChange = useCallback((newStartDate: Date, newEndDate: Date) => {
     setStartDate(newStartDate);
     setEndDate(newEndDate);
-  };
+  }, []);
 
-  const checkoutQueryFromRouter = useMemo(() => {
-    const params = new URLSearchParams();
-    Object.entries(router.query).forEach(([key, value]) => {
-      if (key === "openCheckout") return;
-      if (Array.isArray(value)) {
-        value.forEach((entry) => params.append(key, entry));
-        return;
-      }
-      if (value != null) {
-        params.set(key, String(value));
-      }
-    });
-    return params;
-  }, [router.query]);
+  // Serialize router.query to a stable string for dependency tracking
+  const queryString = useMemo(() => JSON.stringify(router.query), [router.query]);
 
   const isUsingAnyMockData = useMemo(
     () => mockDataUsage.metrics || mockDataUsage.analytics || mockDataUsage.orders,
     [mockDataUsage]
   );
+
+  const handleMetricsMockData = useCallback((isUsingMockData: boolean) => {
+    setMockDataUsage((prev) => ({ ...prev, metrics: isUsingMockData }));
+  }, []);
+
+  const handleAnalyticsMockData = useCallback((isUsingMockData: boolean) => {
+    setMockDataUsage((prev) => ({ ...prev, analytics: isUsingMockData }));
+  }, []);
+
+  const handleOrdersMockData = useCallback((isUsingMockData: boolean) => {
+    setMockDataUsage((prev) => ({ ...prev, orders: isUsingMockData }));
+  }, []);
 
   useEffect(() => {
     const checkAccountSetupGate = async () => {
@@ -65,6 +67,12 @@ export default function Dashboard() {
       if (!router.isReady || !user) {
         return;
       }
+
+      // Only run once
+      if (hasCheckedSetup.current) {
+        return;
+      }
+      hasCheckedSetup.current = true;
 
       setIsCheckingSetup(true);
       try {
@@ -89,7 +97,19 @@ export default function Dashboard() {
         }
 
         if (shouldShowCheckout) {
-          const params = new URLSearchParams(checkoutQueryFromRouter.toString());
+          // Build params directly from router.query
+          const params = new URLSearchParams();
+          Object.entries(router.query).forEach(([key, value]) => {
+            if (key === "openCheckout") return;
+            if (Array.isArray(value)) {
+              value.forEach((entry) => params.append(key, entry));
+              return;
+            }
+            if (value != null) {
+              params.set(key, String(value));
+            }
+          });
+          
           const selectedPlanType = localStorage.getItem("selectedPlanType");
           const selectedPlanName = localStorage.getItem("selectedPlanName");
 
@@ -100,8 +120,8 @@ export default function Dashboard() {
             params.set("planName", selectedPlanName);
           }
 
-          const queryString = params.toString();
-          setCheckoutEmbedUrl(`/checkout?embed=1${queryString ? `&${queryString}` : ""}`);
+          const queryStr = params.toString();
+          setCheckoutEmbedUrl(`/checkout?embed=1${queryStr ? `&${queryStr}` : ""}`);
           setShowCheckoutGate(true);
         } else {
           setShowCheckoutGate(false);
@@ -116,14 +136,13 @@ export default function Dashboard() {
     };
 
     void checkAccountSetupGate();
-  }, [router.isReady, user, authenticatedFetch, hasActiveSubscription, checkoutQueryFromRouter]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.isReady, user]);
 
   return (
-    <div className="flex h-screen bg-background relative">
-      <Sidebar />
-      <div className={`flex-1 flex flex-col overflow-hidden ${showCheckoutGate ? "pointer-events-none select-none blur-[2px]" : ""}`}>
-        <Header />
-        <main className="flex-1 overflow-y-auto p-8 space-y-8" id="overview-dashboard">
+    <Layout>
+      <div className={`relative ${showCheckoutGate ? "pointer-events-none select-none blur-[2px]" : ""}`}>
+        <div className="p-8 space-y-8" id="overview-dashboard">
           {/* Header Section */}
           <div>
             <h1 className="text-2xl font-semibold text-foreground mb-1 tracking-tight">
@@ -147,27 +166,21 @@ export default function Dashboard() {
           <MetricCards
             startDate={startDate}
             endDate={endDate}
-            onMockDataStatusChange={(isUsingMockData) =>
-              setMockDataUsage((prev) => ({ ...prev, metrics: isUsingMockData }))
-            }
+            onMockDataStatusChange={handleMetricsMockData}
           />
 
           {/* Analytics Chart */}
           <StoreAnalytics
             startDate={startDate}
             endDate={endDate}
-            onMockDataStatusChange={(isUsingMockData) =>
-              setMockDataUsage((prev) => ({ ...prev, analytics: isUsingMockData }))
-            }
+            onMockDataStatusChange={handleAnalyticsMockData}
           />
 
           {/* Recent Orders */}
           <RecentOrders
-            onMockDataStatusChange={(isUsingMockData) =>
-              setMockDataUsage((prev) => ({ ...prev, orders: isUsingMockData }))
-            }
+            onMockDataStatusChange={handleOrdersMockData}
           />
-        </main>
+        </div>
       </div>
 
       {!isCheckingSetup && showCheckoutGate && (
@@ -195,6 +208,6 @@ export default function Dashboard() {
           </div>
         </div>
       )}
-    </div>
+    </Layout>
   );
 }
