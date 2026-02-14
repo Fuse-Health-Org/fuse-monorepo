@@ -45,6 +45,14 @@ export class GlobalFees extends Model {
   })
   declare stripeTransactionFeePercent: number;
 
+  @Column({
+    type: DataType.INTEGER,
+    allowNull: false,
+    defaultValue: 0,
+    comment: 'Number of days to delay refund processing (e.g., 7 for 7-day delay)',
+  })
+  declare refundProcessingDelayDays: number;
+
   @CreatedAt
   declare createdAt: Date;
 
