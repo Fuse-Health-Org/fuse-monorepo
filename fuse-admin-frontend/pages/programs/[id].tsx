@@ -149,20 +149,19 @@ export default function ProgramEditor() {
     const [configModalProductId, setConfigModalProductId] = useState<string | null>(null)
     const [configModalData, setConfigModalData] = useState<IndividualProductProgram | null>(null)
 
-    // Analytics tab state
-    const [activeTab, setActiveTab] = useState<'details' | 'analytics'>('details')
-    const [analyticsSubTab, setAnalyticsSubTab] = useState<'overview' | 'forms' | 'revenue' | 'customers'>('overview')
+    // Tab state - 4 tabs at top level
+    const [activeTab, setActiveTab] = useState<'details' | 'services' | 'form' | 'analytics'>('details')
     const [analyticsLoading, setAnalyticsLoading] = useState(false)
     const [analyticsData, setAnalyticsData] = useState<any>(null)
 
-    // Handle tab query parameter
+    // Initialize active tab from URL query parameter
     useEffect(() => {
-      if (router.query.tab === 'analytics') {
-        setActiveTab('analytics')
-      } else {
-        setActiveTab('details')
-      }
-    }, [router.query.tab])
+        if (!router.isReady) return
+        const tabParam = router.query.tab as string
+        if (tabParam && ['details', 'services', 'form', 'analytics'].includes(tabParam)) {
+            setActiveTab(tabParam as 'details' | 'services' | 'form' | 'analytics')
+        }
+    }, [router.isReady, router.query.tab])
 
     // Fetch analytics when tab is active
     const fetchAnalytics = async () => {
@@ -814,7 +813,7 @@ export default function ProgramEditor() {
                         </p>
                     </div>
 
-                    {/* Tab Navigation - Only show in edit mode */}
+                    {/* Tab Navigation - 4 tabs at top level (only show in edit mode) */}
                     {!isCreateMode && (
                         <div className="flex items-center gap-2 border-b border-gray-200 mb-6">
                             <button
@@ -822,29 +821,67 @@ export default function ProgramEditor() {
                                     setActiveTab('details')
                                     router.push(`/programs/${id}`, undefined, { shallow: true })
                                 }}
-                                className={`px-4 py-2 font-medium text-sm transition-colors border-b-2 ${
+                                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
                                     activeTab === 'details'
-                                        ? 'border-purple-600 text-purple-600'
-                                        : 'border-transparent text-muted-foreground hover:text-foreground'
+                                        ? 'border-primary text-primary'
+                                        : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
                                 }`}
                             >
-                                <Settings2 className="h-4 w-4 inline-block mr-2" />
-                                Program Details
+                                <div className="flex items-center gap-2">
+                                    <FileText className="h-4 w-4" />
+                                    Details
+                                </div>
                             </button>
                             <button
                                 onClick={() => {
-                                    setActiveTab('analytics')
-                                    router.push(`/programs/${id}?tab=analytics`, undefined, { shallow: true })
+                                    setActiveTab('services')
+                                    router.push(`/programs/${id}?tab=services`, undefined, { shallow: true })
                                 }}
-                                className={`px-4 py-2 font-medium text-sm transition-colors border-b-2 ${
-                                    activeTab === 'analytics'
-                                        ? 'border-blue-600 text-blue-600'
-                                        : 'border-transparent text-muted-foreground hover:text-foreground'
+                                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                                    activeTab === 'services'
+                                        ? 'border-primary text-primary'
+                                        : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
                                 }`}
                             >
-                                <BarChart3 className="h-4 w-4 inline-block mr-2" />
-                                Analytics
+                                <div className="flex items-center gap-2">
+                                    <Settings2 className="h-4 w-4" />
+                                    Services
+                                </div>
                             </button>
+                            <button
+                                onClick={() => {
+                                    setActiveTab('form')
+                                    router.push(`/programs/${id}?tab=form`, undefined, { shallow: true })
+                                }}
+                                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                                    activeTab === 'form'
+                                        ? 'border-primary text-primary'
+                                        : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
+                                }`}
+                            >
+                                <div className="flex items-center gap-2">
+                                    <ExternalLink className="h-4 w-4" />
+                                    Form
+                                </div>
+                            </button>
+                            {medicalTemplateId && (
+                                <button
+                                    onClick={() => {
+                                        setActiveTab('analytics')
+                                        router.push(`/programs/${id}?tab=analytics`, undefined, { shallow: true })
+                                    }}
+                                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                                        activeTab === 'analytics'
+                                            ? 'border-primary text-primary'
+                                            : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
+                                    }`}
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <BarChart3 className="h-4 w-4" />
+                                        Analytics
+                                    </div>
+                                </button>
+                            )}
                         </div>
                     )}
 
@@ -855,7 +892,8 @@ export default function ProgramEditor() {
                         </div>
                     )}
 
-                    {activeTab === 'details' ? (
+                    {/* Details Tab Content */}
+                    {activeTab === 'details' && (
                         <>
                             {/* Step Indicator for Create Mode */}
                     {isCreateMode && (
@@ -2128,8 +2166,11 @@ export default function ProgramEditor() {
                         </div>
                     )}
 
-                    {/* Edit Mode: Non-Medical Services (only shown in unified mode) */}
-                    {!isCreateMode && programMode === 'unified' && (
+                        </>
+                    )}
+
+                    {/* Services Tab Content */}
+                    {activeTab === 'services' && !isCreateMode && programMode === 'unified' && (
                         <div className="bg-card rounded-2xl shadow-sm border border-border p-6 mt-6">
                             <div className="flex items-center gap-2 mb-2">
                                 <Sparkles className="h-5 w-5 text-primary" />
@@ -2223,59 +2264,27 @@ export default function ProgramEditor() {
                             </div>
                         </div>
                     )}
-                        </>
-                    ) : (
-                        <>
-                            {/* ANALYTICS TAB CONTENT */}
-                            
-                            {/* Analytics Sub-Tabs */}
-                            <div className="flex items-center gap-2 border-b border-gray-200 mb-6">
-                                <button
-                                    onClick={() => setAnalyticsSubTab('overview')}
-                                    className={`px-4 py-2 font-medium text-sm transition-colors border-b-2 ${
-                                        analyticsSubTab === 'overview'
-                                            ? 'border-blue-600 text-blue-600'
-                                            : 'border-transparent text-muted-foreground hover:text-foreground'
-                                    }`}
-                                >
-                                    Overview
-                                </button>
-                                <button
-                                    onClick={() => setAnalyticsSubTab('forms')}
-                                    className={`px-4 py-2 font-medium text-sm transition-colors border-b-2 ${
-                                        analyticsSubTab === 'forms'
-                                            ? 'border-blue-600 text-blue-600'
-                                            : 'border-transparent text-muted-foreground hover:text-foreground'
-                                    }`}
-                                >
-                                    Forms
-                                </button>
-                                <button
-                                    onClick={() => setAnalyticsSubTab('revenue')}
-                                    className={`px-4 py-2 font-medium text-sm transition-colors border-b-2 ${
-                                        analyticsSubTab === 'revenue'
-                                            ? 'border-blue-600 text-blue-600'
-                                            : 'border-transparent text-muted-foreground hover:text-foreground'
-                                    }`}
-                                >
-                                    Revenue
-                                </button>
-                                <button
-                                    onClick={() => setAnalyticsSubTab('customers')}
-                                    className={`px-4 py-2 font-medium text-sm transition-colors border-b-2 ${
-                                        analyticsSubTab === 'customers'
-                                            ? 'border-blue-600 text-blue-600'
-                                            : 'border-transparent text-muted-foreground hover:text-foreground'
-                                    }`}
-                                >
-                                    Customers
-                                </button>
-                            </div>
 
-                            {/* Overview Tab Content */}
-                            {analyticsSubTab === 'overview' && (
-                                <>
-                                    {analyticsLoading ? (
+                    {/* Form Tab Content */}
+                    {activeTab === 'form' && !isCreateMode && (
+                        <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
+                            <ExternalLink className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                            <h3 className="text-lg font-medium text-foreground mb-2">
+                                Form Configuration
+                            </h3>
+                            <p className="text-muted-foreground mb-4">
+                                Manage form settings, customizations, and integrations
+                            </p>
+                            <div className="text-sm text-muted-foreground bg-purple-50 p-4 rounded-lg">
+                                💡 Form builder and customization options will appear here
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Analytics Tab Content */}
+                    {activeTab === 'analytics' && !isCreateMode && (
+                        <>
+                            {analyticsLoading ? (
                                 <div className="flex items-center justify-center py-12">
                                     <div className="animate-pulse text-muted-foreground">Loading analytics...</div>
                                 </div>
@@ -2458,120 +2467,6 @@ export default function ProgramEditor() {
                                     <p className="text-muted-foreground">
                                         Start receiving program visits to see analytics here
                                     </p>
-                                </div>
-                            )}
-                                </>
-                            )}
-
-                            {/* Forms Tab Content */}
-                            {analyticsSubTab === 'forms' && (
-                                <div className="space-y-6">
-                                    <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
-                                        <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                                        <h3 className="text-lg font-medium text-foreground mb-2">
-                                            Form-Specific Analytics
-                                        </h3>
-                                        <p className="text-muted-foreground mb-4">
-                                            Detailed breakdown of how each form in this program is performing
-                                        </p>
-                                        <div className="text-sm text-muted-foreground bg-blue-50 p-4 rounded-lg">
-                                            💡 This will show conversion funnels, drop-off points, and completion rates for each form
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Revenue Tab Content */}
-                            {analyticsSubTab === 'revenue' && (
-                                <div className="space-y-6">
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                                        <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-                                            <div className="flex items-center justify-between mb-2">
-                                                <p className="text-sm text-muted-foreground">Total Revenue</p>
-                                                <DollarSign className="h-4 w-4 text-green-500" />
-                                            </div>
-                                            <p className="text-3xl font-bold text-foreground">$12,450</p>
-                                            <p className="text-xs text-green-600 mt-1">+23% from last month</p>
-                                        </div>
-
-                                        <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-                                            <div className="flex items-center justify-between mb-2">
-                                                <p className="text-sm text-muted-foreground">Avg Order Value</p>
-                                                <DollarSign className="h-4 w-4 text-blue-500" />
-                                            </div>
-                                            <p className="text-3xl font-bold text-foreground">$296</p>
-                                            <p className="text-xs text-blue-600 mt-1">Per transaction</p>
-                                        </div>
-
-                                        <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-                                            <div className="flex items-center justify-between mb-2">
-                                                <p className="text-sm text-muted-foreground">Total Orders</p>
-                                                <Package className="h-4 w-4 text-purple-500" />
-                                            </div>
-                                            <p className="text-3xl font-bold text-foreground">42</p>
-                                            <p className="text-xs text-purple-600 mt-1">Completed purchases</p>
-                                        </div>
-                                    </div>
-
-                                    <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
-                                        <DollarSign className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                                        <h3 className="text-lg font-medium text-foreground mb-2">
-                                            Revenue Breakdown
-                                        </h3>
-                                        <p className="text-muted-foreground mb-4">
-                                            Revenue by product, subscription type, and payment method
-                                        </p>
-                                        <div className="text-sm text-muted-foreground bg-green-50 p-4 rounded-lg">
-                                            💡 This will show revenue trends, MRR, product performance, and payment analytics
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Customers Tab Content */}
-                            {analyticsSubTab === 'customers' && (
-                                <div className="space-y-6">
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                                        <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-                                            <div className="flex items-center justify-between mb-2">
-                                                <p className="text-sm text-muted-foreground">Total Customers</p>
-                                                <Users className="h-4 w-4 text-blue-500" />
-                                            </div>
-                                            <p className="text-3xl font-bold text-foreground">156</p>
-                                            <p className="text-xs text-blue-600 mt-1">Active patients</p>
-                                        </div>
-
-                                        <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-                                            <div className="flex items-center justify-between mb-2">
-                                                <p className="text-sm text-muted-foreground">New This Month</p>
-                                                <TrendingUp className="h-4 w-4 text-green-500" />
-                                            </div>
-                                            <p className="text-3xl font-bold text-foreground">23</p>
-                                            <p className="text-xs text-green-600 mt-1">+18% growth</p>
-                                        </div>
-
-                                        <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-                                            <div className="flex items-center justify-between mb-2">
-                                                <p className="text-sm text-muted-foreground">Retention Rate</p>
-                                                <Check className="h-4 w-4 text-purple-500" />
-                                            </div>
-                                            <p className="text-3xl font-bold text-foreground">87%</p>
-                                            <p className="text-xs text-purple-600 mt-1">Month-over-month</p>
-                                        </div>
-                                    </div>
-
-                                    <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
-                                        <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                                        <h3 className="text-lg font-medium text-foreground mb-2">
-                                            Customer Insights
-                                        </h3>
-                                        <p className="text-muted-foreground mb-4">
-                                            Demographics, behavior patterns, and engagement metrics
-                                        </p>
-                                        <div className="text-sm text-muted-foreground bg-purple-50 p-4 rounded-lg">
-                                            💡 This will show customer lifetime value, churn analysis, and segmentation
-                                        </div>
-                                    </div>
                                 </div>
                             )}
                         </>
