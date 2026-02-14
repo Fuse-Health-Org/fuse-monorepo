@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import Layout from '@/components/Layout'
+import { FormAnalytics } from '@/components/form-analytics-detail'
 import {
     ArrowLeft,
     FileText,
@@ -151,8 +152,6 @@ export default function ProgramEditor() {
 
     // Tab state - 4 tabs at top level
     const [activeTab, setActiveTab] = useState<'details' | 'services' | 'form' | 'analytics'>('details')
-    const [analyticsLoading, setAnalyticsLoading] = useState(false)
-    const [analyticsData, setAnalyticsData] = useState<any>(null)
 
     // Initialize active tab from URL query parameter
     useEffect(() => {
@@ -162,48 +161,6 @@ export default function ProgramEditor() {
             setActiveTab(tabParam as 'details' | 'services' | 'form' | 'analytics')
         }
     }, [router.isReady, router.query.tab])
-
-    // Fetch analytics when tab is active
-    const fetchAnalytics = async () => {
-      if (!id || id === 'create') return
-
-      try {
-        setAnalyticsLoading(true)
-        
-        // Mock data for now - replace with real API call when ready
-        setAnalyticsData({
-          totalViews: 248,
-          totalConversions: 42,
-          conversionRate: 16.9,
-          revenueGenerated: 12450,
-          averageOrderValue: 296.43,
-          topPerformingForms: [
-            { formName: 'Weight Loss Intake', views: 145, conversions: 28, rate: 19.3 },
-            { formName: 'Anti-Aging Consultation', views: 78, conversions: 10, rate: 12.8 },
-            { formName: 'Hair Growth Assessment', views: 25, conversions: 4, rate: 16.0 },
-          ],
-          chartData: [
-            { date: 'Feb 6', views: 32, conversions: 6 },
-            { date: 'Feb 7', views: 28, conversions: 4 },
-            { date: 'Feb 8', views: 45, conversions: 9 },
-            { date: 'Feb 9', views: 38, conversions: 7 },
-            { date: 'Feb 10', views: 41, conversions: 6 },
-            { date: 'Feb 11', views: 35, conversions: 5 },
-            { date: 'Feb 12', views: 29, conversions: 5 },
-          ]
-        })
-      } catch (error) {
-        console.error('Error fetching analytics:', error)
-      } finally {
-        setAnalyticsLoading(false)
-      }
-    }
-
-    useEffect(() => {
-      if (activeTab === 'analytics') {
-        fetchAnalytics()
-      }
-    }, [activeTab, id])
 
     // Load existing program if editing
     useEffect(() => {
@@ -931,7 +888,7 @@ export default function ProgramEditor() {
                     )}
 
                     {/* Step 3: Program Details (or Edit Mode) */}
-                    {(currentStep === 3 || !isCreateMode) && (
+                    {(currentStep === 3 || (!isCreateMode && activeTab === 'details')) && (
                         <div className="bg-card rounded-2xl shadow-sm border border-border p-6 mb-6">
                             <h3 className="text-lg font-semibold mb-4">Program Details</h3>
 
@@ -1491,7 +1448,7 @@ export default function ProgramEditor() {
                     )}
 
                     {/* Edit Mode: Show Medical Template Selection */}
-                    {!isCreateMode && (
+                    {!isCreateMode && activeTab === 'details' && (
                         <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
                             <h3 className="text-lg font-semibold mb-4">Medical Template</h3>
 
@@ -1610,7 +1567,7 @@ export default function ProgramEditor() {
                     )}
 
                     {/* Edit Mode: Program Form Link - uses program ID */}
-                    {!isCreateMode && id && clinicSlug && (
+                    {!isCreateMode && activeTab === 'form' && id && clinicSlug && (
                         <div className="bg-card rounded-2xl shadow-sm border border-border p-6 mt-6">
                             <div className="flex items-center gap-2 mb-2">
                                 <FileText className="h-5 w-5 text-green-500" />
@@ -1787,7 +1744,7 @@ export default function ProgramEditor() {
                     )}
 
                     {/* Edit Mode: Selected Template Products & Form Links */}
-                    {!isCreateMode && selectedTemplateDetails && selectedTemplateDetails.formProducts && selectedTemplateDetails.formProducts.length > 0 && (
+                    {!isCreateMode && activeTab === 'services' && selectedTemplateDetails && selectedTemplateDetails.formProducts && selectedTemplateDetails.formProducts.length > 0 && (
                         <div className="bg-card rounded-2xl shadow-sm border border-border p-6 mt-6">
                             <div className="flex items-center gap-2 mb-2">
                                 <Pill className="h-5 w-5 text-blue-500" />
@@ -2169,8 +2126,8 @@ export default function ProgramEditor() {
                         </>
                     )}
 
-                    {/* Services Tab Content */}
-                    {activeTab === 'services' && !isCreateMode && programMode === 'unified' && (
+                    {/* Edit Mode: Non-Medical Services (only shown in unified mode) */}
+                    {!isCreateMode && activeTab === 'services' && programMode === 'unified' && (
                         <div className="bg-card rounded-2xl shadow-sm border border-border p-6 mt-6">
                             <div className="flex items-center gap-2 mb-2">
                                 <Sparkles className="h-5 w-5 text-primary" />
@@ -2264,212 +2221,57 @@ export default function ProgramEditor() {
                             </div>
                         </div>
                     )}
-
-                    {/* Form Tab Content */}
-                    {activeTab === 'form' && !isCreateMode && (
-                        <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
-                            <ExternalLink className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                            <h3 className="text-lg font-medium text-foreground mb-2">
-                                Form Configuration
-                            </h3>
-                            <p className="text-muted-foreground mb-4">
-                                Manage form settings, customizations, and integrations
-                            </p>
-                            <div className="text-sm text-muted-foreground bg-purple-50 p-4 rounded-lg">
-                                💡 Form builder and customization options will appear here
+                        
+                    {/* Analytics Tab */}
+                    {!isCreateMode && activeTab === 'analytics' && medicalTemplateId && (
+                        <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
+                            <div className="flex items-center gap-2 mb-6">
+                                <BarChart3 className="h-5 w-5 text-blue-500" />
+                                <h3 className="text-lg font-semibold">Form Analytics</h3>
                             </div>
-                        </div>
-                    )}
-
-                    {/* Analytics Tab Content */}
-                    {activeTab === 'analytics' && !isCreateMode && (
-                        <>
-                            {analyticsLoading ? (
-                                <div className="flex items-center justify-center py-12">
-                                    <div className="animate-pulse text-muted-foreground">Loading analytics...</div>
-                                </div>
-                            ) : analyticsData ? (
-                                <div className="space-y-6">
-                                    {/* Summary Cards */}
-                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                                        <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-                                            <div className="flex items-center justify-between mb-2">
-                                                <p className="text-sm text-muted-foreground">Total Views</p>
-                                                <TrendingUp className="h-4 w-4 text-blue-500" />
-                                            </div>
-                                            <p className="text-3xl font-bold text-foreground">{analyticsData.totalViews}</p>
-                                        </div>
-
-                                        <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-                                            <div className="flex items-center justify-between mb-2">
-                                                <p className="text-sm text-muted-foreground">Conversions</p>
-                                                <Check className="h-4 w-4 text-green-500" />
-                                            </div>
-                                            <p className="text-3xl font-bold text-foreground">{analyticsData.totalConversions}</p>
-                                        </div>
-
-                                        <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-                                            <div className="flex items-center justify-between mb-2">
-                                                <p className="text-sm text-muted-foreground">Conversion Rate</p>
-                                                <BarChart3 className="h-4 w-4 text-purple-500" />
-                                            </div>
-                                            <p className="text-3xl font-bold text-foreground">{analyticsData.conversionRate}%</p>
-                                        </div>
-
-                                        <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-                                            <div className="flex items-center justify-between mb-2">
-                                                <p className="text-sm text-muted-foreground">Revenue</p>
-                                                <DollarSign className="h-4 w-4 text-green-500" />
-                                            </div>
-                                            <p className="text-3xl font-bold text-foreground">${analyticsData.revenueGenerated.toLocaleString()}</p>
-                                        </div>
-                                    </div>
-
-                                    {/* Chart */}
-                                    <div className="bg-white rounded-xl border border-gray-200/60 p-8 shadow-sm">
-                                        <div className="mb-8">
-                                            <h3 className="text-lg font-semibold text-foreground mb-1">Views & Conversions Over Time</h3>
-                                            <p className="text-sm text-muted-foreground/60">
-                                                Daily performance metrics for the past week
+                            <p className="text-sm text-muted-foreground mb-6">
+                                Track visitor behavior, completion rates, and form performance for this program's medical form.
+                            </p>
+                            
+                            {(() => {
+                                // Find the first form ID (TenantProductForm ID) for analytics
+                                // All products in the program share the same medical template
+                                const formWithId = enabledForms.find(f => f.id)
+                                
+                                if (!formWithId?.id) {
+                                    return (
+                                        <div className="text-center py-12">
+                                            <BarChart3 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                                            <h4 className="text-lg font-medium text-foreground mb-2">
+                                                No Form Data Available
+                                            </h4>
+                                            <p className="text-muted-foreground">
+                                                {enabledForms.length === 0 
+                                                    ? "Loading forms..." 
+                                                    : "This program's forms have not been published yet"}
                                             </p>
                                         </div>
-                                        
-                                        {/* Bar Chart */}
-                                        <div className="relative pt-6" style={{ height: '320px' }}>
-                                            {/* Y-axis labels */}
-                                            <div className="absolute left-0 top-6 bottom-20 flex flex-col justify-between text-xs text-muted-foreground/60 pr-3">
-                                                {(() => {
-                                                    const maxValue = Math.max(...analyticsData.chartData.map((d: any) => Math.max(d.views, d.conversions)))
-                                                    const chartMax = Math.ceil(maxValue * 1.2)
-                                                    const steps = 4
-                                                    const stepValue = Math.ceil(chartMax / steps)
-                                                    return Array.from({ length: steps + 1 }, (_, i) => (
-                                                        <div key={i} className="text-right">
-                                                            {stepValue * (steps - i)}
-                                                        </div>
-                                                    ))
-                                                })()}
-                                            </div>
-
-                                            {/* Chart Area */}
-                                            <div className="absolute left-12 right-0 top-6 bottom-0">
-                                                {/* Grid lines */}
-                                                <div className="absolute inset-0 flex flex-col justify-between pb-20">
-                                                    {Array.from({ length: 5 }).map((_, i) => (
-                                                        <div key={i} className="border-t border-gray-200/40" />
-                                                    ))}
-                                                </div>
-
-                                                {/* Bars */}
-                                                <div className="absolute inset-0 flex items-end justify-between gap-4 pb-20">
-                                                    {(() => {
-                                                        const maxValue = Math.max(...analyticsData.chartData.map((d: any) => Math.max(d.views, d.conversions)))
-                                                        const chartMax = maxValue * 1.2
-                                                        const chartHeight = 200
-                                                        
-                                                        return analyticsData.chartData.map((day: any, index: number) => {
-                                                            const viewsHeight = (day.views / chartMax) * chartHeight
-                                                            const conversionsHeight = (day.conversions / chartMax) * chartHeight
-                                                            
-                                                            return (
-                                                                <div key={index} className="flex-1 flex flex-col items-center justify-end group relative" style={{ height: chartHeight }}>
-                                                                    {/* Hover tooltip */}
-                                                                    <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 absolute -top-16 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-xs rounded-lg px-3 py-2 pointer-events-none whitespace-nowrap z-10 shadow-lg">
-                                                                        <div className="font-semibold mb-1">{day.date}</div>
-                                                                        <div className="text-blue-300">{day.views} views</div>
-                                                                        <div className="text-green-300">{day.conversions} conversions</div>
-                                                                        <div className="text-gray-300">{day.conversions > 0 ? ((day.conversions / day.views) * 100).toFixed(1) : 0}% rate</div>
-                                                                    </div>
-
-                                                                    {/* Side-by-side bars */}
-                                                                    <div className="w-full flex items-end justify-center gap-1">
-                                                                        {/* Views Bar */}
-                                                                        <div className="flex-1 max-w-[32px] flex flex-col items-center justify-end">
-                                                                            <div className="text-xs font-semibold text-blue-600 mb-1">{day.views}</div>
-                                                                            <div 
-                                                                                className="w-full rounded-t transition-all duration-700 ease-out hover:opacity-80"
-                                                                                style={{ 
-                                                                                    height: `${viewsHeight}px`,
-                                                                                    background: 'linear-gradient(180deg, hsl(217, 91%, 60%) 0%, hsl(217, 91%, 50%) 100%)',
-                                                                                    minHeight: day.views > 0 ? '8px' : '0'
-                                                                                }}
-                                                                            />
-                                                                        </div>
-
-                                                                        {/* Conversions Bar */}
-                                                                        <div className="flex-1 max-w-[32px] flex flex-col items-center justify-end">
-                                                                            <div className="text-xs font-semibold text-green-600 mb-1">{day.conversions}</div>
-                                                                            <div 
-                                                                                className="w-full rounded-t transition-all duration-700 ease-out hover:opacity-90"
-                                                                                style={{ 
-                                                                                    height: `${conversionsHeight}px`,
-                                                                                    background: 'linear-gradient(180deg, hsl(145, 65%, 50%) 0%, hsl(145, 65%, 45%) 100%)',
-                                                                                    minHeight: day.conversions > 0 ? '8px' : '0'
-                                                                                }}
-                                                                            />
-                                                                        </div>
-                                                                    </div>
-
-                                                                    {/* Date label */}
-                                                                    <div className="mt-4 text-center w-full">
-                                                                        <div className="text-xs font-medium text-muted-foreground">
-                                                                            {day.date}
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            )
-                                                        })
-                                                    })()}
+                                    )
+                                }
+                                
+                                return (
+                                    <div>
+                                        {selectedTemplateDetails && (
+                                            <div className="flex items-center gap-3 pb-4 mb-6 border-b border-border">
+                                                <FileText className="h-5 w-5 text-blue-500" />
+                                                <div>
+                                                    <h4 className="text-base font-semibold">{selectedTemplateDetails.title}</h4>
+                                                    {selectedTemplateDetails.description && (
+                                                        <p className="text-sm text-muted-foreground">{selectedTemplateDetails.description}</p>
+                                                    )}
                                                 </div>
                                             </div>
-                                        </div>
-
-                                        {/* Legend */}
-                                        <div className="flex items-center justify-center gap-6 mt-6 pt-4 border-t border-gray-200/60">
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-3 h-3 rounded" style={{ background: 'linear-gradient(135deg, hsl(217, 91%, 60%) 0%, hsl(217, 91%, 50%) 100%)' }}></div>
-                                                <span className="text-xs text-muted-foreground/70">Views</span>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-3 h-3 rounded" style={{ background: 'linear-gradient(135deg, hsl(145, 65%, 50%) 0%, hsl(145, 65%, 45%) 100%)' }}></div>
-                                                <span className="text-xs text-muted-foreground/70">Conversions</span>
-                                            </div>
-                                        </div>
+                                        )}
+                                        <FormAnalytics formId={formWithId.id} />
                                     </div>
-
-                                    {/* Top Performing Forms */}
-                                    <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-                                        <h3 className="text-lg font-semibold text-foreground mb-4">Top Performing Forms</h3>
-                                        <div className="space-y-3">
-                                            {analyticsData.topPerformingForms.map((form: any, index: number) => (
-                                                <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                                                    <div className="flex-1">
-                                                        <p className="font-medium text-foreground">{form.formName}</p>
-                                                        <p className="text-sm text-muted-foreground">
-                                                            {form.views} views • {form.conversions} conversions
-                                                        </p>
-                                                    </div>
-                                                    <div className="text-right">
-                                                        <p className="text-2xl font-bold text-foreground">{form.rate}%</p>
-                                                        <p className="text-xs text-muted-foreground">conversion rate</p>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="text-center py-12">
-                                    <BarChart3 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                                    <h3 className="text-lg font-medium text-foreground mb-2">
-                                        No analytics data yet
-                                    </h3>
-                                    <p className="text-muted-foreground">
-                                        Start receiving program visits to see analytics here
-                                    </p>
-                                </div>
-                            )}
-                        </>
+                                )
+                            })()}
+                        </div>
                     )}
                 </div>
             </div>
