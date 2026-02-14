@@ -83,6 +83,10 @@ export default function Orders() {
     const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
     const [refundingOrders, setRefundingOrders] = useState<Set<string>>(new Set())
     const [refundSuccess, setRefundSuccess] = useState<string | null>(null)
+    const [showRefundModal, setShowRefundModal] = useState(false)
+    const [refundModalOrder, setRefundModalOrder] = useState<Order | null>(null)
+    const [refundReason, setRefundReason] = useState('')
+    const [pendingRefundRequests, setPendingRefundRequests] = useState<Set<string>>(new Set())
     const { user, token } = useAuth()
 
     // Stripe Connect states
@@ -241,11 +245,17 @@ export default function Orders() {
         }
     }
 
-    const handleRefund = async (orderId: string, orderNumber: string) => {
-        if (!token) return
+    const openRefundModal = (order: Order) => {
+        setRefundModalOrder(order)
+        setRefundReason('')
+        setShowRefundModal(true)
+    }
 
-        const confirmRefund = confirm(`Are you sure you want to refund order ${orderNumber}? This action cannot be undone.`)
-        if (!confirmRefund) return
+    const handleRefundRequest = async () => {
+        if (!token || !refundModalOrder) return
+
+        const orderId = refundModalOrder.id
+        const orderNumber = refundModalOrder.orderNumber
 
         try {
             setRefundingOrders(prev => new Set(prev).add(orderId))
@@ -253,7 +263,7 @@ export default function Orders() {
             setRefundSuccess(null)
 
             const response = await fetch(
-                `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/refunds`,
+                `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/refund-requests`,
                 {
                     method: 'POST',
                     headers: {
@@ -261,7 +271,8 @@ export default function Orders() {
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        orderId: orderId
+                        orderId: orderId,
+                        reason: refundReason || undefined,
                     })
                 }
             )
@@ -269,17 +280,19 @@ export default function Orders() {
             const data = await response.json()
 
             if (response.ok && data.success) {
-                setRefundSuccess(`Order ${orderNumber} has been refunded successfully!`)
-                // Refresh orders to show updated status
-                fetchOrders()
+                setRefundSuccess(`Refund request for order ${orderNumber} has been submitted for review.`)
+                setPendingRefundRequests(prev => new Set(prev).add(orderId))
+                setShowRefundModal(false)
+                setRefundModalOrder(null)
+                setRefundReason('')
                 // Clear success message after 5 seconds
                 setTimeout(() => setRefundSuccess(null), 5000)
             } else {
-                setError(data.message || 'Failed to process refund')
+                setError(data.message || 'Failed to submit refund request')
             }
         } catch (err) {
-            console.error('Error processing refund:', err)
-            setError('An error occurred while processing the refund')
+            console.error('Error submitting refund request:', err)
+            setError('An error occurred while submitting the refund request')
         } finally {
             setRefundingOrders(prev => {
                 const newSet = new Set(prev)
@@ -681,36 +694,43 @@ export default function Orders() {
                                                                                                 </span>
                                                                                             </div>
                                                                                             
-                                                                                            {/* Refund Button - Only show for paid/captured orders that are not already refunded */}
-                                                                                            {(order.payment.status === 'succeeded' || 
-                                                                                              order.payment.status === 'paid' || 
-                                                                                              order.payment.status === 'captured') && 
-                                                                                             order.status !== 'refunded' && (
-                                                                                                <button
-                                                                                                    onClick={(e) => {
-                                                                                                        e.stopPropagation()
-                                                                                                        handleRefund(order.id, order.orderNumber)
-                                                                                                    }}
-                                                                                                    disabled={refundingOrders.has(order.id)}
-                                                                                                    className={`w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                                                                                                        refundingOrders.has(order.id)
-                                                                                                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                                                                                            : 'bg-red-50 text-red-700 border border-red-200 hover:bg-red-100'
-                                                                                                    }`}
-                                                                                                >
-                                                                                                    {refundingOrders.has(order.id) ? (
-                                                                                                        <>
-                                                                                                            <RefreshCw className="h-4 w-4 animate-spin" />
-                                                                                                            Processing Refund...
-                                                                                                        </>
-                                                                                                    ) : (
-                                                                                                        <>
-                                                                                                            <RefreshCw className="h-4 w-4" />
-                                                                                                            Issue Refund
-                                                                                                        </>
-                                                                                                    )}
-                                                                                                </button>
-                                                                                            )}
+                                                                            {/* Refund Request Button - Only show for paid/captured orders that are not already refunded */}
+                                                                            {(order.payment.status === 'succeeded' || 
+                                                                              order.payment.status === 'paid' || 
+                                                                              order.payment.status === 'captured') && 
+                                                                             order.status !== 'refunded' && (
+                                                                                pendingRefundRequests.has(order.id) ? (
+                                                                                    <div className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-md bg-amber-50 text-amber-700 border border-amber-200">
+                                                                                        <Clock className="h-4 w-4" />
+                                                                                        Refund Request Pending
+                                                                                    </div>
+                                                                                ) : (
+                                                                                    <button
+                                                                                        onClick={(e) => {
+                                                                                            e.stopPropagation()
+                                                                                            openRefundModal(order)
+                                                                                        }}
+                                                                                        disabled={refundingOrders.has(order.id)}
+                                                                                        className={`w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                                                                                            refundingOrders.has(order.id)
+                                                                                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                                                                                : 'bg-red-50 text-red-700 border border-red-200 hover:bg-red-100'
+                                                                                        }`}
+                                                                                    >
+                                                                                        {refundingOrders.has(order.id) ? (
+                                                                                            <>
+                                                                                                <RefreshCw className="h-4 w-4 animate-spin" />
+                                                                                                Submitting Request...
+                                                                                            </>
+                                                                                        ) : (
+                                                                                            <>
+                                                                                                <RefreshCw className="h-4 w-4" />
+                                                                                                Request Refund
+                                                                                            </>
+                                                                                        )}
+                                                                                    </button>
+                                                                                )
+                                                                            )}
                                                                                         </div>
                                                                                     </div>
                                                                                 )}
@@ -755,6 +775,107 @@ export default function Orders() {
                             )}
                         </CardContent>
                     </Card>
+
+                    {/* Refund Request Modal */}
+                    {showRefundModal && refundModalOrder && (
+                        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                            <div className="bg-white rounded-lg shadow-xl max-w-md w-full overflow-hidden">
+                                {/* Modal Header */}
+                                <div className="flex items-center justify-between p-6 border-b">
+                                    <div>
+                                        <h2 className="text-lg font-semibold text-gray-900">Request a Refund</h2>
+                                        <p className="text-sm text-gray-500 mt-1">
+                                            Order {refundModalOrder.orderNumber}
+                                        </p>
+                                    </div>
+                                    <button
+                                        onClick={() => {
+                                            setShowRefundModal(false)
+                                            setRefundModalOrder(null)
+                                            setRefundReason('')
+                                        }}
+                                        className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                                    >
+                                        <X className="h-5 w-5 text-gray-500" />
+                                    </button>
+                                </div>
+
+                                {/* Modal Body */}
+                                <div className="p-6 space-y-4">
+                                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                                        <div className="flex gap-3">
+                                            <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                                            <div className="text-sm text-amber-800">
+                                                <p className="font-medium mb-1">Refund requests require approval</p>
+                                                <p>
+                                                    Your refund request will be reviewed before it is processed. If approved, the patient will receive a full refund of <strong>${Number(refundModalOrder.totalAmount).toFixed(2)}</strong>.
+                                                </p>
+                                                <p className="mt-2">
+                                                    Since pharmacy and doctor payments cannot be reversed, the <strong>entire refund amount will come from your brand&apos;s balance</strong>.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                                            Reason for refund <span className="text-gray-400">(optional)</span>
+                                        </label>
+                                        <textarea
+                                            value={refundReason}
+                                            onChange={(e) => setRefundReason(e.target.value)}
+                                            placeholder="e.g. Customer requested cancellation, product quality issue..."
+                                            rows={3}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"
+                                        />
+                                    </div>
+
+                                    <div className="bg-gray-50 rounded-lg p-3 space-y-1.5">
+                                        <div className="flex justify-between text-sm">
+                                            <span className="text-gray-500">Refund amount</span>
+                                            <span className="font-medium text-gray-900">${Number(refundModalOrder.totalAmount).toFixed(2)}</span>
+                                        </div>
+                                        <div className="flex justify-between text-sm">
+                                            <span className="text-gray-500">Charged to your brand</span>
+                                            <span className="font-medium text-red-600">${Number(refundModalOrder.totalAmount).toFixed(2)}</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Modal Footer */}
+                                <div className="flex items-center justify-end gap-3 p-6 border-t bg-gray-50">
+                                    <button
+                                        onClick={() => {
+                                            setShowRefundModal(false)
+                                            setRefundModalOrder(null)
+                                            setRefundReason('')
+                                        }}
+                                        className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={handleRefundRequest}
+                                        disabled={refundingOrders.has(refundModalOrder.id)}
+                                        className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-2 ${
+                                            refundingOrders.has(refundModalOrder.id)
+                                                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                                : 'bg-red-600 text-white hover:bg-red-700'
+                                        }`}
+                                    >
+                                        {refundingOrders.has(refundModalOrder.id) ? (
+                                            <>
+                                                <RefreshCw className="h-4 w-4 animate-spin" />
+                                                Submitting...
+                                            </>
+                                        ) : (
+                                            'Submit Refund Request'
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Stripe Connect Modal */}
                     {showConnectModal && (

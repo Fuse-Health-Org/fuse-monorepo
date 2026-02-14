@@ -67,16 +67,34 @@ export const createRefund = async (req: Request, res: Response) => {
 
     const refundParams: any = {
       payment_intent: payment.stripePaymentIntentId,
-      reverse_transfer: true,
     };
 
     if (amount) {
       refundParams.amount = Math.round(refundAmount * 100);
     }
 
-    const refund = await stripe.refunds.create(refundParams);
-
-    console.log(`✅ Refund created: ${refund.id}`);
+    // Try with reverse_transfer first; fall back to regular refund if no associated transfer
+    let refund: any;
+    try {
+      refund = await stripe.refunds.create({
+        ...refundParams,
+        reverse_transfer: true,
+      });
+      console.log(`✅ Refund created (with reverse_transfer): ${refund.id}`);
+    } catch (stripeErr: any) {
+      if (
+        stripeErr?.type === "StripeInvalidRequestError" &&
+        stripeErr?.message?.includes("does not have an associated transfer")
+      ) {
+        console.log(
+          `⚠️ No associated transfer found, issuing regular refund for order ${order.orderNumber}`
+        );
+        refund = await stripe.refunds.create(refundParams);
+        console.log(`✅ Refund created (regular): ${refund.id}`);
+      } else {
+        throw stripeErr;
+      }
+    }
 
     // Step 2: Calculate what FUSE covered
     const fuseCoverage = refundAmount - order.brandAmount;

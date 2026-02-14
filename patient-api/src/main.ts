@@ -127,6 +127,8 @@ import ordersRoutes from "@endpoints/orders/routes/orders.routes";
 import payoutsRoutes from "@endpoints/payouts/routes/payouts.routes";
 import { tenantRoutes } from "@endpoints/tenant";
 import refundsRoutes from "@endpoints/refunds";
+import refundRequestsRoutes from "@endpoints/refund-requests";
+import RefundRequest from "@models/RefundRequest";
 import { stripeRoutes, webhookRoutes as stripeWebhookRoutes } from "@endpoints/stripe";
 import { GlobalFees } from "./models/GlobalFees";
 import { WebsiteBuilderConfigs, DEFAULT_FOOTER_DISCLAIMER } from "@models/WebsiteBuilderConfigs";
@@ -392,6 +394,7 @@ app.use("/", stripeWebhookRoutes);
 app.use("/", payoutsRoutes);
 app.use("/", tenantRoutes);
 app.use("/", refundsRoutes);
+app.use("/", refundRequestsRoutes);
 // Clone 'doctor' steps from master_template into a target questionnaire (preserve order)
 app.post(
   "/questionnaires/clone-doctor-from-master",
@@ -12197,12 +12200,12 @@ const PORT = process.env.PORT || 3001;
 
 // Initialize database connection and start server
 async function startServer() {
-  // const dbConnected = await initializeDatabase();
+  const dbConnected = await initializeDatabase();
 
-  // if (!dbConnected) {
-  //   console.error("❌ Failed to connect to database. Exiting...");
-  //   process.exit(1);
-  // }
+  if (!dbConnected) {
+    console.error("❌ Failed to connect to database. Exiting...");
+    process.exit(1);
+  }
 
   // Import WebSocket service early so route handlers can reference it
   const WebSocketService = (await import("./services/websocket.service"))
@@ -13465,6 +13468,16 @@ async function startServer() {
       }
     }
   );
+
+  // ============================================
+  // Ensure new tables exist (targeted sync for new models)
+  // ============================================
+  try {
+    await RefundRequest.sync({ alter: true });
+    console.log("✅ RefundRequest table synced");
+  } catch (syncErr) {
+    console.log("⚠️  RefundRequest sync:", syncErr instanceof Error ? syncErr.message : syncErr);
+  }
 
   // ============================================
   // Start server & initialize services

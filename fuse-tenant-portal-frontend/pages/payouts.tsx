@@ -14,6 +14,10 @@ import {
   CheckCircle,
   Clock,
   XCircle,
+  AlertTriangle,
+  RefreshCw,
+  X,
+  AlertCircle,
 } from "lucide-react"
 
 interface PayoutSummary {
@@ -60,19 +64,77 @@ interface PayoutsData {
   }
 }
 
+interface RefundRequestItem {
+  id: string
+  orderId: string
+  clinicId: string
+  requestedById: string
+  amount: number
+  brandCoverageAmount: number
+  reason?: string
+  status: "pending" | "approved" | "denied"
+  reviewedById?: string
+  reviewNotes?: string
+  reviewedAt?: string
+  createdAt: string
+  order?: {
+    id: string
+    orderNumber: string
+    totalAmount: number
+    brandAmount: number
+    status: string
+  }
+  clinic?: {
+    id: string
+    name: string
+    slug: string
+  }
+  requestedBy?: {
+    id: string
+    firstName: string
+    lastName: string
+    email: string
+  }
+  reviewedBy?: {
+    id: string
+    firstName: string
+    lastName: string
+    email: string
+  }
+}
+
 export default function Payouts() {
   const { token } = useAuth()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [data, setData] = useState<PayoutsData | null>(null)
-  const [selectedTab, setSelectedTab] = useState<"brands" | "doctors" | "pharmacies" | "affiliates">("brands")
+  const [selectedTab, setSelectedTab] = useState<"brands" | "doctors" | "pharmacies" | "affiliates" | "refund-requests">("brands")
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo] = useState("")
   const [searchQuery, setSearchQuery] = useState("")
 
+  // Refund request states
+  const [refundRequests, setRefundRequests] = useState<RefundRequestItem[]>([])
+  const [refundRequestsLoading, setRefundRequestsLoading] = useState(false)
+  const [refundRequestsError, setRefundRequestsError] = useState<string | null>(null)
+  const [processingRequestId, setProcessingRequestId] = useState<string | null>(null)
+  const [showReviewModal, setShowReviewModal] = useState(false)
+  const [reviewAction, setReviewAction] = useState<"approve" | "deny">("approve")
+  const [reviewTarget, setReviewTarget] = useState<RefundRequestItem | null>(null)
+  const [reviewNotes, setReviewNotes] = useState("")
+  const [refundRequestFilter, setRefundRequestFilter] = useState<"all" | "pending" | "approved" | "denied">("pending")
+  const [actionSuccess, setActionSuccess] = useState<string | null>(null)
+
   useEffect(() => {
     fetchPayouts()
+    fetchRefundRequests()
   }, [token, dateFrom, dateTo])
+
+  useEffect(() => {
+    if (selectedTab === "refund-requests") {
+      fetchRefundRequests()
+    }
+  }, [selectedTab])
 
   const fetchPayouts = async () => {
     if (!token) return
@@ -111,6 +173,95 @@ export default function Payouts() {
       setLoading(false)
     }
   }
+
+  const fetchRefundRequests = async () => {
+    if (!token) return
+
+    try {
+      setRefundRequestsLoading(true)
+      setRefundRequestsError(null)
+
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"}/refund-requests/clinic/all`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      )
+
+      if (response.ok) {
+        const result = await response.json()
+        if (result.success) {
+          setRefundRequests(result.data)
+        } else {
+          setRefundRequestsError(result.message || "Failed to load refund requests")
+        }
+      } else {
+        setRefundRequestsError("Failed to fetch refund requests")
+      }
+    } catch (err) {
+      console.error("Error fetching refund requests:", err)
+      setRefundRequestsError("Failed to fetch refund requests")
+    } finally {
+      setRefundRequestsLoading(false)
+    }
+  }
+
+  const openReviewModal = (request: RefundRequestItem, action: "approve" | "deny") => {
+    setReviewTarget(request)
+    setReviewAction(action)
+    setReviewNotes("")
+    setShowReviewModal(true)
+  }
+
+  const handleReviewSubmit = async () => {
+    if (!token || !reviewTarget) return
+
+    try {
+      setProcessingRequestId(reviewTarget.id)
+
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"}/refund-requests/${reviewTarget.id}/${reviewAction}`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            reviewNotes: reviewNotes || undefined,
+          }),
+        }
+      )
+
+      const result = await response.json()
+
+      if (response.ok && result.success) {
+        const actionLabel = reviewAction === "approve" ? "approved" : "denied"
+        setActionSuccess(`Refund request for order ${reviewTarget.order?.orderNumber} has been ${actionLabel}.`)
+        setShowReviewModal(false)
+        setReviewTarget(null)
+        setReviewNotes("")
+        fetchRefundRequests()
+        setTimeout(() => setActionSuccess(null), 5000)
+      } else {
+        setRefundRequestsError(result.message || `Failed to ${reviewAction} refund request`)
+      }
+    } catch (err) {
+      console.error(`Error ${reviewAction}ing refund request:`, err)
+      setRefundRequestsError(`An error occurred while processing the refund request`)
+    } finally {
+      setProcessingRequestId(null)
+    }
+  }
+
+  const filteredRefundRequests = refundRequests.filter((r) => {
+    if (refundRequestFilter === "all") return true
+    return r.status === refundRequestFilter
+  })
+
+  const pendingRefundCount = refundRequests.filter((r) => r.status === "pending").length
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-US", {
@@ -335,6 +486,21 @@ export default function Payouts() {
                 >
                   Affiliates ({displayData.affiliates.length})
                 </button>
+                <button
+                  onClick={() => setSelectedTab("refund-requests")}
+                  className={`py-4 px-2 border-b-2 font-medium text-sm transition-colors relative ${
+                    selectedTab === "refund-requests"
+                      ? "border-[#4FA59C] text-[#4FA59C]"
+                      : "border-transparent text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Refund Requests
+                  {pendingRefundCount > 0 && (
+                    <span className="ml-2 inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400">
+                      {pendingRefundCount}
+                    </span>
+                  )}
+                </button>
               </div>
             </div>
 
@@ -509,11 +675,322 @@ export default function Payouts() {
                         </div>
                       ))
                     ))}
+
+                  {selectedTab === "refund-requests" && (
+                    <div className="space-y-4">
+                      {/* Success Banner */}
+                      {actionSuccess && (
+                        <div className="flex items-center gap-3 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl">
+                          <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0" />
+                          <p className="text-sm text-green-800 dark:text-green-300">{actionSuccess}</p>
+                        </div>
+                      )}
+
+                      {/* Error Banner */}
+                      {refundRequestsError && (
+                        <div className="flex items-center gap-3 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
+                          <XCircle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0" />
+                          <p className="text-sm text-red-800 dark:text-red-300">{refundRequestsError}</p>
+                        </div>
+                      )}
+
+                      {/* Filter Chips */}
+                      <div className="flex items-center gap-2">
+                        {(["all", "pending", "approved", "denied"] as const).map((filter) => (
+                          <button
+                            key={filter}
+                            onClick={() => setRefundRequestFilter(filter)}
+                            className={`px-3 py-1.5 text-xs font-medium rounded-full border transition-colors capitalize ${
+                              refundRequestFilter === filter
+                                ? "bg-[#4FA59C] text-white border-[#4FA59C]"
+                                : "bg-muted text-muted-foreground border-border hover:bg-muted/80"
+                            }`}
+                          >
+                            {filter}
+                            {filter === "pending" && pendingRefundCount > 0 && (
+                              <span className="ml-1">({pendingRefundCount})</span>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+
+                      {refundRequestsLoading ? (
+                        <div className="text-center py-12">
+                          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#4FA59C]"></div>
+                          <p className="mt-4 text-muted-foreground">Loading refund requests...</p>
+                        </div>
+                      ) : filteredRefundRequests.length === 0 ? (
+                        <div className="text-center py-12">
+                          <AlertTriangle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                          <p className="text-muted-foreground">
+                            {refundRequestFilter === "pending"
+                              ? "No pending refund requests"
+                              : `No ${refundRequestFilter === "all" ? "" : refundRequestFilter + " "}refund requests found`}
+                          </p>
+                        </div>
+                      ) : (
+                        filteredRefundRequests.map((request) => (
+                          <div
+                            key={request.id}
+                            className={`border rounded-xl p-6 transition-all bg-card ${
+                              request.status === "pending"
+                                ? "border-amber-300 dark:border-amber-700 shadow-sm"
+                                : "border-border hover:shadow-md"
+                            }`}
+                          >
+                            <div className="flex items-start justify-between mb-4">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-3 mb-1">
+                                  <h3 className="text-lg font-semibold text-foreground">
+                                    {request.order?.orderNumber || "Unknown Order"}
+                                  </h3>
+                                  <span
+                                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${
+                                      request.status === "pending"
+                                        ? "bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800"
+                                        : request.status === "approved"
+                                        ? "bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800"
+                                        : "bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800"
+                                    }`}
+                                  >
+                                    {request.status === "pending" && <Clock className="h-3 w-3" />}
+                                    {request.status === "approved" && <CheckCircle className="h-3 w-3" />}
+                                    {request.status === "denied" && <XCircle className="h-3 w-3" />}
+                                    {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+                                  </span>
+                                </div>
+                                {request.clinic?.name && (
+                                  <p className="text-sm text-muted-foreground">
+                                    <span className="inline-flex items-center gap-1">
+                                      <Building2 className="h-3.5 w-3.5" />
+                                      {request.clinic.name}
+                                    </span>
+                                  </p>
+                                )}
+                                <p className="text-sm text-muted-foreground">
+                                  Requested by {request.requestedBy?.firstName} {request.requestedBy?.lastName} ({request.requestedBy?.email})
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                  {formatDate(request.createdAt)}
+                                </p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-2xl font-bold text-foreground">{formatCurrency(request.amount)}</p>
+                                <p className="text-xs text-muted-foreground">Refund amount</p>
+                              </div>
+                            </div>
+
+                            {/* Details */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 p-4 bg-muted/50 rounded-lg">
+                              <div>
+                                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Order Total</p>
+                                <p className="text-sm font-semibold text-foreground">{formatCurrency(request.order?.totalAmount || 0)}</p>
+                              </div>
+                              <div>
+                                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Brand Revenue</p>
+                                <p className="text-sm font-semibold text-foreground">{formatCurrency(request.order?.brandAmount || 0)}</p>
+                              </div>
+                              <div>
+                                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Brand Covers (Full Refund)</p>
+                                <p className="text-sm font-semibold text-red-600 dark:text-red-400">{formatCurrency(request.brandCoverageAmount)}</p>
+                              </div>
+                            </div>
+
+                            {request.reason && (
+                              <div className="mb-4 p-3 bg-muted/30 rounded-lg border border-border">
+                                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Reason</p>
+                                <p className="text-sm text-foreground">{request.reason}</p>
+                              </div>
+                            )}
+
+                            {/* Review info for already-reviewed requests */}
+                            {request.status !== "pending" && request.reviewedBy && (
+                              <div className="mb-4 p-3 bg-muted/30 rounded-lg border border-border">
+                                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
+                                  {request.status === "approved" ? "Approved" : "Denied"} by
+                                </p>
+                                <p className="text-sm text-foreground">
+                                  {request.reviewedBy.firstName} {request.reviewedBy.lastName} &mdash; {request.reviewedAt ? formatDate(request.reviewedAt) : ""}
+                                </p>
+                                {request.reviewNotes && (
+                                  <p className="text-sm text-muted-foreground mt-1">&ldquo;{request.reviewNotes}&rdquo;</p>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Action Buttons for pending requests */}
+                            {request.status === "pending" && (
+                              <div className="flex items-center gap-3 pt-2 border-t border-border">
+                                <button
+                                  onClick={() => openReviewModal(request, "approve")}
+                                  disabled={processingRequestId === request.id}
+                                  className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-green-600 text-white hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  <CheckCircle className="h-4 w-4" />
+                                  Approve &amp; Process Refund
+                                </button>
+                                <button
+                                  onClick={() => openReviewModal(request, "deny")}
+                                  disabled={processingRequestId === request.id}
+                                  className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-muted text-foreground border border-border hover:bg-red-50 hover:text-red-700 hover:border-red-200 dark:hover:bg-red-900/20 dark:hover:text-red-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  <XCircle className="h-4 w-4" />
+                                  Deny
+                                </button>
+                                {processingRequestId === request.id && (
+                                  <RefreshCw className="h-4 w-4 animate-spin text-muted-foreground" />
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           </div>
         </main>
+
+        {/* Review Refund Request Modal */}
+        {showReviewModal && reviewTarget && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-card rounded-2xl shadow-xl max-w-md w-full overflow-hidden border border-border">
+              {/* Modal Header */}
+              <div className="flex items-center justify-between p-6 border-b border-border">
+                <div>
+                  <h2 className="text-lg font-semibold text-foreground">
+                    {reviewAction === "approve" ? "Approve Refund Request" : "Deny Refund Request"}
+                  </h2>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {reviewTarget.order?.orderNumber}
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowReviewModal(false)
+                    setReviewTarget(null)
+                    setReviewNotes("")
+                  }}
+                  className="p-2 hover:bg-muted rounded-lg transition-colors"
+                >
+                  <X className="h-5 w-5 text-muted-foreground" />
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-6 space-y-4">
+                {reviewAction === "approve" ? (
+                  <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+                    <div className="flex gap-3">
+                      <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                      <div className="text-sm text-amber-800 dark:text-amber-300">
+                        <p className="font-medium mb-1">This will process the refund via Stripe</p>
+                        <p>
+                          The patient will receive a refund of <strong>{formatCurrency(reviewTarget.amount)}</strong>.
+                          Since pharmacy and doctor payments cannot be reversed, the entire refund amount will be charged to the brand.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                    <div className="flex gap-3">
+                      <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                      <div className="text-sm text-red-800 dark:text-red-300">
+                        <p className="font-medium mb-1">This will deny the refund request</p>
+                        <p>
+                          The patient will not receive a refund. The brand admin will be notified.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="bg-muted/50 rounded-lg p-3 space-y-1.5">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Refund amount</span>
+                    <span className="font-medium text-foreground">{formatCurrency(reviewTarget.amount)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Requested by</span>
+                    <span className="font-medium text-foreground">
+                      {reviewTarget.requestedBy?.firstName} {reviewTarget.requestedBy?.lastName}
+                    </span>
+                  </div>
+                  {reviewTarget.reason && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Reason</span>
+                      <span className="font-medium text-foreground text-right max-w-[200px]">{reviewTarget.reason}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">
+                    Review notes <span className="text-muted-foreground">(optional)</span>
+                  </label>
+                  <textarea
+                    value={reviewNotes}
+                    onChange={(e) => setReviewNotes(e.target.value)}
+                    placeholder={
+                      reviewAction === "approve"
+                        ? "e.g. Verified with brand, refund approved..."
+                        : "e.g. Reason for denial..."
+                    }
+                    rows={3}
+                    className="w-full px-3 py-2 border border-input bg-background text-foreground rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:border-transparent resize-none"
+                  />
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="flex items-center justify-end gap-3 p-6 border-t border-border bg-muted/30">
+                <button
+                  onClick={() => {
+                    setShowReviewModal(false)
+                    setReviewTarget(null)
+                    setReviewNotes("")
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-foreground bg-card border border-border rounded-lg hover:bg-muted transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleReviewSubmit}
+                  disabled={processingRequestId === reviewTarget.id}
+                  className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-2 ${
+                    reviewAction === "approve"
+                      ? processingRequestId === reviewTarget.id
+                        ? "bg-green-300 dark:bg-green-800 text-green-100 cursor-not-allowed"
+                        : "bg-green-600 text-white hover:bg-green-700"
+                      : processingRequestId === reviewTarget.id
+                      ? "bg-red-300 dark:bg-red-800 text-red-100 cursor-not-allowed"
+                      : "bg-red-600 text-white hover:bg-red-700"
+                  }`}
+                >
+                  {processingRequestId === reviewTarget.id ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 animate-spin" />
+                      Processing...
+                    </>
+                  ) : reviewAction === "approve" ? (
+                    <>
+                      <CheckCircle className="h-4 w-4" />
+                      Approve &amp; Refund
+                    </>
+                  ) : (
+                    <>
+                      <XCircle className="h-4 w-4" />
+                      Deny Request
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
