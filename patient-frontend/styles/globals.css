@@ -70,3 +70,22 @@ input[type="number"] {
 .animate-slide-in-right {
   animation: slide-in-right 0.3s ease-out;
 }
+
+/* Google Places Autocomplete dropdown: show above modals */
+.pac-container {
+  z-index: 10000 !important;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  margin-top: 4px;
+}
+.pac-item {
+  padding: 10px 12px;
+  cursor: pointer;
+}
+.pac-item:hover,
+.pac-item-selected {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+.pac-item-query {
+  font-size: 14px;
+}
