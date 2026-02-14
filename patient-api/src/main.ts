@@ -12388,6 +12388,10 @@ async function startServer() {
   const analyticsRouter = (await import("./endpoints/analytics")).default;
   app.use("/", analyticsRouter);
 
+  // ============= ABANDONED CART ENDPOINTS =============
+  const abandonedCartRouter = (await import("./endpoints/abandonedCart")).default;
+  app.use("/", abandonedCartRouter);
+
   // ============= CONFIG ENDPOINTS =============
   const configRouter = (await import("./endpoints/config")).default;
   app.use("/config", configRouter);

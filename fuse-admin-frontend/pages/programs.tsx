@@ -13,7 +13,8 @@ import {
     FileText,
     Crown,
     X,
-    Filter
+    Filter,
+    BarChart3
 } from 'lucide-react'
 
 interface Program {
@@ -460,6 +461,24 @@ export default function Programs() {
                                                 <Edit className="h-3 w-3 mr-1" />
                                                 Edit
                                             </Button>
+                                            {program.medicalTemplate && (
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation()
+                                                        if (index === 0 && (tutorialStep === 3 || tutorialStep === 4)) {
+                                                            return;
+                                                        }
+                                                        router.push(`/programs/${program.id}?tab=analytics`)
+                                                    }}
+                                                    disabled={index === 0 && (tutorialStep === 3 || tutorialStep === 4)}
+                                                    className="border-blue-200 text-blue-600 hover:bg-blue-50 hover:border-blue-300"
+                                                    title="View Analytics"
+                                                >
+                                                    <BarChart3 className="h-3 w-3" />
+                                                </Button>
+                                            )}
                                             <Button
                                                 size="sm"
                                                 variant="outline"

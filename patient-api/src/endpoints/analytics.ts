@@ -1737,4 +1737,56 @@ router.get("/analytics/forms/:formId/sessions", authenticateJWT, async (req: Req
   }
 });
 
+// Track patient contact information for abandoned cart detection
+router.post("/analytics/track-contact", async (req: Request, res: Response) => {
+  try {
+    const { sessionId, contactInfo, productId, formId, timestamp } = req.body;
+
+    if (!sessionId || !contactInfo || !productId || !formId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: sessionId, contactInfo, productId, formId',
+      });
+    }
+
+    const viewEvent = await TenantAnalyticsEvents.findOne({
+      where: {
+        sessionId,
+        eventType: 'view',
+      },
+      order: [['createdAt', 'DESC']],
+    });
+
+    if (viewEvent) {
+      const updatedMetadata = {
+        ...viewEvent.metadata,
+        contactInfo: {
+          firstName: contactInfo.firstName || viewEvent.metadata?.contactInfo?.firstName,
+          lastName: contactInfo.lastName || viewEvent.metadata?.contactInfo?.lastName,
+          email: contactInfo.email || viewEvent.metadata?.contactInfo?.email,
+          phoneNumber: contactInfo.phoneNumber || viewEvent.metadata?.contactInfo?.phoneNumber,
+          lastUpdated: timestamp || new Date().toISOString(),
+        },
+      };
+
+      await viewEvent.update({ metadata: updatedMetadata });
+
+      console.log('[Contact Tracking] Updated contact info for session:', sessionId);
+    } else {
+      console.warn('[Contact Tracking] No view event found for session:', sessionId);
+    }
+
+    return res.json({
+      success: true,
+      message: 'Contact information tracked successfully',
+    });
+  } catch (error: any) {
+    console.error('[Contact Tracking] Error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
 export default router;

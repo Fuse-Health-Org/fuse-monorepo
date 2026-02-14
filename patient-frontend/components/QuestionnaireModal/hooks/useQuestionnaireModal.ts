@@ -3,7 +3,8 @@ import { apiCall } from "../../../lib/api";
 import { replaceVariables, getVariablesFromClinic } from "../../../lib/templateVariables";
 import { signInUser, createUserAccount as createUserAccountAPI, signInWithGoogle } from "../auth";
 import { createEmailVerificationHandlers } from "../emailVerification";
-import { trackFormConversion } from "../../../lib/analytics";
+import { trackFormConversion, generateSessionId } from "../../../lib/analytics";
+import { trackContactInfoDebounced } from "../../../lib/contactTracking";
 import { QuestionnaireModalProps, QuestionnaireData, PlanOption, PaymentStatus } from "../types";
 import { useQuestionnaireData } from "./useQuestionnaireData";
 import { useGoogleOAuth } from "./useGoogleOAuth";
@@ -22,6 +23,10 @@ export function useQuestionnaireModal(
   isLoadingClinic: boolean
 ) {
   const { isOpen, onClose, questionnaireId, tenantProductId, tenantProductFormId, productName, programData } = props;
+
+  // Get session ID for tracking
+  const sessionId = generateSessionId();
+  const productId = tenantProductId;
 
   // Data loading
   const { questionnaire, loading, setQuestionnaire } = useQuestionnaireData(
@@ -435,7 +440,26 @@ export function useQuestionnaireModal(
     if (questionId === 'mobile') {
       const numericValue = String(value).replace(/\D/g, '');
       if (numericValue.length <= 10) {
-        setAnswers(prev => ({ ...prev, [questionId]: numericValue }));
+        setAnswers(prev => {
+          const updated = { ...prev, [questionId]: numericValue };
+          
+          // Track contact info when mobile is updated
+          if (sessionId && productId && questionnaireId) {
+            trackContactInfoDebounced(
+              sessionId,
+              {
+                firstName: updated.firstName,
+                lastName: updated.lastName,
+                email: updated.email,
+                phoneNumber: numericValue,
+              },
+              productId,
+              questionnaireId
+            );
+          }
+          
+          return updated;
+        });
         if (errors[questionId]) setErrors(prev => { const next = { ...prev }; delete next[questionId]; return next; });
       }
       return;
@@ -458,7 +482,24 @@ export function useQuestionnaireModal(
     }
     setAnswers(newAnswers);
     if (errors[questionId]) setErrors(prev => { const next = { ...prev }; delete next[questionId]; return next; });
-  }, [answers, errors]);
+    
+    // Track contact info when firstName, lastName, or email are updated
+    if (['firstName', 'lastName', 'email'].includes(questionId)) {
+      if (sessionId && productId && questionnaireId) {
+        trackContactInfoDebounced(
+          sessionId,
+          {
+            firstName: newAnswers.firstName,
+            lastName: newAnswers.lastName,
+            email: newAnswers.email,
+            phoneNumber: newAnswers.mobile,
+          },
+          productId,
+          questionnaireId
+        );
+      }
+    }
+  }, [answers, errors, sessionId, productId, questionnaireId]);
 
   const handleRadioChange = useCallback((questionId: string, value: any) => {
     const newAnswers = { ...answers, [questionId]: value };

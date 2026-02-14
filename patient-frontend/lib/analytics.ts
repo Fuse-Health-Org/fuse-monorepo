@@ -168,7 +168,7 @@ export const trackFormConversion = async (params: {
   } catch {}
 };
 
-const generateSessionId = (): string => {
+export const generateSessionId = (): string => {
   if (typeof window === "undefined") {
     return `server-session-${Date.now()}`;
   }

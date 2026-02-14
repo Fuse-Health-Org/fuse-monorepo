@@ -19,7 +19,9 @@ import {
     X,
     Settings2,
     ExternalLink,
-    AlertTriangle
+    AlertTriangle,
+    BarChart3,
+    TrendingUp
 } from 'lucide-react'
 
 interface TemplateProduct {
@@ -145,6 +147,62 @@ export default function ProgramEditor() {
     const [configModalOpen, setConfigModalOpen] = useState(false)
     const [configModalProductId, setConfigModalProductId] = useState<string | null>(null)
     const [configModalData, setConfigModalData] = useState<IndividualProductProgram | null>(null)
+
+    // Analytics tab state
+    const [activeTab, setActiveTab] = useState<'details' | 'analytics'>('details')
+    const [analyticsLoading, setAnalyticsLoading] = useState(false)
+    const [analyticsData, setAnalyticsData] = useState<any>(null)
+
+    // Handle tab query parameter
+    useEffect(() => {
+      if (router.query.tab === 'analytics') {
+        setActiveTab('analytics')
+      } else {
+        setActiveTab('details')
+      }
+    }, [router.query.tab])
+
+    // Fetch analytics when tab is active
+    const fetchAnalytics = async () => {
+      if (!id || id === 'create') return
+
+      try {
+        setAnalyticsLoading(true)
+        
+        // Mock data for now - replace with real API call when ready
+        setAnalyticsData({
+          totalViews: 248,
+          totalConversions: 42,
+          conversionRate: 16.9,
+          revenueGenerated: 12450,
+          averageOrderValue: 296.43,
+          topPerformingForms: [
+            { formName: 'Weight Loss Intake', views: 145, conversions: 28, rate: 19.3 },
+            { formName: 'Anti-Aging Consultation', views: 78, conversions: 10, rate: 12.8 },
+            { formName: 'Hair Growth Assessment', views: 25, conversions: 4, rate: 16.0 },
+          ],
+          chartData: [
+            { date: 'Feb 6', views: 32, conversions: 6 },
+            { date: 'Feb 7', views: 28, conversions: 4 },
+            { date: 'Feb 8', views: 45, conversions: 9 },
+            { date: 'Feb 9', views: 38, conversions: 7 },
+            { date: 'Feb 10', views: 41, conversions: 6 },
+            { date: 'Feb 11', views: 35, conversions: 5 },
+            { date: 'Feb 12', views: 29, conversions: 5 },
+          ]
+        })
+      } catch (error) {
+        console.error('Error fetching analytics:', error)
+      } finally {
+        setAnalyticsLoading(false)
+      }
+    }
+
+    useEffect(() => {
+      if (activeTab === 'analytics') {
+        fetchAnalytics()
+      }
+    }, [activeTab, id])
 
     // Load existing program if editing
     useEffect(() => {
@@ -754,6 +812,40 @@ export default function ProgramEditor() {
                         </p>
                     </div>
 
+                    {/* Tab Navigation - Only show in edit mode */}
+                    {!isCreateMode && (
+                        <div className="flex items-center gap-2 border-b border-gray-200 mb-6">
+                            <button
+                                onClick={() => {
+                                    setActiveTab('details')
+                                    router.push(`/programs/${id}`, undefined, { shallow: true })
+                                }}
+                                className={`px-4 py-2 font-medium text-sm transition-colors border-b-2 ${
+                                    activeTab === 'details'
+                                        ? 'border-purple-600 text-purple-600'
+                                        : 'border-transparent text-muted-foreground hover:text-foreground'
+                                }`}
+                            >
+                                <Settings2 className="h-4 w-4 inline-block mr-2" />
+                                Program Details
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setActiveTab('analytics')
+                                    router.push(`/programs/${id}?tab=analytics`, undefined, { shallow: true })
+                                }}
+                                className={`px-4 py-2 font-medium text-sm transition-colors border-b-2 ${
+                                    activeTab === 'analytics'
+                                        ? 'border-blue-600 text-blue-600'
+                                        : 'border-transparent text-muted-foreground hover:text-foreground'
+                                }`}
+                            >
+                                <BarChart3 className="h-4 w-4 inline-block mr-2" />
+                                Analytics
+                            </button>
+                        </div>
+                    )}
+
                     {/* Error Messages */}
                     {error && (
                         <div className="mb-6 p-4 bg-destructive/10 border border-destructive/30 rounded-lg">
@@ -761,7 +853,9 @@ export default function ProgramEditor() {
                         </div>
                     )}
 
-                    {/* Step Indicator for Create Mode */}
+                    {activeTab === 'details' ? (
+                        <>
+                            {/* Step Indicator for Create Mode */}
                     {isCreateMode && (
                         <div className="mb-8 flex items-center justify-center gap-3">
                             <div className="flex items-center gap-2">
@@ -2168,6 +2262,94 @@ export default function ProgramEditor() {
                     </div>
                 </div>
             )}
+                        </>
+                    ) : (
+                        <>
+                            {/* ANALYTICS TAB CONTENT */}
+                            {analyticsLoading ? (
+                                <div className="flex items-center justify-center py-12">
+                                    <div className="animate-pulse text-muted-foreground">Loading analytics...</div>
+                                </div>
+                            ) : analyticsData ? (
+                                <div className="space-y-6">
+                                    {/* Summary Cards */}
+                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                        <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+                                            <div className="flex items-center justify-between mb-2">
+                                                <p className="text-sm text-muted-foreground">Total Views</p>
+                                                <TrendingUp className="h-4 w-4 text-blue-500" />
+                                            </div>
+                                            <p className="text-3xl font-bold text-foreground">{analyticsData.totalViews}</p>
+                                        </div>
+
+                                        <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+                                            <div className="flex items-center justify-between mb-2">
+                                                <p className="text-sm text-muted-foreground">Conversions</p>
+                                                <Check className="h-4 w-4 text-green-500" />
+                                            </div>
+                                            <p className="text-3xl font-bold text-foreground">{analyticsData.totalConversions}</p>
+                                        </div>
+
+                                        <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+                                            <div className="flex items-center justify-between mb-2">
+                                                <p className="text-sm text-muted-foreground">Conversion Rate</p>
+                                                <BarChart3 className="h-4 w-4 text-purple-500" />
+                                            </div>
+                                            <p className="text-3xl font-bold text-foreground">{analyticsData.conversionRate}%</p>
+                                        </div>
+
+                                        <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+                                            <div className="flex items-center justify-between mb-2">
+                                                <p className="text-sm text-muted-foreground">Revenue</p>
+                                                <DollarSign className="h-4 w-4 text-green-500" />
+                                            </div>
+                                            <p className="text-3xl font-bold text-foreground">${analyticsData.revenueGenerated.toLocaleString()}</p>
+                                        </div>
+                                    </div>
+
+                                    {/* Chart */}
+                                    <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+                                        <h3 className="text-lg font-semibold text-foreground mb-4">Views & Conversions Over Time</h3>
+                                        <div className="h-64 text-muted-foreground text-sm">
+                                            {/* Add recharts or similar charting library here */}
+                                            <p className="text-center py-20">Chart visualization coming soon</p>
+                                        </div>
+                                    </div>
+
+                                    {/* Top Performing Forms */}
+                                    <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+                                        <h3 className="text-lg font-semibold text-foreground mb-4">Top Performing Forms</h3>
+                                        <div className="space-y-3">
+                                            {analyticsData.topPerformingForms.map((form: any, index: number) => (
+                                                <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                                                    <div className="flex-1">
+                                                        <p className="font-medium text-foreground">{form.formName}</p>
+                                                        <p className="text-sm text-muted-foreground">
+                                                            {form.views} views • {form.conversions} conversions
+                                                        </p>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <p className="text-2xl font-bold text-foreground">{form.rate}%</p>
+                                                        <p className="text-xs text-muted-foreground">conversion rate</p>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="text-center py-12">
+                                    <BarChart3 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                                    <h3 className="text-lg font-medium text-foreground mb-2">
+                                        No analytics data yet
+                                    </h3>
+                                    <p className="text-muted-foreground">
+                                        Start receiving program visits to see analytics here
+                                    </p>
+                                </div>
+                            )}
+                        </>
+                    )}
             
             {/* Individual Product Program Configuration Modal */}
             {configModalOpen && configModalData && (
