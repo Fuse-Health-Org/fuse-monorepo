@@ -38,7 +38,6 @@ const allOperations = [
   { name: "Products", icon: Package, current: false, href: "/products" },
   { name: "Orders", icon: ShoppingCart, current: false, href: "/orders" },
   { name: "Payouts", icon: CreditCard, current: false, href: "/payouts" },
-  { name: "Analytics", icon: TrendingUp, current: false, href: "/analytics" },
 ]
 
 const crmItems = [
@@ -215,11 +214,6 @@ export function Sidebar() {
     // Plans page is always accessible
     if (itemName === 'Plans') return false
 
-    // Analytics requires specific access
-    if (itemName === 'Analytics') {
-      return !hasAccessToAnalytics
-    }
-
     // Portal requires Standard tier or higher
     if (itemName === 'Portal') {
       return !hasAccessToPortal
@@ -241,12 +235,6 @@ export function Sidebar() {
   // Helper function to handle clicks on disabled items
   const handleDisabledClick = (e: React.MouseEvent, itemName: string) => {
     e.preventDefault()
-
-    // Analytics requires upgrade - redirect to plans page
-    if (itemName === 'Analytics' && !hasAccessToAnalytics) {
-      router.push('/plans?message=Upgrade your plan to access Analytics.')
-      return
-    }
 
     // Portal requires Standard tier or higher - redirect to plans page
     if (itemName === 'Portal' && !hasAccessToPortal) {
@@ -292,7 +280,7 @@ export function Sidebar() {
           <div
             className={cn(
               "group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-all cursor-pointer",
-              (item.name === 'Analytics' && !hasAccessToAnalytics) || (item.name === 'Portal' && !hasAccessToPortal) || (item.name === 'Programs' && !hasAccessToPrograms)
+              (item.name === 'Portal' && !hasAccessToPortal) || (item.name === 'Programs' && !hasAccessToPrograms)
                 ? "opacity-70 text-muted-foreground/70 hover:bg-sidebar-accent/20 hover:opacity-80"
                 : "opacity-60 grayscale text-muted-foreground/60 hover:bg-sidebar-accent/30 hover:opacity-70",
               isActive
@@ -306,13 +294,13 @@ export function Sidebar() {
             <div className="flex items-center">
               <item.icon className={cn(
                 "mr-3 h-4 w-4",
-                (item.name === 'Analytics' && !hasAccessToAnalytics) || (item.name === 'Portal' && !hasAccessToPortal) || (item.name === 'Programs' && !hasAccessToPrograms) ? "opacity-70" : "opacity-50"
+                (item.name === 'Portal' && !hasAccessToPortal) || (item.name === 'Programs' && !hasAccessToPrograms) ? "opacity-70" : "opacity-50"
               )} />
               <span className={cn(
-                (item.name === 'Analytics' && !hasAccessToAnalytics) || (item.name === 'Portal' && !hasAccessToPortal) || (item.name === 'Programs' && !hasAccessToPrograms) ? "opacity-90" : "opacity-75"
+                (item.name === 'Portal' && !hasAccessToPortal) || (item.name === 'Programs' && !hasAccessToPrograms) ? "opacity-90" : "opacity-75"
               )}>{item.name}</span>
             </div>
-            {(item.name === 'Analytics' && !hasAccessToAnalytics) || (item.name === 'Portal' && !hasAccessToPortal) || (item.name === 'Programs' && !hasAccessToPrograms) ? (
+            {(item.name === 'Portal' && !hasAccessToPortal) || (item.name === 'Programs' && !hasAccessToPrograms) ? (
               <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-100 to-orange-100 text-orange-700 border border-orange-200 font-medium">
                 Upgrade
               </span>
@@ -385,9 +373,7 @@ export function Sidebar() {
         {/* Tooltip for disabled items */}
         {disabled && isHovered && (
           <div className="absolute left-full ml-2 top-1/2 transform -translate-y-1/2 bg-gray-900 text-white text-xs px-2 py-1 rounded shadow-lg z-50 whitespace-nowrap">
-            {item.name === 'Analytics' && !hasAccessToAnalytics
-              ? '✨ Upgrade to access Analytics'
-              : item.name === 'Portal' && !hasAccessToPortal
+            {item.name === 'Portal' && !hasAccessToPortal
                 ? '✨ Upgrade to Standard to customize your Portal'
                 : item.name === 'Programs' && !hasAccessToPrograms
                   ? '✨ Upgrade to access Programs'

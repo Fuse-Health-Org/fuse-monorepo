@@ -1526,14 +1526,18 @@ router.get("/analytics/forms/:formId/sessions", authenticateJWT, async (req: Req
 
     // Get form steps from GlobalFormStructure
     const formStructure = (form as any).globalFormStructure;
-    const formSteps = formStructure?.steps || [];
+    const formSteps = Array.isArray(formStructure?.steps)
+      ? formStructure.steps
+          .filter((step: any) => step?.enabled !== false)
+          .sort((a: any, b: any) => (a?.order ?? 0) - (b?.order ?? 0))
+      : [];
     
     // If no structure, use default stages
     const defaultStages = [
-      { stepNumber: 1, questionText: 'Product Selection', questionId: 'product' },
-      { stepNumber: 2, questionText: 'Medical Questions', questionId: 'medical' },
-      { stepNumber: 3, questionText: 'Checkout', questionId: 'checkout' },
-      { stepNumber: 4, questionText: 'Account Creation', questionId: 'account' },
+      { stepNumber: 1, questionText: "Medical Questions", questionId: "product", questionType: "product_questions" },
+      { stepNumber: 2, questionText: "Create Account", questionId: "account", questionType: "account_creation" },
+      { stepNumber: 3, questionText: "Product Selection", questionId: "productSelection", questionType: "product_selection" },
+      { stepNumber: 4, questionText: "Payment & Checkout", questionId: "checkout", questionType: "checkout" },
     ];
 
     const stages = formSteps.length > 0

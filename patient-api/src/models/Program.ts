@@ -106,6 +106,24 @@ export default class Program extends Entity {
     @BelongsTo(() => Product, 'frontendDisplayProductId')
     declare frontendDisplayProduct?: Product;
 
+    /**
+     * Program form section order
+     *
+     * Controls high-level intake flow ordering for this program.
+     * Allowed section ids:
+     * - productSelection
+     * - medical
+     * - account
+     * - payment
+     *
+     * Payment must always be the last section.
+     */
+    @Column({
+        type: DataType.JSONB,
+        allowNull: true,
+    })
+    declare formStepOrder?: string[] | null;
+
     // Non-Medical Services - Patient Portal
     @Column({
         type: DataType.BOOLEAN,

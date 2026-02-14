@@ -307,7 +307,7 @@ export default function Programs() {
                     <div className="flex justify-between items-start mb-8">
                         <div>
                             <h1 className="text-2xl font-semibold mb-1">Programs</h1>
-                            <p className="text-sm text-muted-foreground">Manage your clinic programs and their medical templates</p>
+                            <p className="text-sm text-muted-foreground">Manage your clinic programs and their Teleforms</p>
                         </div>
                         <div className="flex items-center gap-2">
                             {templates.length > 0 && (
@@ -419,7 +419,7 @@ export default function Programs() {
                                             <div className="mb-4 p-3 bg-muted rounded-lg">
                                                 <div className="flex items-center gap-2 mb-1">
                                                     <FileText className="h-3 w-3 text-muted-foreground" />
-                                                    <span className="text-xs font-medium text-muted-foreground">Medical Template</span>
+                                                    <span className="text-xs font-medium text-muted-foreground">Teleform</span>
                                                 </div>
                                                 <p className="text-sm font-medium">{program.medicalTemplate.title}</p>
                                                 {/* Medical Company Source Badge */}
@@ -586,7 +586,7 @@ export default function Programs() {
                                             <div className="mb-4 p-3 bg-white/50 dark:bg-black/20 rounded-lg">
                                                 <div className="flex items-center gap-2 mb-1">
                                                     <FileText className="h-3 w-3 text-muted-foreground" />
-                                                    <span className="text-xs font-medium text-muted-foreground">Medical Template</span>
+                                                    <span className="text-xs font-medium text-muted-foreground">Teleform</span>
                                                 </div>
                                                 <p className="text-sm font-medium">{template.medicalTemplate.title}</p>
                                                 {/* Medical Company Source Badge */}

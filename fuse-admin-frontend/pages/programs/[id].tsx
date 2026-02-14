@@ -23,7 +23,9 @@ import {
     AlertTriangle,
     BarChart3,
     TrendingUp,
-    Users
+    Users,
+    Edit,
+    GripVertical
 } from 'lucide-react'
 
 interface TemplateProduct {
@@ -115,7 +117,7 @@ export default function ProgramEditor() {
     // Step state for creation flow
     const [currentStep, setCurrentStep] = useState(1)
 
-    // Medical templates
+    // Teleforms
     const [templates, setTemplates] = useState<MedicalTemplate[]>([])
     const [templatesLoading, setTemplatesLoading] = useState(true)
     const [templateSearch, setTemplateSearch] = useState('')
@@ -125,6 +127,45 @@ export default function ProgramEditor() {
     
     // Clinic info for building form URLs
     const [clinicSlug, setClinicSlug] = useState<string | null>(null)
+
+    // Form steps ordering
+    interface FormStep {
+        id: string
+        icon: string
+        label: string
+        locked: boolean
+    }
+
+    const DEFAULT_FORM_STEPS: FormStep[] = [
+        { id: 'medical', icon: '🩺', label: 'Medical Questions', locked: false },
+        { id: 'account', icon: '👤', label: 'Create Account', locked: false },
+        { id: 'productSelection', icon: '🛒', label: 'Product Selection', locked: false },
+        { id: 'payment', icon: '💳', label: 'Payment & Checkout', locked: true }
+    ]
+
+    const mapStepOrderToSteps = (stepOrder?: string[] | null): FormStep[] => {
+        if (!Array.isArray(stepOrder) || stepOrder.length === 0) return DEFAULT_FORM_STEPS
+
+        const stepMap = new Map(DEFAULT_FORM_STEPS.map((step) => [step.id, step]))
+        const normalized = stepOrder
+            .map((stepId) => stepMap.get(stepId))
+            .filter((step): step is FormStep => !!step)
+
+        const included = new Set(normalized.map((step) => step.id))
+        const missing = DEFAULT_FORM_STEPS.filter((step) => !included.has(step.id))
+        const merged = [...normalized, ...missing]
+
+        const payment = merged.find((step) => step.id === 'payment')
+        const withoutPayment = merged.filter((step) => step.id !== 'payment')
+
+        return payment ? [...withoutPayment, payment] : [...withoutPayment, DEFAULT_FORM_STEPS[3]]
+    }
+    
+    const [isEditingSteps, setIsEditingSteps] = useState(false)
+    const [formSteps, setFormSteps] = useState<FormStep[]>(DEFAULT_FORM_STEPS)
+    const [savedFormSteps, setSavedFormSteps] = useState<FormStep[]>(DEFAULT_FORM_STEPS)
+    const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
+    const [savingStepOrder, setSavingStepOrder] = useState(false)
     const [clinicCustomDomain, setClinicCustomDomain] = useState<string | null>(null)
     const [dashboardPrefix, setDashboardPrefix] = useState<string>('/fuse-dashboard')
     
@@ -229,7 +270,7 @@ export default function ProgramEditor() {
         loadTemplate()
     }, [router.isReady, router.query.templateId, isCreateMode, token])
 
-    // Load medical templates
+    // Load Teleforms
     useEffect(() => {
         if (token) {
             fetchTemplates()
@@ -346,6 +387,9 @@ export default function ProgramEditor() {
                     setMedicalTemplateId(program.medicalTemplateId || null)
                     setIsActive(program.isActive)
                     setFrontendDisplayProductId(program.frontendDisplayProductId || null)
+                    const mappedSteps = mapStepOrderToSteps(program.formStepOrder)
+                    setFormSteps(mappedSteps)
+                    setSavedFormSteps(mappedSteps)
                     // Load non-medical services
                     setHasPatientPortal(program.hasPatientPortal || false)
                     setPatientPortalPrice(parseFloat(program.patientPortalPrice) || 0)
@@ -504,6 +548,7 @@ export default function ProgramEditor() {
                 name: name.trim(),
                 description: description.trim() || undefined,
                 medicalTemplateId: medicalTemplateId || undefined,
+                formStepOrder: formSteps.map((step) => step.id),
                 frontendDisplayProductId: frontendDisplayProductId || null,
                 // Non-medical services (for unified mode)
                 hasPatientPortal: programMode === 'unified' ? hasPatientPortal : false,
@@ -616,6 +661,40 @@ export default function ProgramEditor() {
             setError('Failed to save program')
         } finally {
             setSaving(false)
+        }
+    }
+
+    const saveFormStepOrder = async () => {
+        if (isCreateMode || !id) {
+            setIsEditingSteps(false)
+            return
+        }
+
+        try {
+            setSavingStepOrder(true)
+            const response = await fetch(`${API_URL}/programs/${id}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    formStepOrder: formSteps.map((step) => step.id)
+                })
+            })
+
+            const data = await response.json().catch(() => ({}))
+            if (!response.ok || !data?.success) {
+                throw new Error(data?.error || 'Failed to save form step order')
+            }
+
+            setSavedFormSteps(formSteps)
+            setIsEditingSteps(false)
+        } catch (err) {
+            console.error('Error saving form step order:', err)
+            setError(err instanceof Error ? err.message : 'Failed to save form step order')
+        } finally {
+            setSavingStepOrder(false)
         }
     }
 
@@ -766,7 +845,7 @@ export default function ProgramEditor() {
                             {isCreateMode ? 'Create New Program' : 'Edit Program'}
                         </h1>
                         <p className="text-muted-foreground">
-                            {isCreateMode ? 'Set up a new program with medical templates' : 'Update program details'}
+                            {isCreateMode ? 'Set up a new program with Teleforms' : 'Update program details'}
                         </p>
                     </div>
 
@@ -861,7 +940,7 @@ export default function ProgramEditor() {
                                     {currentStep > 1 ? <Check className="h-4 w-4" /> : '1'}
                                 </div>
                                 <span className={`text-sm font-medium hidden sm:inline ${currentStep === 1 ? 'text-foreground' : 'text-muted-foreground'}`}>
-                                    Medical Template
+                                    Teleform
                                 </span>
                             </div>
                             <div className="w-8 h-px bg-border"></div>
@@ -979,10 +1058,10 @@ export default function ProgramEditor() {
                         </div>
                     )}
 
-                    {/* Step 1: Choose Medical Template (Create Mode Only) */}
+                    {/* Step 1: Choose Teleform (Create Mode Only) */}
                     {isCreateMode && currentStep === 1 && (
                         <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
-                            <h3 className="text-lg font-semibold mb-4">Choose Medical Template Form</h3>
+                            <h3 className="text-lg font-semibold mb-4">Choose Teleform</h3>
                             <p className="text-sm text-muted-foreground mb-6">
                                 Select a medical questionnaire template that will be used for patient intake in this program.
                             </p>
@@ -1447,10 +1526,10 @@ export default function ProgramEditor() {
                         </div>
                     )}
 
-                    {/* Edit Mode: Show Medical Template Selection */}
+                    {/* Edit Mode: Show Teleform Selection */}
                     {!isCreateMode && activeTab === 'details' && (
                         <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
-                            <h3 className="text-lg font-semibold mb-4">Medical Template</h3>
+                            <h3 className="text-lg font-semibold mb-4">Teleform</h3>
 
                             {/* Search */}
                             <div className="mb-4">
@@ -1565,9 +1644,17 @@ export default function ProgramEditor() {
                             )}
                         </div>
                     )}
+                        </>
+                    )}
 
                     {/* Edit Mode: Program Form Link - uses program ID */}
-                    {!isCreateMode && activeTab === 'form' && id && clinicSlug && (
+                    {!isCreateMode && activeTab === 'form' && (
+                        <>
+                            {!clinicSlug || !id ? (
+                                <div className="flex items-center justify-center py-12">
+                                    <div className="animate-pulse text-muted-foreground">Loading form data...</div>
+                                </div>
+                            ) : (
                         <div className="bg-card rounded-2xl shadow-sm border border-border p-6 mt-6">
                             <div className="flex items-center gap-2 mb-2">
                                 <FileText className="h-5 w-5 text-green-500" />
@@ -1592,7 +1679,7 @@ export default function ProgramEditor() {
                                     ? `${protocol}://${clinicCustomDomain}${dashboardPrefix}/my-products/${id}/program`
                                     : null
                                 
-                                // Check if medical template is selected and has products
+                                // Check if Teleform is selected and has products
                                 const hasTemplate = !!medicalTemplateId
                                 const templateHasProducts = selectedTemplateDetails?.formProducts && selectedTemplateDetails.formProducts.length > 0
                                 const canPreview = hasTemplate && templateHasProducts
@@ -1600,34 +1687,138 @@ export default function ProgramEditor() {
                                 return (
                                     <div className="border border-border rounded-xl overflow-hidden">
                                         <div className="p-4">
-                                            {/* Form Header with Flow Icons */}
+                                            {/* Header with Edit Button */}
+                                            <div className="flex items-center justify-between mb-4">
+                                                <h5 className="text-sm font-bold text-foreground">
+                                                    Program Default Form
+                                                </h5>
+                                                {!isEditingSteps ? (
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        onClick={() => setIsEditingSteps(true)}
+                                                        className="h-7 px-2"
+                                                    >
+                                                        <Edit className="h-3 w-3 mr-1" />
+                                                        Edit Order
+                                                    </Button>
+                                                ) : (
+                                                    <div className="flex gap-2">
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            onClick={() => {
+                                                                setFormSteps(savedFormSteps)
+                                                                setIsEditingSteps(false)
+                                                            }}
+                                                            className="h-7 px-2"
+                                                            disabled={savingStepOrder}
+                                                        >
+                                                            Cancel
+                                                        </Button>
+                                                        <Button
+                                                            size="sm"
+                                                            onClick={saveFormStepOrder}
+                                                            className="h-7 px-2"
+                                                            disabled={savingStepOrder}
+                                                        >
+                                                            {savingStepOrder ? 'Saving...' : 'Save Order'}
+                                                        </Button>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Form Flow Icons */}
                                             <div className="border-b border-border pb-4 mb-4">
-                                                <div className="flex items-center justify-between gap-6">
-                                                    <div className="flex-shrink-0">
-                                                        <h5 className="text-sm font-semibold mb-1">
-                                                            Program Default Form
-                                                        </h5>
-                                                        <p className="text-xs text-muted-foreground">
-                                                            🎯 Uses program's medical template
+                                                {isEditingSteps ? (
+                                                    // Edit mode: draggable vertical list
+                                                    <div className="space-y-2">
+                                                        {formSteps.map((step, idx) => {
+                                                            const isLast = idx === formSteps.length - 1
+                                                            const isDragging = draggedIndex === idx
+                                                            const canDrag = !step.locked
+
+                                                            return (
+                                                                <div
+                                                                    key={step.id}
+                                                                    draggable={canDrag}
+                                                                    onDragStart={(e) => {
+                                                                        if (canDrag) {
+                                                                            setDraggedIndex(idx)
+                                                                            e.dataTransfer.effectAllowed = 'move'
+                                                                        }
+                                                                    }}
+                                                                    onDragOver={(e) => {
+                                                                        if (!canDrag && isLast) return // Can't drop on locked last item
+                                                                        e.preventDefault()
+                                                                        e.dataTransfer.dropEffect = 'move'
+                                                                    }}
+                                                                    onDrop={(e) => {
+                                                                        e.preventDefault()
+                                                                        if (draggedIndex === null || draggedIndex === idx) return
+                                                                        if (isLast) return // Can't drop on last position
+
+                                                                        const newSteps = [...formSteps]
+                                                                        const draggedStep = newSteps[draggedIndex]
+                                                                        newSteps.splice(draggedIndex, 1)
+                                                                        newSteps.splice(idx, 0, draggedStep)
+                                                                        
+                                                                        // Ensure payment is always last
+                                                                        const paymentIndex = newSteps.findIndex(s => s.id === 'payment')
+                                                                        if (paymentIndex !== newSteps.length - 1) {
+                                                                            const payment = newSteps.splice(paymentIndex, 1)[0]
+                                                                            newSteps.push(payment)
+                                                                        }
+                                                                        
+                                                                        setFormSteps(newSteps)
+                                                                        setDraggedIndex(null)
+                                                                    }}
+                                                                    onDragEnd={() => setDraggedIndex(null)}
+                                                                    className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${
+                                                                        isDragging
+                                                                            ? 'opacity-50 border-primary'
+                                                                            : step.locked
+                                                                            ? 'bg-muted/50 border-border cursor-not-allowed'
+                                                                            : 'bg-card border-border cursor-move hover:border-primary/50'
+                                                                    }`}
+                                                                >
+                                                                    {canDrag && (
+                                                                        <GripVertical className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                                                    )}
+                                                                    <div className="flex items-center gap-2 flex-1">
+                                                                        <div className="w-8 h-8 bg-background rounded-lg flex items-center justify-center text-lg border border-border flex-shrink-0">
+                                                                            {step.icon}
+                                                                        </div>
+                                                                        <span className="text-sm font-medium text-foreground">
+                                                                            {step.label}
+                                                                        </span>
+                                                                        {step.locked && (
+                                                                            <Badge variant="secondary" className="ml-auto text-[10px]">
+                                                                                Fixed Position
+                                                                            </Badge>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            )
+                                                        })}
+                                                        <p className="text-xs text-muted-foreground mt-3">
+                                                            💡 Drag steps to reorder. Payment & Checkout must always be last.
                                                         </p>
                                                     </div>
-
-                                                    <div className="flex items-center gap-2 overflow-x-auto flex-1">
-                                                        {[
-                                                            { icon: '📦', label: 'Product Questions' },
-                                                            { icon: '👤', label: 'Create Account' },
-                                                            { icon: '💳', label: 'Payment & Checkout' }
-                                                        ].map((section, idx, arr) => (
-                                                            <div key={section.label} className="flex items-center gap-2 flex-shrink-0">
+                                                ) : (
+                                                    // View mode: horizontal flow
+                                                    <div className="flex items-center gap-2 overflow-x-auto">
+                                                        {formSteps.map((step, idx) => (
+                                                            <div key={step.id} className="flex items-center gap-2 flex-shrink-0">
                                                                 <div className="flex items-center gap-1.5">
                                                                     <div className="w-8 h-8 bg-card rounded-lg flex items-center justify-center text-lg border border-border">
-                                                                        {section.icon}
+                                                                        {step.icon}
                                                                     </div>
                                                                     <span className="text-[10px] font-medium text-muted-foreground max-w-[60px] leading-tight">
-                                                                        {section.label}
+                                                                        {step.label}
                                                                     </span>
                                                                 </div>
-                                                                {idx < arr.length - 1 && (
+                                                                {idx < formSteps.length - 1 && (
                                                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" className="text-muted-foreground/40 flex-shrink-0">
                                                                         <path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
                                                                     </svg>
@@ -1635,7 +1826,7 @@ export default function ProgramEditor() {
                                                             </div>
                                                         ))}
                                                     </div>
-                                                </div>
+                                                )}
                                             </div>
 
                                             {/* Warning when no template selected */}
@@ -1643,7 +1834,7 @@ export default function ProgramEditor() {
                                                 <div className="flex items-center gap-2 p-3 mb-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
                                                     <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />
                                                     <p className="text-sm text-amber-700 dark:text-amber-300">
-                                                        Please select a medical template above to enable preview links
+                                                        Please select a Teleform above to enable preview links
                                                     </p>
                                                 </div>
                                             )}
@@ -1658,7 +1849,7 @@ export default function ProgramEditor() {
                                                         </p>
                                                     </div>
                                                     <p className="text-xs text-amber-600 dark:text-amber-400 ml-6">
-                                                        A doctor can change the products attached to each medical template
+                                                        A doctor can change the products attached to each Teleform
                                                     </p>
                                                 </div>
                                             )}
@@ -1741,6 +1932,8 @@ export default function ProgramEditor() {
                                 )
                             })()}
                         </div>
+                            )}
+                        </>
                     )}
 
                     {/* Edit Mode: Selected Template Products & Form Links */}
@@ -1991,8 +2184,9 @@ export default function ProgramEditor() {
                                                                     {/* Center: Form Flow Preview (Inline) */}
                                                                     <div className="flex items-center gap-2 overflow-x-auto flex-1">
                                                                         {[
-                                                                            { icon: '📦', label: 'Product Questions' },
+                                                                            { icon: '🩺', label: 'Medical Questions' },
                                                                             { icon: '👤', label: 'Create Account' },
+                                                                            { icon: '🛒', label: 'Product Selection' },
                                                                             { icon: '💳', label: 'Payment & Checkout' }
                                                                         ].map((section, idx, arr) => (
                                                                             <div key={section.label} className="flex items-center gap-2 flex-shrink-0">
@@ -2123,9 +2317,6 @@ export default function ProgramEditor() {
                         </div>
                     )}
 
-                        </>
-                    )}
-
                     {/* Edit Mode: Non-Medical Services (only shown in unified mode) */}
                     {!isCreateMode && activeTab === 'services' && programMode === 'unified' && (
                         <div className="bg-card rounded-2xl shadow-sm border border-border p-6 mt-6">
@@ -2235,7 +2426,7 @@ export default function ProgramEditor() {
                             
                             {(() => {
                                 // Find the first form ID (TenantProductForm ID) for analytics
-                                // All products in the program share the same medical template
+                                // All products in the program share the same Teleform
                                 const formWithId = enabledForms.find(f => f.id)
                                 
                                 if (!formWithId?.id) {
@@ -2267,7 +2458,11 @@ export default function ProgramEditor() {
                                                 </div>
                                             </div>
                                         )}
-                                        <FormAnalytics formId={formWithId.id} />
+                                        <FormAnalytics 
+                                            formId={formWithId.id} 
+                                            templateTitle={selectedTemplateDetails?.title}
+                                            formStepLabels={formSteps.map((step) => step.label)}
+                                        />
                                     </div>
                                 )
                             })()}

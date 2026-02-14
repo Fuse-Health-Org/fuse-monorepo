@@ -40,6 +40,8 @@ interface CheckoutStepViewProps {
   visitType?: 'synchronous' | 'asynchronous' | null;
   loadingVisitFee?: boolean;
   onCalculateVisitFee?: (state: string) => Promise<void>;
+  // Product selection step
+  hasProductSelectionStep?: boolean;
 }
 
 export const CheckoutStepView: React.FC<CheckoutStepViewProps> = ({
@@ -77,6 +79,8 @@ export const CheckoutStepView: React.FC<CheckoutStepViewProps> = ({
   visitType,
   loadingVisitFee,
   onCalculateVisitFee,
+  // Product selection step
+  hasProductSelectionStep = false,
 }) => {
   return (
     <>
@@ -121,6 +125,8 @@ export const CheckoutStepView: React.FC<CheckoutStepViewProps> = ({
           visitType={visitType}
           loadingVisitFee={loadingVisitFee}
           onCalculateVisitFee={onCalculateVisitFee}
+          // Product selection step
+          hasProductSelectionStep={hasProductSelectionStep}
         />
 
         {/* {paymentStatus === 'succeeded' && (

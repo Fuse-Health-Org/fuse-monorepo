@@ -14145,9 +14145,9 @@ app.get("/public/brand-products/:clinicSlug/:slug", async (req, res) => {
       }
     } catch (e) {
       if (process.env.NODE_ENV === "development") {
-        console.error("Error finding product questionnaire:", e);
+        console.error("Error finding medical questionnaire:", e);
       } else {
-        console.error("Error finding product questionnaire");
+        console.error("Error finding medical questionnaire");
       }
     }
 

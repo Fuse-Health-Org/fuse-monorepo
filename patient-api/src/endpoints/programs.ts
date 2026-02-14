@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { DataTypes } from 'sequelize';
 import Program from '../models/Program';
 import Questionnaire from '../models/Questionnaire';
 import FormProducts from '../models/FormProducts';
@@ -10,6 +11,72 @@ import MedicalCompany from '../models/MedicalCompany';
 import { authenticateJWT, getCurrentUser } from '../config/jwt';
 
 const router = Router();
+
+const ALLOWED_FORM_STEP_IDS = ['productSelection', 'medical', 'account', 'payment'] as const;
+type ProgramFormStepId = (typeof ALLOWED_FORM_STEP_IDS)[number];
+
+function normalizeProgramFormStepOrder(input: unknown): ProgramFormStepId[] | null {
+  if (!Array.isArray(input)) return null;
+
+  const deduped = Array.from(
+    new Set(
+      input.filter((step): step is ProgramFormStepId =>
+        typeof step === 'string' && (ALLOWED_FORM_STEP_IDS as readonly string[]).includes(step)
+      )
+    )
+  );
+
+  // Ensure payment is always present and always last.
+  const withoutPayment = deduped.filter(step => step !== 'payment');
+  return [...withoutPayment, 'payment'];
+}
+
+let programFormStepOrderColumnReady = false;
+let programFormStepOrderColumnPromise: Promise<void> | null = null;
+
+async function ensureProgramFormStepOrderColumn(): Promise<void> {
+  if (programFormStepOrderColumnReady) return;
+  if (programFormStepOrderColumnPromise) return programFormStepOrderColumnPromise;
+
+  programFormStepOrderColumnPromise = (async () => {
+    const sequelize = Program.sequelize;
+    if (!sequelize) return;
+
+    const queryInterface = sequelize.getQueryInterface();
+    const table = await queryInterface.describeTable('Program');
+    if (!table.formStepOrder) {
+      await queryInterface.addColumn('Program', 'formStepOrder', {
+        type: DataTypes.JSONB,
+        allowNull: true,
+      });
+      await queryInterface.addIndex('Program', ['formStepOrder'], {
+        name: 'program_form_step_order_idx',
+        using: 'gin',
+      });
+      console.log('✅ Added Program.formStepOrder column automatically');
+    }
+
+    programFormStepOrderColumnReady = true;
+  })()
+    .catch((error) => {
+      console.error('❌ Failed ensuring Program.formStepOrder column:', error);
+      throw error;
+    })
+    .finally(() => {
+      programFormStepOrderColumnPromise = null;
+    });
+
+  return programFormStepOrderColumnPromise;
+}
+
+router.use(async (_req, _res, next) => {
+  try {
+    await ensureProgramFormStepOrderColumn();
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
 
 /**
  * PUBLIC: Get all active programs for a clinic by slug
@@ -366,6 +433,7 @@ router.get('/public/programs/:id', async (req: Request, res: Response) => {
       description: program.description,
       clinicId: program.clinicId,
       medicalTemplateId: program.medicalTemplateId,
+      formStepOrder: program.formStepOrder || null,
       medicalTemplate: program.medicalTemplate ? {
         id: (program.medicalTemplate as any).id,
         title: (program.medicalTemplate as any).title,
@@ -904,6 +972,7 @@ router.post('/programs', authenticateJWT, async (req: Request, res: Response) =>
       individualProductId,
       parentProgramId,
       templateId, // Reference to the program template
+      formStepOrder,
       isActive,
       // Non-medical services
       hasPatientPortal,
@@ -999,6 +1068,7 @@ router.post('/programs', authenticateJWT, async (req: Request, res: Response) =>
       individualProductId: individualProductId || null,
       parentProgramId: parentProgramId || null,
       templateId: templateId || null, // Reference to template
+      formStepOrder: normalizeProgramFormStepOrder(formStepOrder) || null,
       isTemplate: false, // Brand programs are never templates
       isActive: isActive !== undefined ? isActive : true,
       // Non-medical services (use provided or template defaults)
@@ -1073,6 +1143,7 @@ router.put('/programs/:id', authenticateJWT, async (req: Request, res: Response)
       medicalTemplateId,
       individualProductId,
       parentProgramId,
+      formStepOrder,
       isActive,
       frontendDisplayProductId,
       // Non-medical services
@@ -1138,6 +1209,7 @@ router.put('/programs/:id', authenticateJWT, async (req: Request, res: Response)
     if (medicalTemplateId !== undefined) program.medicalTemplateId = medicalTemplateId;
     if (individualProductId !== undefined) program.individualProductId = individualProductId || null;
     if (parentProgramId !== undefined) program.parentProgramId = parentProgramId || null;
+    if (formStepOrder !== undefined) program.formStepOrder = normalizeProgramFormStepOrder(formStepOrder);
     if (isActive !== undefined) program.isActive = isActive;
     if (frontendDisplayProductId !== undefined) program.frontendDisplayProductId = frontendDisplayProductId || null;
 

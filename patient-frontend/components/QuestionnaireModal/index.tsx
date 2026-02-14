@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Modal, ModalContent, ModalBody } from "@heroui/react";
 import { Icon } from "@iconify/react";
@@ -31,8 +31,16 @@ import { OrderSuccessModal } from "./components/OrderSuccessModal";
 export const QuestionnaireModal: React.FC<QuestionnaireModalProps> = (props) => {
   const { isOpen, onClose } = props;
   const { clinic: domainClinic, isLoading: isLoadingClinic } = useClinicFromDomain();
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const modal = useQuestionnaireModal(props, domainClinic, isLoadingClinic);
+
+  // Scroll to top when step changes
+  useEffect(() => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [modal.currentStepIndex]);
 
   if (modal.loading || !modal.questionnaire || !modal.questionnaire.steps) {
     return <LoadingState isOpen={isOpen} onClose={onClose} loading={modal.loading} />;
@@ -267,7 +275,7 @@ export const QuestionnaireModal: React.FC<QuestionnaireModalProps> = (props) => 
               totalSteps={totalSteps}
             />
 
-            <div className="flex-1 overflow-y-auto bg-gray-50 p-4">
+            <div ref={scrollContainerRef} className="flex-1 overflow-y-auto bg-gray-50 p-4">
               <div className={`w-full ${modal.isCheckoutStep() ? 'max-w-5xl' : 'max-w-md'} mx-auto min-h-full flex flex-col justify-center`}>
                 <AnimatePresence mode="wait">
                   <motion.div
@@ -316,11 +324,20 @@ export const QuestionnaireModal: React.FC<QuestionnaireModalProps> = (props) => 
                         selectedProgramProducts={modal.selectedProgramProducts}
                         onProgramProductToggle={modal.handleProgramProductToggle}
                         onCreateProgramSubscription={modal.createProgramSubscription}
+                        // Product selection step
+                        hasProductSelectionStep={
+                          modal.questionnaire.productSelectionStepPosition !== undefined &&
+                          modal.questionnaire.productSelectionStepPosition !== -1
+                        }
                       />
                     ) : modal.isProductSelectionStep() ? (
                       <ProductSelectionStepView
                         progressPercent={progressPercent}
                         theme={modal.theme}
+                        onPrevious={modal.handlePrevious}
+                        canGoBack={modal.currentStepIndex > 0}
+                        clinic={domainClinic ? { name: domainClinic.name, logo: (domainClinic as any).logo } : null}
+                        isLoadingClinic={isLoadingClinic}
                         products={modal.questionnaire.treatment?.products}
                         selectedProducts={modal.selectedProducts}
                         onProductQuantityChange={modal.handleProductQuantityChange}
@@ -329,6 +346,9 @@ export const QuestionnaireModal: React.FC<QuestionnaireModalProps> = (props) => 
                         paymentStatus={modal.paymentStatus as PaymentStatus}
                         isLastStep={isLastStep}
                         isProductSelectionStep={modal.isProductSelectionStep}
+                        programData={modal.programData}
+                        selectedProgramProducts={modal.selectedProgramProducts}
+                        onProgramProductToggle={modal.handleProgramProductToggle}
                       />
                     ) : (
                       <>
