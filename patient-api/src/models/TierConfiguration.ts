@@ -84,6 +84,15 @@ export default class TierConfiguration extends Entity {
   })
   declare fuseFeePercent: number | null;
 
+  // Non-medical services profit percentage for this tier (e.g., 80.0 for 80%)
+  @Column({
+    type: DataType.DECIMAL(5, 2),
+    allowNull: true,
+    defaultValue: null,
+    comment: 'Non-medical services profit percentage for this tier (e.g., 80.0 for 80%)',
+  })
+  declare nonMedicalProfitPercent: number | null;
+
   @BelongsTo(() => BrandSubscriptionPlans)
   declare plan?: BrandSubscriptionPlans;
 
@@ -99,6 +108,7 @@ export default class TierConfiguration extends Entity {
       customTierCardText: this.customTierCardText,
       isCustomTierCardTextActive: this.isCustomTierCardTextActive,
       fuseFeePercent: this.fuseFeePercent,
+      nonMedicalProfitPercent: this.nonMedicalProfitPercent,
     };
   }
 }

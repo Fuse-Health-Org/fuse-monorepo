@@ -130,7 +130,11 @@ import refundsRoutes from "@endpoints/refunds";
 import { stripeRoutes, webhookRoutes as stripeWebhookRoutes } from "@endpoints/stripe";
 import { GlobalFees } from "./models/GlobalFees";
 import { WebsiteBuilderConfigs, DEFAULT_FOOTER_DISCLAIMER } from "@models/WebsiteBuilderConfigs";
-import { getPlatformFeePercent, useGlobalFees } from "@utils/useGlobalFees";
+import {
+  getNonMedicalServicesProfitPercent,
+  getPlatformFeePercent,
+  useGlobalFees,
+} from "@utils/useGlobalFees";
 
 // Helper function to fetch global fees from database
 async function getGlobalFees() {
@@ -6086,6 +6090,10 @@ app.post("/payments/program/sub", async (req, res) => {
       clinicName,
     } = req.body || {};
 
+    const safeTotalAmount = Number(totalAmount) || 0;
+    const safeProductsTotal = Number(productsTotal) || 0;
+    const safeNonMedicalServicesFee = Number(nonMedicalServicesFee) || 0;
+
     console.log("🚀 Program subscription request:", {
       programId,
       selectedProductIds,
@@ -6094,7 +6102,7 @@ app.post("/payments/program/sub", async (req, res) => {
       nonMedicalServicesFee,
     });
 
-    if (!programId || !selectedProductIds?.length || !totalAmount) {
+    if (!programId || !selectedProductIds?.length || !safeTotalAmount) {
       return res.status(400).json({
         success: false,
         message: "programId, selectedProductIds, and totalAmount are required",
@@ -6170,7 +6178,7 @@ app.post("/payments/program/sub", async (req, res) => {
     const stripePrice = await stripe.prices.create({
       product: stripeProduct.id,
       currency: "usd",
-      unit_amount: Math.round(totalAmount * 100), // Convert to cents
+      unit_amount: Math.round(safeTotalAmount * 100), // Convert to cents
       recurring: {
         interval: "month",
         interval_count: 1,
@@ -6178,15 +6186,15 @@ app.post("/payments/program/sub", async (req, res) => {
       metadata: {
         programId: program.id,
         clinicId: program.clinicId || '',
-        productsTotal: String(productsTotal),
-        nonMedicalServicesFee: String(nonMedicalServicesFee),
+        productsTotal: String(safeProductsTotal),
+        nonMedicalServicesFee: String(safeNonMedicalServicesFee),
       },
     });
 
     console.log("✅ Stripe product and price created:", {
       productId: stripeProduct.id,
       priceId: stripePrice.id,
-      amount: totalAmount,
+      amount: safeTotalAmount,
     });
 
     // Calculate fee breakdown
@@ -6197,16 +6205,41 @@ app.post("/payments/program/sub", async (req, res) => {
     const platformFeePercent = programClinicId 
       ? await getPlatformFeePercent(programClinicId)
       : fees.platformFeePercent;
+    const nonMedicalProfitPercent = programClinicId
+      ? await getNonMedicalServicesProfitPercent(programClinicId)
+      : 0;
     
     const stripeFeePercent = fees.stripeFeePercent;
     const doctorFlatUsd = fees.doctorFlatFeeUsd;
-    const platformFeeUsd = Math.max(0, (platformFeePercent / 100) * totalAmount);
-    const stripeFeeUsd = Math.max(0, (stripeFeePercent / 100) * totalAmount);
+    // Fuse Fee = % of total order; Non-Medical Profit = % of non-medical services only; then other fees; rest to brand
+    const platformFeeUsd = Math.max(0, (platformFeePercent / 100) * safeTotalAmount);
+    const nonMedicalProfitShareUsd = Math.max(
+      0,
+      (nonMedicalProfitPercent / 100) * safeNonMedicalServicesFee
+    );
+    const stripeFeeUsd = Math.max(0, (stripeFeePercent / 100) * safeTotalAmount);
     const doctorUsd = Math.max(0, doctorFlatUsd);
+    const totalFuseFeeUsd = platformFeeUsd + nonMedicalProfitShareUsd;
     const brandAmountUsd = Math.max(
       0,
-      totalAmount - platformFeeUsd - stripeFeeUsd - doctorUsd - productsTotal
+      safeTotalAmount - totalFuseFeeUsd - stripeFeeUsd - doctorUsd
     );
+
+    if (process.env.NODE_ENV === "development") {
+      console.log("💰 [program/sub] Fee breakdown:", {
+        programClinicId,
+        platformFeePercent,
+        nonMedicalProfitPercent,
+        safeTotalAmount: safeTotalAmount.toFixed(2),
+        safeNonMedicalServicesFee: safeNonMedicalServicesFee.toFixed(2),
+        platformFeeUsd: platformFeeUsd.toFixed(2),
+        nonMedicalProfitShareUsd: nonMedicalProfitShareUsd.toFixed(2),
+        totalFuseFeeUsd: totalFuseFeeUsd.toFixed(2),
+        stripeFeeUsd: stripeFeeUsd.toFixed(2),
+        doctorUsd: doctorUsd.toFixed(2),
+        brandAmountUsd: brandAmountUsd.toFixed(2),
+      });
+    }
 
     // Calculate visit fee based on patient state and program's questionnaire
     let visitFeeAmount = 0;
@@ -6268,7 +6301,7 @@ app.post("/payments/program/sub", async (req, res) => {
     }
 
     // Add visit fee to total amount
-    const finalTotalAmount = totalAmount + visitFeeAmount;
+    const finalTotalAmount = safeTotalAmount + visitFeeAmount;
 
     // Create order
     const orderNumber = await Order.generateOrderNumber();
@@ -6278,7 +6311,7 @@ app.post("/payments/program/sub", async (req, res) => {
       clinicId: program.clinicId,
       status: "pending",
       billingInterval: BillingInterval.MONTHLY,
-      subtotalAmount: totalAmount,
+      subtotalAmount: safeTotalAmount,
       discountAmount: 0,
       taxAmount: 0,
       shippingAmount: 0,
@@ -6288,7 +6321,7 @@ app.post("/payments/program/sub", async (req, res) => {
       questionnaireAnswers,
       stripePriceId: stripePrice.id,
       programId: program.id,
-      platformFeeAmount: Number(platformFeeUsd.toFixed(2)),
+      platformFeeAmount: Number(totalFuseFeeUsd.toFixed(2)),
       platformFeePercent: Number(platformFeePercent.toFixed(2)),
       stripeAmount: Number(stripeFeeUsd.toFixed(2)),
       doctorAmount: Number(doctorUsd.toFixed(2)),
@@ -6353,8 +6386,10 @@ app.post("/payments/program/sub", async (req, res) => {
         brandAmountUsd: brandAmountUsd.toFixed(2),
         platformFeePercent: String(platformFeePercent),
         platformFeeUsd: platformFeeUsd.toFixed(2),
+        nonMedicalProfitPercent: String(nonMedicalProfitPercent),
+        nonMedicalProfitShareUsd: nonMedicalProfitShareUsd.toFixed(2),
         doctorFlatUsd: doctorUsd.toFixed(2),
-        productsTotal: productsTotal.toFixed(2),
+        productsTotal: safeProductsTotal.toFixed(2),
       },
       // HIPAA: Generic description only; no program/treatment names (Payment Processing Exemption)
       description: `Program Subscription ${orderNumber}`,

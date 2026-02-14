@@ -17,6 +17,7 @@ interface TierConfig {
   customTierCardText: string[] | null;
   isCustomTierCardTextActive: boolean;
   fuseFeePercent: number | null;
+  nonMedicalProfitPercent: number | null;
 }
 
 interface Plan {
@@ -50,6 +51,8 @@ export default function TierManagement() {
   const [maxProductsDraft, setMaxProductsDraft] = useState<number>(0);
   const [editingFuseFee, setEditingFuseFee] = useState<string | null>(null);
   const [fuseFeeDraft, setFuseFeeDraft] = useState<number | null>(null);
+  const [editingNonMedicalProfit, setEditingNonMedicalProfit] = useState<string | null>(null);
+  const [nonMedicalProfitDraft, setNonMedicalProfitDraft] = useState<number | null>(null);
   const [editingName, setEditingName] = useState<string | null>(null);
   const [nameDraft, setNameDraft] = useState<string>('');
   const [editingIntroPrice, setEditingIntroPrice] = useState<string | null>(null);
@@ -318,6 +321,58 @@ export default function TierManagement() {
   const handleCancelEditingFuseFee = () => {
     setEditingFuseFee(null);
     setFuseFeeDraft(null);
+  };
+
+  const handleStartEditingNonMedicalProfit = (planId: string, currentProfit: number | null) => {
+    setEditingNonMedicalProfit(planId);
+    setNonMedicalProfitDraft(currentProfit);
+  };
+
+  const handleSaveNonMedicalProfit = async (planId: string) => {
+    if (!token) return;
+
+    setSaving(planId);
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/tiers/${planId}/config`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          nonMedicalProfitPercent: nonMedicalProfitDraft,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update non-medical profit percent');
+      }
+
+      const result = await response.json();
+      console.log('✅ Updated tier config:', result.data);
+
+      setTiers(prevTiers => prevTiers.map(tier => {
+        if (tier.plan.id === planId) {
+          return {
+            ...tier,
+            config: result.data,
+          };
+        }
+        return tier;
+      }));
+
+      setEditingNonMedicalProfit(null);
+    } catch (error) {
+      console.error('Error updating non-medical profit percent:', error);
+      alert('Failed to update non-medical profit percent');
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  const handleCancelEditingNonMedicalProfit = () => {
+    setEditingNonMedicalProfit(null);
+    setNonMedicalProfitDraft(null);
   };
 
   const handleStartEditingName = (planId: string, currentName: string) => {
@@ -885,6 +940,50 @@ export default function TierManagement() {
                                   onClick={() => handleStartEditingFuseFee(tier.plan.id, tier.config?.fuseFeePercent ?? null)}
                                   className="p-1 text-muted-foreground hover:text-[#4FA59C] hover:bg-teal-50 dark:hover:bg-teal-900/30 rounded transition-colors"
                                   title="Edit fuse fee"
+                                >
+                                  <Edit2 className="h-3 w-3" />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-muted-foreground">Non-Medical Profit:</span>{' '}
+                            {editingNonMedicalProfit === tier.plan.id ? (
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={nonMedicalProfitDraft ?? ''}
+                                  onChange={(e) => setNonMedicalProfitDraft(e.target.value ? parseFloat(e.target.value) : null)}
+                                  className="w-28 px-2 py-1 text-sm border border-input rounded focus:outline-none focus:ring-2 focus:ring-[#4FA59C] bg-background text-foreground"
+                                  placeholder="e.g., 80.0"
+                                />
+                                <span className="text-xs text-muted-foreground">%</span>
+                                <button
+                                  onClick={() => handleSaveNonMedicalProfit(tier.plan.id)}
+                                  disabled={saving === tier.plan.id}
+                                  className="p-1 text-[#4FA59C] hover:bg-teal-50 dark:hover:bg-teal-900/30 rounded transition-colors disabled:opacity-50"
+                                  title="Save"
+                                >
+                                  <Save className="h-4 w-4" />
+                                </button>
+                                <button
+                                  onClick={handleCancelEditingNonMedicalProfit}
+                                  className="p-1 text-muted-foreground hover:bg-muted rounded transition-colors"
+                                  title="Cancel"
+                                >
+                                  <X className="h-4 w-4" />
+                                </button>
+                              </div>
+                            ) : (
+                              <>
+                                <span className="font-semibold text-foreground">
+                                  {tier.config?.nonMedicalProfitPercent != null ? `${tier.config.nonMedicalProfitPercent}%` : 'Not set'}
+                                </span>
+                                <button
+                                  onClick={() => handleStartEditingNonMedicalProfit(tier.plan.id, tier.config?.nonMedicalProfitPercent ?? null)}
+                                  className="p-1 text-muted-foreground hover:text-[#4FA59C] hover:bg-teal-50 dark:hover:bg-teal-900/30 rounded transition-colors"
+                                  title="Edit non-medical profit"
                                 >
                                   <Edit2 className="h-3 w-3" />
                                 </button>
