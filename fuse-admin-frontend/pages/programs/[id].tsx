@@ -2267,11 +2267,114 @@ export default function ProgramEditor() {
                                     </div>
 
                                     {/* Chart */}
-                                    <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-                                        <h3 className="text-lg font-semibold text-foreground mb-4">Views & Conversions Over Time</h3>
-                                        <div className="h-64 text-muted-foreground text-sm">
-                                            {/* Add recharts or similar charting library here */}
-                                            <p className="text-center py-20">Chart visualization coming soon</p>
+                                    <div className="bg-white rounded-xl border border-gray-200/60 p-8 shadow-sm">
+                                        <div className="mb-8">
+                                            <h3 className="text-lg font-semibold text-foreground mb-1">Views & Conversions Over Time</h3>
+                                            <p className="text-sm text-muted-foreground/60">
+                                                Daily performance metrics for the past week
+                                            </p>
+                                        </div>
+                                        
+                                        {/* Bar Chart */}
+                                        <div className="relative pt-6" style={{ height: '320px' }}>
+                                            {/* Y-axis labels */}
+                                            <div className="absolute left-0 top-6 bottom-20 flex flex-col justify-between text-xs text-muted-foreground/60 pr-3">
+                                                {(() => {
+                                                    const maxValue = Math.max(...analyticsData.chartData.map((d: any) => Math.max(d.views, d.conversions)))
+                                                    const chartMax = Math.ceil(maxValue * 1.2)
+                                                    const steps = 4
+                                                    const stepValue = Math.ceil(chartMax / steps)
+                                                    return Array.from({ length: steps + 1 }, (_, i) => (
+                                                        <div key={i} className="text-right">
+                                                            {stepValue * (steps - i)}
+                                                        </div>
+                                                    ))
+                                                })()}
+                                            </div>
+
+                                            {/* Chart Area */}
+                                            <div className="absolute left-12 right-0 top-6 bottom-0">
+                                                {/* Grid lines */}
+                                                <div className="absolute inset-0 flex flex-col justify-between pb-20">
+                                                    {Array.from({ length: 5 }).map((_, i) => (
+                                                        <div key={i} className="border-t border-gray-200/40" />
+                                                    ))}
+                                                </div>
+
+                                                {/* Bars */}
+                                                <div className="absolute inset-0 flex items-end justify-between gap-4 pb-20">
+                                                    {(() => {
+                                                        const maxValue = Math.max(...analyticsData.chartData.map((d: any) => Math.max(d.views, d.conversions)))
+                                                        const chartMax = maxValue * 1.2
+                                                        const chartHeight = 200
+                                                        
+                                                        return analyticsData.chartData.map((day: any, index: number) => {
+                                                            const viewsHeight = (day.views / chartMax) * chartHeight
+                                                            const conversionsHeight = (day.conversions / chartMax) * chartHeight
+                                                            
+                                                            return (
+                                                                <div key={index} className="flex-1 flex flex-col items-center justify-end group relative" style={{ height: chartHeight }}>
+                                                                    {/* Hover tooltip */}
+                                                                    <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 absolute -top-16 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-xs rounded-lg px-3 py-2 pointer-events-none whitespace-nowrap z-10 shadow-lg">
+                                                                        <div className="font-semibold mb-1">{day.date}</div>
+                                                                        <div className="text-blue-300">{day.views} views</div>
+                                                                        <div className="text-green-300">{day.conversions} conversions</div>
+                                                                        <div className="text-gray-300">{day.conversions > 0 ? ((day.conversions / day.views) * 100).toFixed(1) : 0}% rate</div>
+                                                                    </div>
+
+                                                                    {/* Side-by-side bars */}
+                                                                    <div className="w-full flex items-end justify-center gap-1">
+                                                                        {/* Views Bar */}
+                                                                        <div className="flex-1 max-w-[32px] flex flex-col items-center justify-end">
+                                                                            <div className="text-xs font-semibold text-blue-600 mb-1">{day.views}</div>
+                                                                            <div 
+                                                                                className="w-full rounded-t transition-all duration-700 ease-out hover:opacity-80"
+                                                                                style={{ 
+                                                                                    height: `${viewsHeight}px`,
+                                                                                    background: 'linear-gradient(180deg, hsl(217, 91%, 60%) 0%, hsl(217, 91%, 50%) 100%)',
+                                                                                    minHeight: day.views > 0 ? '8px' : '0'
+                                                                                }}
+                                                                            />
+                                                                        </div>
+
+                                                                        {/* Conversions Bar */}
+                                                                        <div className="flex-1 max-w-[32px] flex flex-col items-center justify-end">
+                                                                            <div className="text-xs font-semibold text-green-600 mb-1">{day.conversions}</div>
+                                                                            <div 
+                                                                                className="w-full rounded-t transition-all duration-700 ease-out hover:opacity-90"
+                                                                                style={{ 
+                                                                                    height: `${conversionsHeight}px`,
+                                                                                    background: 'linear-gradient(180deg, hsl(145, 65%, 50%) 0%, hsl(145, 65%, 45%) 100%)',
+                                                                                    minHeight: day.conversions > 0 ? '8px' : '0'
+                                                                                }}
+                                                                            />
+                                                                        </div>
+                                                                    </div>
+
+                                                                    {/* Date label */}
+                                                                    <div className="mt-4 text-center w-full">
+                                                                        <div className="text-xs font-medium text-muted-foreground">
+                                                                            {day.date}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            )
+                                                        })
+                                                    })()}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Legend */}
+                                        <div className="flex items-center justify-center gap-6 mt-6 pt-4 border-t border-gray-200/60">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-3 h-3 rounded" style={{ background: 'linear-gradient(135deg, hsl(217, 91%, 60%) 0%, hsl(217, 91%, 50%) 100%)' }}></div>
+                                                <span className="text-xs text-muted-foreground/70">Views</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-3 h-3 rounded" style={{ background: 'linear-gradient(135deg, hsl(145, 65%, 50%) 0%, hsl(145, 65%, 45%) 100%)' }}></div>
+                                                <span className="text-xs text-muted-foreground/70">Conversions</span>
+                                            </div>
                                         </div>
                                     </div>
 
