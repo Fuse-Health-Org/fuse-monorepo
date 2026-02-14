@@ -2221,8 +2221,6 @@ export default function ProgramEditor() {
                             </div>
                         </div>
                     )}
-                </div>
-            </div>
                         </>
                     ) : (
                         <>
@@ -2311,6 +2309,8 @@ export default function ProgramEditor() {
                             )}
                         </>
                     )}
+                </div>
+            </div>
 
             {/* Warning Dialog for Switching to Unified Mode */}
             {showUnifiedWarning && (
