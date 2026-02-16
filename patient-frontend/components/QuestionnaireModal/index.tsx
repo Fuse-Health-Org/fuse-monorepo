@@ -5,6 +5,7 @@ import { Icon } from "@iconify/react";
 import { stripePromise } from "../../lib/stripe";
 import { QuestionnaireModalProps, PaymentStatus } from "./types";
 import { useClinicFromDomain } from "../../hooks/useClinicFromDomain";
+import { MedicalCompanySlug } from "@fuse/enums";
 import { useQuestionnaireModal } from "./hooks/useQuestionnaireModal";
 import { LoadingState } from "./components/LoadingState";
 import { ModalHeader } from "./components/ModalHeader";
@@ -25,6 +26,7 @@ import {
 } from "./AccountCreationStep";
 import { RegularQuestionsView } from "./components/RegularQuestionsView";
 import { InformationalStepView } from "./components/InformationalStepView";
+import { BelugaConsentStep } from "./components/BelugaConsentStep";
 import { StepNavigationButtons } from "./components/StepNavigationButtons";
 import { OrderSuccessModal } from "./components/OrderSuccessModal";
 
@@ -71,7 +73,8 @@ export const QuestionnaireModal: React.FC<QuestionnaireModalProps> = (props) => 
   if (!currentStep && !modal.isProductSelectionStep() && !modal.isCheckoutStep()) {
     if (modal.questionnaire) {
       const checkoutPos = modal.questionnaire.checkoutStepPosition;
-      const checkoutStepIndex = checkoutPos === -1 ? modal.questionnaire.steps.length : checkoutPos;
+      const belugaOffset = modal.questionnaire.medicalCompanySource === MedicalCompanySlug.BELUGA ? 1 : 0;
+      const checkoutStepIndex = (checkoutPos === -1 ? modal.questionnaire.steps.length : checkoutPos) + belugaOffset;
       console.log('⏭️ No more visible questionnaire steps, advancing to checkout at index:', checkoutStepIndex);
       modal.setCurrentStepIndex(checkoutStepIndex);
     }
@@ -80,6 +83,17 @@ export const QuestionnaireModal: React.FC<QuestionnaireModalProps> = (props) => 
 
   // Render regular step content
   const renderStepContent = () => {
+    // Beluga consent step (first step for Beluga medical company)
+    if (modal.isBelugaConsentStep) {
+      return (
+        <BelugaConsentStep
+          consentGiven={modal.belugaConsentGiven}
+          onConsentChange={modal.setBelugaConsentGiven}
+          error={modal.errors?.belugaConsent}
+        />
+      );
+    }
+
     // Google MFA takes precedence
     if (modal.isGoogleMfaMode) {
       return (
