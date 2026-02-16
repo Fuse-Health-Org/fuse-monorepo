@@ -132,6 +132,10 @@ import RefundRequest from "@models/RefundRequest";
 import { stripeRoutes, webhookRoutes as stripeWebhookRoutes } from "@endpoints/stripe";
 import { GlobalFees } from "./models/GlobalFees";
 import { WebsiteBuilderConfigs, DEFAULT_FOOTER_DISCLAIMER } from "@models/WebsiteBuilderConfigs";
+import {
+  buildStatementDescriptor,
+  buildStatementDescriptorSuffix,
+} from "@utils/statementDescriptor";
 import { getPlatformFeePercent, useGlobalFees } from "@utils/useGlobalFees";
 
 // Helper function to fetch global fees from database
@@ -5267,7 +5271,7 @@ app.post(
         productId,
       });
 
-      // Calculate fee breakdown
+      // Calculate fee breakdown (Stripe fee not subtracted: FUSE pays Stripe)
       const fees = await useGlobalFees();
       
       // Get platform fee percent based on clinic's tier (or global fallback)
@@ -5275,14 +5279,12 @@ app.post(
         ? await getPlatformFeePercent(tenantProduct.clinicId)
         : fees.platformFeePercent;
       
-      const stripeFeePercent = fees.stripeFeePercent;
       const doctorFlatUsd = fees.doctorFlatFeeUsd;
       const totalPaid = Number(totalAmount) || 0;
       const platformFeeUsd = Math.max(
         0,
         (platformFeePercent / 100) * totalPaid
       );
-      const stripeFeeUsd = Math.max(0, (stripeFeePercent / 100) * totalPaid);
 
       // Get pharmacy wholesale cost from the product
       const pharmacyWholesaleUsd = Number(
@@ -5292,12 +5294,11 @@ app.post(
       // Doctor receives flat fee
       const doctorUsd = Math.max(0, doctorFlatUsd);
 
-      // Brand gets the residual after all fees
+      // Brand gets the residual after platform, doctor, pharmacy (no Stripe deduction)
       const brandAmountUsd = Math.max(
         0,
         totalPaid -
         platformFeeUsd -
-        stripeFeeUsd -
         doctorUsd -
         pharmacyWholesaleUsd
       );
@@ -5306,7 +5307,6 @@ app.post(
         console.log("💰 Fee breakdown calculated:", {
           totalPaid,
           platformFeeUsd,
-          stripeFeeUsd,
           pharmacyWholesaleUsd,
           doctorUsd,
           brandAmountUsd,
@@ -5368,7 +5368,7 @@ app.post(
         tenantProductId: tenantProduct.id,
         platformFeeAmount: Number(platformFeeUsd.toFixed(2)),
         platformFeePercent: Number(platformFeePercent.toFixed(2)),
-        stripeAmount: Number(stripeFeeUsd.toFixed(2)),
+        stripeAmount: 0,
         doctorAmount: Number(doctorUsd.toFixed(2)),
         pharmacyWholesaleAmount: Number(pharmacyWholesaleUsd.toFixed(2)),
         brandAmount: Number(brandAmountUsd.toFixed(2)),
@@ -5446,30 +5446,21 @@ app.post(
           `💳 Using on_behalf_of parameter for clinic ${tenantProduct.clinic.id} with Stripe account ${tenantProduct.clinic.stripeAccountId}`
         );
 
-        // When clinic is MOR, use statement_descriptor to show clinic name only (no "FUSE")
-        if (tenantProduct.clinic?.name) {
-          const statementClinicName = tenantProduct.clinic.name
-            .replace(/[^a-zA-Z0-9\s]/g, "") // Remove special characters
-            .substring(0, 22); // Stripe limit for statement_descriptor
-          authPaymentIntentParams.statement_descriptor = statementClinicName;
+        // When clinic is MOR, use statement_descriptor to show "{BrandName} Telehealth"
+        const descriptorClinic = buildStatementDescriptor(tenantProduct.clinic?.name);
+        if (descriptorClinic) {
+          authPaymentIntentParams.statement_descriptor = descriptorClinic;
           console.log(
-            `💳 Clinic is MOR - Using statement descriptor: "${statementClinicName}"`
+            `💳 Clinic is MOR - Using statement descriptor: "${descriptorClinic}"`
           );
         }
       } else {
-        // When Fuse is MOR, use statement_descriptor_suffix to show "FUSE *ClinicName Peptides"
-        if (tenantProduct.clinic?.name) {
-          const cleanName = tenantProduct.clinic.name
-            .replace(/[^a-zA-Z0-9\s]/g, ""); // Remove special characters
-          const peptidesSuffix = " Peptides";
-          const maxLength = 22; // Stripe limit for statement_descriptor_suffix
-          const maxNameLength = maxLength - peptidesSuffix.length;
-          const truncatedName = cleanName.substring(0, maxNameLength);
-          const statementClinicName = `${truncatedName}${peptidesSuffix}`;
-          authPaymentIntentParams.statement_descriptor_suffix =
-            statementClinicName;
+        // When Fuse is MOR, use full statement_descriptor (brand name only) so no account prefix truncation
+        const descriptorClinic = buildStatementDescriptorSuffix(tenantProduct.clinic?.name);
+        if (descriptorClinic) {
+          authPaymentIntentParams.statement_descriptor = descriptorClinic;
           console.log(
-            `💳 Fuse is MOR - Using statement descriptor suffix: "FUSE *${statementClinicName}"`
+            `💳 Fuse is MOR - Using statement descriptor: "${descriptorClinic}"`
           );
         }
       }
@@ -5701,7 +5692,7 @@ app.post("/payments/product/sub", async (req, res) => {
       tenantProductId,
     });
 
-    // Calculate fee breakdown
+    // Calculate fee breakdown (Stripe fee not subtracted: FUSE pays Stripe)
     const fees = await useGlobalFees();
     
     // Get platform fee percent based on clinic's tier (or global fallback)
@@ -5709,11 +5700,9 @@ app.post("/payments/product/sub", async (req, res) => {
       ? await getPlatformFeePercent((tenantProduct as any).clinicId)
       : fees.platformFeePercent;
     
-    const stripeFeePercent = fees.stripeFeePercent;
     const doctorFlatUsd = fees.doctorFlatFeeUsd;
     const totalPaid = Number(totalAmount) || 0;
     const platformFeeUsd = Math.max(0, (platformFeePercent / 100) * totalPaid);
-    const stripeFeeUsd = Math.max(0, (stripeFeePercent / 100) * totalPaid);
 
     // Get pharmacy wholesale cost from the product (quantity is 1 for subscriptions)
     const pharmacyWholesaleUsd = Number(
@@ -5723,12 +5712,11 @@ app.post("/payments/product/sub", async (req, res) => {
     // Doctor receives flat fee
     const doctorUsd = Math.max(0, doctorFlatUsd);
 
-    // Brand gets the residual after all fees
+    // Brand gets the residual after platform, doctor, pharmacy (no Stripe deduction)
     const brandAmountUsd = Math.max(
       0,
       totalPaid -
       platformFeeUsd -
-      stripeFeeUsd -
       doctorUsd -
       pharmacyWholesaleUsd
     );
@@ -5736,7 +5724,6 @@ app.post("/payments/product/sub", async (req, res) => {
     console.log("💰 Fee breakdown calculated:", {
       totalPaid,
       platformFeeUsd,
-      stripeFeeUsd,
       pharmacyWholesaleUsd,
       doctorUsd,
       brandAmountUsd,
@@ -5836,7 +5823,7 @@ app.post("/payments/product/sub", async (req, res) => {
       tenantProductId: (tenantProduct as any).id,
       platformFeeAmount: Number(platformFeeUsd.toFixed(2)),
       platformFeePercent: Number(platformFeePercent.toFixed(2)),
-      stripeAmount: Number(stripeFeeUsd.toFixed(2)),
+      stripeAmount: 0,
       doctorAmount: Number(doctorUsd.toFixed(2)),
       pharmacyWholesaleAmount: Number(pharmacyWholesaleUsd.toFixed(2)),
       brandAmount: Number(brandAmountUsd.toFixed(2)),
@@ -5998,33 +5985,25 @@ app.post("/payments/product/sub", async (req, res) => {
         `💳 Using on_behalf_of parameter for clinic ${(tenantProduct as any).clinic.id} with Stripe account ${(tenantProduct as any).clinic.stripeAccountId}`
       );
 
-      // When clinic is MOR, use statement_descriptor to show clinic name only (no "FUSE")
-      if (clinicName || (tenantProduct as any).clinic?.name) {
-        const statementClinicName = (
-          clinicName || (tenantProduct as any).clinic?.name
-        )
-          .replace(/[^a-zA-Z0-9\s]/g, "") // Remove special characters
-          .substring(0, 22); // Stripe limit for statement_descriptor
-        paymentIntentParams.statement_descriptor = statementClinicName;
+      // When clinic is MOR, use statement_descriptor to show "{BrandName} Telehealth"
+      const descriptorName = buildStatementDescriptor(
+        clinicName || (tenantProduct as any).clinic?.name
+      );
+      if (descriptorName) {
+        paymentIntentParams.statement_descriptor = descriptorName;
         console.log(
-          `💳 Clinic is MOR - Using statement descriptor: "${statementClinicName}"`
+          `💳 Clinic is MOR - Using statement descriptor: "${descriptorName}"`
         );
       }
     } else {
-      // When Fuse is MOR, use statement_descriptor_suffix to show "FUSE *ClinicName Peptides"
-      if (clinicName || (tenantProduct as any).clinic?.name) {
-        const cleanName = (
-          clinicName || (tenantProduct as any).clinic?.name
-        )
-          .replace(/[^a-zA-Z0-9\s]/g, ""); // Remove special characters
-        const peptidesSuffix = " Peptides";
-        const maxLength = 22; // Stripe limit for statement_descriptor_suffix
-        const maxNameLength = maxLength - peptidesSuffix.length;
-        const truncatedName = cleanName.substring(0, maxNameLength);
-        const statementClinicName = `${truncatedName}${peptidesSuffix}`;
-        paymentIntentParams.statement_descriptor_suffix = statementClinicName;
+      // When Fuse is MOR, use full statement_descriptor (brand name only) so no account prefix truncation
+      const descriptorName = buildStatementDescriptorSuffix(
+        clinicName || (tenantProduct as any).clinic?.name
+      );
+      if (descriptorName) {
+        paymentIntentParams.statement_descriptor = descriptorName;
         console.log(
-          `💳 Fuse is MOR - Using statement descriptor suffix: "FUSE *${statementClinicName}"`
+          `💳 Fuse is MOR - Using statement descriptor: "${descriptorName}"`
         );
       }
     }
@@ -6192,7 +6171,7 @@ app.post("/payments/program/sub", async (req, res) => {
       amount: totalAmount,
     });
 
-    // Calculate fee breakdown
+    // Calculate fee breakdown (Stripe fee not subtracted: FUSE pays Stripe)
     const fees = await useGlobalFees();
     
     // Get platform fee percent based on clinic's tier (or global fallback)
@@ -6201,14 +6180,12 @@ app.post("/payments/program/sub", async (req, res) => {
       ? await getPlatformFeePercent(programClinicId)
       : fees.platformFeePercent;
     
-    const stripeFeePercent = fees.stripeFeePercent;
     const doctorFlatUsd = fees.doctorFlatFeeUsd;
     const platformFeeUsd = Math.max(0, (platformFeePercent / 100) * totalAmount);
-    const stripeFeeUsd = Math.max(0, (stripeFeePercent / 100) * totalAmount);
     const doctorUsd = Math.max(0, doctorFlatUsd);
     const brandAmountUsd = Math.max(
       0,
-      totalAmount - platformFeeUsd - stripeFeeUsd - doctorUsd - productsTotal
+      totalAmount - platformFeeUsd - doctorUsd - productsTotal
     );
 
     // Calculate visit fee based on patient state and program's questionnaire
@@ -6293,7 +6270,7 @@ app.post("/payments/program/sub", async (req, res) => {
       programId: program.id,
       platformFeeAmount: Number(platformFeeUsd.toFixed(2)),
       platformFeePercent: Number(platformFeePercent.toFixed(2)),
-      stripeAmount: Number(stripeFeeUsd.toFixed(2)),
+      stripeAmount: 0,
       doctorAmount: Number(doctorUsd.toFixed(2)),
       brandAmount: Number(brandAmountUsd.toFixed(2)),
     });
@@ -6376,16 +6353,12 @@ app.post("/payments/program/sub", async (req, res) => {
       );
     }
 
-    // Add statement descriptor with Peptides suffix
-    if (clinicName || clinic?.name) {
-      const cleanName = (clinicName || clinic?.name)
-        .replace(/[^a-zA-Z0-9\s]/g, "");
-      const peptidesSuffix = " Peptides";
-      const maxLength = 22; // Stripe limit for statement_descriptor_suffix
-      const maxNameLength = maxLength - peptidesSuffix.length;
-      const truncatedName = cleanName.substring(0, maxNameLength);
-      const statementClinicName = `${truncatedName}${peptidesSuffix}`;
-      paymentIntentParams.statement_descriptor_suffix = statementClinicName;
+    // Full statement descriptor (brand name only) so customer sees e.g. "FuseHealth Checkhealth"
+    const programStatementDescriptor = buildStatementDescriptorSuffix(
+      clinicName || clinic?.name
+    );
+    if (programStatementDescriptor) {
+      paymentIntentParams.statement_descriptor = programStatementDescriptor;
     }
 
     const paymentIntent = await stripe.paymentIntents.create(paymentIntentParams);
