@@ -1,4 +1,4 @@
-import React from "react";
+import { useRef, useState, useEffect, type FC, type Key, type CSSProperties } from "react";
 import { Autocomplete, AutocompleteItem } from "@heroui/react";
 import { Icon } from "@iconify/react";
 
@@ -69,7 +69,7 @@ interface USStateAutocompleteProps {
   onChange: (questionId: string, value: string) => void;
 }
 
-export const USStateAutocomplete: React.FC<USStateAutocompleteProps> = ({
+export const USStateAutocomplete: FC<USStateAutocompleteProps> = ({
   questionId,
   questionText,
   isRequired = false,
@@ -83,12 +83,12 @@ export const USStateAutocomplete: React.FC<USStateAutocompleteProps> = ({
   const selectedState = US_STATES.find((s) => s.value === value);
   
   // Ref to measure trigger width and position for perfect alignment
-  const triggerRef = React.useRef<HTMLDivElement>(null);
-  const [triggerWidth, setTriggerWidth] = React.useState<number | undefined>(undefined);
-  const [triggerLeft, setTriggerLeft] = React.useState<number | undefined>(undefined);
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const [triggerWidth, setTriggerWidth] = useState<number | undefined>(undefined);
+  const [triggerLeft, setTriggerLeft] = useState<number | undefined>(undefined);
 
   // Measure trigger width and position on mount and window resize
-  React.useEffect(() => {
+  useEffect(() => {
     const measureTrigger = () => {
       if (triggerRef.current) {
         const rect = triggerRef.current.getBoundingClientRect();
@@ -107,7 +107,7 @@ export const USStateAutocomplete: React.FC<USStateAutocompleteProps> = ({
     };
   }, []);
 
-  const handleSelectionChange = (key: React.Key | null) => {
+  const handleSelectionChange = (key: Key | null) => {
     console.log('✅ State selected from dropdown:', key);
     if (key) {
       const selectedState = US_STATES.find((s) => s.key === key);
@@ -123,7 +123,7 @@ export const USStateAutocomplete: React.FC<USStateAutocompleteProps> = ({
   const instanceId = `state-select-${questionId}`;
 
   // Add global styles for dropdown (since it might render in a portal)
-  React.useEffect(() => {
+  useEffect(() => {
     const styleId = `${instanceId}-global-styles`;
     let style = document.getElementById(styleId) as HTMLStyleElement;
     
@@ -347,8 +347,7 @@ export const USStateAutocomplete: React.FC<USStateAutocompleteProps> = ({
           base: "w-full",
           listboxWrapper: "max-h-[300px] px-2",
           popoverContent: "rounded-2xl w-full",
-          selectorButton: "w-full",
-          input: "text-base",
+          selectorButton: "w-full text-base",
         }}
         startContent={
           <Icon 
@@ -366,7 +365,6 @@ export const USStateAutocomplete: React.FC<USStateAutocompleteProps> = ({
           placement: "bottom-start",
           shouldFlip: false,
           disableAnimation: true,
-          strategy: "fixed",
           classNames: {
             base: "dropdown-fixed-position",
             content: "dropdown-content-fixed"
@@ -383,12 +381,11 @@ export const USStateAutocomplete: React.FC<USStateAutocompleteProps> = ({
           // @ts-ignore - CSS variables work at runtime
           "--nextui-focus": "#9CA3AF",
           "--nextui-primary": "#9CA3AF",
-        } as React.CSSProperties}
+        } as CSSProperties}
       >
         {US_STATES.map((state) => (
           <AutocompleteItem 
             key={state.key} 
-            value={state.value}
             textValue={state.label}
           >
             <div className="flex items-center justify-between gap-2 w-full">
