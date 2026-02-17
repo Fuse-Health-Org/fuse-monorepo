@@ -813,6 +813,130 @@ router.get("/pharmacies", authenticateJWT, async (req: Request, res: Response) =
   }
 });
 
+router.post("/messages/patient", authenticateJWT, async (req: Request, res: Response) => {
+  try {
+    const currentUser = getCurrentUser(req);
+    if (!currentUser?.id) {
+      return res.status(401).json({ success: false, message: "Not authenticated" });
+    }
+
+    const { masterId, content, isMedia } = req.body || {};
+    const resolvedMasterId = toNonEmptyString(masterId);
+    const resolvedContent = toNonEmptyString(content);
+
+    if (!resolvedMasterId || !resolvedContent) {
+      return res.status(400).json({
+        success: false,
+        message: "masterId and content are required",
+      });
+    }
+
+    const user = await User.findByPk(currentUser.id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    const firstName = toNonEmptyString(user.firstName) || "Patient";
+    const lastName = toNonEmptyString(user.lastName) || "User";
+
+    const response = await belugaRequest("/external/receiveChat", {
+      method: "POST",
+      body: {
+        firstName,
+        lastName,
+        content: resolvedContent,
+        isMedia: Boolean(isMedia),
+        masterId: resolvedMasterId,
+      },
+    });
+
+    return res.json({
+      success: true,
+      data: response.payload,
+    });
+  } catch (error: any) {
+    return res.status(error?.statusCode || 500).json({
+      success: false,
+      message: "Failed to send Beluga patient message",
+      details: error?.payload || error?.message || null,
+    });
+  }
+});
+
+router.post("/messages/customer-service", authenticateJWT, async (req: Request, res: Response) => {
+  try {
+    const currentUser = getCurrentUser(req);
+    if (!currentUser?.id) {
+      return res.status(401).json({ success: false, message: "Not authenticated" });
+    }
+
+    const { masterId, content } = req.body || {};
+    const resolvedMasterId = toNonEmptyString(masterId);
+    const resolvedContent = toNonEmptyString(content);
+
+    if (!resolvedMasterId || !resolvedContent) {
+      return res.status(400).json({
+        success: false,
+        message: "masterId and content are required",
+      });
+    }
+
+    const response = await belugaRequest("/external/receiveCSMessage", {
+      method: "POST",
+      body: {
+        content: resolvedContent,
+        masterId: resolvedMasterId,
+      },
+    });
+
+    return res.json({
+      success: true,
+      data: response.payload,
+    });
+  } catch (error: any) {
+    return res.status(error?.statusCode || 500).json({
+      success: false,
+      message: "Failed to send Beluga customer service message",
+      details: error?.payload || error?.message || null,
+    });
+  }
+});
+
+router.post("/patients/:masterId/name", authenticateJWT, async (req: Request, res: Response) => {
+  try {
+    const masterId = toNonEmptyString(req.params.masterId);
+    const firstName = toNonEmptyString(req.body?.firstName);
+    const lastName = toNonEmptyString(req.body?.lastName);
+
+    if (!masterId || !firstName || !lastName) {
+      return res.status(400).json({
+        success: false,
+        message: "masterId, firstName and lastName are required",
+      });
+    }
+
+    const response = await belugaRequest("/external/patientName", {
+      method: "POST",
+      body: {
+        masterId,
+        firstName,
+        lastName,
+      },
+    });
+
+    return res.json({
+      success: true,
+      data: response.payload,
+    });
+  } catch (error: any) {
+    return res.status(error?.statusCode || 500).json({
+      success: false,
+      message: "Failed to update Beluga patient name",
+      details: error?.payload || error?.message || null,
+    });
+  }
+});
+
 router.post("/cases", async (req: Request, res: Response) => {
   try {
     console.log('🐋 [BELUGA] ========== POST /beluga/cases REQUEST ==========');
