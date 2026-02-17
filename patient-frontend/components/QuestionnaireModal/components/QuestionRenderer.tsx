@@ -1,6 +1,7 @@
 import React from "react";
 import { Icon } from "@iconify/react";
 import { Question, ThemePalette } from "../types";
+import { USStateAutocomplete, US_STATES } from "./USStateAutocomplete";
 
 interface QuestionRendererProps {
     question: Question;
@@ -468,6 +469,46 @@ export const QuestionRenderer: React.FC<QuestionRendererProps> = ({
         }
 
         case "radio": {
+            // Detect if this is a US State selection question
+            const questionTextLower = (question.questionText || '').toLowerCase();
+            const isStateQuestion = (
+                (questionTextLower.includes('state') && (
+                    questionTextLower.includes('live') ||
+                    questionTextLower.includes('reside') ||
+                    questionTextLower.includes('located') ||
+                    questionTextLower.includes('where') ||
+                    questionTextLower.includes('which')
+                )) ||
+                questionTextLower.includes('state do you') ||
+                questionTextLower.includes('your state')
+            );
+
+            // Check if options match US states (verify by checking if at least 40+ state codes exist in options)
+            const hasStateOptions = question.options && question.options.length >= 40 && 
+                US_STATES.some(state => 
+                    question.options?.some(opt => 
+                        opt.optionValue === state.value || opt.optionText === state.label
+                    )
+                );
+
+            // If this is a state question, render the autocomplete
+            if (isStateQuestion || hasStateOptions) {
+                console.log('🗺️ Detected state question, rendering autocomplete:', question.questionText);
+                return (
+                    <USStateAutocomplete
+                        key={question.id}
+                        questionId={question.id}
+                        questionText={question.questionText}
+                        isRequired={isQuestionRequired}
+                        value={value}
+                        error={errors[question.id]}
+                        helpText={question.helpText}
+                        theme={theme}
+                        onChange={onAnswerChange}
+                    />
+                );
+            }
+
             const renderGenericRadio = () => (
                 <div key={question.id} className="space-y-4">
                     <div>
@@ -612,6 +653,48 @@ export const QuestionRenderer: React.FC<QuestionRendererProps> = ({
             );
 
         case "select":
+            // Check if this is a state question - use modern autocomplete instead of radio list
+            const questionTextLowerSelect = (question.questionText || '').toLowerCase();
+            const isStateQuestionSelect = (
+                (question as any).questionSubtype === "State" ||
+                (questionTextLowerSelect.includes('state') && (
+                    questionTextLowerSelect.includes('live') ||
+                    questionTextLowerSelect.includes('reside') ||
+                    questionTextLowerSelect.includes('located') ||
+                    questionTextLowerSelect.includes('where') ||
+                    questionTextLowerSelect.includes('which')
+                )) ||
+                questionTextLowerSelect.includes('state do you') ||
+                questionTextLowerSelect.includes('your state')
+            );
+
+            // Check if options match US states
+            const hasStateOptionsSelect = question.options && question.options.length >= 40 && 
+                US_STATES.some(state => 
+                    question.options?.some(opt => 
+                        opt.optionValue === state.value || opt.optionText === state.label
+                    )
+                );
+
+            // Use modern autocomplete for state questions
+            if (isStateQuestionSelect || hasStateOptionsSelect) {
+                console.log('🗺️ [SELECT] Detected state question, rendering autocomplete:', question.questionText);
+                return (
+                    <USStateAutocomplete
+                        key={question.id}
+                        questionId={question.id}
+                        questionText={question.questionText}
+                        isRequired={isQuestionRequired}
+                        value={value}
+                        error={errors[question.id]}
+                        helpText={question.helpText}
+                        theme={theme}
+                        onChange={onAnswerChange}
+                    />
+                );
+            }
+
+            // Fallback to old state rendering (shouldn't reach here for states)
             if ((question as any).questionSubtype === "State") {
                 const stateAbbreviations: Record<string, string> = {
                     "Alabama": "AL", "Alaska": "AK", "Arizona": "AZ", "Arkansas": "AR",

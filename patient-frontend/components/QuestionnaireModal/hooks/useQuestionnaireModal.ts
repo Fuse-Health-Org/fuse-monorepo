@@ -3,7 +3,8 @@ import { apiCall } from "../../../lib/api";
 import { replaceVariables, getVariablesFromClinic } from "../../../lib/templateVariables";
 import { signInUser, createUserAccount as createUserAccountAPI, signInWithGoogle } from "../auth";
 import { createEmailVerificationHandlers } from "../emailVerification";
-import { trackFormConversion } from "../../../lib/analytics";
+import { trackFormConversion, generateSessionId } from "../../../lib/analytics";
+import { trackContactInfoDebounced } from "../../../lib/contactTracking";
 import { QuestionnaireModalProps, QuestionnaireData, PlanOption, PaymentStatus } from "../types";
 import { useQuestionnaireData } from "./useQuestionnaireData";
 import { useGoogleOAuth } from "./useGoogleOAuth";
@@ -23,6 +24,10 @@ export function useQuestionnaireModal(
 ) {
   const { isOpen, onClose, questionnaireId, tenantProductId, tenantProductFormId, productName, programData } = props;
 
+  // Get session ID for tracking
+  const sessionId = generateSessionId();
+  const productId = tenantProductId;
+
   // Data loading
   const { questionnaire, loading, setQuestionnaire } = useQuestionnaireData(
     isOpen,
@@ -33,6 +38,7 @@ export function useQuestionnaireModal(
       productCategory: props.productCategory,
       productFormVariant: props.productFormVariant,
       globalFormStructure: props.globalFormStructure,
+      programData: props.programData,
     },
     onClose
   );
@@ -50,6 +56,7 @@ export function useQuestionnaireModal(
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>('idle');
   const [userId, setUserId] = useState<string | null>(null);
   const [accountCreated, setAccountCreated] = useState(false);
+  const [isAuthenticatedUser, setIsAuthenticatedUser] = useState(false);
   const [patientName, setPatientName] = useState<string>('');
   const [patientFirstName, setPatientFirstName] = useState<string>('');
   const [shippingInfo, setShippingInfo] = useState({
@@ -116,6 +123,12 @@ export function useQuestionnaireModal(
   const [affiliateSlug, setAffiliateSlug] = useState<string | null>(null);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    const hasAuthToken = !!localStorage.getItem("auth-token");
+    setIsAuthenticatedUser(hasAuthToken);
+  }, [isOpen, userId, accountCreated]);
+
+  useEffect(() => {
     const detectAffiliateSlug = async () => {
       if (typeof window === 'undefined') return;
 
@@ -179,6 +192,7 @@ export function useQuestionnaireModal(
 
   // Track initialization
   const hasInitializedStepRef = useRef(false);
+  const hasRestoredFromCacheRef = useRef(false);
 
   // Debug sign-in mode changes
   useEffect(() => {
@@ -211,7 +225,13 @@ export function useQuestionnaireModal(
   );
 
   // Step helpers - must be defined before getCurrentStage
-  const isProductSelectionStep = useCallback((): boolean => false, []);
+  const isProductSelectionStep = useCallback((): boolean => {
+    if (!questionnaire) return false;
+    const productSelectionPos = questionnaire.productSelectionStepPosition;
+    // Only show product selection if it's explicitly configured (position >= 0)
+    if (productSelectionPos === undefined || productSelectionPos === -1) return false;
+    return currentStepIndex === productSelectionPos;
+  }, [questionnaire, currentStepIndex]);
 
   const isCheckoutStep = useCallback((): boolean => {
     if (!questionnaire) return false;
@@ -258,7 +278,7 @@ export function useQuestionnaireModal(
     }
 
     // Check if user is signed in
-    const isSignedIn = accountCreated || userId;
+    const isSignedIn = isAuthenticatedUser;
 
     // Find the current visible step at actualStepIndex
     // Don't modify currentStepIndex during render - that should only happen in handleNext/handlePrevious
@@ -278,7 +298,7 @@ export function useQuestionnaireModal(
       }
     }
     return null;
-  }, [questionnaire, currentStepIndex, isProductSelectionStep, isCheckoutStep, evaluateStepConditionalLogic, accountCreated, userId]);
+  }, [questionnaire, currentStepIndex, isProductSelectionStep, isCheckoutStep, evaluateStepConditionalLogic, isAuthenticatedUser]);
 
   // Analytics
   const getCurrentStage = useCallback((): 'product' | 'payment' | 'account' => {
@@ -293,12 +313,12 @@ export function useQuestionnaireModal(
         stepOrder: currentStep.stepOrder
       } : null,
       isCheckoutStep: isCheckoutStep(),
-      isSignedIn: accountCreated || userId,
+      isSignedIn: isAuthenticatedUser,
     });
 
     // Only consider "account" stage if the step title indicates account creation
     // (e.g., "Create Your Account", not "Location Verification")
-    const isSignedIn = accountCreated || userId;
+    const isSignedIn = isAuthenticatedUser;
     if (!isSignedIn && currentStep?.category === 'user_profile') {
       const stepTitle = currentStep.title?.toLowerCase() || '';
       // Check if it's actually an account creation step
@@ -308,7 +328,7 @@ export function useQuestionnaireModal(
     }
 
     return 'product';
-  }, [isCheckoutStep, getCurrentQuestionnaireStep, currentStepIndex, accountCreated, userId]);
+  }, [isCheckoutStep, getCurrentQuestionnaireStep, currentStepIndex, isAuthenticatedUser]);
 
   const { trackConversion, resetTrackingFlags } = useQuestionnaireAnalytics(
     isOpen, questionnaireId, tenantProductFormId, tenantProductId, domainClinic, productName,
@@ -325,19 +345,31 @@ export function useQuestionnaireModal(
   // Helper: Get total steps (excluding user_profile if signed in)
   const getTotalSteps = useCallback((): number => {
     if (!questionnaire) return 0;
-    const isSignedIn = accountCreated || userId;
+    const isSignedIn = isAuthenticatedUser;
     const visibleSteps = questionnaire.steps.filter(step => {
       if (isSignedIn && step.category === 'user_profile') return false;
       return true;
     }).length;
-    return visibleSteps + 1; // +1 for checkout
-  }, [questionnaire, accountCreated, userId]);
+    
+    // Count special steps
+    let specialSteps = 1; // Always +1 for checkout
+    
+    // Add product selection step if enabled
+    const productSelectionPos = questionnaire.productSelectionStepPosition;
+    if (productSelectionPos !== undefined && productSelectionPos !== -1) {
+      specialSteps += 1;
+    }
+    
+    return visibleSteps + specialSteps;
+  }, [questionnaire, isAuthenticatedUser]);
 
   // Get current visible step number for progress display
   const getCurrentVisibleStepNumber = useCallback((): number => {
     if (!questionnaire) return 1;
-    const isSignedIn = accountCreated || userId;
+    const isSignedIn = isAuthenticatedUser;
+    const productSelectionPos = questionnaire.productSelectionStepPosition;
     const checkoutPos = questionnaire.checkoutStepPosition;
+    const productSelectionStepIndex = (productSelectionPos !== undefined && productSelectionPos !== -1) ? productSelectionPos : -1;
     const checkoutStepIndex = checkoutPos === -1 ? questionnaire.steps.length : checkoutPos;
 
     // Log all steps with their categories for debugging
@@ -347,6 +379,7 @@ export function useQuestionnaireModal(
       isSignedIn,
       accountCreated,
       userId,
+      productSelectionStepIndex,
       checkoutStepIndex,
       totalQuestionnaireSteps: questionnaire.steps.length,
       stepCategories
@@ -355,6 +388,18 @@ export function useQuestionnaireModal(
     // If we're on checkout step
     if (currentStepIndex >= checkoutStepIndex) {
       return getTotalSteps();
+    }
+
+    // If we're on product selection step
+    if (productSelectionStepIndex !== -1 && currentStepIndex === productSelectionStepIndex) {
+      // Count all visible steps before product selection + 1 for product selection itself
+      let visibleCount = 0;
+      for (let i = 0; i < productSelectionStepIndex && i < questionnaire.steps.length; i++) {
+        const step = questionnaire.steps[i];
+        if (isSignedIn && step.category === 'user_profile') continue;
+        visibleCount++;
+      }
+      return visibleCount + 1;
     }
 
     // Count visible steps up to and including current index
@@ -374,7 +419,7 @@ export function useQuestionnaireModal(
 
     // Ensure we return at least 1
     return Math.max(visibleCount, 1);
-  }, [questionnaire, currentStepIndex, accountCreated, userId, getTotalSteps]);
+  }, [questionnaire, currentStepIndex, isAuthenticatedUser, getTotalSteps]);
 
   // Build questionnaire answers
   const buildQuestionnaireAnswers = useCallback((currentAnswers: Record<string, any>) => {
@@ -435,7 +480,27 @@ export function useQuestionnaireModal(
     if (questionId === 'mobile') {
       const numericValue = String(value).replace(/\D/g, '');
       if (numericValue.length <= 10) {
-        setAnswers(prev => ({ ...prev, [questionId]: numericValue }));
+        setAnswers(prev => {
+          const updated = { ...prev, [questionId]: numericValue };
+          
+          // Track contact info when mobile is updated
+          if (sessionId && productId && questionnaireId) {
+            const contactInfo = {
+              firstName: (prev as any).firstName,
+              lastName: (prev as any).lastName,
+              email: (prev as any).email,
+              phoneNumber: numericValue,
+            };
+            trackContactInfoDebounced(
+              sessionId,
+              contactInfo,
+              productId,
+              questionnaireId
+            );
+          }
+          
+          return updated;
+        });
         if (errors[questionId]) setErrors(prev => { const next = { ...prev }; delete next[questionId]; return next; });
       }
       return;
@@ -458,7 +523,24 @@ export function useQuestionnaireModal(
     }
     setAnswers(newAnswers);
     if (errors[questionId]) setErrors(prev => { const next = { ...prev }; delete next[questionId]; return next; });
-  }, [answers, errors]);
+    
+    // Track contact info when firstName, lastName, or email are updated
+    if (['firstName', 'lastName', 'email'].includes(questionId)) {
+      if (sessionId && productId && questionnaireId) {
+        trackContactInfoDebounced(
+          sessionId,
+          {
+            firstName: newAnswers.firstName,
+            lastName: newAnswers.lastName,
+            email: newAnswers.email,
+            phoneNumber: newAnswers.mobile,
+          },
+          productId,
+          questionnaireId
+        );
+      }
+    }
+  }, [answers, errors, sessionId, productId, questionnaireId]);
 
   const handleRadioChange = useCallback((questionId: string, value: any) => {
     const newAnswers = { ...answers, [questionId]: value };
@@ -486,6 +568,13 @@ export function useQuestionnaireModal(
   const validateCurrentStep = useCallback((): boolean => {
     if (!questionnaire) return true;
     if (isProductSelectionStep()) {
+      if (programData) {
+        if (!Object.values(selectedProgramProducts).some(Boolean)) {
+          alert('Please select at least one product to continue.');
+          return false;
+        }
+        return true;
+      }
       if (!Object.values(selectedProducts).some(qty => qty > 0)) {
         alert('Please select at least one product to continue.');
         return false;
@@ -551,7 +640,7 @@ export function useQuestionnaireModal(
     });
     setErrors(stepErrors);
     return Object.keys(stepErrors).length === 0;
-  }, [questionnaire, isProductSelectionStep, isCheckoutStep, selectedProducts, shippingInfo, paymentStatus, getCurrentQuestionnaireStep, answers]);
+  }, [questionnaire, isProductSelectionStep, isCheckoutStep, selectedProducts, selectedProgramProducts, programData, shippingInfo, paymentStatus, getCurrentQuestionnaireStep, answers]);
 
   // Auth handlers
   const handleSignIn = useCallback(async () => {
@@ -571,6 +660,7 @@ export function useQuestionnaireModal(
       setPatientName(`${result.userData.firstName} ${result.userData.lastName}`.trim());
       setUserId(result.userData.id);
       setAccountCreated(true);
+      setIsAuthenticatedUser(true);
       setIsSignInMode(false);
       setIsSignInOptionsMode(false);
       setIsPasswordSignInMode(false);
@@ -599,6 +689,7 @@ export function useQuestionnaireModal(
       setPatientName(`${result.userData.firstName} ${result.userData.lastName}`.trim());
       setUserId(result.userData.id);
       setAccountCreated(true);
+      setIsAuthenticatedUser(true);
       setIsSignInMode(false);
       setIsSignInOptionsMode(false);
       setIsPasswordSignInMode(false);
@@ -846,13 +937,24 @@ export function useQuestionnaireModal(
       setPaymentStatus('ready');
       console.log('🎉 [CHECKOUT] ========== CHECKOUT COMPLETE - READY TO REDIRECT ==========');
 
+      // Clear form cache after successful payment
+      if (questionnaire?.id) {
+        const cacheKey = `form-draft-${questionnaire.id}-${questionnaireId || 'unknown'}`;
+        try {
+          localStorage.removeItem(cacheKey);
+          console.log('🗑️ [CACHE] Cleared form draft after successful payment');
+        } catch (error) {
+          console.warn('⚠️ [CACHE] Failed to clear cache:', error);
+        }
+      }
+
     } catch (error) {
       console.error('❌ [CHECKOUT] Payment success handler error:', error);
       setPaymentStatus('failed');
       setShowSuccessModal(false); // Ensure modal is closed on error
       alert('Payment processing error. Please contact support.');
     }
-  }, [paymentIntentId, orderId, userId, accountCreated, triggerCheckoutSequenceRun, trackConversion, createMDCase, questionnaire]);
+  }, [paymentIntentId, orderId, userId, accountCreated, triggerCheckoutSequenceRun, trackConversion, createMDCase, questionnaire, questionnaireId]);
 
   const handlePaymentConfirm = useCallback(() => {
     // Open modal with processing state when payment confirmation starts
@@ -1025,9 +1127,11 @@ export function useQuestionnaireModal(
         await createUserAccount();
       }
 
-      const isSignedIn = accountCreated || userId;
+      const isSignedIn = isAuthenticatedUser;
       const checkoutPos = questionnaire.checkoutStepPosition;
+      const productSelectionPos = questionnaire.productSelectionStepPosition;
       const checkoutStepIndex = checkoutPos === -1 ? questionnaire.steps.length : checkoutPos;
+      const productSelectionStepIndex = (productSelectionPos !== undefined && productSelectionPos !== -1) ? productSelectionPos : -1;
 
       // Find the next valid step (skipping user_profile if signed in)
       let nextIndex = currentStepIndex + 1;
@@ -1043,19 +1147,26 @@ export function useQuestionnaireModal(
       }
 
       if (nextIndex >= questionnaire.steps.length) {
-        console.log('⏭️ No more valid questionnaire steps, advancing to checkout');
-        setCurrentStepIndex(checkoutStepIndex);
+        console.log('⏭️ No more valid questionnaire steps, checking for product selection or checkout');
+        // Check if there's a product selection step to show before checkout
+        if (productSelectionStepIndex !== -1 && currentStepIndex < productSelectionStepIndex) {
+          console.log('➡️ Moving to product selection step');
+          setCurrentStepIndex(productSelectionStepIndex);
+        } else {
+          console.log('➡️ Moving to checkout step');
+          setCurrentStepIndex(checkoutStepIndex);
+        }
       } else if (nextIndex <= checkoutStepIndex) {
         setCurrentStepIndex(nextIndex);
       } else {
         handleSubmit();
       }
     }
-  }, [validateCurrentStep, questionnaire, getCurrentQuestionnaireStep, isCheckoutStep, paymentStatus, accountCreated, userId, createUserAccount, currentStepIndex, handleSubmit]);
+  }, [validateCurrentStep, questionnaire, getCurrentQuestionnaireStep, isCheckoutStep, paymentStatus, isAuthenticatedUser, createUserAccount, currentStepIndex, handleSubmit]);
 
   const handlePrevious = useCallback(() => {
     if (currentStepIndex > 0 && questionnaire) {
-      const isSignedIn = accountCreated || userId;
+      const isSignedIn = isAuthenticatedUser;
       let targetIndex = currentStepIndex - 1;
 
       while (targetIndex >= 0) {
@@ -1072,7 +1183,7 @@ export function useQuestionnaireModal(
         setCurrentStepIndex(targetIndex);
       }
     }
-  }, [currentStepIndex, questionnaire, accountCreated, userId]);
+  }, [currentStepIndex, questionnaire, isAuthenticatedUser]);
 
   const handleProductQuantityChange = useCallback((productId: string, quantity: number) => {
     setSelectedProducts(prev => ({ ...prev, [productId]: quantity }));
@@ -1081,7 +1192,7 @@ export function useQuestionnaireModal(
   // Program product toggle - handles both single_choice and multiple_choice modes
   const handleProgramProductToggle = useCallback((productId: string) => {
     console.log('📦 [PRODUCT TOGGLE] Toggling product:', productId);
-    const offerType = programData?.productOfferType || programData?.medicalTemplate?.productOfferType || 'multiple_choice';
+    const offerType = programData?.productOfferType || programData?.medicalTemplate?.productOfferType || 'single_choice';
 
     // Reset payment state when product selection changes (in case of previous failure)
     if (paymentStatus === 'failed') {
@@ -1234,15 +1345,127 @@ export function useQuestionnaireModal(
     }
   }, [programData, selectedProgramProducts, answers, shippingInfo, domainClinic, buildQuestionnaireAnswers]);
 
+  // FORM CACHING: Save form progress to localStorage
+  useEffect(() => {
+    if (!isOpen || !questionnaire?.id) return;
+    
+    // Only save if we have some answers
+    if (Object.keys(answers).length > 0) {
+      const cacheKey = `form-draft-${questionnaire.id}-${questionnaireId || 'unknown'}`;
+      const cacheData = {
+        answers,
+        currentStepIndex,
+        timestamp: Date.now(),
+        questionnaireId: questionnaire.id,
+        productName,
+        selectedProducts,
+        selectedProgramProducts,
+        shippingInfo,
+        // Save user info if account was created
+        userId,
+        accountCreated,
+        patientName,
+        patientFirstName,
+      };
+      
+      try {
+        localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+        console.log('💾 [CACHE] Form progress saved to localStorage', {
+          cacheKey,
+          answersCount: Object.keys(answers).length,
+          currentStepIndex,
+        });
+      } catch (error) {
+        console.warn('⚠️ [CACHE] Failed to save to localStorage:', error);
+      }
+    }
+  }, [answers, currentStepIndex, selectedProducts, selectedProgramProducts, shippingInfo, userId, accountCreated, patientName, patientFirstName, isOpen, questionnaire, questionnaireId, productName]);
+
+  // FORM CACHING: Restore form progress from localStorage on mount
+  useEffect(() => {
+    if (!isOpen || !questionnaire?.id || hasRestoredFromCacheRef.current) return;
+    
+    const cacheKey = `form-draft-${questionnaire.id}-${questionnaireId || 'unknown'}`;
+    
+    try {
+      const cached = localStorage.getItem(cacheKey);
+      
+      if (cached) {
+        const cacheData = JSON.parse(cached);
+        const CACHE_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+        const cacheAge = Date.now() - cacheData.timestamp;
+        
+        if (cacheAge < CACHE_EXPIRY_MS) {
+          // Restore form state
+          setAnswers(cacheData.answers || {});
+          setCurrentStepIndex(cacheData.currentStepIndex || 0);
+          setSelectedProducts(cacheData.selectedProducts || {});
+          setSelectedProgramProducts(cacheData.selectedProgramProducts || {});
+          setShippingInfo(cacheData.shippingInfo || { address: "", apartment: "", city: "", state: "", zipCode: "", country: "us" });
+          
+          // Restore user info if it was saved
+          // IMPORTANT: Only restore accountCreated/authentication flags if userId is present
+          // This prevents skipping "Create Your Account" step from stale cache data
+          if (cacheData.userId) {
+            setUserId(cacheData.userId);
+            // Only mark account as created if we have a valid userId
+            if (cacheData.accountCreated) setAccountCreated(cacheData.accountCreated);
+            if (cacheData.patientName) setPatientName(cacheData.patientName);
+            if (cacheData.patientFirstName) setPatientFirstName(cacheData.patientFirstName);
+          } else {
+            // No userId means account was never created - clear authentication flags
+            console.log('⚠️ [CACHE] No userId found, resetting authentication flags to show account creation step');
+            setAccountCreated(false);
+            setUserId(null);
+          }
+          
+          const minutesAgo = Math.floor(cacheAge / 1000 / 60);
+          const hoursAgo = Math.floor(minutesAgo / 60);
+          const timeAgoStr = hoursAgo > 0 
+            ? `${hoursAgo} hour${hoursAgo > 1 ? 's' : ''} ago`
+            : `${minutesAgo} minute${minutesAgo > 1 ? 's' : ''} ago`;
+          
+          console.log('✅ [CACHE] Form progress restored from localStorage!', {
+            cacheKey,
+            savedAt: timeAgoStr,
+            answersCount: Object.keys(cacheData.answers).length,
+            currentStepIndex: cacheData.currentStepIndex,
+          });
+          
+          // Show a subtle notification (you could use a toast library here)
+          if (typeof window !== 'undefined' && Object.keys(cacheData.answers).length > 3) {
+            console.log(`📋 Progress restored from ${timeAgoStr}`);
+          }
+          
+          hasRestoredFromCacheRef.current = true;
+        } else {
+          // Cache expired, remove it
+          console.log('⏰ [CACHE] Cache expired, clearing:', cacheKey);
+          localStorage.removeItem(cacheKey);
+        }
+      }
+    } catch (error) {
+      console.warn('⚠️ [CACHE] Failed to restore from localStorage:', error);
+    }
+  }, [isOpen, questionnaire, questionnaireId]);
+
   // Step initialization
   useEffect(() => {
     if (questionnaire && isOpen) {
       console.log('🟡 [STEP INIT] Effect triggered', {
         hasHandledGoogleAuth: hasHandledGoogleAuthRef.current,
         hasInitializedStep: hasInitializedStepRef.current,
+        hasRestoredFromCache: hasRestoredFromCacheRef.current,
         currentStepIndex,
         stepsCount: questionnaire.steps.length
       });
+
+      // If we restored from cache, mark as initialized and keep the restored step
+      if (hasRestoredFromCacheRef.current && !hasInitializedStepRef.current) {
+        console.log('📍 [STEP INIT] Cache restored, keeping currentStepIndex:', currentStepIndex);
+        hasInitializedStepRef.current = true;
+        return;
+      }
 
       // If user just signed in via Google OAuth, find the first non-user_profile step
       if (hasHandledGoogleAuthRef.current && !hasInitializedStepRef.current) {
@@ -1274,7 +1497,7 @@ export function useQuestionnaireModal(
         console.log('⏭️ [STEP INIT] Already initialized, keeping step:', currentStepIndex);
       }
     }
-  }, [questionnaire, isOpen, hasHandledGoogleAuthRef]);
+  }, [questionnaire, isOpen, hasHandledGoogleAuthRef, currentStepIndex]);
 
   // Reset state when modal closes
   useEffect(() => {
@@ -1288,6 +1511,7 @@ export function useQuestionnaireModal(
       setPaymentIntentId(null);
       setPaymentStatus('idle');
       setSelectedPlan("monthly");
+      setIsAuthenticatedUser(false);
       resetTrackingFlags();
       setIsSignInMode(false);
       setIsSignInOptionsMode(false);
@@ -1299,6 +1523,10 @@ export function useQuestionnaireModal(
       setShippingInfo({ address: "", apartment: "", city: "", state: "", zipCode: "", country: "us" });
       setCheckoutPaymentInfo({ cardNumber: "", expiryDate: "", securityCode: "", country: "brazil" });
       hasInitializedStepRef.current = false;
+      hasRestoredFromCacheRef.current = false;
+      
+      // Note: We DON'T clear localStorage cache here - it should persist across modal close/open
+      // Only clear it after successful payment or if user explicitly abandons
     }
   }, [isOpen, setQuestionnaire, setSelectedPlan, resetTrackingFlags]);
 

@@ -35,6 +35,7 @@ const TRIGGER_OPTIONS = [
     { value: 'checkout_completed', label: 'Checkout Completed' },
     { value: 'protocol_start', label: 'Protocol Start' },
     { value: 'prescription_expired', label: 'Prescription Expired' },
+    { value: 'abandoned_cart', label: 'Abandoned Cart' },
     { value: 'manual', label: 'Manual Trigger' }
 ]
 

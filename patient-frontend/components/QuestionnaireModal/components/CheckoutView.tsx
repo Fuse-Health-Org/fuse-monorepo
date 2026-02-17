@@ -49,6 +49,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
     visitType,
     loadingVisitFee = false,
     onCalculateVisitFee,
+    hasProductSelectionStep = false,
 }) => {
     const selectedPlanData = plans.find((plan) => plan.id === selectedPlan);
     const isProgramCheckout = !!programData;
@@ -279,12 +280,12 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                     <p className="text-gray-600">Secure checkout for your {treatmentName} subscription</p>
                 </div>
 
-                {/* Program Product Selection - Only for programs */}
-                {isProgramCheckout && programData && (
+                {/* Program Product Selection - Only for programs AND when not a separate step */}
+                {isProgramCheckout && programData && !hasProductSelectionStep && (
                     <Card>
                         <CardBody className="p-6">
                             {(() => {
-                                const productOfferType = programData.productOfferType || programData.medicalTemplate?.productOfferType || 'multiple_choice';
+                                const productOfferType = programData.productOfferType || programData.medicalTemplate?.productOfferType || 'single_choice';
                                 const isSingleChoice = productOfferType === 'single_choice';
 
                                 // Helper function to calculate full price (product + services) for each product

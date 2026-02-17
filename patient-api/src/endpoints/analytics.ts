@@ -1526,14 +1526,18 @@ router.get("/analytics/forms/:formId/sessions", authenticateJWT, async (req: Req
 
     // Get form steps from GlobalFormStructure
     const formStructure = (form as any).globalFormStructure;
-    const formSteps = formStructure?.steps || [];
+    const formSteps = Array.isArray(formStructure?.steps)
+      ? formStructure.steps
+          .filter((step: any) => step?.enabled !== false)
+          .sort((a: any, b: any) => (a?.order ?? 0) - (b?.order ?? 0))
+      : [];
     
     // If no structure, use default stages
     const defaultStages = [
-      { stepNumber: 1, questionText: 'Product Selection', questionId: 'product' },
-      { stepNumber: 2, questionText: 'Medical Questions', questionId: 'medical' },
-      { stepNumber: 3, questionText: 'Checkout', questionId: 'checkout' },
-      { stepNumber: 4, questionText: 'Account Creation', questionId: 'account' },
+      { stepNumber: 1, questionText: "Medical Questions", questionId: "product", questionType: "product_questions" },
+      { stepNumber: 2, questionText: "Create Account", questionId: "account", questionType: "account_creation" },
+      { stepNumber: 3, questionText: "Product Selection", questionId: "productSelection", questionType: "product_selection" },
+      { stepNumber: 4, questionText: "Payment & Checkout", questionId: "checkout", questionType: "checkout" },
     ];
 
     const stages = formSteps.length > 0
@@ -1733,6 +1737,58 @@ router.get("/analytics/forms/:formId/sessions", authenticateJWT, async (req: Req
     return res.status(500).json({
       success: false,
       message: "Failed to fetch form session analytics",
+    });
+  }
+});
+
+// Track patient contact information for abandoned cart detection
+router.post("/analytics/track-contact", async (req: Request, res: Response) => {
+  try {
+    const { sessionId, contactInfo, productId, formId, timestamp } = req.body;
+
+    if (!sessionId || !contactInfo || !productId || !formId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: sessionId, contactInfo, productId, formId',
+      });
+    }
+
+    const viewEvent = await TenantAnalyticsEvents.findOne({
+      where: {
+        sessionId,
+        eventType: 'view',
+      },
+      order: [['createdAt', 'DESC']],
+    });
+
+    if (viewEvent) {
+      const updatedMetadata = {
+        ...viewEvent.metadata,
+        contactInfo: {
+          firstName: contactInfo.firstName || viewEvent.metadata?.contactInfo?.firstName,
+          lastName: contactInfo.lastName || viewEvent.metadata?.contactInfo?.lastName,
+          email: contactInfo.email || viewEvent.metadata?.contactInfo?.email,
+          phoneNumber: contactInfo.phoneNumber || viewEvent.metadata?.contactInfo?.phoneNumber,
+          lastUpdated: timestamp || new Date().toISOString(),
+        },
+      };
+
+      await viewEvent.update({ metadata: updatedMetadata });
+
+      console.log('[Contact Tracking] Updated contact info for session:', sessionId);
+    } else {
+      console.warn('[Contact Tracking] No view event found for session:', sessionId);
+    }
+
+    return res.json({
+      success: true,
+      message: 'Contact information tracked successfully',
+    });
+  } catch (error: any) {
+    console.error('[Contact Tracking] Error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message,
     });
   }
 });

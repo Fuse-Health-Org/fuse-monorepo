@@ -12398,6 +12398,10 @@ async function startServer() {
   const analyticsRouter = (await import("./endpoints/analytics")).default;
   app.use("/", analyticsRouter);
 
+  // ============= ABANDONED CART ENDPOINTS =============
+  const abandonedCartRouter = (await import("./endpoints/abandonedCart")).default;
+  app.use("/", abandonedCartRouter);
+
   // ============= CONFIG ENDPOINTS =============
   const configRouter = (await import("./endpoints/config")).default;
   app.use("/config", configRouter);
@@ -14161,9 +14165,9 @@ app.get("/public/brand-products/:clinicSlug/:slug", async (req, res) => {
       }
     } catch (e) {
       if (process.env.NODE_ENV === "development") {
-        console.error("Error finding product questionnaire:", e);
+        console.error("Error finding medical questionnaire:", e);
       } else {
-        console.error("Error finding product questionnaire");
+        console.error("Error finding medical questionnaire");
       }
     }
 

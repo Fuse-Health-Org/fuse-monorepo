@@ -48,51 +48,70 @@ export const AccountCreationStep: React.FC<AccountCreationStepProps> = ({
   // OAuth options are handled by SignInOptionsStep when user clicks "Need to sign in?"
   return (
     <div className="space-y-4">
-      <div>
-        <h3 className="text-2xl font-medium text-gray-900 mb-3">Create your account</h3>
-        <p className="text-gray-600 text-base">We'll use this information to set up your personalized care plan</p>
+      {/* Header */}
+      <div className="mb-6">
+        <h3 className="text-2xl font-semibold text-gray-900 mb-3">Create Your Medical Profile</h3>
+        <p className="text-gray-600 text-base leading-relaxed">
+          A licensed healthcare provider will use this information to verify, prescribe and deliver treatments at their discretion.
+        </p>
       </div>
 
       <div className="space-y-6">
         {/* First Name and Last Name Row */}
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">First Name</label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-gray-700">Legal Name</label>
+            </div>
             <input
               type="text"
               value={firstName}
               onChange={(e) => onFieldChange('firstName', e.target.value)}
-              className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-              placeholder="John"
+              className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="First Name"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Last Name</label>
+            <div className="flex items-center justify-end mb-2">
+              <span className="text-xs text-gray-500">For prescription</span>
+            </div>
             <input
               type="text"
               value={lastName}
               onChange={(e) => onFieldChange('lastName', e.target.value)}
-              className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-              placeholder="Cena"
+              className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Last Name"
             />
           </div>
         </div>
 
         {/* Email Address */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
+          <div className="flex items-center justify-between mb-2">
+            <label className="block text-sm font-medium text-gray-700">Email Address</label>
+            <span className="text-xs text-gray-500 flex items-center gap-1">
+              <Icon icon="mdi:email-outline" className="text-gray-400" />
+              Medical updates
+            </span>
+          </div>
           <input
             type="email"
             value={email}
             onChange={(e) => onFieldChange('email', e.target.value)}
-            className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-            placeholder="john.cena@gmail.com"
+            className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="Email Address"
           />
         </div>
 
         {/* Mobile Number */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Mobile Number</label>
+          <div className="flex items-center justify-between mb-2">
+            <label className="block text-sm font-medium text-gray-700">Mobile Number</label>
+            <span className="text-xs text-gray-500 flex items-center gap-1">
+              <Icon icon="mdi:shield-check-outline" className="text-gray-400" />
+              Secure verification
+            </span>
+          </div>
           <div className="relative">
             <div className="absolute left-4 top-1/2 transform -translate-y-1/2 flex items-center">
               <span className="text-lg mr-2">🇺🇸</span>
@@ -101,20 +120,33 @@ export const AccountCreationStep: React.FC<AccountCreationStepProps> = ({
               type="tel"
               value={mobile}
               onChange={(e) => onFieldChange('mobile', e.target.value)}
-              className="w-full pl-16 pr-4 py-3 bg-white border border-gray-200 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-              placeholder="(213) 343-4134"
+              className="w-full pl-16 pr-4 py-3 bg-white border border-gray-200 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Mobile Number"
             />
           </div>
         </div>
       </div>
 
       {/* Privacy Notice */}
-      <div className="bg-gray-100 rounded-xl p-4 mt-6">
-        <div className="flex items-start gap-3">
-          <Icon icon="lucide:lock" className="text-gray-600 text-lg flex-shrink-0 mt-0.5" />
-          <p className="text-sm text-gray-600 leading-relaxed">
-            {clinicName || 'Hims'} takes your privacy seriously with industry leading encryption.
-          </p>
+      <div className="bg-gray-50 rounded-lg p-3 mt-6">
+        <div className="flex items-start gap-3 mb-2">
+          <Icon icon="healthicons:health-data-security" className="text-emerald-600 text-base flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-medium text-gray-900 text-sm">HIPAA-Compliant & Secure</p>
+            <p className="text-xs text-gray-600 leading-relaxed mt-0.5">
+              Your medical information is protected by federal privacy laws and encrypted with industry-leading security.
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-4 text-xs text-gray-500 ml-7">
+          <span className="flex items-center gap-1">
+            <Icon icon="mdi:shield-check" className="text-emerald-600 text-sm" />
+            256-bit Encryption
+          </span>
+          <span className="flex items-center gap-1">
+            <Icon icon="healthicons:doctor" className="text-emerald-600 text-sm" />
+            Licensed Providers
+          </span>
         </div>
       </div>
     </div>
@@ -340,7 +372,7 @@ export const PasswordSignInStep: React.FC<PasswordSignInStepProps> = ({
             value={email}
             onChange={(e) => onEmailChange(e.target.value)}
             className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-            placeholder="john.cena@gmail.com"
+            placeholder="Email Address"
             onKeyDown={(e) => { if (e.key === 'Enter') onSignIn(); }}
           />
         </div>
