@@ -372,6 +372,29 @@ const fetchBelugaProducts = async (): Promise<{ products: BelugaAPIProduct[]; so
 
 const findAnswerFromQuestionnaire = (answers: Record<string, any>, terms: string[]): string | undefined => {
   const normalizedTerms = terms.map((term) => term.toLowerCase());
+  
+  // Handle new structured format: { answers: [{questionText, answer}], metadata }
+  if (answers.answers && Array.isArray(answers.answers)) {
+    for (const item of answers.answers) {
+      const questionText = item.questionText || item.questionId || '';
+      const normalizedQuestion = questionText.toLowerCase();
+      
+      if (normalizedTerms.some((term) => normalizedQuestion.includes(term))) {
+        const value = item.answer;
+        if (Array.isArray(value)) {
+          const content = value
+            .map((item) => (item == null ? "" : String(item).trim()))
+            .filter(Boolean)
+            .join("; ");
+          if (content) return content;
+        }
+        const valueAsString = toNonEmptyString(String(value ?? ""));
+        if (valueAsString) return valueAsString;
+      }
+    }
+  }
+  
+  // Handle old flat format: { "Question?": "Answer" }
   for (const [key, value] of Object.entries(answers)) {
     const normalizedKey = key.toLowerCase();
     if (normalizedTerms.some((term) => normalizedKey.includes(term))) {
@@ -422,7 +445,7 @@ const collectBelugaCustomQuestions = (answers: Record<string, any>, questionnair
         const answerType = toNonEmptyString(q.answerType);
         
         // For multiple-choice questions, store their options
-        if (questionText && (answerType === 'multiple_choice' || answerType === 'single_choice')) {
+        if (questionText && (answerType === 'multiple_choice' || answerType === 'single_choice' || answerType === 'radio')) {
           const options = Array.isArray(q.options) ? q.options : [];
           const optionTexts = options
             .map((opt: any) => toNonEmptyString(opt.text || opt.label || opt))
@@ -439,7 +462,22 @@ const collectBelugaCustomQuestions = (answers: Record<string, any>, questionnair
   const result: Record<string, string> = {};
   let index = 1;
 
-  for (const [question, answer] of Object.entries(answers)) {
+  // Handle both new structured format and old flat format
+  let answerEntries: Array<[string, any]> = [];
+  
+  if (answers.answers && Array.isArray(answers.answers)) {
+    // New structured format: { answers: [{questionText, answer, ...}], metadata: {...} }
+    for (const item of answers.answers) {
+      if (item.questionText && item.answer !== undefined) {
+        answerEntries.push([item.questionText, item.answer]);
+      }
+    }
+  } else {
+    // Old flat format: { "Question?": "Answer" }
+    answerEntries = Object.entries(answers);
+  }
+
+  for (const [question, answer] of answerEntries) {
     const normalizedQuestion = question.toLowerCase();
     if (excludedTerms.some((term) => normalizedQuestion.includes(term))) {
       continue;
@@ -535,9 +573,13 @@ const resolveBelugaPharmacyCandidates = async (params: {
   city?: string;
   state?: string;
 }): Promise<string[]> => {
+  console.log('🏥 [PHARMACY] Starting pharmacy search with params:', params);
   const candidates = new Set<string>();
   const requested = toNonEmptyString(params.requestedPharmacyId);
-  if (requested) candidates.add(requested);
+  if (requested) {
+    console.log('🏥 [PHARMACY] Using requested pharmacyId:', requested);
+    candidates.add(requested);
+  }
 
   const searches = [
     { zip: params.zip, state: params.state },
@@ -556,16 +598,24 @@ const resolveBelugaPharmacyCandidates = async (params: {
     if (state) body.state = state;
     if (Object.keys(body).length === 0) continue;
 
+    console.log('🏥 [PHARMACY] Searching Beluga API with:', body);
     try {
       const response = await belugaRequest("/external/pharmacies", { method: "POST", body }, { allowHttpErrors: true });
+      console.log('🏥 [PHARMACY] API response status:', response.statusCode);
+      console.log('🏥 [PHARMACY] API response payload:', JSON.stringify(response.payload, null, 2));
+      
       const ids = extractBelugaPharmacyIds(response.payload);
+      console.log('🏥 [PHARMACY] Extracted pharmacy IDs:', ids);
+      
       ids.slice(0, 8).forEach((id) => candidates.add(id));
       if (candidates.size >= 8) break;
-    } catch {
+    } catch (error: any) {
+      console.log('⚠️ [PHARMACY] API call failed:', error?.message || error);
       // Continue trying broader searches
     }
   }
 
+  console.log('🏥 [PHARMACY] Final candidates:', Array.from(candidates));
   return Array.from(candidates);
 };
 
@@ -921,25 +971,15 @@ router.post("/cases", async (req: Request, res: Response) => {
     console.log('✅ [BELUGA] Found BelugaProduct:', {
       id: belugaProduct.id,
       name: belugaProduct.name,
-      medId: belugaProduct.medId,
+      medId: belugaProduct.medId || 'null (will try without medId)',
     });
 
     const belugaMedId = toNonEmptyString(belugaProduct.medId);
     if (!belugaMedId) {
-      console.log('❌ [BELUGA] BelugaProduct has no medId assigned yet');
-      console.log('🐋 [BELUGA] ========== END (VALIDATION ERROR) ==========');
-      return res.status(400).json({
-        success: false,
-        message: "Linked BelugaProduct does not have a medId assigned yet",
-        details: {
-          orderId: order.id,
-          productId: product?.id || null,
-          belugaProductId: belugaProduct.id,
-          belugaProductName: belugaProduct.name,
-        },
-      });
+      console.log('⚠️ [BELUGA] BelugaProduct has no medId - proceeding without it (Beluga API will validate)');
     }
 
+    console.log('🐋 [BELUGA] Building patientPreference array...');
     const patientPreference = [
       {
         name: toNonEmptyString(belugaProduct.name) || "N/A",
@@ -947,13 +987,21 @@ router.post("/cases", async (req: Request, res: Response) => {
         quantity: toNonEmptyString(belugaProduct.quantity) || "1",
         refills: toNonEmptyString(belugaProduct.refills) || "0",
         daysSupply: toNonEmptyString(belugaProduct.daysSupply) || "30",
-        medId: belugaMedId,
+        ...(belugaMedId ? { medId: belugaMedId } : {}), // Only include medId if present
       },
     ];
+    console.log('✅ [BELUGA] patientPreference built:', JSON.stringify(patientPreference, null, 2));
 
+    console.log('🐋 [BELUGA] Collecting custom questions from questionnaire answers...');
+    console.log('🐋 [BELUGA] questionnaireAnswers:', JSON.stringify(questionnaireAnswers, null, 2));
+    console.log('🐋 [BELUGA] questionnaire:', questionnaire ? `Present (${questionnaire.id})` : 'null');
+    
     const customQuestions = collectBelugaCustomQuestions(questionnaireAnswers, questionnaire);
+    console.log('✅ [BELUGA] Custom questions collected:', JSON.stringify(customQuestions, null, 2));
+    
     const masterId = String(order.id);
 
+    console.log('🐋 [BELUGA] Building form object...');
     const formObj = {
       consentsSigned: true,
       firstName,
@@ -972,6 +1020,7 @@ router.post("/cases", async (req: Request, res: Response) => {
       patientPreference,
       ...customQuestions,
     };
+    console.log('✅ [BELUGA] Form object built, validating required fields...');
 
     const requiredValidation: Array<{ key: string; value: unknown }> = [
       { key: "firstName", value: formObj.firstName },
@@ -1004,6 +1053,9 @@ router.post("/cases", async (req: Request, res: Response) => {
     }
 
     if (missingFields.length > 0) {
+      console.log('❌ [BELUGA] Validation failed - missing required fields:', missingFields);
+      console.log('🐋 [BELUGA] Form data:', JSON.stringify(formObj, null, 2));
+      console.log('🐋 [BELUGA] ========== END (VALIDATION FAILED) ==========');
       return res.status(400).json({
         success: false,
         message: "Cannot create Beluga visit: missing or invalid required fields",
@@ -1015,22 +1067,39 @@ router.post("/cases", async (req: Request, res: Response) => {
       });
     }
 
+    console.log('✅ [BELUGA] All required fields validated');
+    console.log('🐋 [BELUGA] Resolving dynamic parameters (company, visitType, pharmacy)...');
+
+    console.log('🐋 [BELUGA] Step 1: Getting patient history hints...');
     const patientHistoryHints = await getBelugaPatientHistoryHints(phone);
+    console.log('✅ [BELUGA] Patient history hints:', patientHistoryHints);
+
+    console.log('🐋 [BELUGA] Step 2: Resolving company candidates...');
     const companyCandidates = resolveBelugaCompanyCandidates(clinic, requestedCompany);
+    console.log('✅ [BELUGA] Company candidates:', companyCandidates);
+
+    console.log('🐋 [BELUGA] Step 3: Resolving visit type candidates...');
     const visitTypeCandidates = resolveBelugaVisitTypeCandidates({
       requestedVisitType,
       questionnaire,
       state,
       patientVisitType: patientHistoryHints.visitType,
     });
+    console.log('✅ [BELUGA] Visit type candidates:', visitTypeCandidates);
+
+    console.log('🐋 [BELUGA] Step 4: Resolving pharmacy candidates...');
+    console.log('🐋 [BELUGA] Pharmacy search inputs:', { requestedPharmacyId, zip, city, state });
     const pharmacyCandidates = await resolveBelugaPharmacyCandidates({
       requestedPharmacyId,
       zip,
       city,
       state,
     });
+    console.log('✅ [BELUGA] Pharmacy candidates:', pharmacyCandidates);
 
     if (companyCandidates.length === 0) {
+      console.log('❌ [BELUGA] No company candidates found');
+      console.log('🐋 [BELUGA] ========== END (NO COMPANY) ==========');
       return res.status(400).json({
         success: false,
         message: "Unable to resolve Beluga company dynamically",
@@ -1038,6 +1107,8 @@ router.post("/cases", async (req: Request, res: Response) => {
     }
 
     if (visitTypeCandidates.length === 0) {
+      console.log('❌ [BELUGA] No visit type candidates found');
+      console.log('🐋 [BELUGA] ========== END (NO VISIT TYPE) ==========');
       return res.status(400).json({
         success: false,
         message: "Unable to resolve Beluga visitType dynamically",
@@ -1045,6 +1116,9 @@ router.post("/cases", async (req: Request, res: Response) => {
     }
 
     if (pharmacyCandidates.length === 0) {
+      console.log('❌ [BELUGA] No pharmacy candidates found');
+      console.log('🐋 [BELUGA] Details:', { city, state, zip });
+      console.log('🐋 [BELUGA] ========== END (NO PHARMACY) ==========');
       return res.status(400).json({
         success: false,
         message: "Unable to resolve Beluga pharmacyId dynamically from patient address",
