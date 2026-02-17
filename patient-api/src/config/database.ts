@@ -544,6 +544,16 @@ export async function initializeDatabase() {
       console.log('✅ Database tables synchronized successfully');
     }
 
+    // Ensure GIN index exists on Program.formStepOrder (JSONB)
+    try {
+      await sequelize.query(`
+        CREATE INDEX IF NOT EXISTS "program_form_step_order_idx"
+        ON "Program" USING gin ("formStepOrder");
+      `);
+    } catch (indexError) {
+      console.log('⚠️  Program.formStepOrder index:', indexError instanceof Error ? indexError.message : indexError);
+    }
+
     // Allow Program.clinicId to be NULL for templates
     try {
       console.log('🔄 Allowing Program.clinicId to be NULL for templates...');

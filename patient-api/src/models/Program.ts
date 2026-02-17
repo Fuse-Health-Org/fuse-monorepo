@@ -1,4 +1,4 @@
-import { Table, Column, DataType, ForeignKey, BelongsTo } from 'sequelize-typescript';
+import { Table, Column, DataType, ForeignKey, BelongsTo, Index } from 'sequelize-typescript';
 import Entity from './Entity';
 import Clinic from './Clinic';
 import Questionnaire from './Questionnaire';
@@ -118,6 +118,7 @@ export default class Program extends Entity {
      *
      * Payment must always be the last section.
      */
+    @Index({ name: 'program_form_step_order_idx', using: 'gin' })
     @Column({
         type: DataType.JSONB,
         allowNull: true,
