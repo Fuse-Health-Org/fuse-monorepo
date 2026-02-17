@@ -549,6 +549,11 @@ export async function initializeDatabase() {
 
     // Ensure TierConfiguration exists for all active BrandSubscriptionPlans
     try {
+      await sequelize.query(`
+        ALTER TABLE "TierConfiguration"
+        ADD COLUMN IF NOT EXISTS "nonMedicalProfitPercent" numeric(5,2) DEFAULT NULL;
+      `);
+
       if (process.env.NODE_ENV === 'development') {
         console.log('🔍 Checking TierConfiguration for active plans...');
       }

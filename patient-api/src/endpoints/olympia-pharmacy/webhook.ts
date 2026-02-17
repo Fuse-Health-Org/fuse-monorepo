@@ -162,6 +162,9 @@ export function registerOlympiaPharmacyWebhooks(
           });
         }
 
+        // Log the full webhook payload for debugging
+        console.log('📥 Olympia Pharmacy webhook full payload:', JSON.stringify(req.body, null, 2));
+
         // Process the webhook
         await olympiaPharmacyWebhookService.processOlympiaWebhook(req.body);
 

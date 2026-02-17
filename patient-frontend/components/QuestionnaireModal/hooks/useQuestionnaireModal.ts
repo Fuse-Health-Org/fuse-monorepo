@@ -1200,6 +1200,11 @@ export function useQuestionnaireModal(
         body: JSON.stringify(requestBody)
       });
 
+      // So you can find it in Console (enable "Preserve log" in DevTools)
+      if (!result.success) {
+        console.error('[PAYMENT] Backend error:', (result as { error?: string }).error, 'Full result:', result);
+      }
+
       if (result.success && result.data) {
         const subscriptionData = result.data.data || result.data;
         if (subscriptionData.clientSecret) {
@@ -1220,11 +1225,12 @@ export function useQuestionnaireModal(
         }
       }
       setPaymentStatus('failed');
-      return null;
+      const backendMessage = (result as { error?: string }).error;
+      throw new Error(backendMessage || 'Failed to set up payment. Please try again.');
     } catch (error) {
       console.error('❌ Program subscription error:', error);
       setPaymentStatus('failed');
-      return null;
+      throw error;
     }
   }, [programData, selectedProgramProducts, answers, shippingInfo, domainClinic, buildQuestionnaireAnswers]);
 

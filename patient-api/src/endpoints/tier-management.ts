@@ -195,6 +195,7 @@ export function registerTierManagementEndpoints(
           customTierCardText,
           isCustomTierCardTextActive,
           fuseFeePercent,
+          nonMedicalProfitPercent,
         } = req.body;
 
         // Check if plan exists
@@ -249,6 +250,10 @@ export function registerTierManagementEndpoints(
               typeof fuseFeePercent === "number"
                 ? fuseFeePercent
                 : null,
+            nonMedicalProfitPercent:
+              typeof nonMedicalProfitPercent === "number"
+                ? nonMedicalProfitPercent
+                : null,
           });
           console.log(`✅ Created TierConfiguration for plan: ${plan.name}`);
         } else {
@@ -290,6 +295,13 @@ export function registerTierManagementEndpoints(
 
           if (fuseFeePercent !== undefined) {
             updates.fuseFeePercent = typeof fuseFeePercent === "number" ? fuseFeePercent : null;
+          }
+
+          if (nonMedicalProfitPercent !== undefined) {
+            updates.nonMedicalProfitPercent =
+              typeof nonMedicalProfitPercent === "number"
+                ? nonMedicalProfitPercent
+                : null;
           }
 
           await config.update(updates);
