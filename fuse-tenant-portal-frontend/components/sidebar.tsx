@@ -20,6 +20,7 @@ import {
   Ship,
   Stethoscope,
   Pill,
+  Activity,
 } from "lucide-react"
 
 const navigation = [
@@ -37,6 +38,7 @@ const navigation = [
   { name: "Audit Logs", icon: Shield, href: "/audit-logs" },
   { name: "Support", icon: MessageSquare, href: "/support" },
   { name: "MDI Admin Area", icon: ExternalLink, href: "/mdi-admin" },
+  { name: "Beluga Admin Area", icon: Activity, href: "/beluga-admin" },
   { name: "IronSail Admin", icon: Ship, href: "/ironsail-admin" },
   { name: "Olympia Admin", icon: Pill, href: "/olympia-admin" },
 ]

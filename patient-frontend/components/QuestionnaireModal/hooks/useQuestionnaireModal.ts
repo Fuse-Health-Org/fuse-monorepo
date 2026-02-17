@@ -822,6 +822,67 @@ export function useQuestionnaireModal(
     console.log('🔵 [MDI] ========== END ==========');
   }, [domainClinic, answers, questionnaire]);
 
+  const createBelugaCase = useCallback(async (orderIdForCase: string) => {
+    console.log('🟢 [BELUGA] ========== BELUGA CASE CREATION ==========');
+    console.log('🟢 [BELUGA] Order ID:', orderIdForCase);
+    console.log('🟢 [BELUGA] Questionnaire medicalCompanySource:', questionnaire?.medicalCompanySource);
+
+    if (!domainClinic) {
+      console.log('⚠️ [BELUGA] No domain clinic found - skipping Beluga case creation');
+      return;
+    }
+
+    const medicalCompany = questionnaire?.medicalCompanySource;
+    if (medicalCompany !== MedicalCompanySlug.BELUGA) {
+      console.log('ℹ️ [BELUGA] Questionnaire is not beluga - skipping Beluga case creation');
+      return;
+    }
+
+    const patientOverrides = {
+      firstName: answers['firstName'],
+      lastName: answers['lastName'],
+      email: answers['email'],
+      phoneNumber: answers['mobile'],
+      dob: answers['dob'] || answers['dateOfBirth'],
+      gender: answers['gender'],
+    };
+
+    const requestPayload = {
+      orderId: orderIdForCase,
+      clinicId: domainClinic.id,
+      patientOverrides,
+    };
+
+    try {
+      console.log('🟢 [BELUGA] Calling POST /beluga/cases...');
+      const result = await apiCall('/beluga/cases', {
+        method: 'POST',
+        body: JSON.stringify(requestPayload),
+      });
+
+      if (result.success) {
+        const wasSkipped = result.data?.skipped;
+        if (wasSkipped) {
+          console.log('ℹ️ [BELUGA] Backend skipped Beluga case creation:', (result as any).message || result.data?.message || 'No message');
+        } else {
+          console.log('✅ [BELUGA] Beluga case created successfully');
+        }
+      } else {
+        console.error('❌ [BELUGA] Failed to create Beluga case:', result);
+      }
+    } catch (error: any) {
+      console.error('❌ [BELUGA] Error creating Beluga case:', error);
+      console.error('❌ [BELUGA] Error details:', {
+        message: error?.message,
+        response: error?.response?.data,
+        status: error?.response?.status,
+      });
+      // Don't fail checkout flow for external integration issues
+    }
+
+    console.log('🟢 [BELUGA] ========== END ==========');
+  }, [domainClinic, answers, questionnaire]);
+
   const handlePaymentSuccess = useCallback(async (data?: { paymentIntentId?: string; orderId?: string }) => {
     // Use passed data or fall back to state
     const finalPaymentIntentId = data?.paymentIntentId || paymentIntentId;
@@ -847,17 +908,23 @@ export function useQuestionnaireModal(
         console.log('🎉 [CHECKOUT] Conversion tracked');
       }
 
-      // Create MD Integrations case if questionnaire uses md-integrations as medical company source
+      // Create telehealth case if questionnaire uses external medical company source
       const medicalCompany = questionnaire?.medicalCompanySource;
       const needsMDCase = medicalCompany === MedicalCompanySlug.MD_INTEGRATIONS;
+      const needsBelugaCase = medicalCompany === MedicalCompanySlug.BELUGA;
 
       if (needsMDCase && finalOrderId) {
         console.log('🎉 [CHECKOUT] Questionnaire uses MD Integrations, creating case...');
         setPaymentStatus('creatingMDCase'); // Update status to show MD case creation in progress
         await createMDCase(finalOrderId);
         console.log('✅ [CHECKOUT] MD case creation complete');
+      } else if (needsBelugaCase && finalOrderId) {
+        console.log('🎉 [CHECKOUT] Questionnaire uses Beluga, creating case...');
+        setPaymentStatus('creatingBelugaCase');
+        await createBelugaCase(finalOrderId);
+        console.log('✅ [CHECKOUT] Beluga case creation complete');
       } else {
-        console.log('ℹ️ [CHECKOUT] Skipping MD case creation (medicalCompanySource: ' + medicalCompany + ', orderId: ' + finalOrderId + ')');
+        console.log('ℹ️ [CHECKOUT] Skipping external case creation (medicalCompanySource: ' + medicalCompany + ', orderId: ' + finalOrderId + ')');
       }
 
       // Set status to ready - all steps complete, user can now continue to dashboard
@@ -870,7 +937,7 @@ export function useQuestionnaireModal(
       setShowSuccessModal(false); // Ensure modal is closed on error
       alert('Payment processing error. Please contact support.');
     }
-  }, [paymentIntentId, orderId, userId, accountCreated, triggerCheckoutSequenceRun, trackConversion, createMDCase, questionnaire]);
+  }, [paymentIntentId, orderId, userId, accountCreated, triggerCheckoutSequenceRun, trackConversion, createMDCase, createBelugaCase, questionnaire]);
 
   const handlePaymentConfirm = useCallback(() => {
     // Open modal with processing state when payment confirmation starts

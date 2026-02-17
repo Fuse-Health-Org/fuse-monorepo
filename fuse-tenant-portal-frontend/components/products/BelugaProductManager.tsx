@@ -37,7 +37,7 @@ export function BelugaProductManager({ productId, productName, currentBelugaProd
     setError(null)
 
     try {
-      // Fetch all available Beluga products (placeholder data)
+      // Fetch all available Beluga products from Beluga API proxy
       const res = await fetch(`${baseUrl}/beluga/products`, {
         headers: { Authorization: `Bearer ${token}` }
       })
@@ -182,9 +182,6 @@ export function BelugaProductManager({ productId, productName, currentBelugaProd
             <Activity className="h-5 w-5 text-teal-600" />
             <CardTitle>Beluga Integration</CardTitle>
           </div>
-          <span className="px-3 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-700 border border-amber-200">
-            Placeholder Data
-          </span>
         </div>
         <CardDescription>
           Link this product to a Beluga product for telehealth integration
@@ -293,16 +290,16 @@ export function BelugaProductManager({ productId, productName, currentBelugaProd
             </div>
           </div>
 
-          {/* Info box */}
+          {/* Integration info */}
           <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
             <div className="flex items-start gap-3">
               <AlertCircle className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
               <div className="text-sm text-blue-700 dark:text-blue-400">
-                <p className="font-medium mb-1">Placeholder Data</p>
+                <p className="font-medium mb-1">Beluga Product IDs</p>
                 <p className="text-xs">
-                  These are placeholder Beluga products for testing (IDs start with PLACEHOLDER-). 
-                  When Beluga integration is complete, this will connect to real Beluga products for
-                  seamless case management and prescription fulfillment.
+                  Product IDs are loaded from Beluga and saved into your product's
+                  <code className="ml-1 mr-1">belugaProductId</code>
+                  field. This ID is used when creating Beluga visits after checkout.
                 </p>
               </div>
             </div>
