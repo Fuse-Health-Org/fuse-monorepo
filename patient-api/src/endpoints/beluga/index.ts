@@ -8,13 +8,14 @@ import Questionnaire from "../../models/Questionnaire";
 import ShippingAddress from "../../models/ShippingAddress";
 import TenantProduct from "../../models/TenantProduct";
 import Product from "../../models/Product";
+import BelugaProduct from "../../models/BelugaProduct";
 import { Op } from "sequelize";
 import fs from "fs";
 import path from "path";
 
 const router = express.Router();
 
-interface BelugaProduct {
+interface BelugaAPIProduct {
   id: string;
   name: string;
   description?: string;
@@ -160,7 +161,7 @@ const belugaRequest = async (
   return { statusCode: response.status, payload };
 };
 
-const normalizeBelugaProducts = (payload: any): BelugaProduct[] => {
+const normalizeBelugaProducts = (payload: any): BelugaAPIProduct[] => {
   const candidates = Array.isArray(payload)
     ? payload
     : Array.isArray(payload?.data)
@@ -174,7 +175,7 @@ const normalizeBelugaProducts = (payload: any): BelugaProduct[] => {
             : [];
 
   const normalized = candidates
-    .map((item: any): BelugaProduct | null => {
+    .map((item: any): BelugaAPIProduct | null => {
       const id =
         toNonEmptyString(item?.medId) ||
         toNonEmptyString(item?.productId) ||
@@ -200,9 +201,9 @@ const normalizeBelugaProducts = (payload: any): BelugaProduct[] => {
         raw: item,
       };
     })
-    .filter((item): item is BelugaProduct => Boolean(item));
+    .filter((item): item is BelugaAPIProduct => Boolean(item));
 
-  const deduped = new Map<string, BelugaProduct>();
+  const deduped = new Map<string, BelugaAPIProduct>();
   for (const product of normalized) {
     if (!deduped.has(product.id)) {
       deduped.set(product.id, product);
@@ -222,12 +223,12 @@ const getBelugaErrorText = (payload: any): string => {
   return raw.toLowerCase();
 };
 
-const mapVisitResponseToProducts = (payload: any): BelugaProduct[] => {
+const mapVisitResponseToProducts = (payload: any): BelugaAPIProduct[] => {
   const formObj = payload?.data?.formObj || payload?.formObj;
   const preferences = Array.isArray(formObj?.patientPreference) ? formObj.patientPreference : [];
 
   return preferences
-    .map((item: any): BelugaProduct | null => {
+    .map((item: any): BelugaAPIProduct | null => {
       const id = toNonEmptyString(item?.medId);
       if (!id) return null;
       return {
@@ -237,11 +238,11 @@ const mapVisitResponseToProducts = (payload: any): BelugaProduct[] => {
         description: toNonEmptyString(item?.name),
       };
     })
-    .filter((item): item is BelugaProduct => Boolean(item));
+    .filter((item): item is BelugaAPIProduct => Boolean(item));
 };
 
-const dedupeProducts = (items: BelugaProduct[]): BelugaProduct[] => {
-  const map = new Map<string, BelugaProduct>();
+const dedupeProducts = (items: BelugaAPIProduct[]): BelugaAPIProduct[] => {
+  const map = new Map<string, BelugaAPIProduct>();
   for (const item of items) {
     if (!map.has(item.id)) {
       map.set(item.id, item);
@@ -250,7 +251,7 @@ const dedupeProducts = (items: BelugaProduct[]): BelugaProduct[] => {
   return Array.from(map.values());
 };
 
-const fetchBelugaProductsFromRecentVisits = async (): Promise<BelugaProduct[]> => {
+const fetchBelugaProductsFromRecentVisits = async (): Promise<BelugaAPIProduct[]> => {
   const orders = await Order.findAll({
     where: {
       questionnaireId: { [Op.ne]: null } as any,
@@ -259,7 +260,7 @@ const fetchBelugaProductsFromRecentVisits = async (): Promise<BelugaProduct[]> =
     limit: 75,
   } as any);
 
-  const collected: BelugaProduct[] = [];
+  const collected: BelugaAPIProduct[] = [];
 
   for (const order of orders) {
     try {
@@ -288,7 +289,7 @@ const fetchBelugaProductsFromRecentVisits = async (): Promise<BelugaProduct[]> =
   return dedupeProducts(collected);
 };
 
-const fetchBelugaProductsFromLocalMappings = async (): Promise<BelugaProduct[]> => {
+const fetchBelugaProductsFromLocalMappings = async (): Promise<BelugaAPIProduct[]> => {
   const mappedProducts = await Product.findAll({
     where: {
       belugaProductId: { [Op.ne]: null } as any,
@@ -299,7 +300,7 @@ const fetchBelugaProductsFromLocalMappings = async (): Promise<BelugaProduct[]> 
   } as any);
 
   const normalized = mappedProducts
-    .map((item: any): BelugaProduct | null => {
+    .map((item: any): BelugaAPIProduct | null => {
       const id = toNonEmptyString(item?.belugaProductId);
       if (!id) return null;
       return {
@@ -309,12 +310,12 @@ const fetchBelugaProductsFromLocalMappings = async (): Promise<BelugaProduct[]> 
         strength: toNonEmptyString(item?.placeholderSig),
       };
     })
-    .filter((item): item is BelugaProduct => Boolean(item));
+    .filter((item): item is BelugaAPIProduct => Boolean(item));
 
   return dedupeProducts(normalized);
 };
 
-const fetchBelugaProducts = async (): Promise<{ products: BelugaProduct[]; source: string; warning?: string }> => {
+const fetchBelugaProducts = async (): Promise<{ products: BelugaAPIProduct[]; source: string; warning?: string }> => {
   const configuredEndpoint = toNonEmptyString(process.env.BELUGA_PRODUCTS_ENDPOINT);
   const endpointsToTry = configuredEndpoint
     ? [configuredEndpoint]
@@ -371,6 +372,29 @@ const fetchBelugaProducts = async (): Promise<{ products: BelugaProduct[]; sourc
 
 const findAnswerFromQuestionnaire = (answers: Record<string, any>, terms: string[]): string | undefined => {
   const normalizedTerms = terms.map((term) => term.toLowerCase());
+  
+  // Handle new structured format: { answers: [{questionText, answer}], metadata }
+  if (answers.answers && Array.isArray(answers.answers)) {
+    for (const item of answers.answers) {
+      const questionText = item.questionText || item.questionId || '';
+      const normalizedQuestion = questionText.toLowerCase();
+      
+      if (normalizedTerms.some((term) => normalizedQuestion.includes(term))) {
+        const value = item.answer;
+        if (Array.isArray(value)) {
+          const content = value
+            .map((item) => (item == null ? "" : String(item).trim()))
+            .filter(Boolean)
+            .join("; ");
+          if (content) return content;
+        }
+        const valueAsString = toNonEmptyString(String(value ?? ""));
+        if (valueAsString) return valueAsString;
+      }
+    }
+  }
+  
+  // Handle old flat format: { "Question?": "Answer" }
   for (const [key, value] of Object.entries(answers)) {
     const normalizedKey = key.toLowerCase();
     if (normalizedTerms.some((term) => normalizedKey.includes(term))) {
@@ -388,7 +412,7 @@ const findAnswerFromQuestionnaire = (answers: Record<string, any>, terms: string
   return undefined;
 };
 
-const collectBelugaCustomQuestions = (answers: Record<string, any>) => {
+const collectBelugaCustomQuestions = (answers: Record<string, any>, questionnaire?: Questionnaire | null) => {
   const excludedTerms = [
     "first name",
     "last name",
@@ -410,10 +434,50 @@ const collectBelugaCustomQuestions = (answers: Record<string, any>) => {
     "medicalconditions",
   ];
 
+  // Build a map of question text -> question options for multiple-choice questions
+  const questionOptionsMap = new Map<string, string[]>();
+  if (questionnaire) {
+    const steps = (questionnaire as any).steps || [];
+    for (const step of steps) {
+      const questions = (step as any).questions || [];
+      for (const q of questions) {
+        const questionText = toNonEmptyString(q.questionText);
+        const answerType = toNonEmptyString(q.answerType);
+        
+        // For multiple-choice questions, store their options
+        if (questionText && (answerType === 'multiple_choice' || answerType === 'single_choice' || answerType === 'radio')) {
+          const options = Array.isArray(q.options) ? q.options : [];
+          const optionTexts = options
+            .map((opt: any) => toNonEmptyString(opt.text || opt.label || opt))
+            .filter(Boolean);
+          
+          if (optionTexts.length > 0) {
+            questionOptionsMap.set(questionText, optionTexts);
+          }
+        }
+      }
+    }
+  }
+
   const result: Record<string, string> = {};
   let index = 1;
 
-  for (const [question, answer] of Object.entries(answers)) {
+  // Handle both new structured format and old flat format
+  let answerEntries: Array<[string, any]> = [];
+  
+  if (answers.answers && Array.isArray(answers.answers)) {
+    // New structured format: { answers: [{questionText, answer, ...}], metadata: {...} }
+    for (const item of answers.answers) {
+      if (item.questionText && item.answer !== undefined) {
+        answerEntries.push([item.questionText, item.answer]);
+      }
+    }
+  } else {
+    // Old flat format: { "Question?": "Answer" }
+    answerEntries = Object.entries(answers);
+  }
+
+  for (const [question, answer] of answerEntries) {
     const normalizedQuestion = question.toLowerCase();
     if (excludedTerms.some((term) => normalizedQuestion.includes(term))) {
       continue;
@@ -429,7 +493,15 @@ const collectBelugaCustomQuestions = (answers: Record<string, any>) => {
     }
 
     if (!answerText) continue;
-    result[`Q${index}`] = question;
+
+    // For Beluga API: append "POSSIBLE ANSWERS: option1; option2; option3" for multiple-choice questions
+    let questionText = question;
+    const options = questionOptionsMap.get(question);
+    if (options && options.length > 0) {
+      questionText = `${question} POSSIBLE ANSWERS: ${options.join("; ")}`;
+    }
+
+    result[`Q${index}`] = questionText;
     result[`A${index}`] = answerText;
     index += 1;
   }
@@ -453,9 +525,14 @@ const normalizeSlugCandidate = (value?: string): string | undefined => {
 };
 
 const resolveBelugaCompanyCandidates = (clinic: Clinic | null, requestedCompany?: string): string[] => {
+  // Prioritize environment variable if set
+  const envCompanyId = toNonEmptyString(process.env.BELUGA_COMPANY_ID) || 
+                       readEnvValueFromEnvLocal("BELUGA_COMPANY_ID");
+  
   const clinicName = toNonEmptyString((clinic as any)?.name);
   const clinicSlug = toNonEmptyString((clinic as any)?.slug);
   return dedupeStrings([
+    envCompanyId, // Try environment config first
     requestedCompany,
     clinicSlug,
     normalizeSlugCandidate(clinicSlug),
@@ -471,6 +548,10 @@ const resolveBelugaVisitTypeCandidates = (params: {
   state?: string;
   patientVisitType?: string;
 }): string[] => {
+  // Prioritize environment variable if set
+  const envVisitType = toNonEmptyString(process.env.BELUGA_DEFAULT_VISIT_TYPE) ||
+                       readEnvValueFromEnvLocal("BELUGA_DEFAULT_VISIT_TYPE");
+  
   const state = toNonEmptyString(params.state)?.toUpperCase();
   const questionnaireVisitType =
     state && params.questionnaire?.visitTypeByState
@@ -478,6 +559,7 @@ const resolveBelugaVisitTypeCandidates = (params: {
       : undefined;
 
   return dedupeStrings([
+    envVisitType, // Try environment config first
     params.requestedVisitType,
     params.patientVisitType,
     questionnaireVisitType,
@@ -501,9 +583,13 @@ const resolveBelugaPharmacyCandidates = async (params: {
   city?: string;
   state?: string;
 }): Promise<string[]> => {
+  console.log('🏥 [PHARMACY] Starting pharmacy search with params:', params);
   const candidates = new Set<string>();
   const requested = toNonEmptyString(params.requestedPharmacyId);
-  if (requested) candidates.add(requested);
+  if (requested) {
+    console.log('🏥 [PHARMACY] Using requested pharmacyId:', requested);
+    candidates.add(requested);
+  }
 
   const searches = [
     { zip: params.zip, state: params.state },
@@ -522,16 +608,24 @@ const resolveBelugaPharmacyCandidates = async (params: {
     if (state) body.state = state;
     if (Object.keys(body).length === 0) continue;
 
+    console.log('🏥 [PHARMACY] Searching Beluga API with:', body);
     try {
       const response = await belugaRequest("/external/pharmacies", { method: "POST", body }, { allowHttpErrors: true });
+      console.log('🏥 [PHARMACY] API response status:', response.statusCode);
+      console.log('🏥 [PHARMACY] API response payload:', JSON.stringify(response.payload, null, 2));
+      
       const ids = extractBelugaPharmacyIds(response.payload);
+      console.log('🏥 [PHARMACY] Extracted pharmacy IDs:', ids);
+      
       ids.slice(0, 8).forEach((id) => candidates.add(id));
       if (candidates.size >= 8) break;
-    } catch {
+    } catch (error: any) {
+      console.log('⚠️ [PHARMACY] API call failed:', error?.message || error);
       // Continue trying broader searches
     }
   }
 
+  console.log('🏥 [PHARMACY] Final candidates:', Array.from(candidates));
   return Array.from(candidates);
 };
 
@@ -677,22 +771,39 @@ router.get("/pharmacies", authenticateJWT, async (req: Request, res: Response) =
 
 router.post("/cases", async (req: Request, res: Response) => {
   try {
+    console.log('🐋 [BELUGA] ========== POST /beluga/cases REQUEST ==========');
+    console.log('🐋 [BELUGA] Request body:', JSON.stringify(req.body, null, 2));
+    
     let currentUser: any = null;
     try {
       currentUser = getCurrentUser(req);
+      console.log('🐋 [BELUGA] Authenticated user:', currentUser?.id);
     } catch {
+      console.log('🐋 [BELUGA] No authenticated user (checkout flow)');
       // User may be unauthenticated during checkout. We'll infer user from order.
     }
 
     const { orderId, patientOverrides, clinicId, company: requestedCompany, visitType: requestedVisitType, pharmacyId: requestedPharmacyId } = req.body || {};
     if (!orderId || typeof orderId !== "string") {
+      console.log('❌ [BELUGA] Missing orderId in request');
       return res.status(400).json({ success: false, message: "orderId is required" });
     }
+    
+    console.log('🐋 [BELUGA] Processing order:', orderId);
 
     const order = await Order.findByPk(orderId);
     if (!order) {
+      console.log('❌ [BELUGA] Order not found');
+      console.log('🐋 [BELUGA] ========== END (ORDER NOT FOUND) ==========');
       return res.status(404).json({ success: false, message: "Order not found" });
     }
+    
+    console.log('✅ [BELUGA] Order found:', {
+      orderId: order.id,
+      userId: (order as any).userId,
+      questionnaireId: (order as any).questionnaireId,
+      tenantProductId: (order as any).tenantProductId,
+    });
 
     let clinic: Clinic | null = null;
     if (clinicId) {
@@ -710,40 +821,68 @@ router.post("/cases", async (req: Request, res: Response) => {
 
     const user = await User.findByPk((order as any).userId);
     if (!user) {
+      console.log('❌ [BELUGA] User not found for order');
+      console.log('🐋 [BELUGA] ========== END (USER NOT FOUND) ==========');
       return res.status(404).json({ success: false, message: "User not found for order" });
     }
+    
+    console.log('✅ [BELUGA] User found:', user.id);
 
     const questionnaireAnswers = ((order as any).questionnaireAnswers || {}) as Record<string, any>;
     let questionnaire: Questionnaire | null = null;
 
     if ((order as any).questionnaireId) {
       questionnaire = await Questionnaire.findByPk((order as any).questionnaireId);
+      console.log('🐋 [BELUGA] Questionnaire lookup:', questionnaire ? `Found (${questionnaire.id})` : 'Not found');
+    } else {
+      console.log('⚠️ [BELUGA] No questionnaireId on order');
     }
 
     let tenantProductRecord: TenantProduct | null = null;
     let product: Product | null = null;
     if ((order as any).tenantProductId) {
+      console.log('🐋 [BELUGA] Looking up product from tenantProductId:', (order as any).tenantProductId);
       tenantProductRecord = await TenantProduct.findByPk((order as any).tenantProductId, {
         include: [{ model: Product, as: "product", required: false }] as any,
       } as any);
       product = (tenantProductRecord as any)?.product || null;
+      console.log('🐋 [BELUGA] Product found:', product ? product.id : 'null');
 
       if (!questionnaire && product?.id) {
+        console.log('🐋 [BELUGA] No questionnaire from order, looking up by productId:', product.id);
         questionnaire = await Questionnaire.findOne({
           where: { productId: product.id },
           order: [["createdAt", "DESC"]] as any,
         } as any);
+        console.log('🐋 [BELUGA] Questionnaire from product:', questionnaire ? `Found (${questionnaire.id})` : 'Not found');
       }
+    } else {
+      console.log('⚠️ [BELUGA] No tenantProductId on order');
     }
 
+    console.log('🐋 [BELUGA] Checking medical company source:', {
+      questionnaireId: questionnaire?.id,
+      questionnaireMedicalCompanySource: questionnaire?.medicalCompanySource,
+      clinicDashboardFormat: clinic?.patientPortalDashboardFormat,
+    });
+
     const medicalCompanySource = questionnaire?.medicalCompanySource || clinic?.patientPortalDashboardFormat || null;
+    
+    console.log('🐋 [BELUGA] Resolved medical company source:', medicalCompanySource);
+    console.log('🐋 [BELUGA] Expected:', MedicalCompanySlug.BELUGA);
+    console.log('🐋 [BELUGA] Match:', medicalCompanySource === MedicalCompanySlug.BELUGA);
+
     if (medicalCompanySource !== MedicalCompanySlug.BELUGA) {
+      console.log('❌ [BELUGA] Medical company source is not Beluga, skipping');
+      console.log('🐋 [BELUGA] ========== END (SKIPPED - NOT BELUGA) ==========');
       return res.json({
         success: true,
         message: "Beluga case creation skipped (questionnaire medical company is not beluga)",
         data: { skipped: true, medicalCompanySource },
       });
     }
+    
+    console.log('✅ [BELUGA] Medical company is Beluga, continuing...');
 
     const shippingAddress = (order as any).shippingAddressId
       ? await ShippingAddress.findByPk((order as any).shippingAddressId)
@@ -807,11 +946,13 @@ router.post("/cases", async (req: Request, res: Response) => {
       findAnswerFromQuestionnaire(questionnaireAnswers, ["medical conditions", "health conditions", "condition"]) ||
       "None reported";
 
-    const belugaProductId = toNonEmptyString(product?.belugaProductId);
-    if (!belugaProductId) {
+    const belugaProductUUID = toNonEmptyString(product?.belugaProductId);
+    if (!belugaProductUUID) {
+      console.log('❌ [BELUGA] Product is not linked to a BelugaProduct');
+      console.log('🐋 [BELUGA] ========== END (VALIDATION ERROR) ==========');
       return res.status(400).json({
         success: false,
-        message: "Selected product is missing belugaProductId",
+        message: "Selected product is missing belugaProductId (not linked to a BelugaProduct)",
         details: {
           orderId: order.id,
           tenantProductId: (order as any).tenantProductId || null,
@@ -820,20 +961,57 @@ router.post("/cases", async (req: Request, res: Response) => {
       });
     }
 
+    console.log('🐋 [BELUGA] Looking up BelugaProduct:', belugaProductUUID);
+    // Lookup the BelugaProduct record to get all prescription details
+    const belugaProduct = await BelugaProduct.findByPk(belugaProductUUID);
+    if (!belugaProduct) {
+      console.log('❌ [BELUGA] BelugaProduct not found in database');
+      console.log('🐋 [BELUGA] ========== END (VALIDATION ERROR) ==========');
+      return res.status(400).json({
+        success: false,
+        message: "Linked BelugaProduct not found",
+        details: {
+          orderId: order.id,
+          productId: product?.id || null,
+          belugaProductId: belugaProductUUID,
+        },
+      });
+    }
+
+    console.log('✅ [BELUGA] Found BelugaProduct:', {
+      id: belugaProduct.id,
+      name: belugaProduct.name,
+      medId: belugaProduct.medId || 'null (will try without medId)',
+    });
+
+    const belugaMedId = toNonEmptyString(belugaProduct.medId);
+    if (!belugaMedId) {
+      console.log('⚠️ [BELUGA] BelugaProduct has no medId - proceeding without it (Beluga API will validate)');
+    }
+
+    console.log('🐋 [BELUGA] Building patientPreference array...');
     const patientPreference = [
       {
-        name: toNonEmptyString(product?.name) || "N/A",
-        strength: toNonEmptyString(product?.placeholderSig) || "N/A",
-        quantity: "1",
-        refills: "0",
-        daysSupply: "30",
-        medId: belugaProductId,
+        name: toNonEmptyString(belugaProduct.name) || "N/A",
+        strength: toNonEmptyString(belugaProduct.strength) || "N/A",
+        quantity: toNonEmptyString(belugaProduct.quantity) || "1",
+        refills: toNonEmptyString(belugaProduct.refills) || "0",
+        daysSupply: toNonEmptyString(belugaProduct.daysSupply) || "30",
+        ...(belugaMedId ? { medId: belugaMedId } : {}), // Only include medId if present
       },
     ];
+    console.log('✅ [BELUGA] patientPreference built:', JSON.stringify(patientPreference, null, 2));
 
-    const customQuestions = collectBelugaCustomQuestions(questionnaireAnswers);
+    console.log('🐋 [BELUGA] Collecting custom questions from questionnaire answers...');
+    console.log('🐋 [BELUGA] questionnaireAnswers:', JSON.stringify(questionnaireAnswers, null, 2));
+    console.log('🐋 [BELUGA] questionnaire:', questionnaire ? `Present (${questionnaire.id})` : 'null');
+    
+    const customQuestions = collectBelugaCustomQuestions(questionnaireAnswers, questionnaire);
+    console.log('✅ [BELUGA] Custom questions collected:', JSON.stringify(customQuestions, null, 2));
+    
     const masterId = String(order.id);
 
+    console.log('🐋 [BELUGA] Building form object...');
     const formObj = {
       consentsSigned: true,
       firstName,
@@ -852,6 +1030,7 @@ router.post("/cases", async (req: Request, res: Response) => {
       patientPreference,
       ...customQuestions,
     };
+    console.log('✅ [BELUGA] Form object built, validating required fields...');
 
     const requiredValidation: Array<{ key: string; value: unknown }> = [
       { key: "firstName", value: formObj.firstName },
@@ -884,6 +1063,9 @@ router.post("/cases", async (req: Request, res: Response) => {
     }
 
     if (missingFields.length > 0) {
+      console.log('❌ [BELUGA] Validation failed - missing required fields:', missingFields);
+      console.log('🐋 [BELUGA] Form data:', JSON.stringify(formObj, null, 2));
+      console.log('🐋 [BELUGA] ========== END (VALIDATION FAILED) ==========');
       return res.status(400).json({
         success: false,
         message: "Cannot create Beluga visit: missing or invalid required fields",
@@ -895,22 +1077,39 @@ router.post("/cases", async (req: Request, res: Response) => {
       });
     }
 
+    console.log('✅ [BELUGA] All required fields validated');
+    console.log('🐋 [BELUGA] Resolving dynamic parameters (company, visitType, pharmacy)...');
+
+    console.log('🐋 [BELUGA] Step 1: Getting patient history hints...');
     const patientHistoryHints = await getBelugaPatientHistoryHints(phone);
+    console.log('✅ [BELUGA] Patient history hints:', patientHistoryHints);
+
+    console.log('🐋 [BELUGA] Step 2: Resolving company candidates...');
     const companyCandidates = resolveBelugaCompanyCandidates(clinic, requestedCompany);
+    console.log('✅ [BELUGA] Company candidates:', companyCandidates);
+
+    console.log('🐋 [BELUGA] Step 3: Resolving visit type candidates...');
     const visitTypeCandidates = resolveBelugaVisitTypeCandidates({
       requestedVisitType,
       questionnaire,
       state,
       patientVisitType: patientHistoryHints.visitType,
     });
+    console.log('✅ [BELUGA] Visit type candidates:', visitTypeCandidates);
+
+    console.log('🐋 [BELUGA] Step 4: Resolving pharmacy candidates...');
+    console.log('🐋 [BELUGA] Pharmacy search inputs:', { requestedPharmacyId, zip, city, state });
     const pharmacyCandidates = await resolveBelugaPharmacyCandidates({
       requestedPharmacyId,
       zip,
       city,
       state,
     });
+    console.log('✅ [BELUGA] Pharmacy candidates:', pharmacyCandidates);
 
     if (companyCandidates.length === 0) {
+      console.log('❌ [BELUGA] No company candidates found');
+      console.log('🐋 [BELUGA] ========== END (NO COMPANY) ==========');
       return res.status(400).json({
         success: false,
         message: "Unable to resolve Beluga company dynamically",
@@ -918,6 +1117,8 @@ router.post("/cases", async (req: Request, res: Response) => {
     }
 
     if (visitTypeCandidates.length === 0) {
+      console.log('❌ [BELUGA] No visit type candidates found');
+      console.log('🐋 [BELUGA] ========== END (NO VISIT TYPE) ==========');
       return res.status(400).json({
         success: false,
         message: "Unable to resolve Beluga visitType dynamically",
@@ -925,6 +1126,9 @@ router.post("/cases", async (req: Request, res: Response) => {
     }
 
     if (pharmacyCandidates.length === 0) {
+      console.log('❌ [BELUGA] No pharmacy candidates found');
+      console.log('🐋 [BELUGA] Details:', { city, state, zip });
+      console.log('🐋 [BELUGA] ========== END (NO PHARMACY) ==========');
       return res.status(400).json({
         success: false,
         message: "Unable to resolve Beluga pharmacyId dynamically from patient address",
@@ -932,11 +1136,14 @@ router.post("/cases", async (req: Request, res: Response) => {
       });
     }
 
+    console.log('🐋 [BELUGA] Checking if visit already exists for masterId:', masterId);
     const existingVisit = await belugaRequest(`/visit/externalFetch/${encodeURIComponent(masterId)}`, { method: "GET" }, {
       allowHttpErrors: true,
     });
 
     if (existingVisit.statusCode === 200 && existingVisit.payload?.status === 200) {
+      console.log('ℹ️ [BELUGA] Visit already exists, skipping creation');
+      console.log('🐋 [BELUGA] ========== END (ALREADY EXISTS) ==========');
       return res.json({
         success: true,
         message: "Beluga visit already exists for this order",
@@ -948,6 +1155,16 @@ router.post("/cases", async (req: Request, res: Response) => {
         },
       });
     }
+    
+    console.log('🐋 [BELUGA] No existing visit found, proceeding with creation');
+
+    console.log('🐋 [BELUGA] ========== CREATING VISIT ==========');
+    console.log('🐋 [BELUGA] Order ID:', order.id);
+    console.log('🐋 [BELUGA] masterId:', masterId);
+    console.log('🐋 [BELUGA] Form data:', JSON.stringify(formObj, null, 2));
+    console.log('🐋 [BELUGA] Company candidates:', companyCandidates);
+    console.log('🐋 [BELUGA] Visit type candidates:', visitTypeCandidates);
+    console.log('🐋 [BELUGA] Pharmacy candidates:', pharmacyCandidates);
 
     const attempts: Array<{
       company: string;
@@ -972,11 +1189,17 @@ router.post("/cases", async (req: Request, res: Response) => {
             visitType,
           };
 
+          console.log(`🐋 [BELUGA] Attempting: company="${company}", visitType="${visitType}", pharmacyId="${pharmacyId}"`);
+          console.log('🐋 [BELUGA] Full payload:', JSON.stringify(payload, null, 2));
+
           const createVisitResponse = await belugaRequest(
             "/visit/createNoPayPhotos",
             { method: "POST", body: payload },
             { allowHttpErrors: true }
           );
+
+          console.log('🐋 [BELUGA] Response status:', createVisitResponse.statusCode);
+          console.log('🐋 [BELUGA] Response payload:', JSON.stringify(createVisitResponse.payload, null, 2));
 
           const errorText = getBelugaErrorText(createVisitResponse.payload);
           attempts.push({
@@ -988,11 +1211,15 @@ router.post("/cases", async (req: Request, res: Response) => {
           });
 
           if (createVisitResponse.statusCode < 400 && createVisitResponse.payload?.status === 200) {
+            console.log('✅ [BELUGA] SUCCESS! Visit created successfully');
+            console.log('✅ [BELUGA] visitId:', createVisitResponse.payload?.data?.visitId);
+            console.log('✅ [BELUGA] masterId:', createVisitResponse.payload?.data?.masterId);
             createdPayload = createVisitResponse.payload;
             createdMeta = { company, visitType, pharmacyId };
             break outerLoop;
           }
 
+          console.log('❌ [BELUGA] Attempt failed:', errorText || 'Unknown error');
           lastFailure = createVisitResponse;
 
           // Duplicate masterId means the visit already exists; treat as idempotent success.
@@ -1019,9 +1246,10 @@ router.post("/cases", async (req: Request, res: Response) => {
           if (errorText.includes("no match for")) {
             return res.status(400).json({
               success: false,
-              message: "Beluga rejected the selected product medId",
+              message: "Beluga rejected the product medId - it may not be enabled for your company",
               details: {
-                belugaProductId,
+                belugaProductName: belugaProduct.name,
+                belugaMedId: belugaMedId,
                 response: createVisitResponse.payload,
                 attempted: { company, visitType, pharmacyId },
               },
@@ -1032,6 +1260,12 @@ router.post("/cases", async (req: Request, res: Response) => {
     }
 
     if (!createdPayload || !createdMeta) {
+      console.log('❌ [BELUGA] ALL ATTEMPTS FAILED');
+      console.log('❌ [BELUGA] Total attempts:', attempts.length);
+      console.log('❌ [BELUGA] Attempts summary:', JSON.stringify(attempts, null, 2));
+      console.log('❌ [BELUGA] Last failure payload:', JSON.stringify(lastFailure?.payload, null, 2));
+      console.log('🐋 [BELUGA] ========== END (FAILED) ==========');
+      
       return res.status(lastFailure?.statusCode || 400).json({
         success: false,
         message: "Beluga visit creation failed after dynamic resolution attempts",
@@ -1045,6 +1279,11 @@ router.post("/cases", async (req: Request, res: Response) => {
       });
     }
 
+    console.log('🎉 [BELUGA] Visit created successfully!');
+    console.log('🎉 [BELUGA] Resolved with:', createdMeta);
+    console.log('🎉 [BELUGA] Visit data:', JSON.stringify(createdPayload?.data, null, 2));
+    console.log('🐋 [BELUGA] ========== END (SUCCESS) ==========');
+
     return res.json({
       success: true,
       message: "Beluga visit created successfully",
@@ -1056,7 +1295,9 @@ router.post("/cases", async (req: Request, res: Response) => {
       },
     });
   } catch (error: any) {
-    console.error("❌ Error creating Beluga visit:", error?.message || error);
+    console.error("❌ [BELUGA] EXCEPTION in POST /beluga/cases:", error?.message || error);
+    console.error("❌ [BELUGA] Stack trace:", error?.stack);
+    console.log('🐋 [BELUGA] ========== END (EXCEPTION) ==========');
     return res.status(error?.statusCode || 500).json({
       success: false,
       message: "Failed to create Beluga visit",

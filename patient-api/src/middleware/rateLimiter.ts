@@ -14,6 +14,17 @@ import { rateLimit } from 'express-rate-limit';
 
 const isDevelopment = process.env.NODE_ENV === 'development';
 
+// Custom key generator that handles X-Forwarded-For in development
+// In production, this should be combined with proper trust proxy settings
+const keyGenerator = (req: any) => {
+  // In development, use IP without X-Forwarded-For validation
+  if (isDevelopment) {
+    return req.ip || req.connection?.remoteAddress || 'unknown';
+  }
+  // In production, use default behavior (requires trust proxy to be configured)
+  return req.ip;
+};
+
 // CRITICAL: Authentication endpoints (login, signup, password reset, MFA)
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -25,6 +36,7 @@ export const authLimiter = rateLimit({
   standardHeaders: 'draft-8', // Return rate limit info in `RateLimit` header
   legacyHeaders: false, // Disable `X-RateLimit-*` headers
   skipSuccessfulRequests: true, // Don't count successful auth attempts
+  keyGenerator,
   handler: (req, res) => {
     res.status(429).json({
       success: false,
@@ -43,6 +55,7 @@ export const publicLimiter = rateLimit({
   },
   standardHeaders: 'draft-8',
   legacyHeaders: false,
+  keyGenerator,
   handler: (req, res) => {
     res.status(429).json({
       success: false,
@@ -61,6 +74,7 @@ export const apiLimiter = rateLimit({
   },
   standardHeaders: 'draft-8',
   legacyHeaders: false,
+  keyGenerator,
   handler: (req, res) => {
     res.status(429).json({
       success: false,
@@ -79,6 +93,7 @@ export const writeLimiter = rateLimit({
   },
   standardHeaders: 'draft-8',
   legacyHeaders: false,
+  keyGenerator,
   handler: (req, res) => {
     res.status(429).json({
       success: false,
@@ -97,6 +112,7 @@ export const webhookLimiter = rateLimit({
   },
   standardHeaders: 'draft-8',
   legacyHeaders: false,
+  keyGenerator,
   handler: (req, res) => {
     res.status(429).json({
       success: false,

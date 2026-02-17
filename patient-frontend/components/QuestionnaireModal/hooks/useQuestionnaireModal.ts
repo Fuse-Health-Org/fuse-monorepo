@@ -864,11 +864,16 @@ export function useQuestionnaireModal(
         const wasSkipped = result.data?.skipped;
         if (wasSkipped) {
           console.log('ℹ️ [BELUGA] Backend skipped Beluga case creation:', (result as any).message || result.data?.message || 'No message');
+          console.log('🟢 [BELUGA] ========== END (SKIPPED) ==========');
+          throw new Error(`Beluga case creation was skipped: ${(result as any).message || result.data?.message || 'Medical company source is not Beluga'}`);
         } else {
           console.log('✅ [BELUGA] Beluga case created successfully');
+          console.log('🟢 [BELUGA] ========== END (SUCCESS) ==========');
         }
       } else {
         console.error('❌ [BELUGA] Failed to create Beluga case:', result);
+        console.log('🟢 [BELUGA] ========== END (FAILED) ==========');
+        throw new Error(`Failed to create Beluga case: ${(result as any).message || 'Unknown error'}`);
       }
     } catch (error: any) {
       console.error('❌ [BELUGA] Error creating Beluga case:', error);
@@ -877,10 +882,10 @@ export function useQuestionnaireModal(
         response: error?.response?.data,
         status: error?.response?.status,
       });
-      // Don't fail checkout flow for external integration issues
+      console.log('🟢 [BELUGA] ========== END (EXCEPTION) ==========');
+      // Re-throw the error to fail the checkout for Beluga questionnaires
+      throw error;
     }
-
-    console.log('🟢 [BELUGA] ========== END ==========');
   }, [domainClinic, answers, questionnaire]);
 
   const handlePaymentSuccess = useCallback(async (data?: { paymentIntentId?: string; orderId?: string }) => {
@@ -931,11 +936,14 @@ export function useQuestionnaireModal(
       setPaymentStatus('ready');
       console.log('🎉 [CHECKOUT] ========== CHECKOUT COMPLETE - READY TO REDIRECT ==========');
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ [CHECKOUT] Payment success handler error:', error);
       setPaymentStatus('failed');
       setShowSuccessModal(false); // Ensure modal is closed on error
-      alert('Payment processing error. Please contact support.');
+      
+      // Show specific error message if available
+      const errorMessage = error?.message || 'Payment processing error. Please contact support.';
+      alert(`Checkout Error: ${errorMessage}\n\nYour payment was authorized but not captured. Please contact support.`);
     }
   }, [paymentIntentId, orderId, userId, accountCreated, triggerCheckoutSequenceRun, trackConversion, createMDCase, createBelugaCase, questionnaire]);
 

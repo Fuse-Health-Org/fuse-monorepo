@@ -128,7 +128,9 @@ import payoutsRoutes from "@endpoints/payouts/routes/payouts.routes";
 import { tenantRoutes } from "@endpoints/tenant";
 import refundsRoutes from "@endpoints/refunds";
 import refundRequestsRoutes from "@endpoints/refund-requests";
+import belugaProductsRoutes from "@endpoints/beluga-products";
 import RefundRequest from "@models/RefundRequest";
+import BelugaProduct from "@models/BelugaProduct";
 import { stripeRoutes, webhookRoutes as stripeWebhookRoutes } from "@endpoints/stripe";
 import { GlobalFees } from "./models/GlobalFees";
 import { WebsiteBuilderConfigs, DEFAULT_FOOTER_DISCLAIMER } from "@models/WebsiteBuilderConfigs";
@@ -6291,6 +6293,7 @@ app.post("/payments/program/sub", async (req, res) => {
       questionnaireAnswers,
       stripePriceId: stripePrice.id,
       programId: program.id,
+      questionnaireId: program.medicalTemplateId, // Link to questionnaire for Beluga/MDI
       platformFeeAmount: Number(platformFeeUsd.toFixed(2)),
       platformFeePercent: Number(platformFeePercent.toFixed(2)),
       stripeAmount: Number(stripeFeeUsd.toFixed(2)),
@@ -6299,6 +6302,7 @@ app.post("/payments/program/sub", async (req, res) => {
     });
 
     // Create order items for each selected product
+    let firstTenantProductId: string | null = null;
     for (const productId of selectedProductIds) {
       const product = await Product.findByPk(productId);
       if (product) {
@@ -6307,6 +6311,11 @@ app.post("/payments/program/sub", async (req, res) => {
           where: { productId, clinicId: program.clinicId },
         });
         const unitPrice = tenantProduct?.price || product.price || 0;
+
+        // Save first tenantProductId for linking to Beluga/MDI
+        if (!firstTenantProductId && tenantProduct) {
+          firstTenantProductId = tenantProduct.id;
+        }
 
         await OrderItem.create({
           orderId: order.id,
@@ -6317,6 +6326,11 @@ app.post("/payments/program/sub", async (req, res) => {
           placeholderSig: product.placeholderSig,
         });
       }
+    }
+
+    // Update order with first tenantProductId for Beluga/MDI integration
+    if (firstTenantProductId) {
+      await order.update({ tenantProductId: firstTenantProductId });
     }
 
     // Shipping address
@@ -12200,12 +12214,12 @@ const PORT = process.env.PORT || 3001;
 
 // Initialize database connection and start server
 async function startServer() {
-  // const dbConnected = await initializeDatabase();
+  const dbConnected = await initializeDatabase();
 
-  // if (!dbConnected) {
-  //   console.error("❌ Failed to connect to database. Exiting...");
-  //   process.exit(1);
-  // }
+  if (!dbConnected) {
+    console.error("❌ Failed to connect to database. Exiting...");
+    process.exit(1);
+  }
 
   // Import WebSocket service early so route handlers can reference it
   const WebSocketService = (await import("./services/websocket.service"))
@@ -12440,6 +12454,7 @@ async function startServer() {
   // ============= BELUGA ENDPOINTS =============
   const belugaRouter = (await import('./endpoints/beluga')).default;
   app.use('/beluga', belugaRouter);
+  app.use('/beluga-products', belugaProductsRoutes);
 
   // ============================================
   // DOCTOR-PATIENT CHAT ENDPOINTS
@@ -13477,6 +13492,13 @@ async function startServer() {
     console.log("✅ RefundRequest table synced");
   } catch (syncErr) {
     console.log("⚠️  RefundRequest sync:", syncErr instanceof Error ? syncErr.message : syncErr);
+  }
+
+  try {
+    await BelugaProduct.sync({ alter: true });
+    console.log("✅ BelugaProduct table synced");
+  } catch (syncErr) {
+    console.log("⚠️  BelugaProduct sync:", syncErr instanceof Error ? syncErr.message : syncErr);
   }
 
   // ============================================

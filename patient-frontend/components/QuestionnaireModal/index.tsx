@@ -70,7 +70,7 @@ export const QuestionnaireModal: React.FC<QuestionnaireModalProps> = (props) => 
   }
 
   // Handle case when no visible steps remain
-  if (!currentStep && !modal.isProductSelectionStep() && !modal.isCheckoutStep()) {
+  if (!currentStep && !modal.isProductSelectionStep() && !modal.isCheckoutStep() && !modal.isBelugaConsentStep) {
     if (modal.questionnaire) {
       const checkoutPos = modal.questionnaire.checkoutStepPosition;
       const belugaOffset = modal.questionnaire.medicalCompanySource === MedicalCompanySlug.BELUGA ? 1 : 0;
