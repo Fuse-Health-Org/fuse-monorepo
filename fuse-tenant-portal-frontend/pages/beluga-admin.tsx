@@ -1,11 +1,11 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Sidebar } from "@/components/sidebar";
 import { Header } from "@/components/header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, RefreshCw, Search, Package, Activity, Users, Building2, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Loader2, RefreshCw, Search, Package, Activity, Users, Building2, AlertCircle, CheckCircle2, Plus, Edit2, Trash2, X } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 
@@ -14,10 +14,13 @@ type BelugaTab = "products" | "visit" | "patient" | "pharmacies";
 interface BelugaProduct {
   id: string;
   name: string;
-  description?: string;
-  category?: string;
-  type?: string;
-  strength?: string;
+  strength: string;
+  quantity: string;
+  refills: string;
+  daysSupply?: string;
+  medId?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export default function BelugaAdmin() {
@@ -27,7 +30,18 @@ export default function BelugaAdmin() {
   const [activeTab, setActiveTab] = useState<BelugaTab>("products");
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [products, setProducts] = useState<BelugaProduct[]>([]);
-  const [productsSource, setProductsSource] = useState<string | null>(null);
+  const [showProductModal, setShowProductModal] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<BelugaProduct | null>(null);
+  const [productForm, setProductForm] = useState({
+    name: "",
+    strength: "",
+    quantity: "1",
+    refills: "0",
+    daysSupply: "",
+    medId: "",
+  });
+  const [savingProduct, setSavingProduct] = useState(false);
+  const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
 
   const [visitMasterId, setVisitMasterId] = useState("");
   const [loadingVisit, setLoadingVisit] = useState(false);
@@ -57,19 +71,125 @@ export default function BelugaAdmin() {
   const fetchProducts = async () => {
     setLoadingProducts(true);
     try {
-      const response = await fetch(`${baseUrl}/beluga/products`, { headers: authHeaders });
+      const response = await fetch(`${baseUrl}/beluga-products`, { headers: authHeaders });
       const data = await response.json();
       if (!data.success) {
         throw new Error(data.message || data.error || "Failed to load products");
       }
       setProducts(data.data || []);
-      setProductsSource(data.source || null);
       toast.success(`Loaded ${data.count || data.data?.length || 0} Beluga products`);
     } catch (error: any) {
       console.error(error);
       toast.error(error.message || "Failed to load Beluga products");
     } finally {
       setLoadingProducts(false);
+    }
+  };
+
+  const openCreateModal = () => {
+    setEditingProduct(null);
+    setProductForm({
+      name: "",
+      strength: "",
+      quantity: "1",
+      refills: "0",
+      daysSupply: "",
+      medId: "",
+    });
+    setShowProductModal(true);
+  };
+
+  const openEditModal = (product: BelugaProduct) => {
+    setEditingProduct(product);
+    setProductForm({
+      name: product.name,
+      strength: product.strength,
+      quantity: product.quantity,
+      refills: product.refills,
+      daysSupply: product.daysSupply || "",
+      medId: product.medId || "",
+    });
+    setShowProductModal(true);
+  };
+
+  const closeModal = () => {
+    setShowProductModal(false);
+    setEditingProduct(null);
+    setProductForm({
+      name: "",
+      strength: "",
+      quantity: "1",
+      refills: "0",
+      daysSupply: "",
+      medId: "",
+    });
+  };
+
+  const handleSaveProduct = async () => {
+    if (!productForm.name || !productForm.strength) {
+      toast.error("Name and strength are required");
+      return;
+    }
+
+    setSavingProduct(true);
+    try {
+      const payload = {
+        ...productForm,
+        medId: productForm.medId || null,
+        daysSupply: productForm.daysSupply || null,
+      };
+
+      const url = editingProduct
+        ? `${baseUrl}/beluga-products/${editingProduct.id}`
+        : `${baseUrl}/beluga-products`;
+      const method = editingProduct ? "PUT" : "POST";
+
+      const response = await fetch(url, {
+        method,
+        headers: authHeaders,
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json();
+      if (!data.success) {
+        throw new Error(data.message || "Failed to save product");
+      }
+
+      toast.success(editingProduct ? "Product updated successfully" : "Product created successfully");
+      closeModal();
+      fetchProducts();
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.message || "Failed to save product");
+    } finally {
+      setSavingProduct(false);
+    }
+  };
+
+  const handleDeleteProduct = async (productId: string, productName: string) => {
+    if (!confirm(`Are you sure you want to delete "${productName}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    setDeletingProductId(productId);
+    try {
+      const response = await fetch(`${baseUrl}/beluga-products/${productId}`, {
+        method: "DELETE",
+        headers: authHeaders,
+      });
+
+      const data = await response.json();
+      if (!data.success) {
+        throw new Error(data.message || "Failed to delete product");
+      }
+
+      toast.success("Product deleted successfully");
+      fetchProducts();
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.message || "Failed to delete product");
+    } finally {
+      setDeletingProductId(null);
     }
   };
 
@@ -160,6 +280,13 @@ export default function BelugaAdmin() {
     </Button>
   );
 
+  // Auto-fetch products on mount
+  useEffect(() => {
+    if (activeTab === "products" && products.length === 0) {
+      fetchProducts();
+    }
+  }, [activeTab]);
+
   return (
     <div className="flex min-h-screen bg-gray-50 dark:bg-gray-950">
       <Sidebar />
@@ -202,38 +329,81 @@ export default function BelugaAdmin() {
                       Beluga Products
                     </CardTitle>
                     <CardDescription>
-                      Pulls product IDs from Beluga for mapping to local products
+                      Manage Beluga product catalog (medId, strength, refills, etc.)
                     </CardDescription>
                   </div>
-                  <Button onClick={fetchProducts} disabled={loadingProducts} className="bg-teal-600 hover:bg-teal-700">
-                    {loadingProducts ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
-                    Refresh
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button onClick={openCreateModal} variant="default" className="bg-teal-600 hover:bg-teal-700">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Product
+                    </Button>
+                    <Button onClick={fetchProducts} disabled={loadingProducts} variant="outline">
+                      {loadingProducts ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+                      Refresh
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                {productsSource && (
-                  <div className="flex items-start gap-2 text-sm p-3 rounded-lg border bg-blue-50 text-blue-800 border-blue-200">
-                    <AlertCircle className="h-4 w-4 mt-0.5" />
-                    <span>Source endpoint: <code>{productsSource}</code></span>
-                  </div>
-                )}
                 <div className="grid gap-3">
-                  {products.length === 0 && (
-                    <p className="text-sm text-muted-foreground">
-                      No products loaded yet. Click <strong>Refresh</strong>.
+                  {products.length === 0 && !loadingProducts && (
+                    <p className="text-sm text-muted-foreground text-center py-8">
+                      No products yet. Click <strong>Add Product</strong> to create one.
                     </p>
                   )}
                   {products.map((product) => (
-                    <div key={product.id} className="rounded-lg border p-4 bg-white dark:bg-gray-900">
-                      <div className="flex flex-wrap items-center gap-2 mb-2">
-                        <Badge className="bg-teal-600">{product.id}</Badge>
-                        {product.category && <Badge variant="outline">{product.category}</Badge>}
-                        {product.type && <Badge variant="outline">{product.type}</Badge>}
+                    <div key={product.id} className="rounded-lg border p-4 bg-white dark:bg-gray-900 hover:shadow-md transition-shadow">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          {product.medId && (
+                            <div className="flex flex-wrap items-center gap-2 mb-2">
+                              <Badge className="bg-teal-600">{product.medId}</Badge>
+                            </div>
+                          )}
+                          <p className="font-medium text-foreground text-lg">{product.name}</p>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3 text-sm">
+                            <div>
+                              <span className="text-muted-foreground">Strength:</span>
+                              <p className="font-medium">{product.strength}</p>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Quantity:</span>
+                              <p className="font-medium">{product.quantity}</p>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Refills:</span>
+                              <p className="font-medium">{product.refills}</p>
+                            </div>
+                            {product.daysSupply && (
+                              <div>
+                                <span className="text-muted-foreground">Days Supply:</span>
+                                <p className="font-medium">{product.daysSupply}</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => openEditModal(product)}
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleDeleteProduct(product.id, product.name)}
+                            disabled={deletingProductId === product.id}
+                          >
+                            {deletingProductId === product.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
                       </div>
-                      <p className="font-medium text-foreground">{product.name}</p>
-                      {product.description && <p className="text-sm text-muted-foreground mt-1">{product.description}</p>}
-                      {product.strength && <p className="text-xs text-muted-foreground mt-2">Strength: {product.strength}</p>}
                     </div>
                   ))}
                 </div>
@@ -314,6 +484,118 @@ export default function BelugaAdmin() {
           )}
         </div>
       </main>
+
+      {/* Create/Edit Product Modal */}
+      {showProductModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl max-w-2xl w-full overflow-hidden border border-border">
+            <div className="flex items-center justify-between p-6 border-b border-border">
+              <h2 className="text-lg font-semibold text-foreground">
+                {editingProduct ? "Edit Beluga Product" : "Add Beluga Product"}
+              </h2>
+              <button
+                onClick={closeModal}
+                className="p-2 hover:bg-muted rounded-lg transition-colors"
+              >
+                <X className="h-5 w-5 text-muted-foreground" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">
+                    Name <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    value={productForm.name}
+                    onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
+                    placeholder="e.g. NAD+"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">
+                    Strength <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    value={productForm.strength}
+                    onChange={(e) => setProductForm({ ...productForm, strength: e.target.value })}
+                    placeholder="e.g. 100mg/ml 10ml"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">
+                    Quantity
+                  </label>
+                  <Input
+                    value={productForm.quantity}
+                    onChange={(e) => setProductForm({ ...productForm, quantity: e.target.value })}
+                    placeholder="e.g. 1"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">
+                    Refills
+                  </label>
+                  <Input
+                    value={productForm.refills}
+                    onChange={(e) => setProductForm({ ...productForm, refills: e.target.value })}
+                    placeholder="e.g. 3"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">
+                    Days Supply
+                  </label>
+                  <Input
+                    value={productForm.daysSupply}
+                    onChange={(e) => setProductForm({ ...productForm, daysSupply: e.target.value })}
+                    placeholder="e.g. 30 (optional)"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">
+                    Beluga Med ID
+                  </label>
+                  <Input
+                    value={productForm.medId}
+                    onChange={(e) => setProductForm({ ...productForm, medId: e.target.value })}
+                    placeholder="Beluga-assigned ID (optional)"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Leave empty until you receive the ID from Beluga
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 p-6 border-t border-border bg-muted/30">
+              <Button onClick={closeModal} variant="outline">
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSaveProduct}
+                disabled={savingProduct}
+                className="bg-teal-600 hover:bg-teal-700"
+              >
+                {savingProduct ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  editingProduct ? "Update Product" : "Create Product"
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
