@@ -89,7 +89,10 @@ export const QuestionnaireModal: React.FC<QuestionnaireModalProps> = (props) => 
         <BelugaConsentStep
           consentGiven={modal.belugaConsentGiven}
           onConsentChange={modal.setBelugaConsentGiven}
-          error={modal.errors?.belugaConsent}
+          onPhotoChange={modal.setBelugaPhoto}
+          selectedPhotoName={modal.belugaPhoto?.fileName}
+          consentError={modal.errors?.belugaConsent}
+          photoError={modal.errors?.belugaPhoto}
         />
       );
     }

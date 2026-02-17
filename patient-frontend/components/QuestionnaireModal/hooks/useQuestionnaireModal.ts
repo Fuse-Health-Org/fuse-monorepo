@@ -40,6 +40,7 @@ export function useQuestionnaireModal(
   // State management
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [belugaConsentGiven, setBelugaConsentGiven] = useState(false);
+  const [belugaPhoto, setBelugaPhoto] = useState<{ mime: "image/jpeg"; data: string; fileName: string } | null>(null);
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [selectedProducts, setSelectedProducts] = useState<Record<string, number>>({});
@@ -496,11 +497,26 @@ export function useQuestionnaireModal(
   const validateCurrentStep = useCallback((): boolean => {
     if (!questionnaire) return true;
     if (isBelugaConsentStep) {
+      const nextErrors: Record<string, string> = {};
+
       if (!belugaConsentGiven) {
-        setErrors((prev) => ({ ...prev, belugaConsent: 'Please acknowledge the Informed Consent and Privacy Policy to continue.' }));
+        nextErrors.belugaConsent = 'Please acknowledge the Informed Consent and Privacy Policy to continue.';
+      }
+      if (!belugaPhoto?.data) {
+        nextErrors.belugaPhoto = 'Please upload a JPEG image before continuing.';
+      }
+
+      if (Object.keys(nextErrors).length > 0) {
+        setErrors((prev) => ({ ...prev, ...nextErrors }));
         return false;
       }
-      setErrors((prev) => { const next = { ...prev }; delete next.belugaConsent; return next; });
+
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next.belugaConsent;
+        delete next.belugaPhoto;
+        return next;
+      });
       return true;
     }
     if (isProductSelectionStep()) {
@@ -569,7 +585,7 @@ export function useQuestionnaireModal(
     });
     setErrors(stepErrors);
     return Object.keys(stepErrors).length === 0;
-  }, [questionnaire, isBelugaConsentStep, belugaConsentGiven, isProductSelectionStep, isCheckoutStep, selectedProducts, shippingInfo, paymentStatus, getCurrentQuestionnaireStep, answers]);
+  }, [questionnaire, isBelugaConsentStep, belugaConsentGiven, belugaPhoto, isProductSelectionStep, isCheckoutStep, selectedProducts, shippingInfo, paymentStatus, getCurrentQuestionnaireStep, answers]);
 
   // Auth handlers
   const handleSignIn = useCallback(async () => {
@@ -851,6 +867,9 @@ export function useQuestionnaireModal(
       orderId: orderIdForCase,
       clinicId: domainClinic.id,
       patientOverrides,
+      belugaPhotos: belugaPhoto
+        ? [{ mime: belugaPhoto.mime, data: belugaPhoto.data }]
+        : [],
     };
 
     try {
@@ -886,7 +905,7 @@ export function useQuestionnaireModal(
       // Re-throw the error to fail the checkout for Beluga questionnaires
       throw error;
     }
-  }, [domainClinic, answers, questionnaire]);
+  }, [domainClinic, answers, questionnaire, belugaPhoto]);
 
   const handlePaymentSuccess = useCallback(async (data?: { paymentIntentId?: string; orderId?: string }) => {
     // Use passed data or fall back to state
@@ -1388,6 +1407,7 @@ export function useQuestionnaireModal(
     if (!isOpen) {
       setCurrentStepIndex(0);
       setBelugaConsentGiven(false);
+      setBelugaPhoto(null);
       setAnswers({});
       setErrors({});
       setQuestionnaire(null);
@@ -1416,6 +1436,7 @@ export function useQuestionnaireModal(
     // State
     currentStepIndex, setCurrentStepIndex,
     belugaConsentGiven, setBelugaConsentGiven,
+    belugaPhoto, setBelugaPhoto,
     isBelugaConsentStep,
     answers, setAnswers,
     errors, setErrors,

@@ -38,8 +38,8 @@ const PRODUCT_ENDPOINT_CANDIDATES = [
   "/medications",
 ];
 
-const DEFAULT_BELUGA_COMPANY_CANDIDATES = ["fuseHealthTestCompany", "fusehealthtestcompany"];
-const DEFAULT_BELUGA_VISIT_TYPE_CANDIDATES = ["testVisitType", "asynchronous", "synchronous"];
+const DEFAULT_BELUGA_COMPANY_CANDIDATES: string[] = [];
+const DEFAULT_BELUGA_VISIT_TYPE_CANDIDATES = ["asynchronous", "synchronous"];
 
 const toNonEmptyString = (value: unknown): string | undefined => {
   if (typeof value !== "string") return undefined;
@@ -654,6 +654,50 @@ const getBelugaPatientHistoryHints = async (phone: string): Promise<{ visitType?
   }
 };
 
+const normalizeBelugaPhotos = (input: unknown): Array<{ mime: "image/jpeg"; data: string }> => {
+  if (!Array.isArray(input)) return [];
+
+  return input
+    .map((item: any): { mime: "image/jpeg"; data: string } | null => {
+      const mimeRaw = toNonEmptyString(item?.mime)?.toLowerCase();
+      const data = toNonEmptyString(item?.data);
+      if (!data) return null;
+      if (mimeRaw !== "image/jpeg") return null;
+      return { mime: "image/jpeg", data };
+    })
+    .filter((item): item is { mime: "image/jpeg"; data: string } => Boolean(item));
+};
+
+const submitBelugaPhotos = async (
+  visitId: string,
+  images: Array<{ mime: "image/jpeg"; data: string }>
+) => {
+  if (images.length === 0) {
+    return { attempted: false, reason: "no_images_provided" as const };
+  }
+
+  const response = await belugaRequest(
+    "/external/receivePhotos",
+    {
+      method: "POST",
+      body: {
+        visitId,
+        images,
+      },
+    },
+    { allowHttpErrors: true }
+  );
+
+  const success = response.statusCode < 400 && response.payload?.status === 200;
+  return {
+    attempted: true,
+    success,
+    statusCode: response.statusCode,
+    payload: response.payload,
+    visitId,
+  };
+};
+
 router.get("/products", authenticateJWT, async (_req: Request, res: Response) => {
   try {
     const { products, source, warning } = await fetchBelugaProducts();
@@ -783,7 +827,15 @@ router.post("/cases", async (req: Request, res: Response) => {
       // User may be unauthenticated during checkout. We'll infer user from order.
     }
 
-    const { orderId, patientOverrides, clinicId, company: requestedCompany, visitType: requestedVisitType, pharmacyId: requestedPharmacyId } = req.body || {};
+    const {
+      orderId,
+      patientOverrides,
+      clinicId,
+      company: requestedCompany,
+      visitType: requestedVisitType,
+      pharmacyId: requestedPharmacyId,
+      belugaPhotos,
+    } = req.body || {};
     if (!orderId || typeof orderId !== "string") {
       console.log('❌ [BELUGA] Missing orderId in request');
       return res.status(400).json({ success: false, message: "orderId is required" });
@@ -887,6 +939,7 @@ router.post("/cases", async (req: Request, res: Response) => {
     const shippingAddress = (order as any).shippingAddressId
       ? await ShippingAddress.findByPk((order as any).shippingAddressId)
       : null;
+    const normalizedBelugaPhotos = normalizeBelugaPhotos(belugaPhotos);
 
     const firstName =
       toNonEmptyString(patientOverrides?.firstName) ||
@@ -903,7 +956,7 @@ router.post("/cases", async (req: Request, res: Response) => {
     const dob = formatDobForBeluga(
       toNonEmptyString(patientOverrides?.dob) ||
       toNonEmptyString(user.dob as any) ||
-      findAnswerFromQuestionnaire(questionnaireAnswers, ["date of birth", "dob", "birth"])
+      findAnswerFromQuestionnaire(questionnaireAnswers, ["date of birth", "dob", "birthday"])
     );
     const phoneCandidate =
       toNonEmptyString(patientOverrides?.phoneNumber) ||
@@ -984,7 +1037,15 @@ router.post("/cases", async (req: Request, res: Response) => {
       medId: belugaProduct.medId || 'null (will try without medId)',
     });
 
-    const belugaMedId = toNonEmptyString(belugaProduct.medId);
+    const forcedBelugaMedId =
+      process.env.NODE_ENV !== "production"
+        ? toNonEmptyString(process.env.BELUGA_TEST_MED_ID) ||
+          readEnvValueFromEnvLocal("BELUGA_TEST_MED_ID")
+        : undefined;
+    const belugaMedId = forcedBelugaMedId || toNonEmptyString(belugaProduct.medId);
+    if (forcedBelugaMedId) {
+      console.log("🧪 [BELUGA] Development mode: forcing test medId:", forcedBelugaMedId);
+    }
     if (!belugaMedId) {
       console.log('⚠️ [BELUGA] BelugaProduct has no medId - proceeding without it (Beluga API will validate)');
     }
@@ -1077,6 +1138,13 @@ router.post("/cases", async (req: Request, res: Response) => {
       });
     }
 
+    if (normalizedBelugaPhotos.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Beluga requires at least one JPEG image in belugaPhotos for receivePhotos",
+      });
+    }
+
     console.log('✅ [BELUGA] All required fields validated');
     console.log('🐋 [BELUGA] Resolving dynamic parameters (company, visitType, pharmacy)...');
 
@@ -1142,6 +1210,23 @@ router.post("/cases", async (req: Request, res: Response) => {
     });
 
     if (existingVisit.statusCode === 200 && existingVisit.payload?.status === 200) {
+      const existingVisitId =
+        toNonEmptyString(existingVisit.payload?.data?.visitId) ||
+        toNonEmptyString(existingVisit.payload?.visitId) ||
+        masterId;
+      const photoResult = await submitBelugaPhotos(existingVisitId, normalizedBelugaPhotos);
+      if (photoResult.attempted && !photoResult.success) {
+        return res.status(502).json({
+          success: false,
+          message: "Beluga visit exists but photo submission failed",
+          details: {
+            masterId,
+            visitId: existingVisitId,
+            belugaPhotoResponse: photoResult.payload,
+          },
+        });
+      }
+
       console.log('ℹ️ [BELUGA] Visit already exists, skipping creation');
       console.log('🐋 [BELUGA] ========== END (ALREADY EXISTS) ==========');
       return res.json({
@@ -1152,6 +1237,7 @@ router.post("/cases", async (req: Request, res: Response) => {
           alreadyExists: true,
           masterId,
           visit: existingVisit.payload,
+          belugaPhotoSubmission: photoResult,
         },
       });
     }
@@ -1228,6 +1314,23 @@ router.post("/cases", async (req: Request, res: Response) => {
               allowHttpErrors: true,
             });
             if (visitLookup.statusCode === 200 && visitLookup.payload?.status === 200) {
+              const duplicateVisitId =
+                toNonEmptyString(visitLookup.payload?.data?.visitId) ||
+                toNonEmptyString(visitLookup.payload?.visitId) ||
+                masterId;
+              const photoResult = await submitBelugaPhotos(duplicateVisitId, normalizedBelugaPhotos);
+              if (photoResult.attempted && !photoResult.success) {
+                return res.status(502).json({
+                  success: false,
+                  message: "Beluga visit already existed but photo submission failed",
+                  details: {
+                    masterId,
+                    visitId: duplicateVisitId,
+                    belugaPhotoResponse: photoResult.payload,
+                  },
+                });
+              }
+
               return res.json({
                 success: true,
                 message: "Beluga visit already exists for this order",
@@ -1237,6 +1340,7 @@ router.post("/cases", async (req: Request, res: Response) => {
                   masterId,
                   visit: visitLookup.payload,
                   resolved: { company, visitType, pharmacyId },
+                  belugaPhotoSubmission: photoResult,
                 },
               });
             }
@@ -1282,6 +1386,25 @@ router.post("/cases", async (req: Request, res: Response) => {
     console.log('🎉 [BELUGA] Visit created successfully!');
     console.log('🎉 [BELUGA] Resolved with:', createdMeta);
     console.log('🎉 [BELUGA] Visit data:', JSON.stringify(createdPayload?.data, null, 2));
+
+    const createdVisitId =
+      toNonEmptyString(createdPayload?.data?.visitId) ||
+      toNonEmptyString(createdPayload?.visitId) ||
+      masterId;
+    const photoResult = await submitBelugaPhotos(createdVisitId, normalizedBelugaPhotos);
+    if (photoResult.attempted && !photoResult.success) {
+      return res.status(502).json({
+        success: false,
+        message: "Beluga visit created but photo submission failed",
+        details: {
+          masterId,
+          visitId: createdVisitId,
+          belugaResponse: createdPayload,
+          belugaPhotoResponse: photoResult.payload,
+        },
+      });
+    }
+
     console.log('🐋 [BELUGA] ========== END (SUCCESS) ==========');
 
     return res.json({
@@ -1292,6 +1415,7 @@ router.post("/cases", async (req: Request, res: Response) => {
         masterId,
         belugaResponse: createdPayload,
         resolved: createdMeta,
+        belugaPhotoSubmission: photoResult,
       },
     });
   } catch (error: any) {
