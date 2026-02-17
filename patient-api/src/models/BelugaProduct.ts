@@ -4,6 +4,13 @@ import { Table, Column, Model, DataType } from 'sequelize-typescript';
   freezeTableName: true,
   tableName: 'BelugaProduct',
   paranoid: false,
+  indexes: [
+    {
+      unique: true,
+      fields: ['name'],
+      name: 'beluga_product_name_unique',
+    },
+  ],
 })
 export default class BelugaProduct extends Model {
   @Column({
