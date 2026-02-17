@@ -6293,6 +6293,7 @@ app.post("/payments/program/sub", async (req, res) => {
       questionnaireAnswers,
       stripePriceId: stripePrice.id,
       programId: program.id,
+      questionnaireId: program.medicalTemplateId, // Link to questionnaire for Beluga/MDI
       platformFeeAmount: Number(platformFeeUsd.toFixed(2)),
       platformFeePercent: Number(platformFeePercent.toFixed(2)),
       stripeAmount: Number(stripeFeeUsd.toFixed(2)),
@@ -6301,6 +6302,7 @@ app.post("/payments/program/sub", async (req, res) => {
     });
 
     // Create order items for each selected product
+    let firstTenantProductId: string | null = null;
     for (const productId of selectedProductIds) {
       const product = await Product.findByPk(productId);
       if (product) {
@@ -6309,6 +6311,11 @@ app.post("/payments/program/sub", async (req, res) => {
           where: { productId, clinicId: program.clinicId },
         });
         const unitPrice = tenantProduct?.price || product.price || 0;
+
+        // Save first tenantProductId for linking to Beluga/MDI
+        if (!firstTenantProductId && tenantProduct) {
+          firstTenantProductId = tenantProduct.id;
+        }
 
         await OrderItem.create({
           orderId: order.id,
@@ -6319,6 +6326,11 @@ app.post("/payments/program/sub", async (req, res) => {
           placeholderSig: product.placeholderSig,
         });
       }
+    }
+
+    // Update order with first tenantProductId for Beluga/MDI integration
+    if (firstTenantProductId) {
+      await order.update({ tenantProductId: firstTenantProductId });
     }
 
     // Shipping address

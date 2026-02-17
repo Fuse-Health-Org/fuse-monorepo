@@ -711,22 +711,39 @@ router.get("/pharmacies", authenticateJWT, async (req: Request, res: Response) =
 
 router.post("/cases", async (req: Request, res: Response) => {
   try {
+    console.log('🐋 [BELUGA] ========== POST /beluga/cases REQUEST ==========');
+    console.log('🐋 [BELUGA] Request body:', JSON.stringify(req.body, null, 2));
+    
     let currentUser: any = null;
     try {
       currentUser = getCurrentUser(req);
+      console.log('🐋 [BELUGA] Authenticated user:', currentUser?.id);
     } catch {
+      console.log('🐋 [BELUGA] No authenticated user (checkout flow)');
       // User may be unauthenticated during checkout. We'll infer user from order.
     }
 
     const { orderId, patientOverrides, clinicId, company: requestedCompany, visitType: requestedVisitType, pharmacyId: requestedPharmacyId } = req.body || {};
     if (!orderId || typeof orderId !== "string") {
+      console.log('❌ [BELUGA] Missing orderId in request');
       return res.status(400).json({ success: false, message: "orderId is required" });
     }
+    
+    console.log('🐋 [BELUGA] Processing order:', orderId);
 
     const order = await Order.findByPk(orderId);
     if (!order) {
+      console.log('❌ [BELUGA] Order not found');
+      console.log('🐋 [BELUGA] ========== END (ORDER NOT FOUND) ==========');
       return res.status(404).json({ success: false, message: "Order not found" });
     }
+    
+    console.log('✅ [BELUGA] Order found:', {
+      orderId: order.id,
+      userId: (order as any).userId,
+      questionnaireId: (order as any).questionnaireId,
+      tenantProductId: (order as any).tenantProductId,
+    });
 
     let clinic: Clinic | null = null;
     if (clinicId) {
@@ -744,40 +761,68 @@ router.post("/cases", async (req: Request, res: Response) => {
 
     const user = await User.findByPk((order as any).userId);
     if (!user) {
+      console.log('❌ [BELUGA] User not found for order');
+      console.log('🐋 [BELUGA] ========== END (USER NOT FOUND) ==========');
       return res.status(404).json({ success: false, message: "User not found for order" });
     }
+    
+    console.log('✅ [BELUGA] User found:', user.id);
 
     const questionnaireAnswers = ((order as any).questionnaireAnswers || {}) as Record<string, any>;
     let questionnaire: Questionnaire | null = null;
 
     if ((order as any).questionnaireId) {
       questionnaire = await Questionnaire.findByPk((order as any).questionnaireId);
+      console.log('🐋 [BELUGA] Questionnaire lookup:', questionnaire ? `Found (${questionnaire.id})` : 'Not found');
+    } else {
+      console.log('⚠️ [BELUGA] No questionnaireId on order');
     }
 
     let tenantProductRecord: TenantProduct | null = null;
     let product: Product | null = null;
     if ((order as any).tenantProductId) {
+      console.log('🐋 [BELUGA] Looking up product from tenantProductId:', (order as any).tenantProductId);
       tenantProductRecord = await TenantProduct.findByPk((order as any).tenantProductId, {
         include: [{ model: Product, as: "product", required: false }] as any,
       } as any);
       product = (tenantProductRecord as any)?.product || null;
+      console.log('🐋 [BELUGA] Product found:', product ? product.id : 'null');
 
       if (!questionnaire && product?.id) {
+        console.log('🐋 [BELUGA] No questionnaire from order, looking up by productId:', product.id);
         questionnaire = await Questionnaire.findOne({
           where: { productId: product.id },
           order: [["createdAt", "DESC"]] as any,
         } as any);
+        console.log('🐋 [BELUGA] Questionnaire from product:', questionnaire ? `Found (${questionnaire.id})` : 'Not found');
       }
+    } else {
+      console.log('⚠️ [BELUGA] No tenantProductId on order');
     }
 
+    console.log('🐋 [BELUGA] Checking medical company source:', {
+      questionnaireId: questionnaire?.id,
+      questionnaireMedicalCompanySource: questionnaire?.medicalCompanySource,
+      clinicDashboardFormat: clinic?.patientPortalDashboardFormat,
+    });
+
     const medicalCompanySource = questionnaire?.medicalCompanySource || clinic?.patientPortalDashboardFormat || null;
+    
+    console.log('🐋 [BELUGA] Resolved medical company source:', medicalCompanySource);
+    console.log('🐋 [BELUGA] Expected:', MedicalCompanySlug.BELUGA);
+    console.log('🐋 [BELUGA] Match:', medicalCompanySource === MedicalCompanySlug.BELUGA);
+
     if (medicalCompanySource !== MedicalCompanySlug.BELUGA) {
+      console.log('❌ [BELUGA] Medical company source is not Beluga, skipping');
+      console.log('🐋 [BELUGA] ========== END (SKIPPED - NOT BELUGA) ==========');
       return res.json({
         success: true,
         message: "Beluga case creation skipped (questionnaire medical company is not beluga)",
         data: { skipped: true, medicalCompanySource },
       });
     }
+    
+    console.log('✅ [BELUGA] Medical company is Beluga, continuing...');
 
     const shippingAddress = (order as any).shippingAddressId
       ? await ShippingAddress.findByPk((order as any).shippingAddressId)
@@ -843,6 +888,8 @@ router.post("/cases", async (req: Request, res: Response) => {
 
     const belugaProductUUID = toNonEmptyString(product?.belugaProductId);
     if (!belugaProductUUID) {
+      console.log('❌ [BELUGA] Product is not linked to a BelugaProduct');
+      console.log('🐋 [BELUGA] ========== END (VALIDATION ERROR) ==========');
       return res.status(400).json({
         success: false,
         message: "Selected product is missing belugaProductId (not linked to a BelugaProduct)",
@@ -854,9 +901,12 @@ router.post("/cases", async (req: Request, res: Response) => {
       });
     }
 
+    console.log('🐋 [BELUGA] Looking up BelugaProduct:', belugaProductUUID);
     // Lookup the BelugaProduct record to get all prescription details
     const belugaProduct = await BelugaProduct.findByPk(belugaProductUUID);
     if (!belugaProduct) {
+      console.log('❌ [BELUGA] BelugaProduct not found in database');
+      console.log('🐋 [BELUGA] ========== END (VALIDATION ERROR) ==========');
       return res.status(400).json({
         success: false,
         message: "Linked BelugaProduct not found",
@@ -868,8 +918,16 @@ router.post("/cases", async (req: Request, res: Response) => {
       });
     }
 
+    console.log('✅ [BELUGA] Found BelugaProduct:', {
+      id: belugaProduct.id,
+      name: belugaProduct.name,
+      medId: belugaProduct.medId,
+    });
+
     const belugaMedId = toNonEmptyString(belugaProduct.medId);
     if (!belugaMedId) {
+      console.log('❌ [BELUGA] BelugaProduct has no medId assigned yet');
+      console.log('🐋 [BELUGA] ========== END (VALIDATION ERROR) ==========');
       return res.status(400).json({
         success: false,
         message: "Linked BelugaProduct does not have a medId assigned yet",
@@ -994,11 +1052,14 @@ router.post("/cases", async (req: Request, res: Response) => {
       });
     }
 
+    console.log('🐋 [BELUGA] Checking if visit already exists for masterId:', masterId);
     const existingVisit = await belugaRequest(`/visit/externalFetch/${encodeURIComponent(masterId)}`, { method: "GET" }, {
       allowHttpErrors: true,
     });
 
     if (existingVisit.statusCode === 200 && existingVisit.payload?.status === 200) {
+      console.log('ℹ️ [BELUGA] Visit already exists, skipping creation');
+      console.log('🐋 [BELUGA] ========== END (ALREADY EXISTS) ==========');
       return res.json({
         success: true,
         message: "Beluga visit already exists for this order",
@@ -1010,6 +1071,16 @@ router.post("/cases", async (req: Request, res: Response) => {
         },
       });
     }
+    
+    console.log('🐋 [BELUGA] No existing visit found, proceeding with creation');
+
+    console.log('🐋 [BELUGA] ========== CREATING VISIT ==========');
+    console.log('🐋 [BELUGA] Order ID:', order.id);
+    console.log('🐋 [BELUGA] masterId:', masterId);
+    console.log('🐋 [BELUGA] Form data:', JSON.stringify(formObj, null, 2));
+    console.log('🐋 [BELUGA] Company candidates:', companyCandidates);
+    console.log('🐋 [BELUGA] Visit type candidates:', visitTypeCandidates);
+    console.log('🐋 [BELUGA] Pharmacy candidates:', pharmacyCandidates);
 
     const attempts: Array<{
       company: string;
@@ -1034,11 +1105,17 @@ router.post("/cases", async (req: Request, res: Response) => {
             visitType,
           };
 
+          console.log(`🐋 [BELUGA] Attempting: company="${company}", visitType="${visitType}", pharmacyId="${pharmacyId}"`);
+          console.log('🐋 [BELUGA] Full payload:', JSON.stringify(payload, null, 2));
+
           const createVisitResponse = await belugaRequest(
             "/visit/createNoPayPhotos",
             { method: "POST", body: payload },
             { allowHttpErrors: true }
           );
+
+          console.log('🐋 [BELUGA] Response status:', createVisitResponse.statusCode);
+          console.log('🐋 [BELUGA] Response payload:', JSON.stringify(createVisitResponse.payload, null, 2));
 
           const errorText = getBelugaErrorText(createVisitResponse.payload);
           attempts.push({
@@ -1050,11 +1127,15 @@ router.post("/cases", async (req: Request, res: Response) => {
           });
 
           if (createVisitResponse.statusCode < 400 && createVisitResponse.payload?.status === 200) {
+            console.log('✅ [BELUGA] SUCCESS! Visit created successfully');
+            console.log('✅ [BELUGA] visitId:', createVisitResponse.payload?.data?.visitId);
+            console.log('✅ [BELUGA] masterId:', createVisitResponse.payload?.data?.masterId);
             createdPayload = createVisitResponse.payload;
             createdMeta = { company, visitType, pharmacyId };
             break outerLoop;
           }
 
+          console.log('❌ [BELUGA] Attempt failed:', errorText || 'Unknown error');
           lastFailure = createVisitResponse;
 
           // Duplicate masterId means the visit already exists; treat as idempotent success.
@@ -1095,6 +1176,12 @@ router.post("/cases", async (req: Request, res: Response) => {
     }
 
     if (!createdPayload || !createdMeta) {
+      console.log('❌ [BELUGA] ALL ATTEMPTS FAILED');
+      console.log('❌ [BELUGA] Total attempts:', attempts.length);
+      console.log('❌ [BELUGA] Attempts summary:', JSON.stringify(attempts, null, 2));
+      console.log('❌ [BELUGA] Last failure payload:', JSON.stringify(lastFailure?.payload, null, 2));
+      console.log('🐋 [BELUGA] ========== END (FAILED) ==========');
+      
       return res.status(lastFailure?.statusCode || 400).json({
         success: false,
         message: "Beluga visit creation failed after dynamic resolution attempts",
@@ -1108,6 +1195,11 @@ router.post("/cases", async (req: Request, res: Response) => {
       });
     }
 
+    console.log('🎉 [BELUGA] Visit created successfully!');
+    console.log('🎉 [BELUGA] Resolved with:', createdMeta);
+    console.log('🎉 [BELUGA] Visit data:', JSON.stringify(createdPayload?.data, null, 2));
+    console.log('🐋 [BELUGA] ========== END (SUCCESS) ==========');
+
     return res.json({
       success: true,
       message: "Beluga visit created successfully",
@@ -1119,7 +1211,9 @@ router.post("/cases", async (req: Request, res: Response) => {
       },
     });
   } catch (error: any) {
-    console.error("❌ Error creating Beluga visit:", error?.message || error);
+    console.error("❌ [BELUGA] EXCEPTION in POST /beluga/cases:", error?.message || error);
+    console.error("❌ [BELUGA] Stack trace:", error?.stack);
+    console.log('🐋 [BELUGA] ========== END (EXCEPTION) ==========');
     return res.status(error?.statusCode || 500).json({
       success: false,
       message: "Failed to create Beluga visit",
