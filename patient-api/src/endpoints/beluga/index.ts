@@ -525,9 +525,14 @@ const normalizeSlugCandidate = (value?: string): string | undefined => {
 };
 
 const resolveBelugaCompanyCandidates = (clinic: Clinic | null, requestedCompany?: string): string[] => {
+  // Prioritize environment variable if set
+  const envCompanyId = toNonEmptyString(process.env.BELUGA_COMPANY_ID) || 
+                       readEnvValueFromEnvLocal("BELUGA_COMPANY_ID");
+  
   const clinicName = toNonEmptyString((clinic as any)?.name);
   const clinicSlug = toNonEmptyString((clinic as any)?.slug);
   return dedupeStrings([
+    envCompanyId, // Try environment config first
     requestedCompany,
     clinicSlug,
     normalizeSlugCandidate(clinicSlug),
@@ -543,6 +548,10 @@ const resolveBelugaVisitTypeCandidates = (params: {
   state?: string;
   patientVisitType?: string;
 }): string[] => {
+  // Prioritize environment variable if set
+  const envVisitType = toNonEmptyString(process.env.BELUGA_DEFAULT_VISIT_TYPE) ||
+                       readEnvValueFromEnvLocal("BELUGA_DEFAULT_VISIT_TYPE");
+  
   const state = toNonEmptyString(params.state)?.toUpperCase();
   const questionnaireVisitType =
     state && params.questionnaire?.visitTypeByState
@@ -550,6 +559,7 @@ const resolveBelugaVisitTypeCandidates = (params: {
       : undefined;
 
   return dedupeStrings([
+    envVisitType, // Try environment config first
     params.requestedVisitType,
     params.patientVisitType,
     questionnaireVisitType,
