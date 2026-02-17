@@ -389,7 +389,7 @@ const findAnswerFromQuestionnaire = (answers: Record<string, any>, terms: string
   return undefined;
 };
 
-const collectBelugaCustomQuestions = (answers: Record<string, any>) => {
+const collectBelugaCustomQuestions = (answers: Record<string, any>, questionnaire?: Questionnaire | null) => {
   const excludedTerms = [
     "first name",
     "last name",
@@ -411,6 +411,31 @@ const collectBelugaCustomQuestions = (answers: Record<string, any>) => {
     "medicalconditions",
   ];
 
+  // Build a map of question text -> question options for multiple-choice questions
+  const questionOptionsMap = new Map<string, string[]>();
+  if (questionnaire) {
+    const steps = (questionnaire as any).steps || [];
+    for (const step of steps) {
+      const questions = (step as any).questions || [];
+      for (const q of questions) {
+        const questionText = toNonEmptyString(q.questionText);
+        const answerType = toNonEmptyString(q.answerType);
+        
+        // For multiple-choice questions, store their options
+        if (questionText && (answerType === 'multiple_choice' || answerType === 'single_choice')) {
+          const options = Array.isArray(q.options) ? q.options : [];
+          const optionTexts = options
+            .map((opt: any) => toNonEmptyString(opt.text || opt.label || opt))
+            .filter(Boolean);
+          
+          if (optionTexts.length > 0) {
+            questionOptionsMap.set(questionText, optionTexts);
+          }
+        }
+      }
+    }
+  }
+
   const result: Record<string, string> = {};
   let index = 1;
 
@@ -430,7 +455,15 @@ const collectBelugaCustomQuestions = (answers: Record<string, any>) => {
     }
 
     if (!answerText) continue;
-    result[`Q${index}`] = question;
+
+    // For Beluga API: append "POSSIBLE ANSWERS: option1; option2; option3" for multiple-choice questions
+    let questionText = question;
+    const options = questionOptionsMap.get(question);
+    if (options && options.length > 0) {
+      questionText = `${question} POSSIBLE ANSWERS: ${options.join("; ")}`;
+    }
+
+    result[`Q${index}`] = questionText;
     result[`A${index}`] = answerText;
     index += 1;
   }
@@ -860,7 +893,7 @@ router.post("/cases", async (req: Request, res: Response) => {
       },
     ];
 
-    const customQuestions = collectBelugaCustomQuestions(questionnaireAnswers);
+    const customQuestions = collectBelugaCustomQuestions(questionnaireAnswers, questionnaire);
     const masterId = String(order.id);
 
     const formObj = {
