@@ -252,6 +252,18 @@ export default class Order extends Entity {
     type: DataType.STRING,
     allowNull: true,
   })
+  declare belugaMasterId?: string;
+
+  @Column({
+    type: DataType.STRING,
+    allowNull: true,
+  })
+  declare belugaVisitId?: string;
+
+  @Column({
+    type: DataType.STRING,
+    allowNull: true,
+  })
   declare stripePriceId?: string;
 
 

@@ -1455,6 +1455,11 @@ router.post("/cases", async (req: Request, res: Response) => {
                 });
               }
 
+              await order.update({
+                belugaMasterId: masterId,
+                belugaVisitId: duplicateVisitId !== masterId ? duplicateVisitId : undefined,
+              });
+
               return res.json({
                 success: true,
                 message: "Beluga visit already exists for this order",
@@ -1528,6 +1533,13 @@ router.post("/cases", async (req: Request, res: Response) => {
         },
       });
     }
+
+    const savedVisitId = toNonEmptyString(createdPayload?.data?.visitId) || toNonEmptyString(createdPayload?.visitId);
+    await order.update({
+      belugaMasterId: masterId,
+      ...(savedVisitId ? { belugaVisitId: savedVisitId } : {}),
+    });
+    console.log('💾 [BELUGA] Saved to Order — belugaMasterId:', masterId, '| belugaVisitId:', savedVisitId || '(none)');
 
     console.log('🐋 [BELUGA] ========== END (SUCCESS) ==========');
 
