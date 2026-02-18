@@ -701,25 +701,25 @@ const submitBelugaPhotos = async (
 
 const resolveBelugaWebhookSecret = (): string | undefined => {
   return (
-    toNonEmptyString(process.env.BELUGA_WEBHOOK_SECRET) ||
-    readEnvValueFromEnvLocal("BELUGA_WEBHOOK_SECRET")
+    toNonEmptyString(process.env.FUSE_BELUGA_WEBHOOK_SECRET) ||
+    readEnvValueFromEnvLocal("FUSE_BELUGA_WEBHOOK_SECRET")
   );
 };
 
-const isBelugaWebhookAuthorized = (req: Request): boolean => {
+const isBelugaWebhookAuthorized = (req: Request): { authorized: boolean; configError?: boolean } => {
   const expectedSecret = resolveBelugaWebhookSecret();
-  if (!expectedSecret) return true;
+  if (!expectedSecret) return { authorized: false, configError: true };
 
   const authHeader = toNonEmptyString(String(req.headers.authorization || ""));
   const headerSecret = toNonEmptyString(String(req.headers["x-beluga-webhook-secret"] || ""));
-  if (headerSecret && headerSecret === expectedSecret) return true;
+  if (headerSecret && headerSecret === expectedSecret) return { authorized: true };
 
   if (authHeader?.toLowerCase().startsWith("bearer ")) {
     const token = toNonEmptyString(authHeader.slice(7));
-    if (token === expectedSecret) return true;
+    if (token === expectedSecret) return { authorized: true };
   }
 
-  return false;
+  return { authorized: false };
 };
 
 const findBelugaOrderByMasterId = async (masterId: string): Promise<Order | null> => {
@@ -966,7 +966,13 @@ router.get("/pharmacies", authenticateJWT, async (req: Request, res: Response) =
  */
 router.post("/webhook", async (req: Request, res: Response) => {
   try {
-    if (!isBelugaWebhookAuthorized(req)) {
+    const authResult = isBelugaWebhookAuthorized(req);
+    if (authResult.configError) {
+      console.error("BELUGA_WEBHOOK_SECRET environment variable is not set");
+      return res.status(500).json({ success: false, message: "Server configuration error" });
+    }
+    if (!authResult.authorized) {
+      console.warn("⚠️ Invalid Beluga webhook authorization");
       return res.status(403).json({ success: false, message: "Invalid Beluga webhook authorization" });
     }
 
