@@ -908,9 +908,11 @@ export function registerAuthEndpoints(
             );
 
             if (emailSent) {
-                console.log("✅ Verification email resent to:", email);
+                if (process.env.NODE_ENV === "development") {
+                    console.log("✅ Verification email resent");
+                }
             } else {
-                console.error("❌ Failed to resend verification email to:", email);
+                console.error("❌ Failed to resend verification email");
             }
 
             res.status(200).json({
