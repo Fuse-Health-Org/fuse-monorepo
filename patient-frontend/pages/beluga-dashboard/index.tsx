@@ -27,11 +27,26 @@ interface NavItem {
 }
 
 interface BelugaVisit {
+  orderId: string;
   masterId: string;
-  visitStatus?: string;
-  resolvedStatus?: string;
-  updateTimestamp?: string;
-  visitType?: string;
+  belugaVisitId?: string | null;
+  orderStatus?: string;
+  orderCreatedAt?: string;
+  visitStatus?: string | null;
+  resolvedStatus?: string | null;
+  updateTimestamp?: string | null;
+  visitType?: string | null;
+  formObj?: {
+    patientPreference?: Array<{
+      name?: string;
+      strength?: string;
+      quantity?: string;
+      refills?: string;
+      daysSupply?: string;
+      medId?: string;
+    }>;
+    intakeResults?: Array<{ question: string; answer: string }>;
+  } | null;
   rxHistory: Array<{
     rxTimestamp?: string;
     name?: string;
@@ -133,7 +148,6 @@ function BelugaDashboardPage() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
-  const [patientPayload, setPatientPayload] = React.useState<any | null>(null);
   const [visits, setVisits] = React.useState<BelugaVisit[]>([]);
   const [selectedMasterId, setSelectedMasterId] = React.useState("");
   const [messageDrafts, setMessageDrafts] = React.useState<Record<string, string>>({});
@@ -143,51 +157,18 @@ function BelugaDashboardPage() {
   const [nameLast, setNameLast] = React.useState("");
   const [accountResult, setAccountResult] = React.useState<string | null>(null);
 
-  const toDigits = (value?: string) => (value || "").replace(/\D/g, "");
-
   const loadBelugaData = React.useCallback(async () => {
-    const phone = toDigits(user?.phoneNumber);
-    if (!phone || phone.length !== 10) {
-      setError("A valid 10-digit phone number is required on your account to load Beluga data.");
-      return;
-    }
-
     setLoading(true);
     setError(null);
     try {
-      const patientRes = await apiCall(`/beluga/patients/${phone}`);
-      if (!patientRes.success) {
-        throw new Error(patientRes.error || "Failed to load Beluga patient");
+      const res = await apiCall("/beluga/my-visits");
+      if (!res.success) {
+        throw new Error((res as any).error || "Failed to load Beluga visits");
       }
 
-      const patientData = (patientRes.data as any)?.data ?? (patientRes.data as any);
-      setPatientPayload(patientData);
-
-      const masterIds: string[] = Array.isArray(patientData?.data?.visits)
-        ? patientData.data.visits
-        : [];
-
-      const visitResults = await Promise.all(
-        masterIds.map(async (masterId) => {
-          const response = await apiCall(`/beluga/visits/${encodeURIComponent(masterId)}`);
-          if (!response.success) return null;
-          const payload = (response.data as any)?.data ?? (response.data as any);
-          if (payload?.status !== 200) return null;
-
-          return {
-            masterId,
-            visitStatus: payload.visitStatus,
-            resolvedStatus: payload.resolvedStatus,
-            updateTimestamp: payload.updateTimestamp,
-            visitType: payload?.data?.visitType,
-            rxHistory: Array.isArray(payload?.data?.rxHistory) ? payload.data.rxHistory : [],
-          } as BelugaVisit;
-        })
-      );
-
-      const validVisits = visitResults.filter((item): item is BelugaVisit => Boolean(item));
-      setVisits(validVisits);
-      setSelectedMasterId(validVisits[0]?.masterId || masterIds[0] || "");
+      const visitList: BelugaVisit[] = Array.isArray((res.data as any)?.data) ? (res.data as any).data : [];
+      setVisits(visitList);
+      setSelectedMasterId(visitList[0]?.masterId || "");
       setNameFirst(user?.firstName || "");
       setNameLast(user?.lastName || "");
     } catch (err: any) {
@@ -195,7 +176,7 @@ function BelugaDashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [user?.phoneNumber, user?.firstName, user?.lastName]);
+  }, [user?.firstName, user?.lastName]);
 
   // Close mobile menu when tab changes
   React.useEffect(() => {
@@ -254,7 +235,7 @@ function BelugaDashboardPage() {
   };
 
   const totalRx = visits.reduce((acc, item) => acc + item.rxHistory.length, 0);
-  const activeVisits = visits.filter((v) => (v.visitStatus || "").toLowerCase() === "active").length;
+  const activeVisits = visits.filter((v) => v.visitStatus && ["active", "pending", "holding", "admin"].includes(v.visitStatus.toLowerCase())).length;
   const resolvedVisits = visits.filter((v) => (v.resolvedStatus || "").toLowerCase() === "closed").length;
 
   return (
@@ -350,9 +331,9 @@ function BelugaDashboardPage() {
                   <CardBody className="p-6">
                     <h3 className="font-semibold mb-3">Patient Snapshot</h3>
                     <div className="text-sm space-y-2">
-                      <p><span className="text-foreground-500">Name:</span> {patientPayload?.data?.firstName || user?.firstName || "-"} {patientPayload?.data?.lastName || user?.lastName || ""}</p>
-                      <p><span className="text-foreground-500">Phone:</span> {patientPayload?.data?.phone || user?.phoneNumber || "-"}</p>
-                      <p><span className="text-foreground-500">Known Visits:</span> {Array.isArray(patientPayload?.data?.visits) ? patientPayload.data.visits.length : 0}</p>
+                      <p><span className="text-foreground-500">Name:</span> {user?.firstName || "-"} {user?.lastName || ""}</p>
+                      <p><span className="text-foreground-500">Email:</span> {user?.email || "-"}</p>
+                      <p><span className="text-foreground-500">Total Visits:</span> {visits.length}</p>
                       <p><span className="text-foreground-500">Total Prescriptions in History:</span> {totalRx}</p>
                     </div>
                   </CardBody>
@@ -368,30 +349,77 @@ function BelugaDashboardPage() {
                 )}
                 {visits.map((visit) => (
                   <Card key={visit.masterId}>
-                    <CardBody className="p-6 space-y-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <h3 className="font-semibold">Visit {visit.masterId}</h3>
-                        <span className="text-xs px-2 py-1 rounded bg-content2">
-                          {(visit.visitStatus || "unknown").toUpperCase()}
+                    <CardBody className="p-6 space-y-4">
+                      <div className="flex items-center justify-between gap-3 flex-wrap">
+                        <div>
+                          <h3 className="font-semibold">
+                            {visit.formObj?.patientPreference?.map(p => p.name).filter(Boolean).join(", ") || "Beluga Visit"}
+                          </h3>
+                          <p className="text-xs text-foreground-400 mt-0.5">
+                            Visit Type: {visit.visitType || "-"} &nbsp;·&nbsp; Ordered: {visit.orderCreatedAt ? new Date(visit.orderCreatedAt).toLocaleDateString() : "-"}
+                          </p>
+                        </div>
+                        <span className={`text-xs px-2 py-1 rounded font-medium ${
+                          visit.visitStatus === "active" || visit.visitStatus === "pending"
+                            ? "bg-teal-500/10 text-teal-600"
+                            : visit.visitStatus === "resolved"
+                            ? "bg-success/10 text-success"
+                            : "bg-content2 text-foreground-500"
+                        }`}>
+                          {(visit.visitStatus || "pending").toUpperCase()}
                         </span>
                       </div>
-                      <p className="text-xs text-foreground-500">
-                        Visit Type: {visit.visitType || "-"} | Updated: {visit.updateTimestamp ? new Date(visit.updateTimestamp).toLocaleString() : "-"}
-                      </p>
-                      {visit.rxHistory.length === 0 ? (
-                        <p className="text-sm text-foreground-500">No prescription history yet.</p>
-                      ) : (
-                        <div className="space-y-2">
-                          {visit.rxHistory.map((rx, idx) => (
-                            <div key={`${visit.masterId}-${idx}`} className="p-3 rounded bg-content2 text-sm">
-                              <p className="font-medium">{rx.name || "Medication"}</p>
-                              <p className="text-foreground-500">
-                                Strength: {rx.strength || "-"} | Qty: {rx.quantity || "-"} | Refills: {rx.refills || "-"} | Pharmacy: {rx.pharmacyName || "-"}
-                              </p>
-                            </div>
-                          ))}
+
+                      {/* Requested Treatment */}
+                      {Array.isArray(visit.formObj?.patientPreference) && visit.formObj!.patientPreference!.length > 0 && (
+                        <div>
+                          <p className="text-xs font-medium text-foreground-500 mb-1.5 uppercase tracking-wide">Requested Treatment</p>
+                          <div className="space-y-2">
+                            {visit.formObj!.patientPreference!.map((pref, idx) => (
+                              <div key={idx} className="p-3 rounded-lg bg-content2 text-sm">
+                                <p className="font-medium">{pref.name || "Medication"}</p>
+                                <p className="text-foreground-500 text-xs mt-0.5">
+                                  {[
+                                    pref.strength && `Strength: ${pref.strength}`,
+                                    pref.quantity && `Qty: ${pref.quantity}`,
+                                    pref.refills && `Refills: ${pref.refills}`,
+                                    pref.daysSupply && `Days Supply: ${pref.daysSupply}`,
+                                  ].filter(Boolean).join(" · ")}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       )}
+
+                      {/* Prescription History */}
+                      <div>
+                        <p className="text-xs font-medium text-foreground-500 mb-1.5 uppercase tracking-wide">Prescription History</p>
+                        {visit.rxHistory.length === 0 ? (
+                          <p className="text-sm text-foreground-400">No prescriptions written yet — visit is pending doctor review.</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {visit.rxHistory.map((rx, idx) => (
+                              <div key={`${visit.masterId}-${idx}`} className="p-3 rounded-lg bg-content2 text-sm">
+                                <p className="font-medium">{rx.name || "Medication"}</p>
+                                <p className="text-foreground-500 text-xs mt-0.5">
+                                  {[
+                                    rx.strength && `Strength: ${rx.strength}`,
+                                    rx.quantity && `Qty: ${rx.quantity}`,
+                                    rx.refills && `Refills: ${rx.refills}`,
+                                    rx.pharmacyName && `Pharmacy: ${rx.pharmacyName}`,
+                                  ].filter(Boolean).join(" · ")}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <p className="text-xs text-foreground-400">
+                        Last updated: {visit.updateTimestamp ? new Date(visit.updateTimestamp).toLocaleString() : "—"}
+                        &nbsp;·&nbsp; Visit ID: {visit.belugaVisitId || visit.masterId}
+                      </p>
                     </CardBody>
                   </Card>
                 ))}
@@ -418,9 +446,14 @@ function BelugaDashboardPage() {
                   <Card key={`chat-${visit.masterId}`}>
                     <CardBody className="p-6 space-y-4">
                       <div className="flex items-center justify-between gap-3">
-                        <h3 className="font-semibold">Visit Chat: {visit.masterId}</h3>
+                        <div>
+                          <h3 className="font-semibold">
+                            {visit.formObj?.patientPreference?.map(p => p.name).filter(Boolean).join(", ") || "Beluga Visit"}
+                          </h3>
+                          <p className="text-xs text-foreground-400 mt-0.5">masterId: {visit.masterId}</p>
+                        </div>
                         <span className="text-xs px-2 py-1 rounded bg-content2">
-                          {(visit.visitStatus || "unknown").toUpperCase()}
+                          {(visit.visitStatus || "pending").toUpperCase()}
                         </span>
                       </div>
                       <Textarea
@@ -491,7 +524,8 @@ function BelugaDashboardPage() {
                         <option value="">Select a visit</option>
                         {visits.map((visit) => (
                           <option key={`master-${visit.masterId}`} value={visit.masterId}>
-                            {visit.masterId}
+                            {visit.formObj?.patientPreference?.map(p => p.name).filter(Boolean).join(", ") || visit.masterId}
+                            {visit.orderCreatedAt ? ` (${new Date(visit.orderCreatedAt).toLocaleDateString()})` : ""}
                           </option>
                         ))}
                       </select>

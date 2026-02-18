@@ -745,6 +745,68 @@ router.get("/products/:productId", authenticateJWT, async (req: Request, res: Re
   }
 });
 
+/**
+ * GET /beluga/my-visits
+ * Returns all Beluga visits for the authenticated user, sourced from their Orders.
+ * Each visit is enriched with live data from the Beluga API.
+ */
+router.get("/my-visits", authenticateJWT, async (req: Request, res: Response) => {
+  try {
+    const currentUser = await getCurrentUser(req);
+    if (!currentUser) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    const orders = await Order.findAll({
+      where: {
+        userId: currentUser.id,
+        belugaMasterId: { [Op.ne]: null },
+      } as any,
+      attributes: ["id", "belugaMasterId", "belugaVisitId", "status", "createdAt"],
+      order: [["createdAt", "DESC"]],
+    });
+
+    const visits = await Promise.all(
+      orders.map(async (order) => {
+        const masterId = (order as any).belugaMasterId as string;
+        const belugaVisitId = (order as any).belugaVisitId as string | undefined;
+
+        let visitData: any = null;
+        try {
+          const response = await belugaRequest(`/visit/externalFetch/${encodeURIComponent(masterId)}`);
+          if (response.statusCode === 200 && response.payload?.status === 200) {
+            visitData = response.payload;
+          }
+        } catch {
+          // Visit data unavailable; return what we have from our DB
+        }
+
+        return {
+          orderId: order.id,
+          masterId,
+          belugaVisitId: belugaVisitId || null,
+          orderStatus: (order as any).status,
+          orderCreatedAt: (order as any).createdAt,
+          visitStatus: visitData?.visitStatus || null,
+          resolvedStatus: visitData?.resolvedStatus || null,
+          updateTimestamp: visitData?.updateTimestamp || null,
+          visitType: visitData?.data?.visitType || null,
+          formObj: visitData?.data?.formObj || null,
+          rxHistory: Array.isArray(visitData?.data?.rxHistory) ? visitData.data.rxHistory : [],
+        };
+      })
+    );
+
+    return res.json({ success: true, data: visits });
+  } catch (error: any) {
+    return res.status(error?.statusCode || 500).json({
+      success: false,
+      message: "Failed to fetch Beluga visits",
+      details: error?.message || null,
+    });
+  }
+});
+
 router.get("/visits/:masterId", authenticateJWT, async (req: Request, res: Response) => {
   try {
     const masterId = toNonEmptyString(req.params.masterId);
