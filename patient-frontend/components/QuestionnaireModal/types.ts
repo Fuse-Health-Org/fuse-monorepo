@@ -62,6 +62,7 @@ export interface QuestionnaireData {
     id: string;
     title: string;
     description?: string;
+    productSelectionStepPosition?: number;
     checkoutStepPosition: number;
     color?: string | null;
     medicalCompanySource?: string;
@@ -130,6 +131,8 @@ export interface ProgramData {
     productOfferType?: 'single_choice' | 'multiple_choice';
     /** Whether this program has per-product pricing (child programs) */
     hasPerProductPricing?: boolean;
+    /** Program-level form section order (productSelection|medical|account|payment) */
+    formStepOrder?: string[] | null;
 }
 
 export interface QuestionnaireModalProps {
@@ -234,6 +237,8 @@ export interface CheckoutViewProps {
     onProgramProductToggle?: (productId: string) => void;
     /** Creates a program subscription and returns payment data for confirmation */
     onCreateProgramSubscription?: () => Promise<PaymentIntentResult | null>;
+    /** Whether product selection has its own dedicated step (hide it from checkout if true) */
+    hasProductSelectionStep?: boolean;
 }
 
 

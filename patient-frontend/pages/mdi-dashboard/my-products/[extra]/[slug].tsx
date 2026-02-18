@@ -69,6 +69,7 @@ interface ProgramData {
     nonMedicalServicesFee: number
     productOfferType?: 'single_choice' | 'multiple_choice'
     hasPerProductPricing?: boolean
+    formStepOrder?: string[] | null
 }
 
 export default function PublicProductPage() {
@@ -136,6 +137,7 @@ export default function PublicProductPage() {
                 nonMedicalServicesFee: programData.nonMedicalServicesFee || 0,
                 productOfferType: programData.productOfferType,
                 hasPerProductPricing: programData.hasPerProductPricing || false,
+                formStepOrder: programData.formStepOrder || null,
             })
             setIsModalOpen(true)
         } catch (err) {

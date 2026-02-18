@@ -8,7 +8,7 @@ import { toast } from "sonner"
 
 interface FormSection {
   id: string
-  type: 'product_questions' | 'category_questions' | 'account_creation' | 'checkout' | 'custom'
+  type: 'product_questions' | 'category_questions' | 'account_creation' | 'product_selection' | 'checkout' | 'custom'
   label: string
   description: string
   order: number
@@ -20,8 +20,8 @@ const DEFAULT_SECTIONS: FormSection[] = [
   {
     id: 'product',
     type: 'product_questions',
-    label: 'Product Questions',
-    description: 'Questions specific to each individual product',
+    label: 'Medical Questions',
+    description: 'Medical questionnaire created by doctors for patient assessment',
     order: 1,
     enabled: true,
     icon: '📦'
@@ -45,11 +45,20 @@ const DEFAULT_SECTIONS: FormSection[] = [
     icon: '👤'
   },
   {
+    id: 'productSelection',
+    type: 'product_selection',
+    label: 'Product Selection',
+    description: 'Patient selects product options before checkout',
+    order: 4,
+    enabled: true,
+    icon: '🛒'
+  },
+  {
     id: 'checkout',
     type: 'checkout',
     label: 'Payment & Checkout',
     description: 'Billing information, shipping address, and payment processing',
-    order: 4,
+    order: 5,
     enabled: true,
     icon: '💳'
   }
@@ -172,9 +181,10 @@ export default function GlobalFormStructure() {
               <div>
                 <h3 className="font-semibold text-blue-900 mb-2">How Form Structure Works</h3>
                 <ul className="text-sm text-blue-800 space-y-1">
-                  <li>• <strong>Product Questions</strong>: Specific to each individual product you create</li>
+                  <li>• <strong>Medical Questions</strong>: Doctor-created medical questionnaire for patient assessment</li>
                   <li>• <strong>Category Questions</strong>: Shared across all products in a category (can have multiple variants)</li>
                   <li>• <strong>Create Account</strong>: Global patient information collection (auto-injected)</li>
+                  <li>• <strong>Product Selection</strong>: Product options step before checkout (auto-injected by system)</li>
                   <li>• <strong>Checkout</strong>: Payment and shipping (auto-injected by system)</li>
                 </ul>
                 <p className="mt-3 text-sm text-blue-700">
@@ -250,7 +260,7 @@ export default function GlobalFormStructure() {
                           <span className="text-xs text-purple-700">✨ Supports Variants (Variant 1, Variant 2)</span>
                         </div>
                       )}
-                      {(section.type === 'account_creation' || section.type === 'checkout') && (
+                      {(section.type === 'account_creation' || section.type === 'product_selection' || section.type === 'checkout') && (
                         <div className="mt-2 inline-flex items-center gap-1.5 px-2 py-1 bg-green-50 border border-green-200 rounded-lg">
                           <span className="text-xs text-green-700">🔒 Auto-injected by system</span>
                         </div>
@@ -261,7 +271,7 @@ export default function GlobalFormStructure() {
                     <div className="flex-shrink-0">
                       <button
                         onClick={() => toggleSection(section.id)}
-                        disabled={section.type === 'account_creation' || section.type === 'checkout'}
+                        disabled={section.type === 'account_creation' || section.type === 'product_selection' || section.type === 'checkout'}
                         className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[#4FA59C] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${
                           section.enabled ? 'bg-[#4FA59C]' : 'bg-gray-300'
                         }`}
@@ -317,8 +327,8 @@ export default function GlobalFormStructure() {
             <h3 className="font-semibold text-[#1F2937] mb-3">💡 Understanding Form Sections</h3>
             <div className="space-y-3 text-sm text-[#4B5563]">
               <div>
-                <span className="font-semibold text-[#1F2937]">📦 Product Questions:</span> These are unique to each product. 
-                When you create a product, you build its specific questions (e.g., "What dosage of NAD+ are you interested in?").
+                <span className="font-semibold text-[#1F2937]">🩺 Medical Questions:</span> These are medical questionnaires created by doctors for patient assessment. 
+                Contains clinical questions to evaluate patient eligibility and medical history.
               </div>
               <div>
                 <span className="font-semibold text-[#1F2937]">📋 Standardized Category Questions:</span> These apply to ALL products in a category. 

@@ -4,7 +4,7 @@ import { sequenceRunWorker } from '@endpoints/sequences/services/worker';
 
 /**
  * Service to trigger sequences based on events
- * Supports: manual, checkout, protocol_start, prescription_expired
+ * Supports: manual, checkout_completed, protocol_start, prescription_expired, abandoned_cart
  */
 export default class SequenceTriggerService {
   /**

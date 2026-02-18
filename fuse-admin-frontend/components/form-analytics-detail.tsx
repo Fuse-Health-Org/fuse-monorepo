@@ -51,9 +51,11 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
 
 interface FormAnalyticsDetailProps {
   formId: string
+  templateTitle?: string
+  formStepLabels?: string[]
 }
 
-export function FormAnalytics({ formId }: FormAnalyticsDetailProps) {
+export function FormAnalytics({ formId, templateTitle, formStepLabels }: FormAnalyticsDetailProps) {
   const { user, authenticatedFetch } = useAuth()
   const [data, setData] = useState<FormAnalyticsData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -64,32 +66,97 @@ export function FormAnalytics({ formId }: FormAnalyticsDetailProps) {
     if (formId && user?.clinicId) {
       fetchFormAnalytics()
     }
-  }, [formId, user?.clinicId])
+  }, [formId, user?.clinicId, formStepLabels])
 
   const fetchFormAnalytics = async () => {
     try {
       setLoading(true)
       setError(null)
+      
+      // ============= TEMPORARY MOCK DATA =============
+      // TODO: Replace with real API call when backend is ready
+      // const response = await authenticatedFetch(`${API_URL}/analytics/forms/${formId}/sessions`)
+      
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 800))
 
-      const response = await authenticatedFetch(
-        `${API_URL}/analytics/forms/${formId}/sessions`,
-        {
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        }
-      )
+      // Build stage metrics from the live program step order.
+      const stepLabels = formStepLabels && formStepLabels.length > 0
+        ? formStepLabels
+        : ['Product Selection', 'Medical Questions', 'Create Account', 'Payment & Checkout']
 
-      if (response.ok) {
-        const result = await response.json()
-        if (result.success) {
-          setData(result.data)
-        } else {
-          setError(result.message || 'Failed to load analytics')
+      const totalSessions = 248
+      let reachedCount = totalSessions
+
+      const stageMetrics: StageMetrics[] = stepLabels.map((label, idx) => {
+        const isLastStep = idx === stepLabels.length - 1
+        const completionFactor = isLastStep
+          ? 0.255
+          : Math.max(0.58, 0.95 - (idx * 0.12))
+        const completed = Math.max(1, Math.round(reachedCount * completionFactor))
+        const dropoffs = reachedCount - completed
+        const stage: StageMetrics = {
+          stepNumber: idx + 1,
+          questionText: label,
+          reached: reachedCount,
+          completed,
+          dropoffs,
+          dropoffRate: reachedCount > 0 ? Number(((dropoffs / reachedCount) * 100).toFixed(1)) : 0,
         }
-      } else {
-        setError(`Failed to load analytics: ${response.status}`)
+        reachedCount = completed
+        return stage
+      })
+
+      const finalCompleted = stageMetrics[stageMetrics.length - 1]?.completed || 0
+
+      const sessionBlueprints = [
+        { firstName: 'Sarah', lastName: 'Johnson', email: 'sarah.j@email.com', phoneNumber: '(555) 123-4567', viewDuration: 456, completionRatio: 1, converted: true, hoursAgo: 2 },
+        { firstName: 'Michael', lastName: 'Chen', email: 'mchen@email.com', phoneNumber: '(555) 234-5678', viewDuration: 623, completionRatio: 1, converted: true, hoursAgo: 5 },
+        { firstName: 'Emily', lastName: 'Rodriguez', email: 'emily.r@email.com', phoneNumber: '(555) 345-6789', viewDuration: 234, completionRatio: 0.75, converted: false, hoursAgo: 8 },
+        { firstName: 'David', lastName: 'Thompson', email: 'dthompson@email.com', phoneNumber: '(555) 456-7890', viewDuration: 189, completionRatio: 0.25, converted: false, hoursAgo: 12 },
+        { firstName: 'Jessica', lastName: 'Martinez', email: 'jmartinez@email.com', phoneNumber: '(555) 567-8901', viewDuration: 512, completionRatio: 1, converted: true, hoursAgo: 24 },
+        { firstName: 'Robert', lastName: 'Wilson', email: 'rwilson@email.com', viewDuration: 156, completionRatio: 0.5, converted: false, hoursAgo: 36 },
+        { firstName: 'Amanda', lastName: 'Taylor', email: 'ataylor@email.com', phoneNumber: '(555) 678-9012', viewDuration: 445, completionRatio: 1, converted: true, hoursAgo: 48 },
+        { firstName: 'Christopher', lastName: 'Anderson', email: 'canderson@email.com', viewDuration: 98, completionRatio: 0.25, converted: false, hoursAgo: 72 },
+      ]
+
+      const sessions: FormSession[] = sessionBlueprints.map((session, idx) => {
+        const totalSteps = stepLabels.length
+        const calculatedStep = Math.ceil(totalSteps * session.completionRatio)
+        const lastStepReached = session.converted
+          ? totalSteps
+          : Math.max(1, Math.min(totalSteps, calculatedStep))
+
+        return {
+          sessionId: `sess_00${idx + 1}`,
+          userId: `user_00${idx + 1}`,
+          firstName: session.firstName,
+          lastName: session.lastName,
+          email: session.email,
+          phoneNumber: session.phoneNumber,
+          viewDuration: session.viewDuration,
+          lastStepReached,
+          totalSteps,
+          completionRate: Number(((lastStepReached / totalSteps) * 100).toFixed(1)),
+          lastViewed: new Date(Date.now() - session.hoursAgo * 60 * 60 * 1000).toISOString(),
+          converted: session.converted,
+          currentStage: stepLabels[lastStepReached - 1] || stepLabels[0],
+        }
+      })
+
+      const mockData = {
+        formId: formId,
+        formName: templateTitle || 'Medical Intake Form',
+        totalSessions,
+        completionRate: Number(((finalCompleted / totalSessions) * 100).toFixed(1)),
+        averageDuration: 385 + Math.max(0, stepLabels.length - 3) * 40, // seconds
+        stageMetrics,
+        sessions,
       }
+      
+      setData(mockData)
+      // ============= END MOCK DATA =============
+      
     } catch (err) {
       console.error('Error fetching form analytics:', err)
       setError(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`)
@@ -171,8 +238,8 @@ export function FormAnalytics({ formId }: FormAnalyticsDetailProps) {
   return (
     <div className="space-y-6">
       {/* Form Progression Chart - TOP */}
-      <div className="bg-white rounded-xl border border-gray-200/60 p-8 shadow-apple">
-        <div className="mb-8">
+      <div className="bg-white rounded-xl border border-gray-200/60 p-6 shadow-apple">
+        <div className="mb-6">
           <h2 className="text-lg font-semibold text-foreground mb-1">Form Progression</h2>
           <p className="text-sm text-muted-foreground/60">
             Number of users at each stage
@@ -180,37 +247,68 @@ export function FormAnalytics({ formId }: FormAnalyticsDetailProps) {
         </div>
         
         {/* Bar Chart */}
-        <div className="relative pt-6" style={{ height: '360px' }}>
+        <div className="relative pt-4" style={{ height: '340px' }}>
           {/* Y-axis labels */}
-          <div className="absolute left-0 top-6 bottom-20 flex flex-col justify-between text-xs text-muted-foreground/60 pr-3">
+          <div className="absolute left-0 top-4 flex flex-col justify-between text-xs text-muted-foreground/60 pr-3" style={{ bottom: '80px' }}>
             {(() => {
               const maxValue = Math.max(...data.stageMetrics.map(s => s.reached))
-              const chartMax = Math.ceil(maxValue * 1.2)
+              const targetMax = maxValue * 1.2
+              
+              // Smart rounding to nearest 10, 50, or 100
+              let chartMax: number
+              if (targetMax <= 50) {
+                chartMax = Math.ceil(targetMax / 10) * 10
+              } else if (targetMax <= 200) {
+                chartMax = Math.ceil(targetMax / 25) * 25
+              } else if (targetMax <= 500) {
+                chartMax = Math.ceil(targetMax / 50) * 50
+              } else if (targetMax <= 1000) {
+                chartMax = Math.ceil(targetMax / 100) * 100
+              } else {
+                chartMax = Math.ceil(targetMax / 250) * 250
+              }
+              
               const steps = 4
-              const stepValue = Math.ceil(chartMax / steps)
+              const stepValue = chartMax / steps
               return Array.from({ length: steps + 1 }, (_, i) => (
                 <div key={i} className="text-right">
-                  {stepValue * (steps - i)}
+                  {Math.round(stepValue * (steps - i))}
                 </div>
               ))
             })()}
           </div>
 
           {/* Chart Area */}
-          <div className="absolute left-12 right-0 top-6 bottom-0">
+          <div className="absolute left-12 right-0 top-4 bottom-0">
             {/* Grid lines */}
-            <div className="absolute inset-0 flex flex-col justify-between pb-20">
+            <div className="absolute inset-0 flex flex-col justify-between" style={{ paddingBottom: '80px' }}>
               {Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="border-t border-gray-200/40" />
+                <div key={i} className={`border-t ${i === 4 ? 'border-gray-400' : 'border-gray-200/40'}`} />
               ))}
             </div>
 
-            {/* Bars */}
-            <div className="absolute inset-0 flex items-end justify-between gap-6 pb-20">
+            {/* Bars Container */}
+            <div className="absolute left-0 right-0 flex justify-between gap-6" style={{ top: '16px', bottom: '80px' }}>
               {(() => {
                 const maxValue = Math.max(...data.stageMetrics.map(s => s.reached))
-                const chartMax = maxValue * 1.2
-                const chartHeight = 240
+                const targetMax = maxValue * 1.2
+                
+                // Smart rounding to nearest 10, 50, or 100 (same as Y-axis)
+                let chartMax: number
+                if (targetMax <= 50) {
+                  chartMax = Math.ceil(targetMax / 10) * 10
+                } else if (targetMax <= 200) {
+                  chartMax = Math.ceil(targetMax / 25) * 25
+                } else if (targetMax <= 500) {
+                  chartMax = Math.ceil(targetMax / 50) * 50
+                } else if (targetMax <= 1000) {
+                  chartMax = Math.ceil(targetMax / 100) * 100
+                } else {
+                  chartMax = Math.ceil(targetMax / 250) * 250
+                }
+                
+                // Chart height matches the grid area: 340px total - 16px top - 80px bottom = 244px
+                const chartHeight = 244
                 
                 return data.stageMetrics.map((stage, index) => {
                   const reachedHeight = (stage.reached / chartMax) * chartHeight
@@ -218,59 +316,63 @@ export function FormAnalytics({ formId }: FormAnalyticsDetailProps) {
                   const isLastStep = index === data.stageMetrics.length - 1
                   
                   return (
-                    <div key={stage.stepNumber} className="flex-1 flex flex-col items-center justify-end group relative" style={{ height: chartHeight }}>
+                    <div key={stage.stepNumber} className="flex-1 group relative" style={{ height: '100%' }}>
                       {/* Hover tooltip */}
                       <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-xs rounded-lg px-3 py-2 pointer-events-none whitespace-nowrap z-10 shadow-lg">
                         <div className="font-semibold mb-1">{stage.questionText}</div>
                         <div className="text-gray-300">{stage.reached} started</div>
-                        <div className="text-gray-300">{stage.completed} completed</div>
-                        <div className="text-gray-300">{stage.dropoffs} dropped off ({stage.dropoffRate}%)</div>
+                        <div className="text-green-300">{stage.completed} completed ({((stage.completed / stage.reached) * 100).toFixed(1)}%)</div>
+                        <div className="text-red-300">{stage.dropoffs} dropped off ({stage.dropoffRate.toFixed(1)}%)</div>
                       </div>
 
-                      {/* Side-by-side bars */}
-                      <div className="w-full flex items-end justify-center gap-2">
+                      {/* Bars - positioned at bottom, growing upward */}
+                      <div className="absolute bottom-0 left-0 right-0 flex items-end justify-center gap-2">
                         {/* Started Bar */}
-                        <div className="flex-1 max-w-[45px] flex flex-col items-center justify-end">
-                          <div className="text-sm font-bold text-foreground mb-1">{stage.reached}</div>
+                        <div className="flex-1 max-w-[45px] relative flex flex-col items-center">
+                          <div className="absolute -top-6 text-sm font-bold text-foreground whitespace-nowrap">{stage.reached}</div>
                           <div 
                             className="w-full rounded-t transition-all duration-700 ease-out hover:opacity-80"
                             style={{ 
-                              height: `${reachedHeight}px`,
-                              background: 'linear-gradient(180deg, hsl(270, 60%, 75%) 0%, hsl(280, 60%, 70%) 100%)',
-                              minHeight: stage.reached > 0 ? '12px' : '0'
+                              height: `${Math.max(reachedHeight, stage.reached > 0 ? 8 : 0)}px`,
+                              background: 'linear-gradient(180deg, hsl(270, 60%, 75%) 0%, hsl(280, 60%, 70%) 100%)'
                             }}
                           />
                         </div>
 
                         {/* Completed Bar */}
-                        <div className="flex-1 max-w-[45px] flex flex-col items-center justify-end">
-                          <div className="text-sm font-bold text-foreground mb-1">{stage.completed}</div>
+                        <div className="flex-1 max-w-[45px] relative flex flex-col items-center">
+                          <div className="absolute -top-6 text-sm font-bold text-foreground whitespace-nowrap">{stage.completed}</div>
                           <div 
                             className="w-full rounded-t transition-all duration-700 ease-out hover:opacity-90"
                             style={{ 
-                              height: `${completedHeight}px`,
+                              height: `${Math.max(completedHeight, stage.completed > 0 ? 8 : 0)}px`,
                               background: isLastStep 
                                 ? 'linear-gradient(180deg, hsl(145, 65%, 50%) 0%, hsl(145, 65%, 45%) 100%)'
-                                : 'linear-gradient(180deg, hsl(270, 80%, 65%) 0%, hsl(280, 75%, 60%) 100%)',
-                              minHeight: stage.completed > 0 ? '12px' : '0'
+                                : 'linear-gradient(180deg, hsl(270, 80%, 65%) 0%, hsl(280, 75%, 60%) 100%)'
                             }}
                           />
                         </div>
                       </div>
 
-                      {/* Stage label */}
-                      <div className="mt-4 text-center w-full px-1">
-                        <div className="text-xs font-medium text-foreground mb-1 line-clamp-2">
+                      {/* Stage label - BELOW the zero line (positioned below the container) */}
+                      <div className="absolute left-0 right-0 text-center px-1" style={{ top: '100%', paddingTop: '6px' }}>
+                        <div className="text-xs font-medium text-foreground mb-0.5 line-clamp-2">
                           {stage.questionText}
                         </div>
-                        <div className="text-xs text-muted-foreground/50 mb-1">
+                        {/* Progression Rate (Green) - Now above step number */}
+                        {(() => {
+                          const progressionRate = stage.reached > 0 
+                            ? ((stage.completed / stage.reached) * 100).toFixed(1)
+                            : '0.0'
+                          return (
+                            <div className="text-xs font-bold text-green-600 mb-0.5">
+                              {progressionRate}% completed
+                            </div>
+                          )
+                        })()}
+                        <div className="text-xs text-muted-foreground/50">
                           Step {stage.stepNumber}
                         </div>
-                        {stage.dropoffs > 0 && (
-                          <div className="text-xs font-bold text-red-600">
-                            {stage.dropoffRate}% drop-off
-                          </div>
-                        )}
                       </div>
                     </div>
                   )
@@ -281,7 +383,7 @@ export function FormAnalytics({ formId }: FormAnalyticsDetailProps) {
         </div>
 
         {/* Legend */}
-        <div className="flex items-center justify-center gap-6 mt-6 pt-4 border-t border-gray-200/60">
+        <div className="flex items-center justify-center gap-6 mt-2 pt-2 border-t border-gray-200/60">
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded" style={{ background: 'linear-gradient(135deg, hsl(270, 60%, 75%) 0%, hsl(280, 60%, 70%) 100%)' }}></div>
             <span className="text-xs text-muted-foreground/70">Started</span>

@@ -911,7 +911,7 @@ export default function Products() {
           throw new Error(errorPayload?.message || errorPayload?.error || 'Failed to import template')
         }
 
-        toast.success('Product questions updated successfully!')
+        toast.success('Medical questions updated successfully!')
       } else {
         // Product has no questionnaire - need to create one first by cloning the template
         console.log(`📋 Cloning template ${formId} for product ${productId}...`)
@@ -930,7 +930,7 @@ export default function Products() {
           throw new Error(errorPayload?.message || errorPayload?.error || 'Failed to clone template')
         }
 
-        toast.success('Product questions added successfully!')
+        toast.success('Medical questions added successfully!')
       }
     } catch (error: any) {
       console.error("❌ Error attaching form to product:", error)

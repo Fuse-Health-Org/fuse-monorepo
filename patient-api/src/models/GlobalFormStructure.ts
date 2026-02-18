@@ -39,7 +39,7 @@ export default class GlobalFormStructure extends Entity {
   })
   declare sections: Array<{
     id: string
-    type: 'product_questions' | 'category_questions' | 'brand_questions' | 'account_creation' | 'checkout'
+    type: 'product_questions' | 'category_questions' | 'brand_questions' | 'account_creation' | 'product_selection' | 'checkout'
     label: string
     description: string
     order: number

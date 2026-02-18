@@ -18,6 +18,7 @@ import UserRoles from "@models/UserRoles";
 import { AuditAction, AuditResourceType, AuditService } from "@services/audit.service";
 import OrderService from "@services/order.service";
 import stripe from "@utils/useGetStripeClient";
+import { buildStatementDescriptorSuffix } from "@utils/statementDescriptor";
 import { useGlobalFees, getPlatformFeePercent } from "@utils/useGlobalFees";
 import { createPaymentIntentSchema } from "@fuse/validators";
 import { Request, Response } from 'express';
@@ -331,8 +332,8 @@ export const createPaymentIntent = async (req: Request, res: Response) => {
             });
         }
 
-        // Calculate distribution: platform fee (% of total), stripe fee, doctor flat, pharmacy wholesale, brand residual
-        // If Clinic has a Stripe Connect account, we transfer only the brand residual to the clinic
+        // Calculate distribution: platform fee (% of total), doctor flat, pharmacy wholesale, brand residual.
+        // Stripe fee is not subtracted: FUSE pays Stripe (covered by FUSE transaction fee).
         const fees = await useGlobalFees();
         
         // Get platform fee percent based on clinic's tier (or global fallback)
@@ -341,13 +342,11 @@ export const createPaymentIntent = async (req: Request, res: Response) => {
             ? await getPlatformFeePercent(effectiveClinicId)
             : fees.platformFeePercent;
         
-        const stripeFeePercent = fees.stripeFeePercent;
         const doctorFlatUsd = fees.doctorFlatFeeUsd;
 
         let brandAmountUsd = 0;
         let pharmacyWholesaleTotal = 0;
         let platformFeeUsd = 0;
-        let stripeFeeUsd = 0;
         try {
             // Sum wholesale cost from treatment products aligned with selectedProducts
             if (treatment?.products && selectedProducts) {
@@ -366,13 +365,11 @@ export const createPaymentIntent = async (req: Request, res: Response) => {
             // Include visit fee in total calculation
             const totalPaid = Number(amount) + visitFeeAmount;
             platformFeeUsd = Math.max(0, (platformFeePercent / 100) * totalPaid);
-            stripeFeeUsd = Math.max(0, (stripeFeePercent / 100) * totalPaid);
             const doctorUsd = Math.max(0, doctorFlatUsd);
             brandAmountUsd = Math.max(
                 0,
                 totalPaid -
                 platformFeeUsd -
-                stripeFeeUsd -
                 doctorUsd -
                 pharmacyWholesaleTotal
             );
@@ -389,14 +386,18 @@ export const createPaymentIntent = async (req: Request, res: Response) => {
             brandAmountUsd = 0;
         }
 
-        // Resolve clinic's Stripe account (via effectiveClinicId if present)
+        // Resolve clinic's Stripe account and name (for statement descriptor)
         let transferData: any = undefined;
+        let clinicNameForStatement: string | null = null;
         try {
             let clinicStripeAccountId: string | undefined = undefined;
             
             if (effectiveClinicId) {
-                const clinic = await Clinic.findByPk(effectiveClinicId);
+                const clinic = await Clinic.findByPk(effectiveClinicId, {
+                    attributes: ["stripeAccountId", "name"],
+                });
                 clinicStripeAccountId = clinic?.stripeAccountId;
+                clinicNameForStatement = clinic?.name ?? null;
             }
             
             if (clinicStripeAccountId && brandAmountUsd > 0) {
@@ -418,12 +419,12 @@ export const createPaymentIntent = async (req: Request, res: Response) => {
             }
         }
 
-        // Persist payout breakdown on Order
+        // Persist payout breakdown on Order (stripeAmount 0: FUSE pays Stripe)
         try {
             await order.update({
                 platformFeeAmount: platformFeeUsd,
                 platformFeePercent: Number(platformFeePercent.toFixed(2)),
-                stripeAmount: Number(stripeFeeUsd.toFixed(2)),
+                stripeAmount: 0,
                 doctorAmount: Number(doctorFlatUsd.toFixed(2)),
                 pharmacyWholesaleAmount: Number(pharmacyWholesaleTotal.toFixed(2)),
                 brandAmount: Number(brandAmountUsd.toFixed(2)),
@@ -472,6 +473,12 @@ export const createPaymentIntent = async (req: Request, res: Response) => {
                 console.log(
                     `💸 Adding transfer_data: $${brandAmountUsd.toFixed(2)} to destination ${transferData.destination}`
                 );
+            }
+
+            // Full statement descriptor so customer sees brand name only (e.g. "FuseHealth Checkhealth"), no truncation
+            const statementDescriptor = buildStatementDescriptorSuffix(clinicNameForStatement);
+            if (statementDescriptor) {
+                paymentIntentParams.statement_descriptor = statementDescriptor;
             }
 
             paymentIntent = await stripe.paymentIntents.create(paymentIntentParams);

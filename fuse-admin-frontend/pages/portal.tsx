@@ -380,7 +380,7 @@ export default function PortalPage() {
 
       // Also save defaultFormColor to clinic/organization settings
       if (settings.defaultFormColor) {
-        await authenticatedFetch(`${API_URL}/organization`, {
+        await authenticatedFetch(`${API_URL}/organization/update`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ defaultFormColor: settings.defaultFormColor }),

@@ -49,6 +49,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
     visitType,
     loadingVisitFee = false,
     onCalculateVisitFee,
+    hasProductSelectionStep = false,
 }) => {
     const selectedPlanData = plans.find((plan) => plan.id === selectedPlan);
     const isProgramCheckout = !!programData;
@@ -279,12 +280,12 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                     <p className="text-gray-600">Secure checkout for your {treatmentName} subscription</p>
                 </div>
 
-                {/* Program Product Selection - Only for programs */}
-                {isProgramCheckout && programData && (
+                {/* Program Product Selection - Only for programs AND when not a separate step */}
+                {isProgramCheckout && programData && !hasProductSelectionStep && (
                     <Card>
                         <CardBody className="p-6">
                             {(() => {
-                                const productOfferType = programData.productOfferType || programData.medicalTemplate?.productOfferType || 'multiple_choice';
+                                const productOfferType = programData.productOfferType || programData.medicalTemplate?.productOfferType || 'single_choice';
                                 const isSingleChoice = productOfferType === 'single_choice';
 
                                 // Helper function to calculate full price (product + services) for each product
@@ -308,11 +309,11 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                                         </p>
 
                                         <div className="space-y-3">
-                                            {programData.products.map((product) => {
+                                            {programData.products.map((product, index) => {
                                                 const fullPrice = getProductFullPrice(product);
                                                 return (
                                                     <div
-                                                        key={product.id}
+                                                        key={`${product.id}-${index}`}
                                                         className={`relative rounded-lg border-2 p-4 transition-all cursor-pointer ${paymentStatus === 'processing' || !!clientSecret
                                                             ? 'opacity-60 cursor-not-allowed bg-gray-50'
                                                             : ''
@@ -745,7 +746,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                                 <div className="space-y-3 mb-4">
                                     {programData.products
                                         .filter((product) => selectedProgramProducts[product.id])
-                                        .map((product) => {
+                                        .map((product, index) => {
                                             // Calculate full price including services for this product
                                             const productPrice = product.displayPrice;
                                             const servicesFee = hasPerProductPricing
@@ -754,7 +755,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                                             const fullPrice = productPrice + servicesFee;
 
                                             return (
-                                                <div key={product.id} className="flex gap-3 p-3 bg-gray-50 rounded-lg">
+                                                <div key={`${product.id}-selected-${index}`} className="flex gap-3 p-3 bg-gray-50 rounded-lg">
                                                     {product.imageUrl ? (
                                                         <img
                                                             src={product.imageUrl}
@@ -814,8 +815,8 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                         {!isProgramCheckout && (
                             <>
                                 <div className="space-y-3 mb-4">
-                                    {questionnaireProducts?.filter((product) => (selectedProducts[product.id] || 0) > 0).map((product) => (
-                                        <div key={product.id} className="flex gap-3 p-3 bg-gray-50 rounded-lg">
+                                    {questionnaireProducts?.filter((product) => (selectedProducts[product.id] || 0) > 0).map((product, index) => (
+                                        <div key={`${product.id}-${index}`} className="flex gap-3 p-3 bg-gray-50 rounded-lg">
                                             <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-sm">
                                                 <Icon icon="lucide:pill" className="w-5 h-5 text-gray-600" />
                                             </div>

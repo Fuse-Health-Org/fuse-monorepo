@@ -374,8 +374,9 @@ async function ensureDefaultFormStructures() {
       sections: [
         { id: "product", icon: "📦", type: "product_questions", label: "Product Questions", order: 1, enabled: true, description: "Questions specific to each individual product" },
         { id: "account", icon: "👤", type: "account_creation", label: "Create Account", order: 2, enabled: true, description: "Patient information collection" },
-        { id: "checkout", icon: "💳", type: "checkout", label: "Payment & Checkout", order: 3, enabled: true, description: "Billing and shipping" },
-        { id: "category", icon: "📋", type: "category_questions", label: "Standardized Category Questions", order: 4, enabled: false, description: "Questions shared across all products in a category" }
+        { id: "productSelection", icon: "🛒", type: "product_selection", label: "Product Selection", order: 3, enabled: true, description: "Select products and quantities" },
+        { id: "checkout", icon: "💳", type: "checkout", label: "Payment & Checkout", order: 4, enabled: true, description: "Billing and shipping" },
+        { id: "category", icon: "📋", type: "category_questions", label: "Standardized Category Questions", order: 5, enabled: false, description: "Questions shared across all products in a category" }
       ],
       createdAt: "2025-11-06T00:00:00.000Z",
       description: "Standard questionnaire flow for all products"
@@ -387,7 +388,8 @@ async function ensureDefaultFormStructures() {
         { id: "category", icon: "📋", type: "category_questions", label: "Standardized Category Questions", order: 1, enabled: true, description: "Questions shared across all products in a category" },
         { id: "product", icon: "📦", type: "product_questions", label: "Product Questions", order: 2, enabled: true, description: "Questions specific to each individual product" },
         { id: "account", icon: "👤", type: "account_creation", label: "Create Account", order: 3, enabled: true, description: "Patient information collection" },
-        { id: "checkout", icon: "💳", type: "checkout", label: "Payment & Checkout", order: 4, enabled: true, description: "Billing information and payment processing" }
+        { id: "productSelection", icon: "🛒", type: "product_selection", label: "Product Selection", order: 4, enabled: true, description: "Select products and quantities" },
+        { id: "checkout", icon: "💳", type: "checkout", label: "Payment & Checkout", order: 5, enabled: true, description: "Billing information and payment processing" }
       ],
       createdAt: "2025-11-06T00:00:00.000Z",
       description: "Category questions first for comprehensive intake"
@@ -398,8 +400,9 @@ async function ensureDefaultFormStructures() {
       sections: [
         { id: "category", icon: "📋", type: "category_questions", label: "Standardized Category Questions", order: 1, enabled: true, description: "Questions shared across all products in a category" },
         { id: "account", icon: "👤", type: "account_creation", label: "Create Account", order: 2, enabled: true, description: "Patient information collection" },
-        { id: "checkout", icon: "💳", type: "checkout", label: "Payment & Checkout", order: 3, enabled: true, description: "Billing information and payment processing" },
-        { id: "product", icon: "📦", type: "product_questions", label: "Product Questions", order: 4, enabled: true, description: "Questions specific to each individual product" }
+        { id: "productSelection", icon: "🛒", type: "product_selection", label: "Product Selection", order: 3, enabled: true, description: "Select products and quantities" },
+        { id: "checkout", icon: "💳", type: "checkout", label: "Payment & Checkout", order: 4, enabled: true, description: "Billing information and payment processing" },
+        { id: "product", icon: "📦", type: "product_questions", label: "Product Questions", order: 5, enabled: true, description: "Questions specific to each individual product" }
       ],
       createdAt: "2025-11-06T00:00:00.000Z",
       description: "Payment after category questions"
@@ -408,10 +411,11 @@ async function ensureDefaultFormStructures() {
       id: "1762382604408",
       name: "Payment First",
       sections: [
-        { id: "checkout", icon: "💳", type: "checkout", label: "Payment & Checkout", order: 1, enabled: true, description: "Billing information and payment processing" },
-        { id: "account", icon: "👤", type: "account_creation", label: "Create Account", order: 2, enabled: true, description: "Patient information collection" },
-        { id: "product", icon: "📦", type: "product_questions", label: "Product Questions", order: 3, enabled: true, description: "Questions specific to each individual product" },
-        { id: "category", icon: "📋", type: "category_questions", label: "Standardized Category Questions", order: 4, enabled: false, description: "Questions shared across all products in a category" }
+        { id: "productSelection", icon: "🛒", type: "product_selection", label: "Product Selection", order: 1, enabled: true, description: "Select products and quantities" },
+        { id: "checkout", icon: "💳", type: "checkout", label: "Payment & Checkout", order: 2, enabled: true, description: "Billing information and payment processing" },
+        { id: "account", icon: "👤", type: "account_creation", label: "Create Account", order: 3, enabled: true, description: "Patient information collection" },
+        { id: "product", icon: "📦", type: "product_questions", label: "Product Questions", order: 4, enabled: true, description: "Questions specific to each individual product" },
+        { id: "category", icon: "📋", type: "category_questions", label: "Standardized Category Questions", order: 5, enabled: false, description: "Questions shared across all products in a category" }
       ],
       createdAt: "2025-11-06T00:00:00.000Z",
       description: "Collect payment before medical questions"
@@ -436,6 +440,77 @@ async function ensureDefaultFormStructures() {
         if (process.env.NODE_ENV === 'development') {
           console.log(`✅ Created default form structure: ${structure.name}`);
         }
+      } else {
+        // Backfill existing structures with newly introduced sections (e.g., product_selection)
+        const currentSections = Array.isArray(existing.sections) ? existing.sections : [];
+        const hasProductSelection = currentSections.some((s: any) => s?.type === "product_selection");
+
+        if (!hasProductSelection) {
+          const templateProductSelection = structure.sections.find((s: any) => s.type === "product_selection");
+          const templateCheckout = structure.sections.find((s: any) => s.type === "checkout");
+
+          if (templateProductSelection && templateCheckout) {
+            const updatedSections = currentSections.map((section: any) => {
+              const currentOrder = Number(section?.order) || 0;
+              if (currentOrder >= templateCheckout.order) {
+                return { ...section, order: currentOrder + 1 };
+              }
+              return section;
+            });
+
+            updatedSections.push({
+              ...templateProductSelection,
+              enabled: true,
+            });
+
+            updatedSections.sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0));
+
+            await existing.update({
+              sections: updatedSections,
+            });
+
+            if (process.env.NODE_ENV === "development") {
+              console.log(`✅ Backfilled product_selection into structure: ${structure.name}`);
+            }
+          }
+        }
+      }
+    }
+
+    // Backfill all existing custom structures so Product Selection is universally available
+    const allStructures = await GlobalFormStructure.findAll();
+    for (const structureRecord of allStructures) {
+      const currentSections = Array.isArray(structureRecord.sections) ? structureRecord.sections : [];
+      const hasProductSelection = currentSections.some((s: any) => s?.type === "product_selection");
+      if (hasProductSelection) continue;
+
+      const checkoutSection = currentSections.find((s: any) => s?.type === "checkout");
+      const checkoutOrder = Number(checkoutSection?.order) || currentSections.length + 1;
+
+      const shiftedSections = currentSections.map((section: any) => {
+        const sectionOrder = Number(section?.order) || 0;
+        if (sectionOrder >= checkoutOrder) {
+          return { ...section, order: sectionOrder + 1 };
+        }
+        return section;
+      });
+
+      shiftedSections.push({
+        id: "productSelection",
+        icon: "🛒",
+        type: "product_selection",
+        label: "Product Selection",
+        order: checkoutOrder,
+        enabled: true,
+        description: "Select products and quantities",
+      });
+
+      shiftedSections.sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0));
+
+      await structureRecord.update({ sections: shiftedSections });
+
+      if (process.env.NODE_ENV === "development") {
+        console.log(`✅ Backfilled product_selection into custom structure: ${structureRecord.name}`);
       }
     }
   } catch (error) {
@@ -468,6 +543,16 @@ export async function initializeDatabase() {
     await sequelize.sync({ alter: true });
     if (process.env.NODE_ENV === 'development') {
       console.log('✅ Database tables synchronized successfully');
+    }
+
+    // Ensure GIN index exists on Program.formStepOrder (JSONB)
+    try {
+      await sequelize.query(`
+        CREATE INDEX IF NOT EXISTS "program_form_step_order_idx"
+        ON "Program" USING gin ("formStepOrder");
+      `);
+    } catch (indexError) {
+      console.log('⚠️  Program.formStepOrder index:', indexError instanceof Error ? indexError.message : indexError);
     }
 
     // Allow Program.clinicId to be NULL for templates
@@ -550,6 +635,11 @@ export async function initializeDatabase() {
 
     // Ensure TierConfiguration exists for all active BrandSubscriptionPlans
     try {
+      await sequelize.query(`
+        ALTER TABLE "TierConfiguration"
+        ADD COLUMN IF NOT EXISTS "nonMedicalProfitPercent" numeric(5,2) DEFAULT NULL;
+      `);
+
       if (process.env.NODE_ENV === 'development') {
         console.log('🔍 Checking TierConfiguration for active plans...');
       }

@@ -13,6 +13,7 @@ export function useQuestionnaireData(
     | "productCategory"
     | "productFormVariant"
     | "globalFormStructure"
+    | "programData"
   >,
   onClose: () => void
 ) {
@@ -67,6 +68,7 @@ export function useQuestionnaireData(
               // Store program info on the questionnaire for later use
               questionnaireData._programId = program.id
               questionnaireData._programName = program.name
+              questionnaireData._programFormStepOrder = Array.isArray(program.formStepOrder) ? program.formStepOrder : null
               console.log('✅ Loaded questionnaire from Program template:', questionnaireData.id)
             } else {
               throw new Error(qData?.message || 'Failed to load questionnaire or program')
@@ -164,7 +166,7 @@ export function useQuestionnaireData(
             for (const section of enabledSections) {
               switch (section.type) {
                 case 'product_questions':
-                  console.log(`  → Adding ${normalSteps.length} product question steps`)
+                  console.log(`  → Adding ${normalSteps.length} medical question steps`)
                   orderedSteps.push(...normalSteps)
                   break
                 case 'category_questions':
@@ -174,6 +176,10 @@ export function useQuestionnaireData(
                 case 'account_creation':
                   console.log(`  → Adding ${userProfileSteps.length} account creation steps`)
                   orderedSteps.push(...userProfileSteps)
+                  break
+                case 'product_selection':
+                  // Product selection is handled separately via productSelectionStepPosition
+                  console.log('  → Product Selection section (handled separately)')
                   break
                 case 'checkout':
                   // Checkout is handled separately via checkoutStepPosition
@@ -193,6 +199,33 @@ export function useQuestionnaireData(
             questionnaireData.steps = orderedSteps
             console.log(`✅ Global Form Structure applied: ${orderedSteps.length} total steps`)
 
+            // Update product selection step position based on Global Form Structure
+            const productSelectionSection = enabledSections.find((s: any) => s.type === 'product_selection')
+            if (productSelectionSection) {
+              // Calculate position: count how many section types come before product selection
+              const sectionsBeforeProductSelection = enabledSections.filter((s: any) => s.order < productSelectionSection.order && s.enabled && s.type !== 'product_selection')
+              let productSelectionPosition = 0
+
+              for (const section of sectionsBeforeProductSelection) {
+                switch (section.type) {
+                  case 'product_questions':
+                    productSelectionPosition += normalSteps.length
+                    break
+                  case 'category_questions':
+                    productSelectionPosition += categoryQuestionSteps.length
+                    break
+                  case 'account_creation':
+                    productSelectionPosition += userProfileSteps.length
+                    break
+                }
+              }
+
+              questionnaireData.productSelectionStepPosition = productSelectionPosition
+              console.log(`✅ Product Selection position set to: ${productSelectionPosition} (based on Global Form Structure)`)
+            } else {
+              questionnaireData.productSelectionStepPosition = -1 // Not enabled
+            }
+
             // Update checkout step position based on Global Form Structure
             const checkoutSection = enabledSections.find((s: any) => s.type === 'checkout')
             if (checkoutSection) {
@@ -210,6 +243,9 @@ export function useQuestionnaireData(
                     break
                   case 'account_creation':
                     checkoutPosition += userProfileSteps.length
+                    break
+                  case 'product_selection':
+                    checkoutPosition += 1 // Product selection is a single step
                     break
                 }
               }
@@ -240,6 +276,86 @@ export function useQuestionnaireData(
               // Order: normal, user_profile, category questions, others
               questionnaireData.steps = [...normal, ...userProfile, ...categoryQuestionSteps, ...others]
             }
+          }
+
+          // Program-level form section ordering override (saved from admin Program Form tab)
+          const programStepOrder = Array.isArray((props.programData as any)?.formStepOrder)
+            ? (props.programData as any).formStepOrder
+            : Array.isArray((questionnaireData as any)._programFormStepOrder)
+            ? (questionnaireData as any)._programFormStepOrder
+            : null
+
+          if (programStepOrder && programStepOrder.length > 0) {
+            const stepSet = new Set<string>(programStepOrder.filter((s: any): s is string => typeof s === 'string'))
+            const normalizedOrder = [...stepSet].filter((s) =>
+              ['productSelection', 'medical', 'account', 'payment'].includes(s)
+            )
+
+            // Payment is always the final step.
+            const withoutPayment = normalizedOrder.filter((s) => s !== 'payment')
+            const finalOrder = [...withoutPayment, 'payment']
+
+            const currentSteps = Array.isArray(questionnaireData.steps) ? questionnaireData.steps : []
+            const medicalSteps = currentSteps
+              .filter((s: any) => s.category === 'normal' || !s.category)
+              .sort((a: any, b: any) => (a.stepOrder ?? 0) - (b.stepOrder ?? 0))
+            const accountSteps = currentSteps
+              .filter((s: any) => s.category === 'user_profile')
+              .sort((a: any, b: any) => (a.stepOrder ?? 0) - (b.stepOrder ?? 0))
+            const otherSteps = currentSteps
+              .filter((s: any) => s.category && s.category !== 'normal' && s.category !== 'user_profile')
+              .sort((a: any, b: any) => (a.stepOrder ?? 0) - (b.stepOrder ?? 0))
+
+            const orderedSteps: any[] = []
+            let cursor = 0
+            let productSelectionPosition: number = -1
+            let checkoutPosition: number = currentSteps.length
+
+            for (const section of finalOrder) {
+              if (section === 'medical') {
+                orderedSteps.push(...medicalSteps)
+                cursor += medicalSteps.length
+              } else if (section === 'account') {
+                orderedSteps.push(...accountSteps)
+                cursor += accountSteps.length
+              } else if (section === 'productSelection') {
+                productSelectionPosition = cursor
+                cursor += 1
+              } else if (section === 'payment') {
+                checkoutPosition = cursor
+              }
+            }
+
+            // Keep any uncategorized steps visible (at the end) to avoid data loss.
+            if (otherSteps.length > 0) {
+              orderedSteps.push(...otherSteps)
+            }
+
+            questionnaireData.steps = orderedSteps
+            questionnaireData.productSelectionStepPosition = productSelectionPosition
+            questionnaireData.checkoutStepPosition = checkoutPosition
+
+            console.log('✅ Applied program form step order:', finalOrder)
+            console.log('   Product selection position:', productSelectionPosition, 'Checkout position:', checkoutPosition)
+          }
+
+          // Universal fallback: ensure dedicated product selection step appears before checkout
+          // when a structure did not explicitly set productSelectionStepPosition.
+          if (
+            questionnaireData.productSelectionStepPosition === undefined &&
+            questionnaireData.checkoutStepPosition !== undefined
+          ) {
+            const checkoutPosition =
+              questionnaireData.checkoutStepPosition === -1
+                ? questionnaireData.steps.length
+                : questionnaireData.checkoutStepPosition
+
+            questionnaireData.productSelectionStepPosition = checkoutPosition
+            questionnaireData.checkoutStepPosition = checkoutPosition + 1
+
+            console.log(
+              `✅ Default Product Selection applied at ${questionnaireData.productSelectionStepPosition}; checkout shifted to ${questionnaireData.checkoutStepPosition}`
+            )
           }
 
           // Fetch clinic data for variable replacement
@@ -389,7 +505,7 @@ export function useQuestionnaireData(
     };
 
     loadQuestionnaire();
-  }, [isOpen, props.treatmentId, props.questionnaireId, onClose]);
+  }, [isOpen, props.treatmentId, props.questionnaireId, props.productCategory, props.productFormVariant, props.globalFormStructure, props.productName, onClose]);
 
   return { questionnaire, loading, setQuestionnaire };
 }

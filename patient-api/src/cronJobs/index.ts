@@ -38,12 +38,14 @@ class CronJobRegistry {
         const prescriptionExpirationJob = (await import('./prescription-expiration.cron')).default;
         const ticketAutoCloseJob = (await import('./ticket-auto-close.cron')).default;
         const ironSailRetryJob = (await import('./ironsail-retry.cron')).default;
+        const abandonedCartJob = (await import('./abandoned-cart.cron')).default;
 
         // Add all job definitions to the registry
         this.definitions = [
             prescriptionExpirationJob,
             ticketAutoCloseJob,
             ironSailRetryJob,
+            abandonedCartJob,
         ];
 
         // Register and start all jobs

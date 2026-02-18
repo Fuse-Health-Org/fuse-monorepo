@@ -796,7 +796,7 @@ export function OrderDetailModal({ order, isOpen, onClose, onApprove, onCancel, 
                                                 )}
                                             </p>
                                             <span className="inline-block mt-2 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
-                                                Product Question
+                                                Medical Question
                                             </span>
                                         </div>
                                     ))}
