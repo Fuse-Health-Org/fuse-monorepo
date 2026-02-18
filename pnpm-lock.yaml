@@ -238,6 +238,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 5.9.2
+      wait-on:
+        specifier: ^8.0.3
+        version: 8.0.5
 
   fuse-admin-frontend:
     dependencies:
@@ -1813,6 +1816,26 @@ packages:
 
   '@formatjs/intl-localematcher@0.6.1':
     resolution: {integrity: sha512-ePEgLgVCqi2BBFnTMWPfIghu6FkbZnnBVhO2sSxvLfrdFw7wCHAHiDoM2h4NRgjbaY7+B7HgOLZGkK187pZTZg==}
+
+  '@hapi/address@5.1.1':
+    resolution: {integrity: sha512-A+po2d/dVoY7cYajycYI43ZbYMXukuopIsqCjh5QzsBCipDtdofHntljDlpccMjIfTy6UOkg+5KPriwYch2bXA==}
+    engines: {node: '>=14.0.0'}
+
+  '@hapi/formula@3.0.2':
+    resolution: {integrity: sha512-hY5YPNXzw1He7s0iqkRQi+uMGh383CGdyyIGYtB+W5N3KHPXoqychklvHhKCC9M3Xtv0OCs/IHw+r4dcHtBYWw==}
+
+  '@hapi/hoek@11.0.7':
+    resolution: {integrity: sha512-HV5undWkKzcB4RZUusqOpcgxOaq6VOAH7zhhIr2g3G8NF/MlFO75SjOr2NfuSx0Mh40+1FqCkagKLJRykUWoFQ==}
+
+  '@hapi/pinpoint@2.0.1':
+    resolution: {integrity: sha512-EKQmr16tM8s16vTT3cA5L0kZZcTMU5DUOZTuvpnY738m+jyP3JIUj+Mm1xc1rsLkGBQ/gVnfKYPwOmPg1tUR4Q==}
+
+  '@hapi/tlds@1.1.6':
+    resolution: {integrity: sha512-xdi7A/4NZokvV0ewovme3aUO5kQhW9pQ2YD1hRqZGhhSi5rBv4usHYidVocXSi9eihYsznZxLtAiEYYUL6VBGw==}
+    engines: {node: '>=14.0.0'}
+
+  '@hapi/topo@6.0.2':
+    resolution: {integrity: sha512-KR3rD5inZbGMrHmgPxsJ9dbi6zEK+C3ZwUwTa+eMwWLz7oijWUTWD2pMSNNYJAU6Qq+65NkxXjqHr/7LM2Xkqg==}
 
   '@heroui/accordion@2.2.23':
     resolution: {integrity: sha512-eXokso461YdSkJ6t3fFxBq2xkxCcZPbXECwanNHaLZPBh1QMaVdtCEZZxVB4HeoMRmZchRHWbUrbiz/l+A9hZQ==}
@@ -4031,6 +4054,9 @@ packages:
   '@socket.io/component-emitter@3.1.2':
     resolution: {integrity: sha512-9BCxFwvbGg/RsZK9tjXd8s4UcwR0MWeFQ1XEKIQVVvAGJyINdrqKMcTRyLoK8Rse1GjzLV9cwjWV1olXRWEXVA==}
 
+  '@standard-schema/spec@1.1.0':
+    resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
+
   '@stripe/connect-js@3.3.31':
     resolution: {integrity: sha512-vjsZbatveSMoceOKZHt4eImmlBQla112OV9+enxcZUC1dGziTl2J2E3iH3n01yx9nu9ziesMJnSh/Y2d62TA/Q==}
 
@@ -6150,6 +6176,10 @@ packages:
     resolution: {integrity: sha512-VXe6RjJkBPj0ohtqaO8vSWP3ZhAKo66fKrFNCll4BTcwljPLz03pCbaNKfzGP5MbrCYcbJ7v0nOYYwUzTEIdXQ==}
     hasBin: true
 
+  joi@18.0.2:
+    resolution: {integrity: sha512-RuCOQMIt78LWnktPoeBL0GErkNaJPTBGcYuyaBvUOQSpcpcLfWrHPPihYdOGbV5pam9VTWbeoF7TsGiHugcjGA==}
+    engines: {node: '>= 20'}
+
   joycon@3.1.1:
     resolution: {integrity: sha512-34wB/Y7MW7bzjKRjUKTa46I2Z7eV62Rkhva+KkopW7Qvv/OSWBqvkSY7vusOPrNuZcUG3tApvdVgNB8POj3SPw==}
     engines: {node: '>=10'}
@@ -7947,6 +7977,11 @@ packages:
   vscode-uri@3.1.0:
     resolution: {integrity: sha512-/BpdSx+yCQGnCvecbyXdxHDkuk55/G3xwnC0GqY4gmQ3j+A+g8kzzgB4Nk/SINjqn6+waqw3EgbVF2QKExkRxQ==}
 
+  wait-on@8.0.5:
+    resolution: {integrity: sha512-J3WlS0txVHkhLRb2FsmRg3dkMTCV1+M6Xra3Ho7HzZDHpE7DCOnoSoCJsZotrmW3uRMhvIJGSKUKrh/MeF4iag==}
+    engines: {node: '>=12.0.0'}
+    hasBin: true
+
   wcwidth@1.0.1:
     resolution: {integrity: sha512-XHPEwS0q6TaxcvG85+8EYkbiCux2XtWG2mkc47Ng2A77BQu9+DqIOJldST4HgPkuea7dvKSj5VgX3P1d4rW8Tg==}
 
@@ -9070,6 +9105,22 @@ snapshots:
   '@formatjs/intl-localematcher@0.6.1':
     dependencies:
       tslib: 2.8.1
+
+  '@hapi/address@5.1.1':
+    dependencies:
+      '@hapi/hoek': 11.0.7
+
+  '@hapi/formula@3.0.2': {}
+
+  '@hapi/hoek@11.0.7': {}
+
+  '@hapi/pinpoint@2.0.1': {}
+
+  '@hapi/tlds@1.1.6': {}
+
+  '@hapi/topo@6.0.2':
+    dependencies:
+      '@hapi/hoek': 11.0.7
 
   '@heroui/accordion@2.2.23(@heroui/system@2.4.22(@heroui/theme@2.4.22(tailwindcss@3.4.17(ts-node@10.9.2(@types/node@24.6.0)(typescript@5.9.2))))(framer-motion@12.23.22(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(@heroui/theme@2.4.22(tailwindcss@3.4.17(ts-node@10.9.2(@types/node@24.6.0)(typescript@5.9.2))))(framer-motion@12.23.22(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
     dependencies:
@@ -12240,6 +12291,8 @@ snapshots:
 
   '@socket.io/component-emitter@3.1.2': {}
 
+  '@standard-schema/spec@1.1.0': {}
+
   '@stripe/connect-js@3.3.31': {}
 
   '@stripe/react-stripe-js@2.9.0(@stripe/stripe-js@4.10.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
@@ -14782,6 +14835,16 @@ snapshots:
   jiti@2.6.0:
     optional: true
 
+  joi@18.0.2:
+    dependencies:
+      '@hapi/address': 5.1.1
+      '@hapi/formula': 3.0.2
+      '@hapi/hoek': 11.0.7
+      '@hapi/pinpoint': 2.0.1
+      '@hapi/tlds': 1.1.6
+      '@hapi/topo': 6.0.2
+      '@standard-schema/spec': 1.1.0
+
   joycon@3.1.1: {}
 
   jpeg-exif@1.1.4: {}
@@ -16779,6 +16842,16 @@ snapshots:
   vscode-languageserver-textdocument@1.0.12: {}
 
   vscode-uri@3.1.0: {}
+
+  wait-on@8.0.5:
+    dependencies:
+      axios: 1.12.2
+      joi: 18.0.2
+      lodash: 4.17.21
+      minimist: 1.2.8
+      rxjs: 7.8.2
+    transitivePeerDependencies:
+      - debug
 
   wcwidth@1.0.1:
     dependencies:

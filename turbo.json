@@ -31,31 +31,6 @@
 
       ]
     },
-    "@fuse/frontend#dev": {
-      "cache": false,
-      "persistent": true,
-      "dependsOn": ["@fuse/api#dev"]
-    },
-    "@fuse/admin-frontend#dev": {
-      "cache": false,
-      "persistent": true,
-      "dependsOn": ["@fuse/api#dev"]
-    },
-    "@fuse/tenant-portal-frontend#dev": {
-      "cache": false,
-      "persistent": true,
-      "dependsOn": ["@fuse/api#dev"]
-    },
-    "@fuse/doctor-portal-frontend#dev": {
-      "cache": false,
-      "persistent": true,
-      "dependsOn": ["@fuse/api#dev"]
-    },
-    "@fuse/affiliate-portal-frontend#dev": {
-      "cache": false,
-      "persistent": true,
-      "dependsOn": ["@fuse/api#dev"]
-    },
     "clean": {
       "cache": false
     },
