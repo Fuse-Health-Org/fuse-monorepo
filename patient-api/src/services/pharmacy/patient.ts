@@ -79,8 +79,7 @@ class PatientService {
         console.error('🔍 AbsoluteRX Patient Creation Error:', {
           status: error.response?.status,
           statusText: error.response?.statusText,
-          data: JSON.stringify(error.response?.data, null, 2),
-          sentData: JSON.stringify(patientData, null, 2)
+          data: JSON.stringify(error.response?.data, null, 2)
         });
 
         return {
@@ -261,9 +260,6 @@ class PatientService {
     }
 
     console.log(`🔍 Syncing patient for user ${userId}:`, {
-      firstName: user.firstName,
-      lastName: user.lastName,
-      email: user.email,
       hasPhoneNumber: !!user.phoneNumber,
       hasDob: !!user.dob,
       hasGender: !!user.gender,
