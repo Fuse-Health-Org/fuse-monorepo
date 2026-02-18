@@ -43,18 +43,20 @@ function serializeProduct(product: Product): SerializedProduct {
   const brandData = (plain as any).brand;
   const brandName = brandData?.clinic?.name || null;
 
-  const pharmacyCoverages = ((plain as any).pharmacyCoverages ?? []).map((c: any) => ({
-    id: c.id,
-    customName: c.customName,
-    customSig: c.customSig,
-    pharmacy: c.pharmacy
-      ? { id: c.pharmacy.id, name: c.pharmacy.name, slug: c.pharmacy.slug }
-      : null,
-    pharmacyProduct:
-      Array.isArray(c.assignments) && c.assignments.length > 0
-        ? { pharmacyProductName: c.assignments[0].pharmacyProductName }
+  const pharmacyCoverages = ((plain as any).pharmacyCoverages ?? [])
+    .map((c: any) => ({
+      id: c.id,
+      customName: c.customName,
+      customSig: c.customSig,
+      pharmacy: c.pharmacy
+        ? { id: c.pharmacy.id, name: c.pharmacy.name, slug: c.pharmacy.slug }
         : null,
-  }));
+      pharmacyProduct:
+        Array.isArray(c.assignments) && c.assignments.length > 0
+          ? { pharmacyProductName: c.assignments[0].pharmacyProductName }
+          : null,
+    }))
+    .sort((a: any, b: any) => (a.customName ?? "").localeCompare(b.customName ?? ""));
 
   return {
     ...plain,
@@ -161,10 +163,7 @@ class ProductService {
       where,
       limit,
       offset,
-      order: [
-        ["createdAt", "DESC"],
-        [PharmacyCoverage, "customName", "ASC"],
-      ],
+      order: [["createdAt", "DESC"]],
       distinct: true,
       include: [
         {
