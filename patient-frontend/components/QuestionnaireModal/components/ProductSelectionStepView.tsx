@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Icon } from "@iconify/react";
 import { ProgressBar } from "./ProgressBar";
 import { StepHeader } from "./StepHeader";
@@ -48,6 +48,12 @@ export const ProductSelectionStepView: React.FC<ProductSelectionStepViewProps> =
   const productOfferType = programData?.productOfferType || programData?.medicalTemplate?.productOfferType || "single_choice";
   const isSingleChoice = productOfferType === "single_choice";
 
+  const [showAdditionalOptions, setShowAdditionalOptions] = useState(true);
+
+  // theme.primaryDark is always a solid hex — safe to use for borders and box-shadows
+  // regardless of whether theme.primary is a solid color or a linear-gradient.
+  const themeSolidColor = theme.primaryDark;
+
   // Auto-select top choice product on mount if nothing is selected yet
   useEffect(() => {
     if (isProgramFlow && programData?.products && programData.products.length > 0) {
@@ -79,19 +85,19 @@ export const ProductSelectionStepView: React.FC<ProductSelectionStepViewProps> =
             {programData?.products && programData.products.length > 0 && (
               <div className="space-y-3">
                 <div className="flex items-center justify-center gap-2">
-                  <div className="rounded-full p-1" style={{ backgroundColor: theme.primary }}>
+                  <div className="rounded-full p-1" style={{ background: theme.primary }}>
                     <Icon icon="lucide:check" className="w-4 h-4 text-white" />
                   </div>
-                  <span className="text-gray-700 font-medium">Your current match</span>
+                  <span className="text-gray-700 font-medium">Top choice</span>
                 </div>
-                <div 
+                <div
                   className={`bg-white rounded-2xl border-2 p-6 transition-all duration-200 cursor-pointer hover:scale-[1.02] ${
                     selectedProgramProducts[programData.products[0].id]
                       ? "shadow-md"
                       : "border-gray-300 hover:border-gray-400 hover:shadow-sm"
                   }`}
-                  style={selectedProgramProducts[programData.products[0].id] ? { 
-                    borderColor: theme.primary 
+                  style={selectedProgramProducts[programData.products[0].id] ? {
+                    borderColor: themeSolidColor,
                   } : {}}
                   onClick={() => onProgramProductToggle?.(programData.products[0].id)}
                 >
@@ -116,44 +122,48 @@ export const ProductSelectionStepView: React.FC<ProductSelectionStepViewProps> =
               </div>
             )}
 
-            {/* All Treatments Section */}
-            {programData?.products && programData.products.length > 0 && (
-              <div className="space-y-4">
-                <div className="text-center space-y-2">
-                  <h2 className="text-2xl font-bold text-gray-900">All treatments</h2>
-                  <p className="text-sm text-gray-600">
-                    {isSingleChoice ? "Choose one option below" : "Select the options that work for you"}
-                  </p>
-                </div>
+            {/* Additional Options — only when there are more products beyond the top match */}
+            {programData?.products && programData.products.length > 1 && (
+              <div className="space-y-3">
+                <button
+                  onClick={() => setShowAdditionalOptions(prev => !prev)}
+                  className="w-full flex items-center justify-center gap-2 text-gray-500 hover:text-gray-700 transition-colors"
+                >
+                  <Icon
+                    icon={showAdditionalOptions ? "lucide:minus" : "lucide:plus"}
+                    className="w-4 h-4 flex-shrink-0"
+                  />
+                  <span className="text-sm font-normal">
+                    {showAdditionalOptions ? "Hide additional options" : `Additional options (${programData.products.length - 1})`}
+                  </span>
+                </button>
 
+                {showAdditionalOptions && (
                 <div className="space-y-3">
-                  {programData.products.map((product: any, index: number) => (
+                  {programData.products.slice(1).map((product: any) => (
                     <div
                       key={product.id}
-                      className={`bg-white rounded-2xl border p-4 transition-all duration-200 cursor-pointer hover:scale-[1.02] ${
+                      className={`bg-white rounded-2xl border-2 p-4 transition-all duration-200 cursor-pointer hover:scale-[1.02] ${
                         selectedProgramProducts[product.id]
                           ? "shadow-md"
                           : "border-gray-200 hover:border-gray-300 hover:shadow-sm"
                       }`}
-                      style={selectedProgramProducts[product.id] ? { 
-                        borderColor: theme.primary 
+                      style={selectedProgramProducts[product.id] ? {
+                        borderColor: themeSolidColor,
                       } : {}}
                       onClick={() => onProgramProductToggle?.(product.id)}
                     >
                       <div className="flex items-center justify-between gap-4">
                         <div className="flex-1 space-y-2">
-                          <div className="flex items-center gap-2">
-                            {product.subtitle && (
-                              <p className="text-xs font-semibold text-gray-600">{product.subtitle}</p>
-                            )}
-                          </div>
+                          {product.subtitle && (
+                            <p className="text-xs font-semibold text-gray-600">{product.subtitle}</p>
+                          )}
                           <div>
                             <h3 className="font-semibold text-gray-900 mb-1">{product.name}</h3>
                             <p className="text-sm text-gray-600">
                               From ${Number(product.displayPrice || 0).toFixed(2)}/mo¹
                             </p>
                           </div>
-                          
                           {product.tags && product.tags.length > 0 && (
                             <div className="flex gap-2 flex-wrap">
                               {product.tags.map((tag: string, i: number) => (
@@ -181,6 +191,7 @@ export const ProductSelectionStepView: React.FC<ProductSelectionStepViewProps> =
                     </div>
                   ))}
                 </div>
+                )}
               </div>
             )}
           </>
@@ -197,31 +208,25 @@ export const ProductSelectionStepView: React.FC<ProductSelectionStepViewProps> =
         {/* Trust indicators */}
         {isProgramFlow && (
           <div className="flex items-center justify-center gap-4 px-4">
-            {/* Doctor trusted badge */}
             <div className="flex items-center gap-2">
               <div className="w-6 h-6 rounded-full bg-green-50 flex items-center justify-center flex-shrink-0">
                 <Icon icon="lucide:shield-check" className="w-3.5 h-3.5 text-green-600" />
               </div>
-              <div className="text-left">
-                <p className="text-[11px] font-semibold text-gray-900 leading-tight">Doctor trusted</p>
-              </div>
+              <p className="text-[11px] font-semibold text-gray-900 leading-tight">Doctor trusted</p>
             </div>
 
             <div className="w-px h-6 bg-gray-200"></div>
 
-            {/* FDA regulated badge */}
             <div className="flex items-center gap-2">
               <div className="w-6 h-6 rounded-full bg-blue-50 flex items-center justify-center flex-shrink-0">
                 <Icon icon="lucide:shield-check" className="w-3.5 h-3.5 text-blue-600" />
               </div>
-              <div className="text-left">
-                <p className="text-[11px] font-semibold text-gray-900 leading-tight">FDA regulated pharmacy</p>
-              </div>
+              <p className="text-[11px] font-semibold text-gray-900 leading-tight">FDA regulated pharmacy</p>
             </div>
           </div>
         )}
 
-        {/* Continue button for product selection */}
+        {/* Continue button */}
         <div className="bg-white rounded-2xl p-6">
           {!(isCheckoutStep() && paymentStatus !== 'succeeded') && (
             <button
@@ -245,4 +250,3 @@ export const ProductSelectionStepView: React.FC<ProductSelectionStepViewProps> =
     </>
   );
 };
-
