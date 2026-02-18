@@ -1080,14 +1080,20 @@ export const handlePaymentIntentAmountCapturableUpdated = async (paymentIntent: 
         return;
     }
 
-    // Check if clinic uses md-integrations dashboard format
-    let clinic: any = null;
-    if (user.clinicId) {
-        clinic = await Clinic.findByPk(user.clinicId);
+    // Only create an MDI case if the order's questionnaire explicitly uses md-integrations.
+    // patientPortalDashboardFormat is deprecated and must not be used here.
+    if (!(order as any).questionnaireId) {
+        console.log('[MD-WH] ℹ️ Skipping MD Integrations - order has no questionnaireId');
+        return;
     }
 
-    if (!clinic || (clinic as any).patientPortalDashboardFormat !== MedicalCompanySlug.MD_INTEGRATIONS) {
-        console.log('[MD-WH] ℹ️ Skipping MD Integrations - clinic does not use md-integrations format');
+    const Questionnaire = (await import('../../models/Questionnaire')).default;
+    const questionnaire = await Questionnaire.findByPk((order as any).questionnaireId);
+    const medicalCompanySource = questionnaire?.medicalCompanySource || null;
+    console.log('[MD-WH] Questionnaire medical company source:', medicalCompanySource);
+
+    if (medicalCompanySource !== MedicalCompanySlug.MD_INTEGRATIONS) {
+        console.log('[MD-WH] ℹ️ Skipping MD Integrations - questionnaire medical company source is:', medicalCompanySource);
         return;
     }
 
