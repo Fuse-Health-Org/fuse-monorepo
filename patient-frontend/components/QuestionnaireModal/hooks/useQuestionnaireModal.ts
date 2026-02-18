@@ -665,7 +665,21 @@ export function useQuestionnaireModal(
     });
     setErrors(stepErrors);
     return Object.keys(stepErrors).length === 0;
-  }, [questionnaire, isProductSelectionStep, isCheckoutStep, selectedProducts, shippingInfo, paymentStatus, getCurrentQuestionnaireStep, answers]);
+  }, [
+    questionnaire,
+    isBelugaConsentStep,
+    belugaConsentGiven,
+    belugaPhoto,
+    programData,
+    selectedProgramProducts,
+    isProductSelectionStep,
+    isCheckoutStep,
+    selectedProducts,
+    shippingInfo,
+    paymentStatus,
+    getCurrentQuestionnaireStep,
+    answers,
+  ]);
 
   // Auth handlers
   const handleSignIn = useCallback(async () => {
@@ -1046,7 +1060,17 @@ export function useQuestionnaireModal(
       const errorMessage = error?.message || 'Payment processing error. Please contact support.';
       alert(`Checkout Error: ${errorMessage}\n\nYour payment was authorized but not captured. Please contact support.`);
     }
-  }, [paymentIntentId, orderId, userId, accountCreated, triggerCheckoutSequenceRun, trackConversion, createMDCase, questionnaire]);
+  }, [
+    paymentIntentId,
+    orderId,
+    userId,
+    accountCreated,
+    triggerCheckoutSequenceRun,
+    trackConversion,
+    createMDCase,
+    createBelugaCase,
+    questionnaire,
+  ]);
 
   const handlePaymentConfirm = useCallback(() => {
     // Open modal with processing state when payment confirmation starts

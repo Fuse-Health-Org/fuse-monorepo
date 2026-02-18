@@ -58,6 +58,17 @@ interface BelugaVisit {
   }>;
 }
 
+interface BelugaChatMessage {
+  id: string;
+  masterId: string;
+  eventType: string;
+  senderRole: "patient" | "doctor" | "beluga_admin" | "system";
+  channel: "patient_chat" | "customer_service" | "system";
+  message?: string;
+  source: "webhook" | "outbound";
+  createdAt: string;
+}
+
 const navItems: NavItem[] = [
   { id: "dashboard", label: "Dashboard", icon: "lucide:layout-dashboard" },
   { id: "treatments", label: "Treatments", icon: "lucide:pill" },
@@ -153,6 +164,8 @@ function BelugaDashboardPage() {
   const [messageDrafts, setMessageDrafts] = React.useState<Record<string, string>>({});
   const [csDrafts, setCsDrafts] = React.useState<Record<string, string>>({});
   const [messageResults, setMessageResults] = React.useState<Record<string, string>>({});
+  const [chatMessagesByMaster, setChatMessagesByMaster] = React.useState<Record<string, BelugaChatMessage[]>>({});
+  const [chatLoadingByMaster, setChatLoadingByMaster] = React.useState<Record<string, boolean>>({});
   const [nameFirst, setNameFirst] = React.useState("");
   const [nameLast, setNameLast] = React.useState("");
   const [accountResult, setAccountResult] = React.useState<string | null>(null);
@@ -187,6 +200,34 @@ function BelugaDashboardPage() {
     loadBelugaData();
   }, [loadBelugaData]);
 
+  const loadChatMessages = React.useCallback(async (masterId: string) => {
+    if (!masterId) return;
+    setChatLoadingByMaster((prev) => ({ ...prev, [masterId]: true }));
+    try {
+      const response = await apiCall(`/beluga/chats/${encodeURIComponent(masterId)}/messages`);
+      if (!response.success) {
+        throw new Error(response.error || "Failed to load messages");
+      }
+      const messages = Array.isArray((response.data as any)?.data)
+        ? ((response.data as any).data as BelugaChatMessage[])
+        : [];
+      setChatMessagesByMaster((prev) => ({ ...prev, [masterId]: messages }));
+    } catch {
+      setChatMessagesByMaster((prev) => ({ ...prev, [masterId]: [] }));
+    } finally {
+      setChatLoadingByMaster((prev) => ({ ...prev, [masterId]: false }));
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (activeTab !== "messages" || visits.length === 0) return;
+    visits.forEach((visit) => {
+      if (!chatMessagesByMaster[visit.masterId]) {
+        loadChatMessages(visit.masterId);
+      }
+    });
+  }, [activeTab, visits, chatMessagesByMaster, loadChatMessages]);
+
   const handleSendMessage = async (masterId: string, customerService = false) => {
     const draft = customerService ? csDrafts[masterId] : messageDrafts[masterId];
     if (!masterId || !draft?.trim()) return;
@@ -212,6 +253,8 @@ function BelugaDashboardPage() {
     } else {
       setMessageDrafts((prev) => ({ ...prev, [masterId]: "" }));
     }
+
+    await loadChatMessages(masterId);
   };
 
   const handleNameUpdate = async () => {
@@ -456,6 +499,31 @@ function BelugaDashboardPage() {
                           {(visit.visitStatus || "pending").toUpperCase()}
                         </span>
                       </div>
+                      {chatLoadingByMaster[visit.masterId] ? (
+                        <p className="text-xs text-foreground-400">Loading conversation...</p>
+                      ) : (chatMessagesByMaster[visit.masterId]?.length || 0) > 0 ? (
+                        <div className="max-h-56 overflow-y-auto space-y-2 p-2 rounded-lg bg-content2">
+                          {(chatMessagesByMaster[visit.masterId] || []).map((message) => (
+                            <div key={message.id} className="rounded-md bg-content1 p-2">
+                              <p className="text-xs font-medium text-foreground-600">
+                                {message.senderRole === "patient"
+                                  ? "You"
+                                  : message.senderRole === "doctor"
+                                    ? "Doctor"
+                                    : message.senderRole === "beluga_admin"
+                                      ? "Beluga Admin"
+                                      : "System"}
+                              </p>
+                              <p className="text-sm text-foreground-700">{message.message || "(no text)"}</p>
+                              <p className="text-[11px] text-foreground-400 mt-1">
+                                {new Date(message.createdAt).toLocaleString()}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-foreground-400">No messages for this visit yet.</p>
+                      )}
                       <Textarea
                         label="Message to Provider"
                         value={messageDrafts[visit.masterId] || ""}

@@ -475,10 +475,10 @@ export const createPaymentIntent = async (req: Request, res: Response) => {
                 );
             }
 
-            // Full statement descriptor so customer sees brand name only (e.g. "FuseHealth Checkhealth"), no truncation
+            // Card payment intents must use statement_descriptor_suffix (not statement_descriptor)
             const statementDescriptor = buildStatementDescriptorSuffix(clinicNameForStatement);
             if (statementDescriptor) {
-                paymentIntentParams.statement_descriptor = statementDescriptor;
+                paymentIntentParams.statement_descriptor_suffix = statementDescriptor;
             }
 
             paymentIntent = await stripe.paymentIntents.create(paymentIntentParams);

@@ -5452,21 +5452,21 @@ app.post(
           `💳 Using on_behalf_of parameter for clinic ${tenantProduct.clinic.id} with Stripe account ${tenantProduct.clinic.stripeAccountId}`
         );
 
-        // When clinic is MOR, use statement_descriptor to show "{BrandName} Telehealth"
+        // Card payment intents must use statement_descriptor_suffix (not statement_descriptor)
         const descriptorClinic = buildStatementDescriptor(tenantProduct.clinic?.name);
         if (descriptorClinic) {
-          authPaymentIntentParams.statement_descriptor = descriptorClinic;
+          authPaymentIntentParams.statement_descriptor_suffix = descriptorClinic;
           console.log(
-            `💳 Clinic is MOR - Using statement descriptor: "${descriptorClinic}"`
+            `💳 Clinic is MOR - Using statement descriptor suffix: "${descriptorClinic}"`
           );
         }
       } else {
-        // When Fuse is MOR, use full statement_descriptor (brand name only) so no account prefix truncation
+        // Card payment intents must use statement_descriptor_suffix
         const descriptorClinic = buildStatementDescriptorSuffix(tenantProduct.clinic?.name);
         if (descriptorClinic) {
-          authPaymentIntentParams.statement_descriptor = descriptorClinic;
+          authPaymentIntentParams.statement_descriptor_suffix = descriptorClinic;
           console.log(
-            `💳 Fuse is MOR - Using statement descriptor: "${descriptorClinic}"`
+            `💳 Fuse is MOR - Using statement descriptor suffix: "${descriptorClinic}"`
           );
         }
       }
@@ -5991,25 +5991,25 @@ app.post("/payments/product/sub", async (req, res) => {
         `💳 Using on_behalf_of parameter for clinic ${(tenantProduct as any).clinic.id} with Stripe account ${(tenantProduct as any).clinic.stripeAccountId}`
       );
 
-      // When clinic is MOR, use statement_descriptor to show "{BrandName} Telehealth"
+      // Card payment intents must use statement_descriptor_suffix (not statement_descriptor)
       const descriptorName = buildStatementDescriptor(
         clinicName || (tenantProduct as any).clinic?.name
       );
       if (descriptorName) {
-        paymentIntentParams.statement_descriptor = descriptorName;
+        paymentIntentParams.statement_descriptor_suffix = descriptorName;
         console.log(
-          `💳 Clinic is MOR - Using statement descriptor: "${descriptorName}"`
+          `💳 Clinic is MOR - Using statement descriptor suffix: "${descriptorName}"`
         );
       }
     } else {
-      // When Fuse is MOR, use full statement_descriptor (brand name only) so no account prefix truncation
+      // Card payment intents must use statement_descriptor_suffix
       const descriptorName = buildStatementDescriptorSuffix(
         clinicName || (tenantProduct as any).clinic?.name
       );
       if (descriptorName) {
-        paymentIntentParams.statement_descriptor = descriptorName;
+        paymentIntentParams.statement_descriptor_suffix = descriptorName;
         console.log(
-          `💳 Fuse is MOR - Using statement descriptor: "${descriptorName}"`
+          `💳 Fuse is MOR - Using statement descriptor suffix: "${descriptorName}"`
         );
       }
     }
@@ -6401,12 +6401,12 @@ app.post("/payments/program/sub", async (req, res) => {
       );
     }
 
-    // Full statement descriptor (brand name only) so customer sees e.g. "FuseHealth Checkhealth"
+    // Card payment intents must use statement_descriptor_suffix
     const programStatementDescriptor = buildStatementDescriptorSuffix(
       clinicName || clinic?.name
     );
     if (programStatementDescriptor) {
-      paymentIntentParams.statement_descriptor = programStatementDescriptor;
+      paymentIntentParams.statement_descriptor_suffix = programStatementDescriptor;
     }
 
     const paymentIntent = await stripe.paymentIntents.create(paymentIntentParams);
@@ -12221,12 +12221,12 @@ const PORT = process.env.PORT || 3001;
 
 // Initialize database connection and start server
 async function startServer() {
-  const dbConnected = await initializeDatabase();
+  // const dbConnected = await initializeDatabase();
 
-  if (!dbConnected) {
-    console.error("❌ Failed to connect to database. Exiting...");
-    process.exit(1);
-  }
+  // if (!dbConnected) {
+  //   console.error("❌ Failed to connect to database. Exiting...");
+  //   process.exit(1);
+  // }
 
   // Import WebSocket service early so route handlers can reference it
   const WebSocketService = (await import("./services/websocket.service"))

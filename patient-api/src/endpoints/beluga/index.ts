@@ -9,6 +9,7 @@ import ShippingAddress from "../../models/ShippingAddress";
 import TenantProduct from "../../models/TenantProduct";
 import Product from "../../models/Product";
 import BelugaProduct from "../../models/BelugaProduct";
+import BelugaEvent, { BelugaEventType, BelugaMessageChannel, BelugaSenderRole } from "../../models/BelugaEvent";
 import { Op } from "sequelize";
 import fs from "fs";
 import path from "path";
@@ -698,6 +699,90 @@ const submitBelugaPhotos = async (
   };
 };
 
+const resolveBelugaWebhookSecret = (): string | undefined => {
+  return (
+    toNonEmptyString(process.env.BELUGA_WEBHOOK_SECRET) ||
+    readEnvValueFromEnvLocal("BELUGA_WEBHOOK_SECRET")
+  );
+};
+
+const isBelugaWebhookAuthorized = (req: Request): boolean => {
+  const expectedSecret = resolveBelugaWebhookSecret();
+  if (!expectedSecret) return true;
+
+  const authHeader = toNonEmptyString(String(req.headers.authorization || ""));
+  const headerSecret = toNonEmptyString(String(req.headers["x-beluga-webhook-secret"] || ""));
+  if (headerSecret && headerSecret === expectedSecret) return true;
+
+  if (authHeader?.toLowerCase().startsWith("bearer ")) {
+    const token = toNonEmptyString(authHeader.slice(7));
+    if (token === expectedSecret) return true;
+  }
+
+  return false;
+};
+
+const findBelugaOrderByMasterId = async (masterId: string): Promise<Order | null> => {
+  const byBelugaMaster = await Order.findOne({
+    where: {
+      belugaMasterId: masterId,
+    } as any,
+  } as any);
+  if (byBelugaMaster) return byBelugaMaster;
+
+  const byOrderId = await Order.findByPk(masterId);
+  if (byOrderId) return byOrderId;
+  return null;
+};
+
+const storeBelugaEvent = async (params: {
+  masterId: string;
+  eventType: BelugaEventType;
+  senderRole: BelugaSenderRole;
+  channel?: BelugaMessageChannel;
+  source: "webhook" | "outbound";
+  message?: string;
+  payload?: Record<string, any>;
+  userId?: string | null;
+  orderId?: string | null;
+}) => {
+  return BelugaEvent.create({
+    userId: params.userId || null,
+    orderId: params.orderId || null,
+    masterId: params.masterId,
+    eventType: params.eventType,
+    senderRole: params.senderRole,
+    channel: params.channel || "system",
+    message: params.message || null,
+    source: params.source,
+    payload: params.payload || null,
+  } as any);
+};
+
+const mapBelugaIncomingEvent = (event: string): {
+  eventType: BelugaEventType;
+  senderRole: BelugaSenderRole;
+  channel: BelugaMessageChannel;
+  message?: string;
+} | null => {
+  switch (event) {
+    case "DOCTOR_CHAT":
+      return { eventType: "DOCTOR_CHAT", senderRole: "doctor", channel: "patient_chat" };
+    case "CS_MESSAGE":
+      return { eventType: "CS_MESSAGE", senderRole: "beluga_admin", channel: "customer_service" };
+    case "RX_WRITTEN":
+      return { eventType: "RX_WRITTEN", senderRole: "system", channel: "system" };
+    case "CONSULT_CONCLUDED":
+      return { eventType: "CONSULT_CONCLUDED", senderRole: "system", channel: "system" };
+    case "CONSULT_CANCELED":
+      return { eventType: "CONSULT_CANCELED", senderRole: "system", channel: "system" };
+    case "NAME_UPDATE":
+      return { eventType: "NAME_UPDATE", senderRole: "system", channel: "system" };
+    default:
+      return null;
+  }
+};
+
 router.get("/products", authenticateJWT, async (_req: Request, res: Response) => {
   try {
     const { products, source, warning } = await fetchBelugaProducts();
@@ -875,6 +960,129 @@ router.get("/pharmacies", authenticateJWT, async (req: Request, res: Response) =
   }
 });
 
+/**
+ * POST /beluga/webhook
+ * Receives webhook events from Beluga (doctor chat, CS chat, rx written, consult status, name updates).
+ */
+router.post("/webhook", async (req: Request, res: Response) => {
+  try {
+    if (!isBelugaWebhookAuthorized(req)) {
+      return res.status(403).json({ success: false, message: "Invalid Beluga webhook authorization" });
+    }
+
+    const masterId = toNonEmptyString(req.body?.masterId);
+    const event = toNonEmptyString(req.body?.event);
+    if (!masterId || !event) {
+      return res.status(400).json({
+        success: false,
+        message: "masterId and event are required",
+      });
+    }
+
+    const mapped = mapBelugaIncomingEvent(event);
+    if (!mapped) {
+      return res.status(400).json({
+        success: false,
+        message: `Unsupported Beluga event: ${event}`,
+      });
+    }
+
+    const order = await findBelugaOrderByMasterId(masterId);
+    const orderId = order?.id ? String(order.id) : null;
+    const userId = (order as any)?.userId ? String((order as any).userId) : null;
+
+    if (mapped.eventType === "NAME_UPDATE" && order?.id) {
+      const firstName = toNonEmptyString(req.body?.firstName);
+      const lastName = toNonEmptyString(req.body?.lastName);
+      if (firstName && lastName && userId) {
+        await User.update(
+          { firstName, lastName } as any,
+          {
+            where: { id: userId } as any,
+          } as any
+        );
+      }
+    }
+
+    const message =
+      mapped.eventType === "DOCTOR_CHAT" || mapped.eventType === "CS_MESSAGE"
+        ? toNonEmptyString(req.body?.content) || ""
+        : undefined;
+
+    await storeBelugaEvent({
+      masterId,
+      eventType: mapped.eventType,
+      senderRole: mapped.senderRole,
+      channel: mapped.channel,
+      source: "webhook",
+      message,
+      payload: req.body || null,
+      userId,
+      orderId,
+    });
+
+    return res.json({ success: true });
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to process Beluga webhook",
+      details: error?.message || null,
+    });
+  }
+});
+
+router.get("/chats/:masterId/messages", authenticateJWT, async (req: Request, res: Response) => {
+  try {
+    const currentUser = getCurrentUser(req);
+    if (!currentUser?.id) {
+      return res.status(401).json({ success: false, message: "Not authenticated" });
+    }
+
+    const masterId = toNonEmptyString(req.params.masterId);
+    if (!masterId) {
+      return res.status(400).json({ success: false, message: "masterId is required" });
+    }
+
+    const order = await findBelugaOrderByMasterId(masterId);
+    if (!order || String((order as any).userId) !== String(currentUser.id)) {
+      return res.status(404).json({
+        success: false,
+        message: "Beluga visit not found for current user",
+      });
+    }
+
+    const messages = await BelugaEvent.findAll({
+      where: {
+        masterId,
+        eventType: {
+          [Op.in]: ["DOCTOR_CHAT", "CS_MESSAGE", "PATIENT_CHAT", "PATIENT_CS_MESSAGE"] as any,
+        } as any,
+      } as any,
+      order: [["createdAt", "ASC"]] as any,
+    } as any);
+
+    return res.json({
+      success: true,
+      data: messages.map((item: any) => ({
+        id: item.id,
+        masterId: item.masterId,
+        eventType: item.eventType,
+        senderRole: item.senderRole,
+        channel: item.channel,
+        message: item.message,
+        source: item.source,
+        createdAt: item.createdAt,
+      })),
+    });
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to load Beluga chat messages",
+      details: error?.message || null,
+    });
+  }
+});
+
 router.post("/messages/patient", authenticateJWT, async (req: Request, res: Response) => {
   try {
     const currentUser = getCurrentUser(req);
@@ -890,6 +1098,14 @@ router.post("/messages/patient", authenticateJWT, async (req: Request, res: Resp
       return res.status(400).json({
         success: false,
         message: "masterId and content are required",
+      });
+    }
+
+    const order = await findBelugaOrderByMasterId(resolvedMasterId);
+    if (!order || String((order as any).userId) !== String(currentUser.id)) {
+      return res.status(404).json({
+        success: false,
+        message: "Beluga visit not found for current user",
       });
     }
 
@@ -910,6 +1126,20 @@ router.post("/messages/patient", authenticateJWT, async (req: Request, res: Resp
         isMedia: Boolean(isMedia),
         masterId: resolvedMasterId,
       },
+    });
+
+    await storeBelugaEvent({
+      masterId: resolvedMasterId,
+      eventType: "PATIENT_CHAT",
+      senderRole: "patient",
+      channel: "patient_chat",
+      source: "outbound",
+      message: resolvedContent,
+      payload: {
+        isMedia: Boolean(isMedia),
+      },
+      userId: String(currentUser.id),
+      orderId: String(order.id),
     });
 
     return res.json({
@@ -943,12 +1173,32 @@ router.post("/messages/customer-service", authenticateJWT, async (req: Request, 
       });
     }
 
+    const order = await findBelugaOrderByMasterId(resolvedMasterId);
+    if (!order || String((order as any).userId) !== String(currentUser.id)) {
+      return res.status(404).json({
+        success: false,
+        message: "Beluga visit not found for current user",
+      });
+    }
+
     const response = await belugaRequest("/external/receiveCSMessage", {
       method: "POST",
       body: {
         content: resolvedContent,
         masterId: resolvedMasterId,
       },
+    });
+
+    await storeBelugaEvent({
+      masterId: resolvedMasterId,
+      eventType: "PATIENT_CS_MESSAGE",
+      senderRole: "patient",
+      channel: "customer_service",
+      source: "outbound",
+      message: resolvedContent,
+      payload: undefined,
+      userId: String(currentUser.id),
+      orderId: String(order.id),
     });
 
     return res.json({
