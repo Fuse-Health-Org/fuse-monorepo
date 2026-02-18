@@ -109,14 +109,14 @@ class IronSailApiOrderService {
             // Format phone number (must be exactly 10 digits)
             let phoneNumber = (user.phoneNumber || '').replace(/\D/g, '');
             if (phoneNumber.length !== 10) {
-                console.warn(`[IronSail API] Invalid phone number length: ${phoneNumber}, using placeholder`);
+                console.warn(`[IronSail API] Invalid phone number length, using placeholder`);
                 phoneNumber = '0000000000'; // Placeholder if invalid
             }
 
             // Format DOB (must be in past, YYYY-MM-DD)
             let dob = user.dob || '';
             if (!dob || new Date(dob) >= new Date()) {
-                console.warn(`[IronSail API] Invalid or missing DOB: ${dob}`);
+                console.warn(`[IronSail API] Invalid or missing DOB, using default`);
                 // Use a default date (18 years ago) if invalid
                 const defaultDate = new Date();
                 defaultDate.setFullYear(defaultDate.getFullYear() - 18);
@@ -166,7 +166,7 @@ class IronSailApiOrderService {
                 }
             };
 
-            console.log(`[IronSail API] Creating patient: ${user.email}`);
+            console.log(`[IronSail API] Creating patient record`);
             const createResponse = await fetch(`${IRONSAIL_API_BASE}/patients`, {
                 method: 'POST',
                 headers: {
