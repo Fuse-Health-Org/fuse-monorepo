@@ -518,6 +518,19 @@ export const createPaymentIntent = async (req: Request, res: Response) => {
             userId: currentUser.id,
         });
 
+        // Audit log: Order creation (PHI record created)
+        await AuditService.logFromRequest(req, {
+            action: AuditAction.CREATE,
+            resourceType: AuditResourceType.ORDER,
+            resourceId: order.id,
+            details: {
+                operation: 'create_order',
+                orderNumber: orderNumber,
+                totalAmount: Number(amount) + visitFeeAmount,
+                orderType: programId ? 'program_order' : 'treatment_order'
+            }
+        });
+
         res.status(200).json({
             success: true,
             data: {
