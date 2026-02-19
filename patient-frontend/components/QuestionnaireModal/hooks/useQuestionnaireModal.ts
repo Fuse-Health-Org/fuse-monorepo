@@ -230,6 +230,7 @@ export function useQuestionnaireModal(
   // Step helpers - must be defined before getCurrentStage
   const isBeluga = questionnaire?.medicalCompanySource === MedicalCompanySlug.BELUGA;
   const belugaIntroStepsOffset = isBeluga ? 2 : 0;
+  const formCacheVersion = "v2";
   const isBelugaConsentStep = isBeluga && currentStepIndex === 0;
   const isBelugaPhotoStep = isBeluga && currentStepIndex === 1;
   // Skip user_profile only after this flow has a confirmed user context.
@@ -1535,7 +1536,7 @@ export function useQuestionnaireModal(
     
     // Only save if we have some answers
     if (Object.keys(answers).length > 0) {
-      const cacheKey = `form-draft-${questionnaire.id}-${questionnaireId || 'unknown'}`;
+      const cacheKey = `form-draft-${formCacheVersion}-${questionnaire.id}-${questionnaireId || 'unknown'}-${belugaIntroStepsOffset}`;
       const cacheData = {
         answers,
         currentStepIndex,
@@ -1563,13 +1564,13 @@ export function useQuestionnaireModal(
         console.warn('⚠️ [CACHE] Failed to save to localStorage:', error);
       }
     }
-  }, [answers, currentStepIndex, selectedProducts, selectedProgramProducts, shippingInfo, userId, accountCreated, patientName, patientFirstName, isOpen, questionnaire, questionnaireId, productName]);
+  }, [answers, currentStepIndex, selectedProducts, selectedProgramProducts, shippingInfo, userId, accountCreated, patientName, patientFirstName, isOpen, questionnaire, questionnaireId, productName, formCacheVersion, belugaIntroStepsOffset]);
 
   // FORM CACHING: Restore form progress from localStorage on mount
   useEffect(() => {
     if (!isOpen || !questionnaire?.id || hasRestoredFromCacheRef.current) return;
     
-    const cacheKey = `form-draft-${questionnaire.id}-${questionnaireId || 'unknown'}`;
+    const cacheKey = `form-draft-${formCacheVersion}-${questionnaire.id}-${questionnaireId || 'unknown'}-${belugaIntroStepsOffset}`;
     
     try {
       const cached = localStorage.getItem(cacheKey);
@@ -1631,7 +1632,7 @@ export function useQuestionnaireModal(
     } catch (error) {
       console.warn('⚠️ [CACHE] Failed to restore from localStorage:', error);
     }
-  }, [isOpen, questionnaire, questionnaireId]);
+  }, [isOpen, questionnaire, questionnaireId, formCacheVersion, belugaIntroStepsOffset]);
 
   // Step initialization
   useEffect(() => {

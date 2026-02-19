@@ -84,8 +84,22 @@ export const QuestionnaireModal: React.FC<QuestionnaireModalProps> = (props) => 
       const checkoutPos = modal.questionnaire.checkoutStepPosition;
       const belugaOffset = modal.questionnaire.medicalCompanySource === MedicalCompanySlug.BELUGA ? 2 : 0;
       const checkoutStepIndex = (checkoutPos === -1 ? modal.questionnaire.steps.length : checkoutPos) + belugaOffset;
-      console.log('⏭️ No more visible questionnaire steps, advancing to checkout at index:', checkoutStepIndex);
-      modal.setCurrentStepIndex(checkoutStepIndex);
+      const productSelectionPos = modal.questionnaire.productSelectionStepPosition;
+      const productSelectionStepIndex =
+        productSelectionPos !== undefined && productSelectionPos !== -1
+          ? productSelectionPos + belugaOffset
+          : -1;
+
+      if (
+        productSelectionStepIndex !== -1 &&
+        modal.currentStepIndex < productSelectionStepIndex
+      ) {
+        console.log('⏭️ No visible questionnaire step; advancing to product selection at index:', productSelectionStepIndex);
+        modal.setCurrentStepIndex(productSelectionStepIndex);
+      } else {
+        console.log('⏭️ No more visible questionnaire steps, advancing to checkout at index:', checkoutStepIndex);
+        modal.setCurrentStepIndex(checkoutStepIndex);
+      }
     }
     return null;
   }
