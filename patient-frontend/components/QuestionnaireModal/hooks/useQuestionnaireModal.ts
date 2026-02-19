@@ -235,24 +235,53 @@ export function useQuestionnaireModal(
   // Skip user_profile only after this flow has a confirmed user context.
   // A leftover auth token alone should not skip "Create Your Account".
   const shouldSkipUserProfileSteps = Boolean(accountCreated || userId);
+  const getEffectiveSpecialStepPositions = useCallback(() => {
+    if (!questionnaire) {
+      return {
+        productSelectionStepIndex: -1,
+        checkoutStepIndex: -1,
+      };
+    }
+
+    const baseCheckoutStepIndex =
+      questionnaire.checkoutStepPosition === -1
+        ? questionnaire.steps.length
+        : questionnaire.checkoutStepPosition;
+
+    let baseProductSelectionStepIndex =
+      questionnaire.productSelectionStepPosition !== undefined &&
+      questionnaire.productSelectionStepPosition !== -1
+        ? questionnaire.productSelectionStepPosition
+        : -1;
+
+    // Keep product selection strictly before checkout when configured values are inconsistent.
+    if (baseProductSelectionStepIndex !== -1) {
+      baseProductSelectionStepIndex = Math.min(
+        Math.max(baseProductSelectionStepIndex, 0),
+        Math.max(baseCheckoutStepIndex - 1, 0)
+      );
+    }
+
+    return {
+      productSelectionStepIndex:
+        baseProductSelectionStepIndex === -1
+          ? -1
+          : baseProductSelectionStepIndex + belugaIntroStepsOffset,
+      checkoutStepIndex: baseCheckoutStepIndex + belugaIntroStepsOffset,
+    };
+  }, [questionnaire, belugaIntroStepsOffset]);
 
   const isProductSelectionStep = useCallback((): boolean => {
     if (!questionnaire) return false;
-    const productSelectionPos = questionnaire.productSelectionStepPosition;
-    const productSelectionStepIndex = (productSelectionPos !== undefined && productSelectionPos !== -1)
-      ? productSelectionPos + belugaIntroStepsOffset
-      : -1;
-    const checkoutPos = questionnaire.checkoutStepPosition;
-    const checkoutStepIndex = (checkoutPos === -1 ? questionnaire.steps.length : checkoutPos) + belugaIntroStepsOffset;
+    const { productSelectionStepIndex } = getEffectiveSpecialStepPositions();
     return productSelectionStepIndex !== -1 && currentStepIndex === productSelectionStepIndex;
-  }, [questionnaire, currentStepIndex, belugaIntroStepsOffset]);
+  }, [questionnaire, currentStepIndex, getEffectiveSpecialStepPositions]);
 
   const isCheckoutStep = useCallback((): boolean => {
     if (!questionnaire) return false;
-    const checkoutPos = questionnaire.checkoutStepPosition;
-    const checkoutStepIndex = (checkoutPos === -1 ? questionnaire.steps.length : checkoutPos) + belugaIntroStepsOffset;
+    const { checkoutStepIndex } = getEffectiveSpecialStepPositions();
     return currentStepIndex === checkoutStepIndex;
-  }, [questionnaire, currentStepIndex, belugaIntroStepsOffset]);
+  }, [questionnaire, currentStepIndex, getEffectiveSpecialStepPositions]);
 
   const evaluateStepConditionalLogic = useCallback((step: any): boolean => {
     const conditionalLogic = step.conditionalLogic;
@@ -374,12 +403,7 @@ export function useQuestionnaireModal(
     if (isBelugaConsentStep) return 1;
     if (isBelugaPhotoStep) return 2;
     const isSignedIn = shouldSkipUserProfileSteps;
-    const productSelectionPos = questionnaire.productSelectionStepPosition;
-    const checkoutPos = questionnaire.checkoutStepPosition;
-    const productSelectionStepIndex = (productSelectionPos !== undefined && productSelectionPos !== -1)
-      ? productSelectionPos + belugaIntroStepsOffset
-      : -1;
-    const checkoutStepIndex = (checkoutPos === -1 ? questionnaire.steps.length : checkoutPos) + belugaIntroStepsOffset;
+    const { productSelectionStepIndex, checkoutStepIndex } = getEffectiveSpecialStepPositions();
 
     // Log all steps with their categories for debugging
     const stepCategories = questionnaire.steps.map((s, i) => `${i}:${s.category}`);
@@ -436,7 +460,7 @@ export function useQuestionnaireModal(
 
     // Ensure we return at least 1
     return Math.max(visibleCount, 1);
-  }, [questionnaire, currentStepIndex, getTotalSteps, isBelugaConsentStep, isBelugaPhotoStep, belugaIntroStepsOffset, shouldSkipUserProfileSteps]);
+  }, [questionnaire, currentStepIndex, getTotalSteps, isBelugaConsentStep, isBelugaPhotoStep, belugaIntroStepsOffset, shouldSkipUserProfileSteps, getEffectiveSpecialStepPositions]);
 
   // Build questionnaire answers
   const buildQuestionnaireAnswers = useCallback((currentAnswers: Record<string, any>) => {
@@ -1281,13 +1305,7 @@ export function useQuestionnaireModal(
       }
 
       const isSignedIn = shouldSkipUserProfileSteps;
-      const productSelectionPos = questionnaire.productSelectionStepPosition;
-      const checkoutPos = questionnaire.checkoutStepPosition;
-      const baseCheckoutStepIndex = checkoutPos === -1 ? questionnaire.steps.length : checkoutPos;
-      const checkoutStepIndex = baseCheckoutStepIndex + belugaIntroStepsOffset;
-      const productSelectionStepIndex = (productSelectionPos !== undefined && productSelectionPos !== -1)
-        ? productSelectionPos + belugaIntroStepsOffset
-        : -1;
+      const { productSelectionStepIndex, checkoutStepIndex } = getEffectiveSpecialStepPositions();
 
       // Find the next valid step (skipping user_profile if signed in)
       const nextEffectiveIndex = currentStepIndex + 1;
@@ -1318,7 +1336,7 @@ export function useQuestionnaireModal(
         handleSubmit();
       }
     }
-  }, [validateCurrentStep, questionnaire, getCurrentQuestionnaireStep, isCheckoutStep, isBelugaConsentStep, isBelugaPhotoStep, paymentStatus, createUserAccount, currentStepIndex, belugaIntroStepsOffset, handleSubmit, shouldSkipUserProfileSteps]);
+  }, [validateCurrentStep, questionnaire, getCurrentQuestionnaireStep, isCheckoutStep, isBelugaConsentStep, isBelugaPhotoStep, paymentStatus, createUserAccount, currentStepIndex, belugaIntroStepsOffset, handleSubmit, shouldSkipUserProfileSteps, getEffectiveSpecialStepPositions]);
 
   const handlePrevious = useCallback(() => {
     if (currentStepIndex > 0 && questionnaire) {
