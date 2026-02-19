@@ -239,7 +239,9 @@ export function useQuestionnaireModal(
   const isProductSelectionStep = useCallback((): boolean => {
     if (!questionnaire) return false;
     const productSelectionPos = questionnaire.productSelectionStepPosition;
-    const productSelectionStepIndex = (productSelectionPos !== undefined && productSelectionPos !== -1) ? productSelectionPos : -1;
+    const productSelectionStepIndex = (productSelectionPos !== undefined && productSelectionPos !== -1)
+      ? productSelectionPos + belugaIntroStepsOffset
+      : -1;
     const checkoutPos = questionnaire.checkoutStepPosition;
     const checkoutStepIndex = (checkoutPos === -1 ? questionnaire.steps.length : checkoutPos) + belugaIntroStepsOffset;
     return productSelectionStepIndex !== -1 && currentStepIndex === productSelectionStepIndex;
@@ -374,7 +376,9 @@ export function useQuestionnaireModal(
     const isSignedIn = shouldSkipUserProfileSteps;
     const productSelectionPos = questionnaire.productSelectionStepPosition;
     const checkoutPos = questionnaire.checkoutStepPosition;
-    const productSelectionStepIndex = (productSelectionPos !== undefined && productSelectionPos !== -1) ? productSelectionPos : -1;
+    const productSelectionStepIndex = (productSelectionPos !== undefined && productSelectionPos !== -1)
+      ? productSelectionPos + belugaIntroStepsOffset
+      : -1;
     const checkoutStepIndex = (checkoutPos === -1 ? questionnaire.steps.length : checkoutPos) + belugaIntroStepsOffset;
 
     // Log all steps with their categories for debugging
@@ -397,10 +401,16 @@ export function useQuestionnaireModal(
 
     // If we're on product selection step
     if (productSelectionStepIndex !== -1 && currentStepIndex === productSelectionStepIndex) {
-      // Count all visible steps before product selection + 1 for product selection itself
+      // Count all visible steps before product selection + 1 for product selection itself.
       let visibleCount = 0;
-      for (let i = 0; i < productSelectionStepIndex && i < questionnaire.steps.length; i++) {
-        const step = questionnaire.steps[i];
+      for (let i = 0; i < productSelectionStepIndex; i++) {
+        if (i < belugaIntroStepsOffset) {
+          visibleCount++;
+          continue;
+        }
+        const questionnaireStepIndex = i - belugaIntroStepsOffset;
+        if (questionnaireStepIndex < 0 || questionnaireStepIndex >= questionnaire.steps.length) break;
+        const step = questionnaire.steps[questionnaireStepIndex];
         if (isSignedIn && step.category === 'user_profile') continue;
         visibleCount++;
       }
@@ -1275,7 +1285,9 @@ export function useQuestionnaireModal(
       const checkoutPos = questionnaire.checkoutStepPosition;
       const baseCheckoutStepIndex = checkoutPos === -1 ? questionnaire.steps.length : checkoutPos;
       const checkoutStepIndex = baseCheckoutStepIndex + belugaIntroStepsOffset;
-      const productSelectionStepIndex = (productSelectionPos !== undefined && productSelectionPos !== -1) ? productSelectionPos : -1;
+      const productSelectionStepIndex = (productSelectionPos !== undefined && productSelectionPos !== -1)
+        ? productSelectionPos + belugaIntroStepsOffset
+        : -1;
 
       // Find the next valid step (skipping user_profile if signed in)
       const nextEffectiveIndex = currentStepIndex + 1;
