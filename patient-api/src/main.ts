@@ -12204,6 +12204,16 @@ app.put("/users/profile", authenticateJWT, async (req, res) => {
         passwordHash: hashedPassword,
         temporaryPasswordHash: null // Clear temporary password after change
       });
+
+      // Audit log: Password change (CRITICAL security event)
+      await AuditService.logFromRequest(req, {
+        action: AuditAction.PASSWORD_CHANGE,
+        resourceType: AuditResourceType.USER,
+        resourceId: user.id,
+        details: {
+          operation: "in_session_password_change"
+        }
+      });
     }
 
     // Update other fields
