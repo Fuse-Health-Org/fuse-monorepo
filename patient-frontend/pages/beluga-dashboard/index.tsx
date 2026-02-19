@@ -486,7 +486,7 @@ function BelugaDashboardPage() {
             )}
 
             {activeTab === "messages" && (
-              <div className="max-w-[1400px] mx-auto space-y-4">
+              <div className="max-w-[1400px] mx-auto h-[calc(100vh-9.5rem)] md:h-[calc(100vh-8.5rem)]">
                 {loading && (
                   <Card>
                     <CardBody className="p-6 text-sm text-foreground-500">
@@ -502,15 +502,15 @@ function BelugaDashboardPage() {
                   </Card>
                 )}
                 {visits.length > 0 && (
-                  <Card>
-                    <CardBody className="p-0 md:p-0">
-                      <div className="grid grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)] min-h-[560px]">
-                        <div className="border-b lg:border-b-0 lg:border-r border-content3 bg-content1">
+                  <Card className="h-full">
+                    <CardBody className="p-0 md:p-0 h-full">
+                      <div className="grid grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)] h-full">
+                        <div className="border-b lg:border-b-0 lg:border-r border-content3 bg-content1 h-full flex flex-col min-h-[220px]">
                           <div className="px-4 py-3 border-b border-content3">
                             <h3 className="text-sm font-semibold text-foreground-700">Conversations</h3>
                             <p className="text-xs text-foreground-500">{visits.length} master IDs</p>
                           </div>
-                          <div className="max-h-[520px] overflow-y-auto p-2 space-y-2">
+                          <div className="flex-1 overflow-y-auto p-2 space-y-2">
                             {visits.map((visit) => {
                               const isSelected = visit.masterId === selectedChatMasterId;
                               const visitMessages = chatMessagesByMaster[visit.masterId] || [];
@@ -545,7 +545,7 @@ function BelugaDashboardPage() {
                           </div>
                         </div>
 
-                        <div className="p-4 md:p-6 h-full">
+                        <div className="p-4 md:p-6 h-full min-h-0">
                           {selectedChatVisit ? (
                             <div className="h-full flex flex-col gap-4">
                               <div className="flex items-center justify-between gap-3">
