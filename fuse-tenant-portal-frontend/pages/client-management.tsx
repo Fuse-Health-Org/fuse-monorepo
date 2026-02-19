@@ -652,12 +652,13 @@ export default function ClientManagement() {
 
     setPreviewing(true)
     try {
-      const response = await fetch(`${baseUrl}/admin/users/${selectedUser.id}/impersonate`, {
+      const response = await fetch(`${baseUrl}/admin/impersonate`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({ userId: selectedUser.id }),
       })
 
       if (!response.ok) {
@@ -680,7 +681,7 @@ export default function ClientManagement() {
       }
 
       // Redirect to admin portal with the impersonation token
-      const previewUrl = `${adminPortalUrl}?impersonateToken=${result.token}`
+      const previewUrl = `${adminPortalUrl}?impersonateToken=${result.data.token}`
       window.open(previewUrl, '_blank')
 
       toast.success(`Opening preview for ${selectedUser.firstName} ${selectedUser.lastName}`)
