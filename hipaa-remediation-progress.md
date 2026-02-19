@@ -20,16 +20,17 @@
 
 ---
 
-### ⏳ Pending — Requires Review Before Proceeding
+| `patient-api/src/services/mdIntegration/MDWebhook.service.ts` | Raw JSON.stringify dumps of full Rx/offering payloads (sig, clinical_note, directions, instructions, accessLink) | `10fec0b` | **Done** |
 
-These two are the most invasive — they log **full `req.body` and full API response objects** including complete patient records and prescription payloads. The fix requires understanding how the logging is used (debug vs. production intent) and potentially replacing with selective field logging.
+---
+
+### ⏳ Pending — Requires Review Before Proceeding
 
 | File | Issue | Risk | Notes |
 |------|-------|------|-------|
-| `patient-api/src/services/mdIntegration/MDWebhook.service.ts` | L575-632: Full prescription payloads logged: `sig`, `clinical_note`, `directions`, `instructions` | **CRITICAL** | Large webhook handler — need to review full context before editing |
-| `patient-api/src/endpoints/olympia-pharmacy/olympia-admin.ts` | L66-131: Full `req.body`/response logged for patient create/search/update/prescription | **CRITICAL** | Need to review all endpoints in this file |
+| `patient-api/src/endpoints/olympia-pharmacy/olympia-admin.ts` | L66-131: Full `req.body`/response logged for patient create/search/update/prescription | **CRITICAL** | Review all endpoints in this file before editing |
 
-**→ Review these two files together and define a plan before editing.**
+**→ Review this file and define a plan before editing.**
 
 ---
 
