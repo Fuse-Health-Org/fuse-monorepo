@@ -119,6 +119,16 @@ export function registerMDIntegrationsEndpoints(
 
             await MDFilesService.deleteFile(fileId);
 
+            // HIPAA Audit: Log medical document deletion
+            await AuditService.logFromRequest(req, {
+                action: AuditAction.DELETE,
+                resourceType: AuditResourceType.DOCUMENT,
+                resourceId: fileId,
+                details: {
+                    operation: "delete_md_file",
+                },
+            });
+
             res.json({
                 success: true,
                 message: "File deleted successfully",
