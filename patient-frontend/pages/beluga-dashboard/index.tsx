@@ -280,6 +280,14 @@ function BelugaDashboardPage() {
   const totalRx = visits.reduce((acc, item) => acc + item.rxHistory.length, 0);
   const activeVisits = visits.filter((v) => v.visitStatus && ["active", "pending", "holding", "admin"].includes(v.visitStatus.toLowerCase())).length;
   const resolvedVisits = visits.filter((v) => (v.resolvedStatus || "").toLowerCase() === "closed").length;
+  const isOutboundMessage = (message: BelugaChatMessage) => message.source === "outbound";
+  const getSenderLabel = (message: BelugaChatMessage) => {
+    if (isOutboundMessage(message)) return "You";
+    if (message.channel === "customer_service") return "Customer Service";
+    if (message.senderRole === "doctor") return "Provider";
+    if (message.senderRole === "beluga_admin") return "Beluga Admin";
+    return "System";
+  };
 
   return (
     <ProtectedRoute>
@@ -499,61 +507,107 @@ function BelugaDashboardPage() {
                           {(visit.visitStatus || "pending").toUpperCase()}
                         </span>
                       </div>
-                      {chatLoadingByMaster[visit.masterId] ? (
-                        <p className="text-xs text-foreground-400">Loading conversation...</p>
-                      ) : (chatMessagesByMaster[visit.masterId]?.length || 0) > 0 ? (
-                        <div className="max-h-56 overflow-y-auto space-y-2 p-2 rounded-lg bg-content2">
-                          {(chatMessagesByMaster[visit.masterId] || []).map((message) => (
-                            <div key={message.id} className="rounded-md bg-content1 p-2">
-                              <p className="text-xs font-medium text-foreground-600">
-                                {message.senderRole === "patient"
-                                  ? "You"
-                                  : message.senderRole === "doctor"
-                                    ? "Doctor"
-                                    : message.senderRole === "beluga_admin"
-                                      ? "Beluga Admin"
-                                      : "System"}
-                              </p>
-                              <p className="text-sm text-foreground-700">{message.message || "(no text)"}</p>
-                              <p className="text-[11px] text-foreground-400 mt-1">
-                                {new Date(message.createdAt).toLocaleString()}
-                              </p>
-                            </div>
-                          ))}
+                      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                        <div className="rounded-xl bg-content2 p-3 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <h4 className="text-sm font-semibold text-foreground-700">Provider Chat</h4>
+                            <span className="text-[11px] text-foreground-500">patient_chat</span>
+                          </div>
+                          <div className="max-h-72 overflow-y-auto space-y-2 rounded-lg bg-content1 p-3">
+                            {chatLoadingByMaster[visit.masterId] ? (
+                              <p className="text-xs text-foreground-400">Loading provider conversation...</p>
+                            ) : (chatMessagesByMaster[visit.masterId] || []).filter((message) => message.channel === "patient_chat").length > 0 ? (
+                              (chatMessagesByMaster[visit.masterId] || [])
+                                .filter((message) => message.channel === "patient_chat")
+                                .map((message) => {
+                                  const outbound = isOutboundMessage(message);
+                                  return (
+                                    <div key={message.id} className={`flex ${outbound ? "justify-end" : "justify-start"}`}>
+                                      <div className={`max-w-[85%] rounded-2xl px-3 py-2 ${outbound ? "bg-teal-600 text-white" : "bg-content2 text-foreground-700"}`}>
+                                        <p className={`text-[11px] font-semibold ${outbound ? "text-white/90" : "text-foreground-500"}`}>
+                                          {getSenderLabel(message)}
+                                        </p>
+                                        <p className={`text-sm ${outbound ? "text-white" : "text-foreground-700"}`}>
+                                          {message.message || "(no text)"}
+                                        </p>
+                                        <p className={`text-[11px] mt-1 ${outbound ? "text-white/80" : "text-foreground-400"}`}>
+                                          {new Date(message.createdAt).toLocaleString()}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  );
+                                })
+                            ) : (
+                              <p className="text-xs text-foreground-400">No provider messages for this visit yet.</p>
+                            )}
+                          </div>
+                          <Textarea
+                            label="Message to Provider"
+                            value={messageDrafts[visit.masterId] || ""}
+                            onValueChange={(value) =>
+                              setMessageDrafts((prev) => ({ ...prev, [visit.masterId]: value }))
+                            }
+                            placeholder="Type message for Beluga doctor..."
+                          />
+                          <Button
+                            className="bg-teal-600 text-white"
+                            onPress={() => handleSendMessage(visit.masterId, false)}
+                            isDisabled={!messageDrafts[visit.masterId]?.trim()}
+                          >
+                            Send Patient Message
+                          </Button>
                         </div>
-                      ) : (
-                        <p className="text-xs text-foreground-400">No messages for this visit yet.</p>
-                      )}
-                      <Textarea
-                        label="Message to Provider"
-                        value={messageDrafts[visit.masterId] || ""}
-                        onValueChange={(value) =>
-                          setMessageDrafts((prev) => ({ ...prev, [visit.masterId]: value }))
-                        }
-                        placeholder="Type message for Beluga doctor..."
-                      />
-                      <Button
-                        className="bg-teal-600 text-white"
-                        onPress={() => handleSendMessage(visit.masterId, false)}
-                        isDisabled={!messageDrafts[visit.masterId]?.trim()}
-                      >
-                        Send Patient Message
-                      </Button>
-                      <Textarea
-                        label="Message to Customer Service"
-                        value={csDrafts[visit.masterId] || ""}
-                        onValueChange={(value) =>
-                          setCsDrafts((prev) => ({ ...prev, [visit.masterId]: value }))
-                        }
-                        placeholder="Type message for Beluga admin..."
-                      />
-                      <Button
-                        variant="flat"
-                        onPress={() => handleSendMessage(visit.masterId, true)}
-                        isDisabled={!csDrafts[visit.masterId]?.trim()}
-                      >
-                        Send CS Message
-                      </Button>
+
+                        <div className="rounded-xl bg-content2 p-3 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <h4 className="text-sm font-semibold text-foreground-700">Customer Service Chat</h4>
+                            <span className="text-[11px] text-foreground-500">customer_service</span>
+                          </div>
+                          <div className="max-h-72 overflow-y-auto space-y-2 rounded-lg bg-content1 p-3">
+                            {chatLoadingByMaster[visit.masterId] ? (
+                              <p className="text-xs text-foreground-400">Loading customer service conversation...</p>
+                            ) : (chatMessagesByMaster[visit.masterId] || []).filter((message) => message.channel === "customer_service").length > 0 ? (
+                              (chatMessagesByMaster[visit.masterId] || [])
+                                .filter((message) => message.channel === "customer_service")
+                                .map((message) => {
+                                  const outbound = isOutboundMessage(message);
+                                  return (
+                                    <div key={message.id} className={`flex ${outbound ? "justify-end" : "justify-start"}`}>
+                                      <div className={`max-w-[85%] rounded-2xl px-3 py-2 ${outbound ? "bg-teal-600 text-white" : "bg-content2 text-foreground-700"}`}>
+                                        <p className={`text-[11px] font-semibold ${outbound ? "text-white/90" : "text-foreground-500"}`}>
+                                          {getSenderLabel(message)}
+                                        </p>
+                                        <p className={`text-sm ${outbound ? "text-white" : "text-foreground-700"}`}>
+                                          {message.message || "(no text)"}
+                                        </p>
+                                        <p className={`text-[11px] mt-1 ${outbound ? "text-white/80" : "text-foreground-400"}`}>
+                                          {new Date(message.createdAt).toLocaleString()}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  );
+                                })
+                            ) : (
+                              <p className="text-xs text-foreground-400">No CS messages for this visit yet.</p>
+                            )}
+                          </div>
+                          <Textarea
+                            label="Message to Customer Service"
+                            value={csDrafts[visit.masterId] || ""}
+                            onValueChange={(value) =>
+                              setCsDrafts((prev) => ({ ...prev, [visit.masterId]: value }))
+                            }
+                            placeholder="Type message for Beluga admin..."
+                          />
+                          <Button
+                            variant="flat"
+                            onPress={() => handleSendMessage(visit.masterId, true)}
+                            isDisabled={!csDrafts[visit.masterId]?.trim()}
+                          >
+                            Send CS Message
+                          </Button>
+                        </div>
+                      </div>
                       {messageResults[visit.masterId] && (
                         <p className="text-sm text-foreground-500">{messageResults[visit.masterId]}</p>
                       )}
