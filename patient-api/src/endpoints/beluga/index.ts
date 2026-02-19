@@ -1407,15 +1407,39 @@ router.post("/visits/:masterId/preferences", authenticateJWT, async (req: Reques
       };
     });
 
+    const visitFormObj = visitResponse.payload?.data?.formObj || {};
+    const fallbackZip = onlyDigits(
+      toNonEmptyString(visitFormObj?.zip) ||
+        toNonEmptyString((user as any)?.zipCode) ||
+        ""
+    );
+    const fallbackCity =
+      toNonEmptyString(visitFormObj?.city) ||
+      toNonEmptyString((user as any)?.city) ||
+      undefined;
+    const fallbackState =
+      toNonEmptyString(visitFormObj?.state) ||
+      toNonEmptyString((user as any)?.state) ||
+      undefined;
+    const fallbackPharmacyCandidates = await resolveBelugaPharmacyCandidates({
+      requestedPharmacyId,
+      zip: fallbackZip,
+      city: fallbackCity,
+      state: fallbackState,
+    });
     const pharmacyId =
-      requestedPharmacyId ||
+      toNonEmptyString(requestedPharmacyId) ||
       toNonEmptyString(visitResponse.payload?.data?.pharmacyId) ||
-      toNonEmptyString(visitResponse.payload?.pharmacyId);
+      toNonEmptyString(visitResponse.payload?.pharmacyId) ||
+      fallbackPharmacyCandidates[0];
 
     if (!pharmacyId) {
       return res.status(400).json({
         success: false,
         message: "pharmacyId is required to update visit preferences",
+        details: {
+          hint: "Pass pharmacyId explicitly or ensure visit/user address has valid zip/city/state for pharmacy lookup",
+        },
       });
     }
 
