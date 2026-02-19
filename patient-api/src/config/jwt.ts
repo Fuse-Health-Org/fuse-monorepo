@@ -30,6 +30,19 @@ export interface JWTPayload {
   impersonatedBy?: string;
 }
 
+// Create a short-lived JWT token for debugging/testing session expiry flows
+export const createDebugShortLivedJWTToken = (payload: JWTPayload): string => {
+  const { iat, exp, ...rest } = payload as any;
+  // Strip aud/iss from the decoded payload — they're passed via options below
+  delete rest.aud;
+  delete rest.iss;
+  return jwt.sign(rest, JWT_SECRET, {
+    expiresIn: '1m',
+    issuer: 'patient-portal-api',
+    audience: 'patient-portal-frontend',
+  });
+};
+
 // Create JWT token
 export const createJWTToken = (user: any): string => {
   // HIPAA: Do not include PII (email) in JWT payload

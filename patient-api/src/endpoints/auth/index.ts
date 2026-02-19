@@ -9,6 +9,7 @@ import { MedicalCompanySlug } from "@fuse/enums";
 import BrandInvitation, { InvitationType } from "../../models/BrandInvitation";
 import {
     createJWTToken,
+    createDebugShortLivedJWTToken,
     getCurrentUser,
 } from "../../config/jwt";
 import CustomWebsite from "../../models/CustomWebsite";
@@ -951,6 +952,16 @@ export function registerAuthEndpoints(
                 success: false,
                 message: "Sign out failed",
             });
+        }
+    });
+
+    app.post("/auth/debug/short-token", authenticateJWT, (req, res) => {
+        try {
+            const token = createDebugShortLivedJWTToken((req as any).user);
+            res.json({ success: true, token });
+        } catch (err) {
+            console.error('❌ [debug/short-token]', err);
+            res.status(500).json({ success: false, message: String(err) });
         }
     });
 
