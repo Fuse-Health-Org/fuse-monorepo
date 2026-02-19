@@ -1032,6 +1032,9 @@ export function useQuestionnaireModal(
       const medicalCompany = questionnaire?.medicalCompanySource;
       const needsMDCase = medicalCompany === MedicalCompanySlug.MD_INTEGRATIONS;
       const needsBelugaCase = medicalCompany === MedicalCompanySlug.BELUGA;
+      console.log('🔍 [CHECKOUT ROUTING] questionnaire?.id:', questionnaire?.id);
+      console.log('🔍 [CHECKOUT ROUTING] medicalCompanySource:', medicalCompany);
+      console.log('🔍 [CHECKOUT ROUTING] needsMDCase:', needsMDCase, '| needsBelugaCase:', needsBelugaCase);
 
       if (needsMDCase && finalOrderId) {
         console.log('🎉 [CHECKOUT] Questionnaire uses MD Integrations, creating case...');

@@ -2073,7 +2073,11 @@ export default function TemplateEditor() {
       const questionUpdates: Promise<any>[] = []
       for (const s of steps) {
         for (const q of s.questions || []) {
-          const optionsPayload = (q.options || []).map((text, idx) => ({ optionText: text, optionValue: text, optionOrder: idx + 1 }))
+          const optionsPayload = (q.options || []).map((opt: any, idx: number) => {
+            const text = typeof opt === 'string' ? opt : (opt.optionText ?? '');
+            const value = typeof opt === 'string' ? opt : (opt.optionValue ?? opt.optionText ?? '');
+            return { optionText: text, optionValue: value, optionOrder: idx + 1 };
+          })
           questionUpdates.push(
             fetch(`${baseUrl}/questions/${q.id}`, {
               method: 'PUT',

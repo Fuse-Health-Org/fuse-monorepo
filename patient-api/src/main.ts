@@ -1386,13 +1386,13 @@ app.get("/clinic/allow-custom-domain", async (req, res) => {
         }
 
         // For this platform domain, we checked and it didn't match - don't allow
-        console.log(`❌ [allow-custom-domain] Rejecting invalid subdomain: ${baseDomain}`);
+        // console.log(`❌ [allow-custom-domain] Rejecting invalid subdomain: ${baseDomain}`);
         return res.status(404).send("not allowed");
       }
     }
 
     // Not a platform domain and not a custom domain - reject
-    console.log(`❌ [allow-custom-domain] Rejecting unknown domain: ${baseDomain}`);
+    //console.log(`❌ [allow-custom-domain] Rejecting unknown domain: ${baseDomain}`);
     return res.status(404).send("not allowed");
   } catch (error) {
     console.error("❌ Error in /clinic/allow-custom-domain:", error);
@@ -10794,11 +10794,7 @@ app.put("/questions/:questionId", authenticateJWT, async (req, res) => {
       data: updated,
     });
   } catch (error) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("❌ Error updating question:", error);
-    } else {
-      console.error("❌ Error updating question");
-    }
+    console.error("❌ Error updating question:", error);
 
     if (error instanceof Error) {
       if (
@@ -10884,11 +10880,7 @@ app.put("/questions", authenticateJWT, async (req, res) => {
       data: updatedQuestion,
     });
   } catch (error) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("❌ Error updating question:", error);
-    } else {
-      console.error("❌ Error updating question");
-    }
+    console.error("❌ Error updating question (PUT /questions):", error);
 
     if (error instanceof Error) {
       if (
