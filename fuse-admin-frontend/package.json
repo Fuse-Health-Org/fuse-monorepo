@@ -14,8 +14,8 @@
     "pm2:stop": "pm2 stop admin-frontend",
     "clean": "git clean -xdf .cache .turbo dist .next node_modules",
     "with-env": "dotenv -e ../.env.local --",
-    "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e": "pnpm with-env playwright test",
+    "test:e2e:ui": "pnpm with-env playwright test --ui"
   },
   "dependencies": {
     "@fuse/enums": "workspace:*",
