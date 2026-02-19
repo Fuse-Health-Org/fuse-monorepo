@@ -13,10 +13,11 @@ interface BelugaProductManagerProps {
 interface BelugaProduct {
   id: string
   name: string
-  description?: string
-  category?: string
-  type?: string
-  strength?: string
+  strength: string
+  quantity: string
+  refills: string
+  daysSupply?: string
+  medId?: string
 }
 
 export function BelugaProductManager({ productId, productName, currentBelugaProductId }: BelugaProductManagerProps) {
@@ -37,8 +38,8 @@ export function BelugaProductManager({ productId, productName, currentBelugaProd
     setError(null)
 
     try {
-      // Fetch all available Beluga products (placeholder data)
-      const res = await fetch(`${baseUrl}/beluga/products`, {
+      // Fetch all available Beluga products from database
+      const res = await fetch(`${baseUrl}/beluga-products`, {
         headers: { Authorization: `Bearer ${token}` }
       })
       const data = await res.json()
@@ -46,11 +47,12 @@ export function BelugaProductManager({ productId, productName, currentBelugaProd
       if (data.success && data.data) {
         setAvailableProducts(data.data)
         
-        // If there's a current linked product, find it in the list
+        // If there's a current linked product, find it by its UUID (stored in Product.belugaProductId)
         if (currentBelugaProductId) {
           const linked = data.data.find((p: BelugaProduct) => p.id === currentBelugaProductId)
           if (linked) {
             setLinkedProduct(linked)
+            setSelectedProductId(linked.id)
           }
         }
       } else {
@@ -80,7 +82,15 @@ export function BelugaProductManager({ productId, productName, currentBelugaProd
     setSuccess(null)
 
     try {
-      // Update the product with the selected Beluga product ID
+      // Find the selected product
+      const selected = availableProducts.find(p => p.id === selectedProductId)
+      if (!selected) {
+        setError("Selected product not found")
+        setLinking(false)
+        return
+      }
+
+      // Update the product with the BelugaProduct UUID
       const res = await fetch(`${baseUrl}/products-management/${productId}`, {
         method: "PUT",
         headers: {
@@ -89,16 +99,15 @@ export function BelugaProductManager({ productId, productName, currentBelugaProd
         },
         body: JSON.stringify({ 
           id: productId,
-          belugaProductId: selectedProductId 
+          belugaProductId: selectedProductId
         })
       })
 
       const data = await res.json()
 
       if (data.success) {
-        const linked = availableProducts.find(p => p.id === selectedProductId)
-        setLinkedProduct(linked || null)
-        setSuccess(`Linked to ${linked?.name || 'Beluga product'}`)
+        setLinkedProduct(selected)
+        setSuccess(`Linked to ${selected.name}`)
         
         // Refresh the page after a short delay to show updated data
         setTimeout(() => {
@@ -182,9 +191,6 @@ export function BelugaProductManager({ productId, productName, currentBelugaProd
             <Activity className="h-5 w-5 text-teal-600" />
             <CardTitle>Beluga Integration</CardTitle>
           </div>
-          <span className="px-3 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-700 border border-amber-200">
-            Placeholder Data
-          </span>
         </div>
         <CardDescription>
           Link this product to a Beluga product for telehealth integration
@@ -216,17 +222,27 @@ export function BelugaProductManager({ productId, productName, currentBelugaProd
                   <h3 className="font-semibold text-teal-900 dark:text-teal-100">Linked Product</h3>
                 </div>
                 <p className="text-sm font-medium text-teal-800 dark:text-teal-200 mb-1">{linkedProduct.name}</p>
-                {linkedProduct.description && (
-                  <p className="text-xs text-teal-600 dark:text-teal-400 mb-2">{linkedProduct.description}</p>
-                )}
-                <div className="flex items-center gap-3 text-xs text-teal-700 dark:text-teal-300">
-                  <span className="px-2 py-0.5 bg-teal-100 dark:bg-teal-900/50 rounded-full font-medium">
-                    ID: {linkedProduct.id}
-                  </span>
-                  {linkedProduct.category && (
-                    <span className="px-2 py-0.5 bg-teal-100 dark:bg-teal-900/50 rounded-full">
-                      {linkedProduct.category}
-                    </span>
+                <p className="text-xs text-teal-600 dark:text-teal-400 mb-3">{linkedProduct.strength}</p>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  {linkedProduct.medId && (
+                    <div>
+                      <span className="text-teal-700 dark:text-teal-300">Beluga Med ID:</span>
+                      <p className="font-medium text-teal-900 dark:text-teal-100">{linkedProduct.medId}</p>
+                    </div>
+                  )}
+                  <div>
+                    <span className="text-teal-700 dark:text-teal-300">Quantity:</span>
+                    <p className="font-medium text-teal-900 dark:text-teal-100">{linkedProduct.quantity}</p>
+                  </div>
+                  <div>
+                    <span className="text-teal-700 dark:text-teal-300">Refills:</span>
+                    <p className="font-medium text-teal-900 dark:text-teal-100">{linkedProduct.refills}</p>
+                  </div>
+                  {linkedProduct.daysSupply && (
+                    <div>
+                      <span className="text-teal-700 dark:text-teal-300">Days Supply:</span>
+                      <p className="font-medium text-teal-900 dark:text-teal-100">{linkedProduct.daysSupply}</p>
+                    </div>
                   )}
                 </div>
               </div>
@@ -264,45 +280,59 @@ export function BelugaProductManager({ productId, productName, currentBelugaProd
             <label className="block text-sm font-medium mb-2">
               {linkedProduct ? "Change Linked Product" : "Link to Existing Beluga Product"}
             </label>
-            <div className="flex gap-2">
-              <select
-                value={selectedProductId}
-                onChange={(e) => setSelectedProductId(e.target.value)}
-                disabled={linking}
-                className="flex-1 px-3 py-2 rounded-lg border border-input bg-background text-sm"
-              >
-                <option value="">Select a Beluga product...</option>
-                {availableProducts.map((product) => (
-                  <option key={product.id} value={product.id}>
-                    {product.name} ({product.id})
-                  </option>
-                ))}
-              </select>
-              <Button
-                onClick={handleLinkProduct}
-                disabled={!selectedProductId || linking}
-                className="bg-teal-600 hover:bg-teal-700 text-white"
-              >
-                {linking ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                ) : (
-                  <Link2 className="h-4 w-4 mr-2" />
-                )}
-                Link
-              </Button>
-            </div>
+            {availableProducts.length === 0 ? (
+              <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                <p className="text-sm text-amber-800 dark:text-amber-300">
+                  No Beluga products available yet. Create them in the{" "}
+                  <a href="/beluga-admin" className="underline font-medium">Beluga Admin Area</a> first.
+                </p>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <select
+                  value={selectedProductId}
+                  onChange={(e) => setSelectedProductId(e.target.value)}
+                  disabled={linking}
+                  className="flex-1 px-3 py-2 rounded-lg border border-input bg-background text-sm"
+                >
+                  <option value="">Select a Beluga product...</option>
+                  {availableProducts.map((product) => (
+                    <option key={product.id} value={product.id}>
+                      {product.name} - {product.strength}
+                      {product.medId ? ` (medId: ${product.medId})` : ' (medId: not assigned yet)'}
+                    </option>
+                  ))}
+                </select>
+                <Button
+                  onClick={handleLinkProduct}
+                  disabled={!selectedProductId || linking}
+                  className="bg-teal-600 hover:bg-teal-700 text-white"
+                >
+                  {linking ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <Link2 className="h-4 w-4 mr-2" />
+                  )}
+                  Link
+                </Button>
+              </div>
+            )}
           </div>
 
-          {/* Info box */}
+          {/* Integration info */}
           <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
             <div className="flex items-start gap-3">
               <AlertCircle className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
               <div className="text-sm text-blue-700 dark:text-blue-400">
-                <p className="font-medium mb-1">Placeholder Data</p>
+                <p className="font-medium mb-1">How This Works</p>
+                <p className="text-xs mb-2">
+                  Select a Beluga product to link. The product's <code className="mx-1">medId</code> will be 
+                  saved to this product's <code className="mx-1">belugaProductId</code> field. When a patient 
+                  checks out, this medId is sent to Beluga in the visit creation payload.
+                </p>
                 <p className="text-xs">
-                  These are placeholder Beluga products for testing (IDs start with PLACEHOLDER-). 
-                  When Beluga integration is complete, this will connect to real Beluga products for
-                  seamless case management and prescription fulfillment.
+                  <strong>Note:</strong> Products must have a medId assigned before they can be linked. 
+                  Manage Beluga products in the <a href="/beluga-admin" className="underline">Beluga Admin Area</a>.
                 </p>
               </div>
             </div>

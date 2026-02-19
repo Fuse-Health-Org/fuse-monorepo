@@ -1,0 +1,78 @@
+﻿Usage:
+These requests will be made to your specified URL endpoint.
+Events:
+Consult canceled:
+This event will be triggered if the patient wants to cancel their visit for any reason.
+Method:
+POST
+Request body:
+{
+masterId: String,
+event: ‘CONSULT_CANCELED’,
+}
+	Prescription written:
+This event will be triggered if the doctor writes and submits a prescription.
+Method:
+POST
+Request body:
+{
+masterId: String,
+event: ‘RX_WRITTEN’,
+docName: String,
+medsPrescribed: Array [
+Object {
+name: String,
+strength: String,
+refills: String,
+quantity: String,
+medId: String,
+rxId: String (can be “N/A” if not applicable),
+},
+...
+]
+}
+	Consult concluded:
+This event will be triggered when the doctor concludes the visit, either with writing a prescription or referring the patient.
+Method:
+POST
+Request body:
+{
+masterId: String,
+event: ‘CONSULT_CONCLUDED’,
+visitOutcome: String (either “prescribed” or “referred”),
+}
+	Chat Events:
+The following event will be passed to your URL.
+Doctor messages patient:
+This event will be triggered when the doctor sends a message to the patient.
+Method:
+POST
+Request body:
+{
+masterId: String,
+event: “DOCTOR_CHAT”,
+content: String,
+}
+	Customer Service Events:
+The following event will be passed to your URL.
+Beluga messages customer service:
+This event will be triggered when a Beluga admin contacts customer service.
+Method:
+POST
+Request body:
+{
+masterId: String,
+event: "CS_MESSAGE",
+content: String,
+}
+	Patient name update:
+This event will be triggered when Beluga updates a patient’s name in the Beluga system. Please update the patient name in your system when receiving this event.
+Method:
+POST
+Request body:
+{
+masterId: String (REQUIRED),
+event: "NAME_UPDATE",
+firstName: String (max length 100) (REQUIRED),
+lastName: String (max length 100) (REQUIRED)
+}

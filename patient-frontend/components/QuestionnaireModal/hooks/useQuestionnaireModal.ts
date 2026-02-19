@@ -45,6 +45,8 @@ export function useQuestionnaireModal(
 
   // State management
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  const [belugaConsentGiven, setBelugaConsentGiven] = useState(false);
+  const [belugaPhoto, setBelugaPhoto] = useState<{ mime: "image/jpeg"; data: string; fileName: string } | null>(null);
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [selectedProducts, setSelectedProducts] = useState<Record<string, number>>({});
@@ -156,7 +158,8 @@ export function useQuestionnaireModal(
     if (!programData || !questionnaire) return;
     
     const checkoutPos = questionnaire.checkoutStepPosition;
-    const checkoutStepIndex = checkoutPos === -1 ? questionnaire.steps.length : checkoutPos;
+    const belugaOffset = questionnaire.medicalCompanySource === MedicalCompanySlug.BELUGA ? 1 : 0;
+    const checkoutStepIndex = (checkoutPos === -1 ? questionnaire.steps.length : checkoutPos) + belugaOffset;
     const isOnCheckout = currentStepIndex === checkoutStepIndex;
     
     console.log('🔍 [VISIT FEE] useEffect check:', {
@@ -225,20 +228,25 @@ export function useQuestionnaireModal(
   );
 
   // Step helpers - must be defined before getCurrentStage
+  const isBeluga = questionnaire?.medicalCompanySource === MedicalCompanySlug.BELUGA;
+  const belugaConsentOffset = isBeluga ? 1 : 0;
+  const isBelugaConsentStep = isBeluga && currentStepIndex === 0;
+
   const isProductSelectionStep = useCallback((): boolean => {
     if (!questionnaire) return false;
     const productSelectionPos = questionnaire.productSelectionStepPosition;
-    // Only show product selection if it's explicitly configured (position >= 0)
-    if (productSelectionPos === undefined || productSelectionPos === -1) return false;
-    return currentStepIndex === productSelectionPos;
-  }, [questionnaire, currentStepIndex]);
+    const productSelectionStepIndex = (productSelectionPos !== undefined && productSelectionPos !== -1) ? productSelectionPos : -1;
+    const checkoutPos = questionnaire.checkoutStepPosition;
+    const checkoutStepIndex = (checkoutPos === -1 ? questionnaire.steps.length : checkoutPos) + belugaConsentOffset;
+    return productSelectionStepIndex !== -1 && currentStepIndex === productSelectionStepIndex;
+  }, [questionnaire, currentStepIndex, belugaConsentOffset]);
 
   const isCheckoutStep = useCallback((): boolean => {
     if (!questionnaire) return false;
     const checkoutPos = questionnaire.checkoutStepPosition;
-    const checkoutStepIndex = checkoutPos === -1 ? questionnaire.steps.length : checkoutPos;
+    const checkoutStepIndex = (checkoutPos === -1 ? questionnaire.steps.length : checkoutPos) + belugaConsentOffset;
     return currentStepIndex === checkoutStepIndex;
-  }, [questionnaire, currentStepIndex]);
+  }, [questionnaire, currentStepIndex, belugaConsentOffset]);
 
   const evaluateStepConditionalLogic = useCallback((step: any): boolean => {
     const conditionalLogic = step.conditionalLogic;
@@ -271,10 +279,11 @@ export function useQuestionnaireModal(
 
   const getCurrentQuestionnaireStep = useCallback(() => {
     if (!questionnaire || isProductSelectionStep() || isCheckoutStep()) return null;
+    if (isBelugaConsentStep) return null;
     const checkoutPos = questionnaire.checkoutStepPosition;
-    let actualStepIndex = currentStepIndex;
-    if (checkoutPos !== -1 && currentStepIndex > checkoutPos + 1) {
-      actualStepIndex = currentStepIndex - 2;
+    let actualStepIndex = currentStepIndex - belugaConsentOffset;
+    if (checkoutPos !== -1 && currentStepIndex > checkoutPos + 1 + belugaConsentOffset) {
+      actualStepIndex = currentStepIndex - 2 - belugaConsentOffset;
     }
 
     // Check if user is signed in
@@ -298,7 +307,7 @@ export function useQuestionnaireModal(
       }
     }
     return null;
-  }, [questionnaire, currentStepIndex, isProductSelectionStep, isCheckoutStep, evaluateStepConditionalLogic, isAuthenticatedUser]);
+  }, [questionnaire, currentStepIndex, isProductSelectionStep, isCheckoutStep, evaluateStepConditionalLogic, accountCreated, userId]);
 
   // Analytics
   const getCurrentStage = useCallback((): 'product' | 'payment' | 'account' => {
@@ -350,27 +359,18 @@ export function useQuestionnaireModal(
       if (isSignedIn && step.category === 'user_profile') return false;
       return true;
     }).length;
-    
-    // Count special steps
-    let specialSteps = 1; // Always +1 for checkout
-    
-    // Add product selection step if enabled
-    const productSelectionPos = questionnaire.productSelectionStepPosition;
-    if (productSelectionPos !== undefined && productSelectionPos !== -1) {
-      specialSteps += 1;
-    }
-    
-    return visibleSteps + specialSteps;
-  }, [questionnaire, isAuthenticatedUser]);
+    return visibleSteps + 1; // +1 for checkout
+  }, [questionnaire, accountCreated, userId]);
 
   // Get current visible step number for progress display
   const getCurrentVisibleStepNumber = useCallback((): number => {
     if (!questionnaire) return 1;
-    const isSignedIn = isAuthenticatedUser;
+    if (isBelugaConsentStep) return 1;
+    const isSignedIn = accountCreated || userId;
     const productSelectionPos = questionnaire.productSelectionStepPosition;
     const checkoutPos = questionnaire.checkoutStepPosition;
     const productSelectionStepIndex = (productSelectionPos !== undefined && productSelectionPos !== -1) ? productSelectionPos : -1;
-    const checkoutStepIndex = checkoutPos === -1 ? questionnaire.steps.length : checkoutPos;
+    const checkoutStepIndex = (checkoutPos === -1 ? questionnaire.steps.length : checkoutPos) + belugaConsentOffset;
 
     // Log all steps with their categories for debugging
     const stepCategories = questionnaire.steps.map((s, i) => `${i}:${s.category}`);
@@ -402,10 +402,12 @@ export function useQuestionnaireModal(
       return visibleCount + 1;
     }
 
-    // Count visible steps up to and including current index
-    let visibleCount = 0;
-    for (let i = 0; i <= currentStepIndex && i < questionnaire.steps.length; i++) {
-      const step = questionnaire.steps[i];
+    // Count visible steps: Beluga consent (1) + questionnaire steps up to current
+    let visibleCount = belugaConsentOffset;
+    const startIdx = belugaConsentOffset;
+    for (let i = startIdx; i <= currentStepIndex && i - belugaConsentOffset < questionnaire.steps.length; i++) {
+      const step = questionnaire.steps[i - belugaConsentOffset];
+      if (!step) break;
       // Skip user_profile steps ONLY if signed in
       if (isSignedIn && step.category === 'user_profile') {
         console.log(`📊 [STEP NUM] Skipping step ${i} (${step.category}) - user signed in`);
@@ -419,7 +421,7 @@ export function useQuestionnaireModal(
 
     // Ensure we return at least 1
     return Math.max(visibleCount, 1);
-  }, [questionnaire, currentStepIndex, isAuthenticatedUser, getTotalSteps]);
+  }, [questionnaire, currentStepIndex, accountCreated, userId, getTotalSteps]);
 
   // Build questionnaire answers
   const buildQuestionnaireAnswers = useCallback((currentAnswers: Record<string, any>) => {
@@ -567,6 +569,29 @@ export function useQuestionnaireModal(
   // Validation
   const validateCurrentStep = useCallback((): boolean => {
     if (!questionnaire) return true;
+    if (isBelugaConsentStep) {
+      const nextErrors: Record<string, string> = {};
+
+      if (!belugaConsentGiven) {
+        nextErrors.belugaConsent = 'Please acknowledge the Informed Consent and Privacy Policy to continue.';
+      }
+      if (!belugaPhoto?.data) {
+        nextErrors.belugaPhoto = 'Please upload a JPEG image before continuing.';
+      }
+
+      if (Object.keys(nextErrors).length > 0) {
+        setErrors((prev) => ({ ...prev, ...nextErrors }));
+        return false;
+      }
+
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next.belugaConsent;
+        delete next.belugaPhoto;
+        return next;
+      });
+      return true;
+    }
     if (isProductSelectionStep()) {
       if (programData) {
         if (!Object.values(selectedProgramProducts).some(Boolean)) {
@@ -640,7 +665,21 @@ export function useQuestionnaireModal(
     });
     setErrors(stepErrors);
     return Object.keys(stepErrors).length === 0;
-  }, [questionnaire, isProductSelectionStep, isCheckoutStep, selectedProducts, selectedProgramProducts, programData, shippingInfo, paymentStatus, getCurrentQuestionnaireStep, answers]);
+  }, [
+    questionnaire,
+    isBelugaConsentStep,
+    belugaConsentGiven,
+    belugaPhoto,
+    programData,
+    selectedProgramProducts,
+    isProductSelectionStep,
+    isCheckoutStep,
+    selectedProducts,
+    shippingInfo,
+    paymentStatus,
+    getCurrentQuestionnaireStep,
+    answers,
+  ]);
 
   // Auth handlers
   const handleSignIn = useCallback(async () => {
@@ -895,6 +934,75 @@ export function useQuestionnaireModal(
     console.log('🔵 [MDI] ========== END ==========');
   }, [domainClinic, answers, questionnaire]);
 
+  const createBelugaCase = useCallback(async (orderIdForCase: string) => {
+    console.log('🟢 [BELUGA] ========== BELUGA CASE CREATION ==========');
+    console.log('🟢 [BELUGA] Order ID:', orderIdForCase);
+    console.log('🟢 [BELUGA] Questionnaire medicalCompanySource:', questionnaire?.medicalCompanySource);
+
+    if (!domainClinic) {
+      console.log('⚠️ [BELUGA] No domain clinic found - skipping Beluga case creation');
+      return;
+    }
+
+    const medicalCompany = questionnaire?.medicalCompanySource;
+    if (medicalCompany !== MedicalCompanySlug.BELUGA) {
+      console.log('ℹ️ [BELUGA] Questionnaire is not beluga - skipping Beluga case creation');
+      return;
+    }
+
+    const patientOverrides = {
+      firstName: answers['firstName'],
+      lastName: answers['lastName'],
+      email: answers['email'],
+      phoneNumber: answers['mobile'],
+      dob: answers['dob'] || answers['dateOfBirth'],
+      gender: answers['gender'],
+    };
+
+    const requestPayload = {
+      orderId: orderIdForCase,
+      clinicId: domainClinic.id,
+      patientOverrides,
+      belugaPhotos: belugaPhoto
+        ? [{ mime: belugaPhoto.mime, data: belugaPhoto.data }]
+        : [],
+    };
+
+    try {
+      console.log('🟢 [BELUGA] Calling POST /beluga/cases...');
+      const result = await apiCall('/beluga/cases', {
+        method: 'POST',
+        body: JSON.stringify(requestPayload),
+      });
+
+      if (result.success) {
+        const wasSkipped = result.data?.skipped;
+        if (wasSkipped) {
+          console.log('ℹ️ [BELUGA] Backend skipped Beluga case creation:', (result as any).message || result.data?.message || 'No message');
+          console.log('🟢 [BELUGA] ========== END (SKIPPED) ==========');
+          throw new Error(`Beluga case creation was skipped: ${(result as any).message || result.data?.message || 'Medical company source is not Beluga'}`);
+        } else {
+          console.log('✅ [BELUGA] Beluga case created successfully');
+          console.log('🟢 [BELUGA] ========== END (SUCCESS) ==========');
+        }
+      } else {
+        console.error('❌ [BELUGA] Failed to create Beluga case:', result);
+        console.log('🟢 [BELUGA] ========== END (FAILED) ==========');
+        throw new Error(`Failed to create Beluga case: ${(result as any).message || 'Unknown error'}`);
+      }
+    } catch (error: any) {
+      console.error('❌ [BELUGA] Error creating Beluga case:', error);
+      console.error('❌ [BELUGA] Error details:', {
+        message: error?.message,
+        response: error?.response?.data,
+        status: error?.response?.status,
+      });
+      console.log('🟢 [BELUGA] ========== END (EXCEPTION) ==========');
+      // Re-throw the error to fail the checkout for Beluga questionnaires
+      throw error;
+    }
+  }, [domainClinic, answers, questionnaire, belugaPhoto]);
+
   const handlePaymentSuccess = useCallback(async (data?: { paymentIntentId?: string; orderId?: string }) => {
     // Use passed data or fall back to state
     const finalPaymentIntentId = data?.paymentIntentId || paymentIntentId;
@@ -920,41 +1028,52 @@ export function useQuestionnaireModal(
         console.log('🎉 [CHECKOUT] Conversion tracked');
       }
 
-      // Create MD Integrations case if questionnaire uses md-integrations as medical company source
+      // Create telehealth case if questionnaire uses external medical company source
       const medicalCompany = questionnaire?.medicalCompanySource;
       const needsMDCase = medicalCompany === MedicalCompanySlug.MD_INTEGRATIONS;
+      const needsBelugaCase = medicalCompany === MedicalCompanySlug.BELUGA;
+      console.log('🔍 [CHECKOUT ROUTING] questionnaire?.id:', questionnaire?.id);
+      console.log('🔍 [CHECKOUT ROUTING] medicalCompanySource:', medicalCompany);
+      console.log('🔍 [CHECKOUT ROUTING] needsMDCase:', needsMDCase, '| needsBelugaCase:', needsBelugaCase);
 
       if (needsMDCase && finalOrderId) {
         console.log('🎉 [CHECKOUT] Questionnaire uses MD Integrations, creating case...');
         setPaymentStatus('creatingMDCase'); // Update status to show MD case creation in progress
         await createMDCase(finalOrderId);
         console.log('✅ [CHECKOUT] MD case creation complete');
+      } else if (needsBelugaCase && finalOrderId) {
+        console.log('🎉 [CHECKOUT] Questionnaire uses Beluga, creating case...');
+        setPaymentStatus('creatingBelugaCase');
+        await createBelugaCase(finalOrderId);
+        console.log('✅ [CHECKOUT] Beluga case creation complete');
       } else {
-        console.log('ℹ️ [CHECKOUT] Skipping MD case creation (medicalCompanySource: ' + medicalCompany + ', orderId: ' + finalOrderId + ')');
+        console.log('ℹ️ [CHECKOUT] Skipping external case creation (medicalCompanySource: ' + medicalCompany + ', orderId: ' + finalOrderId + ')');
       }
 
       // Set status to ready - all steps complete, user can now continue to dashboard
       setPaymentStatus('ready');
       console.log('🎉 [CHECKOUT] ========== CHECKOUT COMPLETE - READY TO REDIRECT ==========');
 
-      // Clear form cache after successful payment
-      if (questionnaire?.id) {
-        const cacheKey = `form-draft-${questionnaire.id}-${questionnaireId || 'unknown'}`;
-        try {
-          localStorage.removeItem(cacheKey);
-          console.log('🗑️ [CACHE] Cleared form draft after successful payment');
-        } catch (error) {
-          console.warn('⚠️ [CACHE] Failed to clear cache:', error);
-        }
-      }
-
     } catch (error) {
       console.error('❌ [CHECKOUT] Payment success handler error:', error);
       setPaymentStatus('failed');
       setShowSuccessModal(false); // Ensure modal is closed on error
-      alert('Payment processing error. Please contact support.');
+      
+      // Show specific error message if available
+      const errorMessage = error?.message || 'Payment processing error. Please contact support.';
+      alert(`Checkout Error: ${errorMessage}\n\nYour payment was authorized but not captured. Please contact support.`);
     }
-  }, [paymentIntentId, orderId, userId, accountCreated, triggerCheckoutSequenceRun, trackConversion, createMDCase, questionnaire, questionnaireId]);
+  }, [
+    paymentIntentId,
+    orderId,
+    userId,
+    accountCreated,
+    triggerCheckoutSequenceRun,
+    trackConversion,
+    createMDCase,
+    createBelugaCase,
+    questionnaire,
+  ]);
 
   const handlePaymentConfirm = useCallback(() => {
     // Open modal with processing state when payment confirmation starts
@@ -1115,6 +1234,12 @@ export function useQuestionnaireModal(
     if (validateCurrentStep() && questionnaire) {
       const currentStep = getCurrentQuestionnaireStep();
 
+      // If we're on Beluga consent step, advance to first questionnaire step
+      if (isBelugaConsentStep) {
+        setCurrentStepIndex(1);
+        return;
+      }
+
       // If we're on checkout step and payment succeeded, submit the form
       if (isCheckoutStep() && paymentStatus === 'succeeded') {
         console.log('✅ Checkout complete with payment succeeded, submitting questionnaire');
@@ -1128,27 +1253,28 @@ export function useQuestionnaireModal(
       }
 
       const isSignedIn = isAuthenticatedUser;
-      const checkoutPos = questionnaire.checkoutStepPosition;
       const productSelectionPos = questionnaire.productSelectionStepPosition;
-      const checkoutStepIndex = checkoutPos === -1 ? questionnaire.steps.length : checkoutPos;
+      const checkoutPos = questionnaire.checkoutStepPosition;
+      const baseCheckoutStepIndex = checkoutPos === -1 ? questionnaire.steps.length : checkoutPos;
+      const checkoutStepIndex = baseCheckoutStepIndex + belugaConsentOffset;
       const productSelectionStepIndex = (productSelectionPos !== undefined && productSelectionPos !== -1) ? productSelectionPos : -1;
 
       // Find the next valid step (skipping user_profile if signed in)
-      let nextIndex = currentStepIndex + 1;
+      const nextEffectiveIndex = currentStepIndex + 1;
+      let nextQuestionnaireIndex = nextEffectiveIndex - belugaConsentOffset;
 
-      while (nextIndex < questionnaire.steps.length) {
-        const step = questionnaire.steps[nextIndex];
+      while (nextQuestionnaireIndex < questionnaire.steps.length) {
+        const step = questionnaire.steps[nextQuestionnaireIndex];
         if (step && isSignedIn && step.category === 'user_profile') {
           console.log('⏭️ Skipping user_profile step when advancing (user signed in):', step.title);
-          nextIndex++;
+          nextQuestionnaireIndex++;
           continue;
         }
         break;
       }
 
-      if (nextIndex >= questionnaire.steps.length) {
+      if (nextQuestionnaireIndex >= questionnaire.steps.length) {
         console.log('⏭️ No more valid questionnaire steps, checking for product selection or checkout');
-        // Check if there's a product selection step to show before checkout
         if (productSelectionStepIndex !== -1 && currentStepIndex < productSelectionStepIndex) {
           console.log('➡️ Moving to product selection step');
           setCurrentStepIndex(productSelectionStepIndex);
@@ -1156,34 +1282,44 @@ export function useQuestionnaireModal(
           console.log('➡️ Moving to checkout step');
           setCurrentStepIndex(checkoutStepIndex);
         }
-      } else if (nextIndex <= checkoutStepIndex) {
-        setCurrentStepIndex(nextIndex);
+      } else if (nextEffectiveIndex <= checkoutStepIndex) {
+        setCurrentStepIndex(nextQuestionnaireIndex + belugaConsentOffset);
       } else {
         handleSubmit();
       }
     }
-  }, [validateCurrentStep, questionnaire, getCurrentQuestionnaireStep, isCheckoutStep, paymentStatus, isAuthenticatedUser, createUserAccount, currentStepIndex, handleSubmit]);
+  }, [validateCurrentStep, questionnaire, getCurrentQuestionnaireStep, isCheckoutStep, isBelugaConsentStep, paymentStatus, accountCreated, userId, createUserAccount, currentStepIndex, belugaConsentOffset, handleSubmit]);
 
   const handlePrevious = useCallback(() => {
     if (currentStepIndex > 0 && questionnaire) {
-      const isSignedIn = isAuthenticatedUser;
-      let targetIndex = currentStepIndex - 1;
+      const isSignedIn = accountCreated || userId;
+      let targetEffectiveIndex = currentStepIndex - 1;
 
-      while (targetIndex >= 0) {
-        const step = questionnaire.steps[targetIndex];
+      // When going back from first questionnaire step to Beluga consent
+      if (belugaConsentOffset > 0 && targetEffectiveIndex < belugaConsentOffset) {
+        setCurrentStepIndex(0);
+        return;
+      }
+
+      let targetQuestionnaireIndex = targetEffectiveIndex - belugaConsentOffset;
+      while (targetQuestionnaireIndex >= 0) {
+        const step = questionnaire.steps[targetQuestionnaireIndex];
         if (step && isSignedIn && step.category === 'user_profile') {
           console.log('⏭️ Skipping user_profile step when going back (user signed in):', step.title);
-          targetIndex--;
+          targetQuestionnaireIndex--;
+          targetEffectiveIndex--;
           continue;
         }
         break;
       }
 
-      if (targetIndex >= 0) {
-        setCurrentStepIndex(targetIndex);
+      if (targetQuestionnaireIndex >= 0) {
+        setCurrentStepIndex(targetQuestionnaireIndex + belugaConsentOffset);
+      } else if (belugaConsentOffset > 0) {
+        setCurrentStepIndex(0);
       }
     }
-  }, [currentStepIndex, questionnaire, isAuthenticatedUser]);
+  }, [currentStepIndex, questionnaire, accountCreated, userId, belugaConsentOffset]);
 
   const handleProductQuantityChange = useCallback((productId: string, quantity: number) => {
     setSelectedProducts(prev => ({ ...prev, [productId]: quantity }));
@@ -1470,17 +1606,19 @@ export function useQuestionnaireModal(
       // If user just signed in via Google OAuth, find the first non-user_profile step
       if (hasHandledGoogleAuthRef.current && !hasInitializedStepRef.current) {
         console.log('🔍 [STEP INIT] Google OAuth handled, finding first non-user_profile step');
-        let targetStepIndex = 0;
+        const belugaOffset = questionnaire.medicalCompanySource === MedicalCompanySlug.BELUGA ? 1 : 0;
+        let targetQuestionnaireIndex = 0;
         for (let i = 0; i < questionnaire.steps.length; i++) {
           const step = questionnaire.steps[i];
           if (step.category !== 'user_profile') {
-            targetStepIndex = i;
+            targetQuestionnaireIndex = i;
             break;
           }
         }
-        if (targetStepIndex === 0 && questionnaire.steps[0]?.category === 'user_profile') {
+        let targetStepIndex = targetQuestionnaireIndex + belugaOffset;
+        if (targetQuestionnaireIndex === 0 && questionnaire.steps[0]?.category === 'user_profile') {
           const checkoutPos = questionnaire.checkoutStepPosition;
-          targetStepIndex = checkoutPos === -1 ? questionnaire.steps.length : checkoutPos;
+          targetStepIndex = (checkoutPos === -1 ? questionnaire.steps.length : checkoutPos) + belugaOffset;
           console.log('⏭️ [STEP INIT] All steps are user_profile, going to checkout:', targetStepIndex);
         }
         console.log('📍 [STEP INIT] Setting step to:', targetStepIndex);
@@ -1503,6 +1641,8 @@ export function useQuestionnaireModal(
   useEffect(() => {
     if (!isOpen) {
       setCurrentStepIndex(0);
+      setBelugaConsentGiven(false);
+      setBelugaPhoto(null);
       setAnswers({});
       setErrors({});
       setQuestionnaire(null);
@@ -1535,6 +1675,9 @@ export function useQuestionnaireModal(
     questionnaire, loading,
     // State
     currentStepIndex, setCurrentStepIndex,
+    belugaConsentGiven, setBelugaConsentGiven,
+    belugaPhoto, setBelugaPhoto,
+    isBelugaConsentStep,
     answers, setAnswers,
     errors, setErrors,
     selectedProducts,

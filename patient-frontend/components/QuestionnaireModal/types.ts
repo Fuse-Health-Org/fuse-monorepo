@@ -189,7 +189,14 @@ export interface PharmacyCoverage {
     };
 }
 
-export type PaymentStatus = "idle" | "processing" | "succeeded" | "creatingMDCase" | "ready" | "failed";
+export type PaymentStatus =
+  | "idle"
+  | "processing"
+  | "succeeded"
+  | "creatingMDCase"
+  | "creatingBelugaCase"
+  | "ready"
+  | "failed";
 
 /** Result from creating a PaymentIntent/subscription */
 export interface PaymentIntentResult {

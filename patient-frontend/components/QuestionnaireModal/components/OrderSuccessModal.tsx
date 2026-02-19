@@ -17,10 +17,11 @@ export const OrderSuccessModal: React.FC<OrderSuccessModalProps> = ({
 
   const isProcessing = paymentStatus === 'processing';
   const isCreatingMDCase = paymentStatus === 'creatingMDCase';
+  const isCreatingBelugaCase = paymentStatus === 'creatingBelugaCase';
   const isReady = paymentStatus === 'ready';
   const isSucceeded = paymentStatus === 'succeeded';
   const showContinueButton = isReady;
-  const showLoadingState = isProcessing || isCreatingMDCase;
+  const showLoadingState = isProcessing || isCreatingMDCase || isCreatingBelugaCase;
   const showSuccessState = isSucceeded || isReady;
 
   return (
@@ -57,12 +58,18 @@ export const OrderSuccessModal: React.FC<OrderSuccessModalProps> = ({
                 id="success-modal-title"
                 className="text-2xl font-semibold text-gray-900"
               >
-                {isProcessing ? 'Processing Your Payment' : 'Setting Up Your Account'}
+                {isProcessing
+                  ? 'Processing Your Payment'
+                  : isCreatingBelugaCase
+                    ? 'Creating Your Beluga Visit'
+                    : 'Setting Up Your Account'}
               </h3>
               <p className="text-gray-600 text-base">
                 {isProcessing 
                   ? 'Please wait while we process your order. This may take a few moments...'
-                  : 'Your payment was successful! We\'re now creating your account and setting everything up...'}
+                  : isCreatingBelugaCase
+                    ? "Your payment was successful! We're now submitting your case to Beluga..."
+                    : "Your payment was successful! We're now creating your account and setting everything up..."}
               </p>
             </div>
 

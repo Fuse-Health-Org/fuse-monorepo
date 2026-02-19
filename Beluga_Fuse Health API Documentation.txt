@@ -1,0 +1,1058 @@
+﻿Usage:
+        Please include your staging or production api key in each API request header as specified in the Authorization section of this document. These will be shared with you separately.
+Staging URLS:
+Please note that our api endpoint will only accept HTTPS requests.
+
+
+Staging: 
+https://api-staging.belugahealth.com
+	 Production:
+https://api.belugahealth.com
+	
+
+Authorization:
+Please use the Authorization header to send through the correct API key based on the environment (staging or production):
+Headers:
+{
+Authorization: Bearer {API_KEY}
+}
+	Endpoints:
+Use the following endpoints to interact with our API. {base url} will change depending on whether you are sending test (staging) data or real (production) data. Please note the exact syntax, capitalization, and nesting structure of the request body in order to ensure proper processing on our end.
+
+
+** Please do not allow any data fields to be sent as empty, null, undefined, or empty string. **
+Visit form submission(ID photos):
+This endpoint accepts the full patient visit creation payload. We will return specific error responses if there is any missing or malformed data before processing the visit details.
+Method:
+POST
+URL:
+{base url}/visit/createNoPayPhotos
+Request body:
+{
+formObj: {
+consentsSigned: Boolean (ONLY true) (REQUIRED),
+firstName: String (100 character limit) (REQUIRED),
+lastName: String (100 character limit) (REQUIRED),
+dob: String (MM/DD/YYYY, 18+ verified in client) (REQUIRED),
+phone: String (10 characters, only digits, ex. “5554567890”, valid US mobile number verified in client) (REQUIRED),
+email: String (REQUIRED),
+address: String (REQUIRED),
+city: String (REQUIRED),
+state: String (2 characters, capitalized, ex. “CA”) (REQUIRED),
+zip: String (5 characters, only digits, ex. “54321”) (REQUIRED),
+sex: String (ONLY “Male”, “Female”) (REQUIRED),
+selfReportedMeds: String (REQUIRED),
+allergies: String (REQUIRED),
+medicalConditions: String (REQUIRED),
+patientPreference: Array [
+Object {
+name: String (REQUIRED),
+strength: String (REQUIRED),
+quantity: String (REQUIRED),
+refills: String (REQUIRED),
+daysSupply: String,
+medId: String (REQUIRED),
+},
+...
+] (REQUIRED),
+Q1: String,
+A1: String,
+...
+Q[n]: String,
+A[n]: String
+},
+pharmacyId: String (REQUIRED),
+masterId: String (REQUIRED),
+company: 
+* “fuseHealthTestCompany” (REQUIRED),
+visitType: String ("testVisitType") (REQUIRED)
+}
+	
+
+For req.body.masterId, this is a unique id your system will generate for each visit submission. Please ensure uniqueness.
+
+
+For req.body.formObj.phone, this needs to be a unique phone number PER PATIENT. Please ensure uniqueness.
+
+
+For req.body.formObj[selfReportedMeds, allergies, medicalConditions], please map these answers to these fields only, without also sending them in the custom questions section.
+
+
+For custom req.body.formObj questions (Q1, A1, etc.), if the question includes multiple choice answers, please include those choices IN THE QUESTION TEXT and any multiple answers in the answer text in the following format (including capitalization, use of colon (:), and use of semicolons (;)):
+{
+Q1: “Have you experienced any of these things? POSSIBLE ANSWERS: answer1; answer2; answer3”,
+A1: “answer2; answer3”
+}
+	
+
+* If the visit is created successfully, we will return the following response. The visitId is what will be passed in with the photo id request:
+Response body:
+{
+status: 200,
+info: “Patient visit created successfully”,
+data: {
+masterId: String,
+visitId: String
+}
+}
+	
+
+* If any of the required parameters are missing from req.body.formObj, we will return the following response:
+Response body:
+{
+status: 400,
+error: Specific error message
+}
+	
+
+* If any of the required metadata parameters are missing from req.body, we will return the following response:
+Response body:
+{
+status: 400,
+error: "Missing metadata"
+}
+	
+
+* If req.body.formObj.state is not included in our allowable state list, we will return the following response:
+Response body:
+{
+status: 400,
+error: "State not valid"
+}
+	* If we have a record of this patient creating a visit with the same visitType as req.body.visitType from a different client within the last 1 week, we will return the following response:
+Response body:
+{
+status: 400,
+error: "Patient not eligible for new visit"
+}
+	* If there are fields in the payload that do not comply with the specifications above, we will return the following responses depending on where the validation issue occurs:
+Response body:
+* If any fields are empty, null, undefined, or empty string
+{
+status: 400,
+error: "Missing values"
+}
+
+
+* If masterId already exists in the Beluga system
+{
+status: 400,
+error: "Duplicate masterId"
+}
+
+
+* If consentsSigned is not true
+{
+status: 400,
+error: "consentsSigned must be true"
+}
+
+
+* If the firstName or lastName fields do not pass validation
+{
+status: 400,
+error: "firstName or lastName error"
+}
+
+
+* If the phone field does not pass validation
+{
+status: 400,
+error: "Phone number error"
+}
+
+
+* If the email field does not pass validation
+{
+status: 400,
+error: "Email error"
+}
+
+
+* If the dob field does not pass validation
+{
+status: 400,
+error: "Dob error"
+}
+
+
+* If the sex field does not pass validation
+{
+status: 400,
+error: "Sex error"
+}
+
+
+* If the address field does not pass validation
+{
+status: 400,
+error: "Address error"
+}
+
+
+* If the city field does not pass validation
+{
+status: 400,
+error: "City error"
+}
+
+
+* If the state field does not pass validation
+{
+status: 400,
+error: "State error"
+}
+
+
+* If the zip field does not pass validation
+{
+status: 400,
+error: "Zip error"
+}
+
+
+* If the allergies field does not pass validation
+{
+status: 400,
+error: "Allergies error"
+}
+
+
+* If the selfReportedMeds field does not pass validation
+{
+status: 400,
+error: "SelfReportedMeds error"
+}
+
+
+* If the medicalConditions field does not pass validation
+{
+status: 400,
+error: "MedicalConditions error"
+}
+
+
+* If any patientPreference does not pass validation
+{
+status: 400,
+error: "patientPreference fields error"
+}
+
+
+* If any patientPreference.medId is not enabled for this company
+{
+status: 400,
+error: "No match for {patientPreference.medId}"
+}
+
+
+* If any patientPreference that is associated with a specific pharmacy does not match the pharmacyId
+{
+status: 400,
+error: "Pharmacy mismatch in patientPreference"
+}
+
+
+* If any patientPreference is a branded medication and the pharmacyId is a compounding-only pharmacy
+{
+status: 400,
+error: "Branded med with compounding pharmacy"
+}
+
+
+* If no company exists that matches the company field
+{
+status: 400,
+error: "No company found"
+}
+
+
+* If the company does not have the visitType submitted
+{
+status: 400,
+error: "Company does not have that visit type"
+}
+
+
+* Generic catch-all error
+{
+status: 400,
+error: "Something went wrong, please check all data"
+}
+	Lab results submission(ID photos):
+This endpoint accepts a visit creation request that includes lab results. We will return specific error responses if there is any missing or malformed data before processing the request.
+Method:
+POST
+URL:
+{base url}/lab/receiveLabResults
+Request body:
+{
+formObj: {
+consentsSigned: Boolean (ONLY true) (REQUIRED),
+firstName: String (100 character limit) (REQUIRED),
+lastName: String (100 character limit) (REQUIRED),
+dob: String (MM/DD/YYYY) (REQUIRED),
+phone: String (10 characters, only digits, ex. 5554567890) (REQUIRED),
+email: String (REQUIRED),
+address: String (REQUIRED),
+city: String (REQUIRED),
+state: String (2 characters, capitalized, ex. “CA”) (REQUIRED),
+zip: String (5 characters, only digits, ex. “54321”) (REQUIRED),
+sex: String (ONLY “Male”, “Female”) (REQUIRED),
+selfReportedMeds: String (REQUIRED),
+allergies: String (REQUIRED),
+medicalConditions: String (REQUIRED),
+testToTreat: Boolean (REQUIRED),
+results: Array [
+Object {
+screeningDate: String (MM/DD/YYYY) (REQUIRED),
+testName: String (REQUIRED),
+testResult: String (REQUIRED),
+testResultUnits: String (“N/A” if not applicable) (REQUIRED),
+refRange: String (“N/A” if not applicable) (REQUIRED),
+statusIndicator: String (“N/A” if not applicable) (“H” if testResult > refRange, “L” if testResult < refRange, “N” if testResult inside refRange) (REQUIRED),
+reportDate: String (MM/DD/YYYY) (REQUIRED),
+sampleSource: String (“URINE”, “BLOOD”, “SALIVA”, “VAGINAL”, “RECTAL”, “SEMEN”) (REQUIRED),
+},
+...
+],
+patientPreference: Array [
+Object {
+name: String (“N/A” if not applicable) (REQUIRED),
+strength: String (“N/A” if not applicable) (REQUIRED),
+refills: String (“N/A” if not applicable) (REQUIRED),
+quantity: String (“N/A” if not applicable) (REQUIRED),
+daysSupply: String,
+medId: String (“N/A” if not applicable) (REQUIRED)
+} (REQUIRED),
+...
+] (REQUIRED if testToTreat: true),
+Q1: String,
+A1: String,
+...
+Q[n]: String,
+A[n]: String
+},
+pharmacyId: String (REQUIRED),
+masterId: String (REQUIRED),
+company: 
+* “fuseHealthTestCompany” (REQUIRED),
+visitType: String ("testVisitType") (REQUIRED)
+}
+	
+
+If req.body.formObj.testToTreat is true, patientPreference is required. Otherwise, DO NOT include the patientPreference field.
+
+
+* If the request is received successfully, we will return the following response. The visitId is what will be passed in with the photo id request:
+Response body:
+{
+status: 200,
+info: “Patient visit created successfully”,
+data: {
+masterId: String,
+visitId: String
+}
+}
+	* If any of the required parameters are missing from req.body.formObj or req.body.formObj.results, we will return the following response:
+Response body:
+{
+status: 400,
+error: Specific error message
+}
+	* If any of the required metadata parameters are missing from req.body, we will return the following response:
+Response body:
+{
+status: 400,
+error: "Missing metadata"
+}
+	* If req.body.testToTreat is false and req.body.patientPreference is present in the payload, we will return the following response:
+Response body:
+{
+status: 400,
+error: "Patient preference not allowed"
+}
+	* If there are any unexpected fields in either req.body or req.body.formObj, we will return the following response:
+Response body:
+{
+status: 400,
+error: "Payload contains bad fields: {FIELD NAMES}"
+}
+	
+
+* If there are fields in the payload that do not comply with the specifications above, we will return the following responses depending on where the validation issue occurs:
+Response body:
+* If any fields are empty, null, undefined, or empty string
+{
+status: 400,
+error: "Missing values"
+}
+
+
+* If masterId already exists in the Beluga system
+{
+status: 400,
+error: "Duplicate masterId"
+}
+
+
+* If consentsSigned is not true
+{
+status: 400,
+error: "consentsSigned must be true"
+}
+
+
+* If the firstName or lastName fields do not pass validation
+{
+status: 400,
+error: "firstName or lastName error"
+}
+
+
+* If the phone field does not pass validation
+{
+status: 400,
+error: "Phone number error"
+}
+
+
+* If the email field does not pass validation
+{
+status: 400,
+error: "Email error"
+}
+
+
+* If the dob field does not pass validation
+{
+status: 400,
+error: "Dob error"
+}
+
+
+* If the sex field does not pass validation
+{
+status: 400,
+error: "Sex error"
+}
+
+
+* If the address field does not pass validation
+{
+status: 400,
+error: "Address error"
+}
+
+
+* If the city field does not pass validation
+{
+status: 400,
+error: "City error"
+}
+
+
+* If the state field does not pass validation
+{
+status: 400,
+error: "State error"
+}
+
+
+* If the zip field does not pass validation
+{
+status: 400,
+error: "Zip error"
+}
+
+
+* If the allergies field does not pass validation
+{
+status: 400,
+error: "Allergies error"
+}
+
+
+* If the selfReportedMeds field does not pass validation
+{
+status: 400,
+error: "SelfReportedMeds error"
+}
+
+
+* If the medicalConditions field does not pass validation
+{
+status: 400,
+error: "MedicalConditions error"
+}
+
+
+* If any patientPreference does not pass validation
+{
+status: 400,
+error: "patientPreference fields error"
+}
+
+
+* If any patientPreference.medId is not enabled for this company
+{
+status: 400,
+error: "No match for {patientPreference.medId}"
+}
+
+
+* If any patientPreference that is associated with a specific pharmacy does not match the pharmacyId
+{
+status: 400,
+error: "Pharmacy mismatch in patientPreference"
+}
+
+
+* If any patientPreference is a branded medication and the pharmacyId is a compounding-only pharmacy
+{
+status: 400,
+error: "Branded med with compounding pharmacy"
+}
+
+
+* If no company exists that matches the company field
+{
+status: 400,
+error: "No company found"
+}
+
+
+* If the company does not have the visitType submitted
+{
+status: 400,
+error: "Company does not have that visit type"
+}
+
+
+* Generic catch-all error
+{
+status: 400,
+error: "Something went wrong, please check all data"
+}
+	Patient photos submission:
+This endpoint accepts a patient’s photos associated with a visit, including the patient’s photo ID image. You can use EITHER the visitId OR the masterId values from the visit creation success response for the visitId field here. Please do the following before sending the request:
+1. Convert all images to jpeg format
+2. Compress the images to width: 1000px before encoding (or ensure that all images are <3MB)
+3. Encode the compressed images to base64 encoding. Do not include the MIME at the beginning of this string.
+Method:
+POST
+URL:
+{base url}/external/receivePhotos
+Request body:
+{
+visitId: String (REQUIRED),
+images: Array [
+ Object {
+mime: “image/jpeg” (REQUIRED),
+data: String (base64 encoded) (REQUIRED)
+}
+...
+]
+}
+	
+
+* If the image submission succeeds, the following success response will be returned:
+Response body:
+{
+status: 200,
+info: "Successfully received images"
+}
+	
+
+* If the visitId does not match a visit in our system, the following error response will be returned:
+Response body:
+{
+status: 400
+info: "Visit does not exist"
+}
+	
+
+* If an error occurs for any other reason, the following error response will be returned:
+Response body:
+{
+status: 400,
+info: "Error accepting images"
+}
+	PDF submission:
+This endpoint accepts a PDF. You can use EITHER the visitId OR the masterId values from the visit creation success response for the visitId field here. Please do the following before sending the request:
+1. Convert image to PDF format only
+2. Encode the compressed image to base64 encoding
+Method:
+POST
+URL:
+{base url}/external/receivePdf
+Request body:
+{
+visitId: String (REQUIRED),
+image: {
+mime: “application/pdf” (REQUIRED),
+data: String (base64 encoded) (REQUIRED)
+}
+}
+	
+
+* If the image submission succeeds, the following success response will be returned:
+Response body:
+{
+status: 200,
+info: "Successfully received image"
+}
+	
+
+* If the visitId does not match a visit in our system, the following error response will be returned:
+Response body:
+{
+status: 400
+info: "Visit does not exist"
+}
+	
+
+* If an error occurs for any other reason, the following error response will be returned:
+Response body:
+{
+status: 400,
+info: "Error accepting image"
+}
+	Send patient chat message:
+This is an endpoint for passing along a patient’s chat message to Beluga’s system. Please note the exact object structure, field names and capitalization.
+Method:
+POST
+URL:
+{base url}/external/receiveChat
+Request body:
+{
+firstName: String (REQUIRED),
+lastName: String (REQUIRED),
+content: String (REQUIRED),
+isMedia: Boolean (REQUIRED),
+masterId: String (REQUIRED),
+}
+	
+
+If a patient sends an image through the chat interface, please do the following:
+1. Convert/compress/encode the image as described in the image submission API section
+2. Enter this encoded string as the value for req.body.content
+3. Enter isMedia: true
+
+
+* If the chat is received successfully, the following response will be returned:
+Response body:
+{
+status: 200,
+info: “Message received successfully”
+}
+	
+
+* If there is something wrong with the formatting of the request body or any field is missing, the following response will be returned:
+Response body:
+{
+status: 400,
+info: “Incorrect data structure or missing data”
+}
+	
+
+* If the masterId does not match any record in our system, the following response will be returned:
+Response body:
+{
+status: 400,
+info: “Visit does not exist”
+}
+	Customer service message:
+        This is an endpoint for routing a customer service-related message from your customer service team to Beluga’s admin. Please note the exact object structure, field names and capitalization.
+Method:
+POST
+URL:
+{base url}/external/receiveCSMessage
+Request body:
+{
+content: String (REQUIRED),
+masterId: String (REQUIRED)
+}
+	
+
+* If the chat is received successfully, the following response will be returned:
+Response body:
+{
+status: 200,
+info: “Message received successfully”
+}
+	
+
+* If there is something wrong with the formatting of the request body or any field is missing, the following response will be returned:
+Response body:
+{
+status: 400,
+info: “Incorrect data structure or missing data”
+}
+	
+
+* If the masterId does not match any record in our system, the following response will be returned:
+Response body:
+{
+status: 400,
+info: “Visit does not exist”
+}
+	Patient name update:
+        This is an endpoint for updating a patient’s name in the Beluga system to match the name in your system. Please note the exact object structure, field names and capitalization.
+Method:
+POST
+URL:
+{base url}/external/patientName
+Request body:
+{
+masterId: String (REQUIRED),
+firstName: String (max length 100) (REQUIRED),
+lastName: String (max length 100) (REQUIRED),
+}
+	
+
+* If the patient name is updated successfully, the following response will be returned:
+Response body:
+{
+status: 200,
+info: “Successfully updated patient name”
+}
+	
+
+* If the patient’s name and photo ID have already been approved by Beluga’s doctors, the following response will be returned:
+Response body:
+{
+status: 400,
+info: “Name change no longer allowed”
+}
+	
+
+* If the masterId does not match any record in our system, the following response will be returned:
+Response body:
+{
+status: 400,
+info: “Visit does not exist”
+}
+	
+
+* If the data format or length of any field is incorrect, the following response will be returned:
+Response body:
+{
+status: 400,
+info: “Data format incorrect”
+}
+	
+
+* If there is an error for any other reason, the following response will be returned:
+Response body:
+{
+status: 400,
+info: “Error accepting name change”
+}
+	Pharmacy list:
+        This endpoint accesses our list of pharmacies. Depending on the structure/content of the request JSON, this endpoint will return the first 100 pharmacies that match the search criteria. The request must include at least one of the listed search parameters for the search to be valid, but may include any or all of the listed parameters as well.
+Method:
+POST
+URL:
+{base url}/external/pharmacies
+Request body:
+{
+name: String,
+city: String,
+state: String (“XX”),
+zip: String (“XXXXX”),
+}  (AT LEAST ONE PARAMETER IS REQUIRED)
+	If there is a successful response, the endpoint will pass back an array of pharmacies that match the search criteria.
+Response body:
+{
+status: 200,
+data: [
+    {
+      "PharmacyId": Number,
+      "StoreName": String,
+      "Address1": String,
+      "Address2": String,
+      "City": String,
+      "State": String,
+      "ZipCode": String,
+      "PrimaryPhone": String,
+      "PrimaryPhoneType": Number,
+      "PrimaryFax": String,
+      "PhoneAdditional1": String | null,
+      "PhoneAdditionalType1": Number,
+      "PhoneAdditional2": String | null,
+      "PhoneAdditionalType2": Number,
+      "PhoneAdditional3": String | null,
+      "PhoneAdditionalType3": Number,
+      "PharmacySpecialties": Array [
+        String,
+...
+      ],
+      "ServiceLevel": Number,
+      "Latitude": Number,
+      "Longitude": Number
+    },
+...
+]
+}
+	* If there is an error, the endpoint will pass that error back to the request origin:
+Response body:
+{
+status: Error status code
+data: Error response data
+}
+	
+
+* If the endpoint is hit with an empty search request payload, it will respond with an error message:
+Response body:
+{
+status: 400,
+data: “Invalid search parameters”
+}
+	
+
+Update visit/Resend prescription:
+This endpoint accepts visit update data and/or preference data for resending/updating a prescription. We will return specific error responses if there is any missing or malformed data before processing the request details.
+
+
+** Please do not allow any data fields to be sent as null, undefined, or empty string. **
+Method:
+POST
+URL:
+{base url}/external/updateVisit
+Request body:
+{
+patientPreference: Array [
+Object {
+name: String (REQUIRED),
+strength: String (REQUIRED),
+refills: String (REQUIRED),
+quantity: String (REQUIRED),
+daysSupply: String (REQUIRED),
+medId: String (REQUIRED)
+} (REQUIRED),
+...
+] (REQUIRED),
+pharmacyId: String (REQUIRED),
+masterId: String (REQUIRED),
+apiKey: String (REQUIRED)
+}
+
+
+	
+
+* If the visit is updated successfully without resulting in a new prescription, we will return the following response. This situation would happen if a visit has not been resolved by a doctor yet:
+Response body:
+{
+status: “VISIT_DATA_UPDATED”,
+info: “Visit data updated for {masterId}”
+}
+	
+
+* If a new prescription is sent successfully, we will return the following response:
+Response body:
+{
+status: “NEW_RX_SENT”,
+info: “Successfully prescribed {medIds}”,
+medsPrescribed: Array [
+Object {
+rxName: String,
+rxStrength: String,
+rxRefills: String,
+rxQuantity: String,
+rxId: String,
+rxDirections: String,
+medId: String
+},
+...
+]
+}
+	
+
+* If the masterId does not match any record in our system, the following response will be returned:
+Response body:
+{
+status: ”NO_VISIT”,
+info: “No visit found for masterId {masterId}”
+}
+	
+
+* If the visit was originally referred by a doctor, the following response will be returned:
+Response body:
+{
+status: ”VISIT_WAS_REFERRED”,
+info: “The visit {masterId} was referred by a doctor”
+}
+	
+
+* If there have already been the agreed number of retries for this visit, we will return the following response:
+Response body:
+{
+status: ”TOO_MANY_RETRIES”,
+info: "Rx retries limit reached for masterId {masterId}"
+}
+	
+
+* If the incoming patientPreference packageNDC does not match the dosage category of the original prescription, we will return the following response:
+Response body:
+{
+status: “CATEGORY_MISMATCH”,
+info: "Preference mismatch between original rx and {medIds}"
+}
+	
+
+* If the incoming pharmacyId does not match the incoming packageNDC for the same pharmacy (if the packageNDC has an associated pharmacy), we will return the following response:
+Response body:
+{
+status: ”PHARMACY_MISMATCH”,
+info: "Pharmacy mismatch between {pharmacyId} and {medIds}"
+}
+	
+
+* If the original prescription was sent greater than 7 days before the request, we will return the following response:
+Response body:
+{
+status: ”TOO_LONG_AGO”,
+info: "Rx was sent too long ago for masterId {masterId}"
+}
+	
+
+* If an error occurred sending the electronic prescription, we will return the following response:
+Response body:
+{
+status: “RX_ERROR”,
+info: "Something went wrong, please try again"
+}
+	
+
+* If any other error occurs, we will return the following response:
+Response body:
+{
+status: “GENERIC”,
+info: "System error: {error}"
+}
+	Patient data:
+This endpoint returns patient-specific data for the phone number sent in the query parameter. Please use the 10 digit phone number, only digits, no punctuation.
+Method:
+GET
+URL:
+{base url}/patient/externalFetch/{10 digit phone number}
+
+
+* Success response:
+{
+status: 200,
+data: {
+firstName: String,
+lastName: String,
+dob: String (MM/DD/YYYY),
+phone: String (10 characters),
+email: String,
+address: String,
+city: String,
+state: String,
+zip: String,
+sex: String (ONLY “Male”, “Female”, “Other”),
+selfReportedMeds: String,
+allergies: String,
+medicalConditions: String,
+visits: Array [
+String (masterId)
+]
+}
+}
+	
+
+* If there is an authorization error, we will return the following:
+Status code: 400
+Response body: None
+* If there is no found patient, we will return the following:
+Status code: 200
+Response body:
+{
+status: 400,
+error: "Patient not found"
+}
+	
+
+Visit data:
+This endpoint returns visit-specific data for the masterId sent in the query parameter.
+Method:
+GET
+URL:
+{base url}/visit/externalFetch/{masterId}
+
+
+* Success response:
+{
+status: 200,
+masterId: String,
+visitStatus: String (ONLY: “active”, “pending”, “admin”, “resolved”, “holding”, “canceled”),
+updateTimestamp: Date (datetime format YYYY-MM-DDTHH:mm:ss.sssZ),
+resolvedStatus: String (ONLY: “open”, “closed”),
+resolvedTimestamp: Date (datetime format YYYY-MM-DDTHH:mm:ss.sssZ) (ONLY included if resolvedStatus = “closed”),
+data: {
+formObj: {
+consentsSigned: Boolean,
+firstName: String,
+lastName: String,
+dob: String (MM/DD/YYYY),
+phone: String (10 characters),
+email: String,
+address: String,
+city: String,
+state: String,
+zip: String,
+sex: String (ONLY “Male”, “Female”, “Other”),
+selfReportedMeds: String,
+allergies: String,
+medicalConditions: String,
+patientPreference: Array [
+Object {
+name: String,
+strength: String,
+quantity: String,
+refills: String,
+medId: String,
+},
+...
+],
+intakeResults: Array [
+Object {
+question: String,
+answer: String
+},
+...
+]
+},
+visitType: String,
+rxHistory: Array [
+Object {
+rxTimestamp: Date (datetime format YYYY-MM-DDTHH:mm:ss.sssZ),
+favoriteName: String (Beluga system name),
+name: String (medication on rx),
+medId: String,
+refills: String,
+quantity: String,
+strength: String,
+daysSupply: String,
+unit: String,
+pharmacyNotes: String,
+pharmacyName: String,
+rxId: String
+}
+]
+}
+}
+	
+
+* If there is an authorization error, we will return the following:
+Status code: 400
+Response body: None
+* If there is no found visit, we will return the following:
+Status code: 200
+Response body:
+{
+status: 400,
+error: "Visit not found"
+}

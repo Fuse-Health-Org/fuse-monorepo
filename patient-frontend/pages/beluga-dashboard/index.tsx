@@ -1,11 +1,12 @@
 import React from "react";
 import { motion } from "framer-motion";
-import { Button, Avatar, Card, CardBody } from "@heroui/react";
+import { Button, Avatar, Card, CardBody, Input, Textarea } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { ProtectedRoute } from "../../components/ProtectedRoute";
 import { useAuth } from "../../contexts/AuthContext";
 import { getAvatarEmoji } from "../../lib/avatarUtils";
 import { DashboardSelector } from "../../components/DashboardSelector";
+import { apiCall } from "../../lib/api";
 
 /**
  * Beluga Dashboard - Beluga Health Portal (Placeholder)
@@ -23,6 +24,49 @@ interface NavItem {
   id: string;
   label: string;
   icon: string;
+}
+
+interface BelugaVisit {
+  orderId: string;
+  masterId: string;
+  belugaVisitId?: string | null;
+  orderStatus?: string;
+  orderCreatedAt?: string;
+  visitStatus?: string | null;
+  resolvedStatus?: string | null;
+  updateTimestamp?: string | null;
+  visitType?: string | null;
+  formObj?: {
+    patientPreference?: Array<{
+      name?: string;
+      strength?: string;
+      quantity?: string;
+      refills?: string;
+      daysSupply?: string;
+      medId?: string;
+    }>;
+    intakeResults?: Array<{ question: string; answer: string }>;
+  } | null;
+  rxHistory: Array<{
+    rxTimestamp?: string;
+    name?: string;
+    medId?: string;
+    refills?: string;
+    quantity?: string;
+    strength?: string;
+    pharmacyName?: string;
+  }>;
+}
+
+interface BelugaChatMessage {
+  id: string;
+  masterId: string;
+  eventType: string;
+  senderRole: "patient" | "doctor" | "beluga_admin" | "system";
+  channel: "patient_chat" | "customer_service" | "system";
+  message?: string;
+  source: "webhook" | "outbound";
+  createdAt: string;
 }
 
 const navItems: NavItem[] = [
@@ -113,27 +157,129 @@ function BelugaDashboardPage() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = React.useState("dashboard");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const [visits, setVisits] = React.useState<BelugaVisit[]>([]);
+  const [selectedMasterId, setSelectedMasterId] = React.useState("");
+  const [messageDrafts, setMessageDrafts] = React.useState<Record<string, string>>({});
+  const [csDrafts, setCsDrafts] = React.useState<Record<string, string>>({});
+  const [messageResults, setMessageResults] = React.useState<Record<string, string>>({});
+  const [chatMessagesByMaster, setChatMessagesByMaster] = React.useState<Record<string, BelugaChatMessage[]>>({});
+  const [chatLoadingByMaster, setChatLoadingByMaster] = React.useState<Record<string, boolean>>({});
+  const [nameFirst, setNameFirst] = React.useState("");
+  const [nameLast, setNameLast] = React.useState("");
+  const [accountResult, setAccountResult] = React.useState<string | null>(null);
+
+  const loadBelugaData = React.useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await apiCall("/beluga/my-visits");
+      if (!res.success) {
+        throw new Error((res as any).error || "Failed to load Beluga visits");
+      }
+
+      const visitList: BelugaVisit[] = Array.isArray((res.data as any)?.data) ? (res.data as any).data : [];
+      setVisits(visitList);
+      setSelectedMasterId(visitList[0]?.masterId || "");
+      setNameFirst(user?.firstName || "");
+      setNameLast(user?.lastName || "");
+    } catch (err: any) {
+      setError(err?.message || "Failed to load Beluga dashboard data.");
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.firstName, user?.lastName]);
 
   // Close mobile menu when tab changes
   React.useEffect(() => {
     setIsMobileMenuOpen(false);
   }, [activeTab]);
 
-  const renderPlaceholderContent = (title: string, icon: string, description: string) => (
-    <Card>
-      <CardBody className="p-8 text-center">
-        <div className="w-12 h-12 rounded-full bg-teal-500/10 flex items-center justify-center mx-auto mb-4">
-          <Icon icon={icon} className="text-teal-500 text-2xl" />
-        </div>
-        <h2 className="text-xl font-semibold mb-2">{title}</h2>
-        <p className="text-foreground-500 mb-4">{description}</p>
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 text-amber-600 text-sm">
-          <Icon icon="lucide:clock" />
-          Pending Beluga API Integration
-        </div>
-      </CardBody>
-    </Card>
-  );
+  React.useEffect(() => {
+    loadBelugaData();
+  }, [loadBelugaData]);
+
+  const loadChatMessages = React.useCallback(async (masterId: string) => {
+    if (!masterId) return;
+    setChatLoadingByMaster((prev) => ({ ...prev, [masterId]: true }));
+    try {
+      const response = await apiCall(`/beluga/chats/${encodeURIComponent(masterId)}/messages`);
+      if (!response.success) {
+        throw new Error(response.error || "Failed to load messages");
+      }
+      const messages = Array.isArray((response.data as any)?.data)
+        ? ((response.data as any).data as BelugaChatMessage[])
+        : [];
+      setChatMessagesByMaster((prev) => ({ ...prev, [masterId]: messages }));
+    } catch {
+      setChatMessagesByMaster((prev) => ({ ...prev, [masterId]: [] }));
+    } finally {
+      setChatLoadingByMaster((prev) => ({ ...prev, [masterId]: false }));
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (activeTab !== "messages" || visits.length === 0) return;
+    visits.forEach((visit) => {
+      if (!chatMessagesByMaster[visit.masterId]) {
+        loadChatMessages(visit.masterId);
+      }
+    });
+  }, [activeTab, visits, chatMessagesByMaster, loadChatMessages]);
+
+  const handleSendMessage = async (masterId: string, customerService = false) => {
+    const draft = customerService ? csDrafts[masterId] : messageDrafts[masterId];
+    if (!masterId || !draft?.trim()) return;
+    setMessageResults((prev) => ({ ...prev, [masterId]: "" }));
+    const endpoint = customerService ? "/beluga/messages/customer-service" : "/beluga/messages/patient";
+    const payload = customerService
+      ? { masterId, content: draft.trim() }
+      : { masterId, content: draft.trim(), isMedia: false };
+
+    const response = await apiCall(endpoint, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.success) {
+      setMessageResults((prev) => ({ ...prev, [masterId]: response.error || "Failed to send message." }));
+      return;
+    }
+
+    setMessageResults((prev) => ({ ...prev, [masterId]: "Message sent to Beluga successfully." }));
+    if (customerService) {
+      setCsDrafts((prev) => ({ ...prev, [masterId]: "" }));
+    } else {
+      setMessageDrafts((prev) => ({ ...prev, [masterId]: "" }));
+    }
+
+    await loadChatMessages(masterId);
+  };
+
+  const handleNameUpdate = async () => {
+    if (!selectedMasterId || !nameFirst.trim() || !nameLast.trim()) return;
+    setAccountResult(null);
+
+    const response = await apiCall(`/beluga/patients/${encodeURIComponent(selectedMasterId)}/name`, {
+      method: "POST",
+      body: JSON.stringify({
+        firstName: nameFirst.trim(),
+        lastName: nameLast.trim(),
+      }),
+    });
+
+    if (!response.success) {
+      setAccountResult(response.error || "Failed to update name in Beluga.");
+      return;
+    }
+
+    setAccountResult("Patient name update sent to Beluga.");
+  };
+
+  const totalRx = visits.reduce((acc, item) => acc + item.rxHistory.length, 0);
+  const activeVisits = visits.filter((v) => v.visitStatus && ["active", "pending", "holding", "admin"].includes(v.visitStatus.toLowerCase())).length;
+  const resolvedVisits = visits.filter((v) => (v.resolvedStatus || "").toLowerCase() === "closed").length;
 
   return (
     <ProtectedRoute>
@@ -205,49 +351,33 @@ function BelugaDashboardPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
           >
+            {error && (
+              <Card className="max-w-4xl mx-auto mb-6 border border-danger/40">
+                <CardBody className="p-4 text-danger text-sm flex items-center justify-between gap-3">
+                  <span>{error}</span>
+                  <Button size="sm" variant="flat" onPress={loadBelugaData}>
+                    Retry
+                  </Button>
+                </CardBody>
+              </Card>
+            )}
+
             {activeTab === "dashboard" && (
               <div className="max-w-4xl mx-auto space-y-6">
-                <div className="text-center py-8">
-                  <div className="w-16 h-16 rounded-full bg-teal-500/10 flex items-center justify-center mx-auto mb-4">
-                    <Icon icon="lucide:activity" className="text-teal-500 text-3xl" />
-                  </div>
-                  <h1 className="text-2xl font-bold mb-2">Welcome to Beluga Health</h1>
-                  <p className="text-foreground-500 max-w-md mx-auto">
-                    Your personalized telehealth dashboard powered by Beluga.
-                  </p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Card><CardBody className="p-5"><p className="text-sm text-foreground-500">Total Visits</p><p className="text-2xl font-semibold">{visits.length}</p></CardBody></Card>
+                  <Card><CardBody className="p-5"><p className="text-sm text-foreground-500">Active Visits</p><p className="text-2xl font-semibold">{activeVisits}</p></CardBody></Card>
+                  <Card><CardBody className="p-5"><p className="text-sm text-foreground-500">Resolved Visits</p><p className="text-2xl font-semibold">{resolvedVisits}</p></CardBody></Card>
                 </div>
 
-                <Card className="border border-teal-500/20">
+                <Card>
                   <CardBody className="p-6">
-                    <div className="flex items-start gap-4">
-                      <div className="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center flex-shrink-0">
-                        <Icon icon="lucide:construction" className="text-amber-500 text-xl" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold mb-1">Coming Soon</h3>
-                        <p className="text-sm text-foreground-500">
-                          The Beluga Health dashboard is currently under development. 
-                          Once the Beluga API integration is complete, you'll be able to:
-                        </p>
-                        <ul className="mt-3 space-y-2 text-sm text-foreground-500">
-                          <li className="flex items-center gap-2">
-                            <Icon icon="lucide:check-circle" className="text-teal-500" />
-                            View your prescriptions and treatment plans
-                          </li>
-                          <li className="flex items-center gap-2">
-                            <Icon icon="lucide:check-circle" className="text-teal-500" />
-                            Chat with your Beluga healthcare provider
-                          </li>
-                          <li className="flex items-center gap-2">
-                            <Icon icon="lucide:check-circle" className="text-teal-500" />
-                            Track your order and shipment status
-                          </li>
-                          <li className="flex items-center gap-2">
-                            <Icon icon="lucide:check-circle" className="text-teal-500" />
-                            Manage your treatment subscriptions
-                          </li>
-                        </ul>
-                      </div>
+                    <h3 className="font-semibold mb-3">Patient Snapshot</h3>
+                    <div className="text-sm space-y-2">
+                      <p><span className="text-foreground-500">Name:</span> {user?.firstName || "-"} {user?.lastName || ""}</p>
+                      <p><span className="text-foreground-500">Email:</span> {user?.email || "-"}</p>
+                      <p><span className="text-foreground-500">Total Visits:</span> {visits.length}</p>
+                      <p><span className="text-foreground-500">Total Prescriptions in History:</span> {totalRx}</p>
                     </div>
                   </CardBody>
                 </Card>
@@ -255,31 +385,190 @@ function BelugaDashboardPage() {
             )}
 
             {activeTab === "treatments" && (
-              <div className="max-w-4xl mx-auto">
-                {renderPlaceholderContent(
-                  "Treatments",
-                  "lucide:pill",
-                  "Your Beluga treatments and prescriptions will appear here once the integration is complete."
+              <div className="max-w-4xl mx-auto space-y-4">
+                {loading && <p className="text-sm text-foreground-500">Loading treatments...</p>}
+                {!loading && visits.length === 0 && (
+                  <Card><CardBody className="p-6 text-sm text-foreground-500">No Beluga visits found yet.</CardBody></Card>
                 )}
+                {visits.map((visit) => (
+                  <Card key={visit.masterId}>
+                    <CardBody className="p-6 space-y-4">
+                      <div className="flex items-center justify-between gap-3 flex-wrap">
+                        <div>
+                          <h3 className="font-semibold">
+                            {visit.formObj?.patientPreference?.map(p => p.name).filter(Boolean).join(", ") || "Beluga Visit"}
+                          </h3>
+                          <p className="text-xs text-foreground-400 mt-0.5">
+                            Visit Type: {visit.visitType || "-"} &nbsp;·&nbsp; Ordered: {visit.orderCreatedAt ? new Date(visit.orderCreatedAt).toLocaleDateString() : "-"}
+                          </p>
+                        </div>
+                        <span className={`text-xs px-2 py-1 rounded font-medium ${
+                          visit.visitStatus === "active" || visit.visitStatus === "pending"
+                            ? "bg-teal-500/10 text-teal-600"
+                            : visit.visitStatus === "resolved"
+                            ? "bg-success/10 text-success"
+                            : "bg-content2 text-foreground-500"
+                        }`}>
+                          {(visit.visitStatus || "pending").toUpperCase()}
+                        </span>
+                      </div>
+
+                      {/* Requested Treatment */}
+                      {Array.isArray(visit.formObj?.patientPreference) && visit.formObj!.patientPreference!.length > 0 && (
+                        <div>
+                          <p className="text-xs font-medium text-foreground-500 mb-1.5 uppercase tracking-wide">Requested Treatment</p>
+                          <div className="space-y-2">
+                            {visit.formObj!.patientPreference!.map((pref, idx) => (
+                              <div key={idx} className="p-3 rounded-lg bg-content2 text-sm">
+                                <p className="font-medium">{pref.name || "Medication"}</p>
+                                <p className="text-foreground-500 text-xs mt-0.5">
+                                  {[
+                                    pref.strength && `Strength: ${pref.strength}`,
+                                    pref.quantity && `Qty: ${pref.quantity}`,
+                                    pref.refills && `Refills: ${pref.refills}`,
+                                    pref.daysSupply && `Days Supply: ${pref.daysSupply}`,
+                                  ].filter(Boolean).join(" · ")}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Prescription History */}
+                      <div>
+                        <p className="text-xs font-medium text-foreground-500 mb-1.5 uppercase tracking-wide">Prescription History</p>
+                        {visit.rxHistory.length === 0 ? (
+                          <p className="text-sm text-foreground-400">No prescriptions written yet — visit is pending doctor review.</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {visit.rxHistory.map((rx, idx) => (
+                              <div key={`${visit.masterId}-${idx}`} className="p-3 rounded-lg bg-content2 text-sm">
+                                <p className="font-medium">{rx.name || "Medication"}</p>
+                                <p className="text-foreground-500 text-xs mt-0.5">
+                                  {[
+                                    rx.strength && `Strength: ${rx.strength}`,
+                                    rx.quantity && `Qty: ${rx.quantity}`,
+                                    rx.refills && `Refills: ${rx.refills}`,
+                                    rx.pharmacyName && `Pharmacy: ${rx.pharmacyName}`,
+                                  ].filter(Boolean).join(" · ")}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <p className="text-xs text-foreground-400">
+                        Last updated: {visit.updateTimestamp ? new Date(visit.updateTimestamp).toLocaleString() : "—"}
+                        &nbsp;·&nbsp; Visit ID: {visit.belugaVisitId || visit.masterId}
+                      </p>
+                    </CardBody>
+                  </Card>
+                ))}
               </div>
             )}
 
             {activeTab === "messages" && (
-              <div className="max-w-4xl mx-auto">
-                {renderPlaceholderContent(
-                  "Messages",
-                  "lucide:message-circle",
-                  "Chat with your Beluga healthcare provider. This feature will be available once the Beluga messaging API is integrated."
+              <div className="max-w-4xl mx-auto space-y-4">
+                {loading && (
+                  <Card>
+                    <CardBody className="p-6 text-sm text-foreground-500">
+                      Syncing visits and chat threads from Beluga...
+                    </CardBody>
+                  </Card>
                 )}
+                {visits.length === 0 && (
+                  <Card>
+                    <CardBody className="p-6 text-sm text-foreground-500">
+                      No Beluga visits available yet. Messages are tied to an existing visit masterId.
+                    </CardBody>
+                  </Card>
+                )}
+                {visits.map((visit) => (
+                  <Card key={`chat-${visit.masterId}`}>
+                    <CardBody className="p-6 space-y-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <h3 className="font-semibold">
+                            {visit.formObj?.patientPreference?.map(p => p.name).filter(Boolean).join(", ") || "Beluga Visit"}
+                          </h3>
+                          <p className="text-xs text-foreground-400 mt-0.5">masterId: {visit.masterId}</p>
+                        </div>
+                        <span className="text-xs px-2 py-1 rounded bg-content2">
+                          {(visit.visitStatus || "pending").toUpperCase()}
+                        </span>
+                      </div>
+                      {chatLoadingByMaster[visit.masterId] ? (
+                        <p className="text-xs text-foreground-400">Loading conversation...</p>
+                      ) : (chatMessagesByMaster[visit.masterId]?.length || 0) > 0 ? (
+                        <div className="max-h-56 overflow-y-auto space-y-2 p-2 rounded-lg bg-content2">
+                          {(chatMessagesByMaster[visit.masterId] || []).map((message) => (
+                            <div key={message.id} className="rounded-md bg-content1 p-2">
+                              <p className="text-xs font-medium text-foreground-600">
+                                {message.senderRole === "patient"
+                                  ? "You"
+                                  : message.senderRole === "doctor"
+                                    ? "Doctor"
+                                    : message.senderRole === "beluga_admin"
+                                      ? "Beluga Admin"
+                                      : "System"}
+                              </p>
+                              <p className="text-sm text-foreground-700">{message.message || "(no text)"}</p>
+                              <p className="text-[11px] text-foreground-400 mt-1">
+                                {new Date(message.createdAt).toLocaleString()}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-foreground-400">No messages for this visit yet.</p>
+                      )}
+                      <Textarea
+                        label="Message to Provider"
+                        value={messageDrafts[visit.masterId] || ""}
+                        onValueChange={(value) =>
+                          setMessageDrafts((prev) => ({ ...prev, [visit.masterId]: value }))
+                        }
+                        placeholder="Type message for Beluga doctor..."
+                      />
+                      <Button
+                        className="bg-teal-600 text-white"
+                        onPress={() => handleSendMessage(visit.masterId, false)}
+                        isDisabled={!messageDrafts[visit.masterId]?.trim()}
+                      >
+                        Send Patient Message
+                      </Button>
+                      <Textarea
+                        label="Message to Customer Service"
+                        value={csDrafts[visit.masterId] || ""}
+                        onValueChange={(value) =>
+                          setCsDrafts((prev) => ({ ...prev, [visit.masterId]: value }))
+                        }
+                        placeholder="Type message for Beluga admin..."
+                      />
+                      <Button
+                        variant="flat"
+                        onPress={() => handleSendMessage(visit.masterId, true)}
+                        isDisabled={!csDrafts[visit.masterId]?.trim()}
+                      >
+                        Send CS Message
+                      </Button>
+                      {messageResults[visit.masterId] && (
+                        <p className="text-sm text-foreground-500">{messageResults[visit.masterId]}</p>
+                      )}
+                    </CardBody>
+                  </Card>
+                ))}
               </div>
             )}
 
             {activeTab === "account" && (
-              <div className="max-w-4xl mx-auto">
+              <div className="max-w-4xl mx-auto space-y-4">
                 <Card>
                   <CardBody className="p-6">
-                    <h2 className="text-xl font-semibold mb-4">Account Settings</h2>
-                    <div className="space-y-4">
+                    <h2 className="text-xl font-semibold mb-4">Beluga Account</h2>
+                    <div className="space-y-4 mb-6">
                       <div className="flex items-center gap-4 p-4 rounded-lg bg-content2">
                         <Avatar
                           name={user?.firstName || user?.email || 'User'}
@@ -291,10 +580,36 @@ function BelugaDashboardPage() {
                           <p className="text-sm text-foreground-500">{user?.email}</p>
                         </div>
                       </div>
-                      <p className="text-sm text-foreground-500">
-                        Additional account settings will be available once the Beluga integration is complete.
-                      </p>
                     </div>
+                    <h3 className="font-semibold mb-2">Update Name in Beluga</h3>
+                    <div className="mb-3">
+                      <label className="block text-sm mb-1 text-foreground-500">Visit (masterId)</label>
+                      <select
+                        className="w-full rounded-md border border-default-200 bg-content1 px-3 py-2 text-sm"
+                        value={selectedMasterId}
+                        onChange={(e) => setSelectedMasterId(e.target.value)}
+                      >
+                        <option value="">Select a visit</option>
+                        {visits.map((visit) => (
+                          <option key={`master-${visit.masterId}`} value={visit.masterId}>
+                            {visit.formObj?.patientPreference?.map(p => p.name).filter(Boolean).join(", ") || visit.masterId}
+                            {visit.orderCreatedAt ? ` (${new Date(visit.orderCreatedAt).toLocaleDateString()})` : ""}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                      <Input label="First Name" value={nameFirst} onValueChange={setNameFirst} />
+                      <Input label="Last Name" value={nameLast} onValueChange={setNameLast} />
+                    </div>
+                    <Button
+                      className="bg-teal-600 text-white"
+                      onPress={handleNameUpdate}
+                      isDisabled={!selectedMasterId || !nameFirst.trim() || !nameLast.trim()}
+                    >
+                      Send Name Update to Beluga
+                    </Button>
+                    {accountResult && <p className="text-sm text-foreground-500 mt-3">{accountResult}</p>}
                   </CardBody>
                 </Card>
               </div>
