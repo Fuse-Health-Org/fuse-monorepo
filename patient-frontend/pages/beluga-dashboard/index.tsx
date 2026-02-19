@@ -168,6 +168,8 @@ function BelugaDashboardPage() {
   const [chatLoadingByMaster, setChatLoadingByMaster] = React.useState<Record<string, boolean>>({});
   const [selectedChatMasterId, setSelectedChatMasterId] = React.useState("");
   const [selectedChatChannel, setSelectedChatChannel] = React.useState<"patient_chat" | "customer_service">("patient_chat");
+  const [patientImageDrafts, setPatientImageDrafts] = React.useState<Record<string, { mime: "image/jpeg"; data: string; fileName: string } | null>>({});
+  const patientImageInputRef = React.useRef<HTMLInputElement | null>(null);
   const [nameFirst, setNameFirst] = React.useState("");
   const [nameLast, setNameLast] = React.useState("");
   const [accountResult, setAccountResult] = React.useState<string | null>(null);
@@ -235,12 +237,15 @@ function BelugaDashboardPage() {
 
   const handleSendMessage = async (masterId: string, customerService = false) => {
     const draft = customerService ? csDrafts[masterId] : messageDrafts[masterId];
-    if (!masterId || !draft?.trim()) return;
+    const patientImageDraft = customerService ? null : patientImageDrafts[masterId];
+    if (!masterId || (!draft?.trim() && !patientImageDraft?.data)) return;
     setMessageResults((prev) => ({ ...prev, [masterId]: "" }));
     const endpoint = customerService ? "/beluga/messages/customer-service" : "/beluga/messages/patient";
     const payload = customerService
       ? { masterId, content: draft.trim() }
-      : { masterId, content: draft.trim(), isMedia: false };
+      : patientImageDraft?.data
+        ? { masterId, content: patientImageDraft.data, isMedia: true }
+        : { masterId, content: draft.trim(), isMedia: false };
 
     const response = await apiCall(endpoint, {
       method: "POST",
@@ -257,6 +262,7 @@ function BelugaDashboardPage() {
       setCsDrafts((prev) => ({ ...prev, [masterId]: "" }));
     } else {
       setMessageDrafts((prev) => ({ ...prev, [masterId]: "" }));
+      setPatientImageDrafts((prev) => ({ ...prev, [masterId]: null }));
     }
 
     await loadChatMessages(masterId);
@@ -289,12 +295,70 @@ function BelugaDashboardPage() {
   const selectedChatMessages = selectedChatMasterId ? (chatMessagesByMaster[selectedChatMasterId] || []) : [];
   const selectedChannelMessages = selectedChatMessages.filter((message) => message.channel === selectedChatChannel);
   const isOutboundMessage = (message: BelugaChatMessage) => message.source === "outbound";
+  const isLikelyBase64Image = (value?: string) =>
+    Boolean(value && value.length > 180 && /^[A-Za-z0-9+/=\r\n]+$/.test(value));
   const getSenderLabel = (message: BelugaChatMessage) => {
     if (isOutboundMessage(message)) return "You";
     if (message.channel === "customer_service") return "Customer Service";
     if (message.senderRole === "doctor") return "Provider";
     if (message.senderRole === "beluga_admin") return "Beluga Admin";
     return "System";
+  };
+  const convertImageToJpegBase64 = async (file: File): Promise<string> => {
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
+      reader.onerror = () => reject(new Error("Failed to read image file"));
+      reader.readAsDataURL(file);
+    });
+
+    const jpegDataUrl = await new Promise<string>((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => {
+        const maxWidth = 1000;
+        const scale = image.width > maxWidth ? maxWidth / image.width : 1;
+        const width = Math.max(1, Math.round(image.width * scale));
+        const height = Math.max(1, Math.round(image.height * scale));
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const context = canvas.getContext("2d");
+        if (!context) {
+          reject(new Error("Could not create canvas context"));
+          return;
+        }
+        context.drawImage(image, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", 0.85));
+      };
+      image.onerror = () => reject(new Error("Failed to decode image"));
+      image.src = dataUrl;
+    });
+
+    return jpegDataUrl.split(",")[1] || "";
+  };
+  const handlePatientImageSelection = async (masterId: string, file: File | null) => {
+    if (!file) {
+      setPatientImageDrafts((prev) => ({ ...prev, [masterId]: null }));
+      return;
+    }
+    if (!file.type.startsWith("image/")) {
+      setMessageResults((prev) => ({ ...prev, [masterId]: "Only image files are allowed." }));
+      return;
+    }
+    try {
+      const encoded = await convertImageToJpegBase64(file);
+      setPatientImageDrafts((prev) => ({
+        ...prev,
+        [masterId]: {
+          mime: "image/jpeg",
+          data: encoded,
+          fileName: file.name.replace(/\.[^.]+$/, ".jpg"),
+        },
+      }));
+      setMessageResults((prev) => ({ ...prev, [masterId]: "" }));
+    } catch {
+      setMessageResults((prev) => ({ ...prev, [masterId]: "Could not process image. Please try another file." }));
+    }
   };
 
   return (
@@ -643,7 +707,17 @@ function BelugaDashboardPage() {
                                                     : "bg-content2 text-foreground"
                                                     }`}
                                                 >
-                                                  <p>{message.message || "(no text)"}</p>
+                                                  {isLikelyBase64Image(message.message) ? (
+                                                    <a href={`data:image/jpeg;base64,${message.message}`} target="_blank" rel="noopener noreferrer">
+                                                      <img
+                                                        src={`data:image/jpeg;base64,${message.message}`}
+                                                        alt="Patient image message"
+                                                        className="max-w-full max-h-[220px] rounded-md cursor-pointer hover:opacity-90"
+                                                      />
+                                                    </a>
+                                                  ) : (
+                                                    <p>{message.message || "(no text)"}</p>
+                                                  )}
                                                 </div>
                                                 <div className="text-xs text-foreground-400 mt-1">
                                                   {new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
@@ -663,7 +737,49 @@ function BelugaDashboardPage() {
                                   </div>
 
                                   <div className="p-3 border-t border-content3">
+                                    {selectedChatChannel === "patient_chat" && patientImageDrafts[selectedChatVisit.masterId]?.data && (
+                                      <div className="mb-2 flex items-center gap-2 bg-content2 rounded-md px-3 py-2">
+                                        <Icon icon="lucide:image" className="text-foreground-500" />
+                                        <span className="text-sm text-foreground-700 truncate flex-1">
+                                          {patientImageDrafts[selectedChatVisit.masterId]?.fileName || "image.jpg"}
+                                        </span>
+                                        <button
+                                          type="button"
+                                          className="text-danger-500 hover:text-danger-700"
+                                          onClick={() =>
+                                            setPatientImageDrafts((prev) => ({ ...prev, [selectedChatVisit.masterId]: null }))
+                                          }
+                                        >
+                                          <Icon icon="lucide:x" width={16} />
+                                        </button>
+                                      </div>
+                                    )}
                                     <div className="flex gap-2 items-center">
+                                      {selectedChatChannel === "patient_chat" && (
+                                        <>
+                                          <input
+                                            ref={patientImageInputRef}
+                                            type="file"
+                                            accept="image/*"
+                                            className="hidden"
+                                            onChange={(e) => {
+                                              const file = e.target.files?.[0] || null;
+                                              void handlePatientImageSelection(selectedChatVisit.masterId, file);
+                                              if (patientImageInputRef.current) {
+                                                patientImageInputRef.current.value = "";
+                                              }
+                                            }}
+                                          />
+                                          <Button
+                                            isIconOnly
+                                            variant="light"
+                                            aria-label="Attach image"
+                                            onPress={() => patientImageInputRef.current?.click()}
+                                          >
+                                            <Icon icon="lucide:paperclip" className="text-foreground-500" />
+                                          </Button>
+                                        </>
+                                      )}
                                       <Input
                                         placeholder={selectedChatChannel === "patient_chat"
                                           ? "Type a message to provider..."
@@ -691,7 +807,7 @@ function BelugaDashboardPage() {
                                         className="bg-teal-600 text-white"
                                         onPress={() => handleSendMessage(selectedChatVisit.masterId, selectedChatChannel === "customer_service")}
                                         isDisabled={selectedChatChannel === "patient_chat"
-                                          ? !messageDrafts[selectedChatVisit.masterId]?.trim()
+                                          ? (!messageDrafts[selectedChatVisit.masterId]?.trim() && !patientImageDrafts[selectedChatVisit.masterId]?.data)
                                           : !csDrafts[selectedChatVisit.masterId]?.trim()}
                                       >
                                         <Icon icon="lucide:send" />
