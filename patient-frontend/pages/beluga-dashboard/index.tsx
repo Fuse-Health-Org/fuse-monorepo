@@ -58,6 +58,15 @@ interface BelugaVisit {
   }>;
 }
 
+interface BelugaPreferenceDraft {
+  name: string;
+  strength: string;
+  quantity: string;
+  refills: string;
+  daysSupply: string;
+  medId: string;
+}
+
 interface BelugaChatMessage {
   id: string;
   masterId: string;
@@ -169,6 +178,9 @@ function BelugaDashboardPage() {
   const [selectedChatMasterId, setSelectedChatMasterId] = React.useState("");
   const [selectedChatChannel, setSelectedChatChannel] = React.useState<"patient_chat" | "customer_service">("patient_chat");
   const [patientImageDrafts, setPatientImageDrafts] = React.useState<Record<string, { mime: "image/jpeg"; data: string; fileName: string } | null>>({});
+  const [preferenceDraftsByMaster, setPreferenceDraftsByMaster] = React.useState<Record<string, BelugaPreferenceDraft[]>>({});
+  const [preferenceSavingByMaster, setPreferenceSavingByMaster] = React.useState<Record<string, boolean>>({});
+  const [preferenceResultByMaster, setPreferenceResultByMaster] = React.useState<Record<string, string>>({});
   const patientImageInputRef = React.useRef<HTMLInputElement | null>(null);
   const [nameFirst, setNameFirst] = React.useState("");
   const [nameLast, setNameLast] = React.useState("");
@@ -286,6 +298,123 @@ function BelugaDashboardPage() {
     }
 
     setAccountResult("Patient name update sent to Beluga.");
+  };
+
+  const toDraftPreference = (pref?: Partial<BelugaPreferenceDraft> | null): BelugaPreferenceDraft => ({
+    name: pref?.name || "",
+    strength: pref?.strength || "",
+    quantity: pref?.quantity || "",
+    refills: pref?.refills || "",
+    daysSupply: pref?.daysSupply || "",
+    medId: pref?.medId || "",
+  });
+
+  const handleStartPreferenceEdit = (visit: BelugaVisit) => {
+    const existing = Array.isArray(visit.formObj?.patientPreference) ? visit.formObj!.patientPreference! : [];
+    const normalized = existing.length > 0 ? existing.map((item) => toDraftPreference(item)) : [toDraftPreference()];
+    setPreferenceDraftsByMaster((prev) => ({ ...prev, [visit.masterId]: normalized }));
+    setPreferenceResultByMaster((prev) => ({ ...prev, [visit.masterId]: "" }));
+  };
+
+  const handleCancelPreferenceEdit = (masterId: string) => {
+    setPreferenceDraftsByMaster((prev) => {
+      const next = { ...prev };
+      delete next[masterId];
+      return next;
+    });
+    setPreferenceResultByMaster((prev) => ({ ...prev, [masterId]: "" }));
+  };
+
+  const handlePreferenceFieldChange = (
+    masterId: string,
+    index: number,
+    field: keyof BelugaPreferenceDraft,
+    value: string
+  ) => {
+    setPreferenceDraftsByMaster((prev) => {
+      const current = prev[masterId] || [];
+      const next = current.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, [field]: value } : item
+      );
+      return { ...prev, [masterId]: next };
+    });
+  };
+
+  const handleAddPreference = (masterId: string) => {
+    setPreferenceDraftsByMaster((prev) => ({
+      ...prev,
+      [masterId]: [...(prev[masterId] || []), toDraftPreference()],
+    }));
+  };
+
+  const handleRemovePreference = (masterId: string, index: number) => {
+    setPreferenceDraftsByMaster((prev) => {
+      const current = prev[masterId] || [];
+      const next = current.filter((_, itemIndex) => itemIndex !== index);
+      return { ...prev, [masterId]: next.length > 0 ? next : [toDraftPreference()] };
+    });
+  };
+
+  const handleSavePreferences = async (visit: BelugaVisit) => {
+    const masterId = visit.masterId;
+    const draftRows = preferenceDraftsByMaster[masterId] || [];
+    const payloadRows = draftRows
+      .map((row) => ({
+        name: row.name.trim(),
+        strength: row.strength.trim(),
+        quantity: row.quantity.trim(),
+        refills: row.refills.trim(),
+        daysSupply: row.daysSupply.trim(),
+        medId: row.medId.trim(),
+      }))
+      .filter((row) => row.name && row.strength && row.quantity && row.refills && row.daysSupply && row.medId);
+
+    if (payloadRows.length === 0) {
+      setPreferenceResultByMaster((prev) => ({
+        ...prev,
+        [masterId]: "Complete all required preference fields before saving.",
+      }));
+      return;
+    }
+
+    setPreferenceSavingByMaster((prev) => ({ ...prev, [masterId]: true }));
+    setPreferenceResultByMaster((prev) => ({ ...prev, [masterId]: "" }));
+
+    const response = await apiCall(`/beluga/visits/${encodeURIComponent(masterId)}/preferences`, {
+      method: "POST",
+      body: JSON.stringify({
+        patientPreference: payloadRows,
+      }),
+    });
+
+    if (!response.success) {
+      setPreferenceResultByMaster((prev) => ({
+        ...prev,
+        [masterId]: response.error || "Failed to update treatment preferences in Beluga.",
+      }));
+      setPreferenceSavingByMaster((prev) => ({ ...prev, [masterId]: false }));
+      return;
+    }
+
+    setVisits((prev) =>
+      prev.map((item) =>
+        item.masterId !== masterId
+          ? item
+          : {
+              ...item,
+              formObj: {
+                ...(item.formObj || {}),
+                patientPreference: payloadRows,
+              },
+            }
+      )
+    );
+    setPreferenceResultByMaster((prev) => ({
+      ...prev,
+      [masterId]: "Treatment preferences updated successfully.",
+    }));
+    setPreferenceSavingByMaster((prev) => ({ ...prev, [masterId]: false }));
+    await loadBelugaData();
   };
 
   const totalRx = visits.reduce((acc, item) => acc + item.rxHistory.length, 0);
@@ -514,6 +643,103 @@ function BelugaDashboardPage() {
                           </div>
                         </div>
                       )}
+                      {!Array.isArray(visit.formObj?.patientPreference) || visit.formObj!.patientPreference!.length === 0 ? (
+                        <div>
+                          <p className="text-xs font-medium text-foreground-500 mb-1.5 uppercase tracking-wide">Requested Treatment</p>
+                          <p className="text-sm text-foreground-400">No preference recorded yet for this visit.</p>
+                        </div>
+                      ) : null}
+
+                      <div className="space-y-3 p-3 rounded-lg border border-default-200 bg-content1">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <p className="text-xs font-medium text-foreground-500 uppercase tracking-wide">Update Preference</p>
+                          {!preferenceDraftsByMaster[visit.masterId] ? (
+                            <Button size="sm" variant="flat" onPress={() => handleStartPreferenceEdit(visit)}>
+                              Edit Preferences
+                            </Button>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <Button size="sm" variant="light" onPress={() => handleAddPreference(visit.masterId)}>
+                                Add Medication
+                              </Button>
+                              <Button size="sm" variant="light" onPress={() => handleCancelPreferenceEdit(visit.masterId)}>
+                                Cancel
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+
+                        {preferenceDraftsByMaster[visit.masterId] && (
+                          <div className="space-y-3">
+                            {preferenceDraftsByMaster[visit.masterId].map((pref, idx) => (
+                              <div key={`${visit.masterId}-pref-${idx}`} className="p-3 rounded-lg bg-content2 space-y-2">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                  <Input
+                                    size="sm"
+                                    label="Medication Name"
+                                    value={pref.name}
+                                    onValueChange={(value) => handlePreferenceFieldChange(visit.masterId, idx, "name", value)}
+                                  />
+                                  <Input
+                                    size="sm"
+                                    label="Med ID"
+                                    value={pref.medId}
+                                    onValueChange={(value) => handlePreferenceFieldChange(visit.masterId, idx, "medId", value)}
+                                  />
+                                  <Input
+                                    size="sm"
+                                    label="Strength"
+                                    value={pref.strength}
+                                    onValueChange={(value) => handlePreferenceFieldChange(visit.masterId, idx, "strength", value)}
+                                  />
+                                  <Input
+                                    size="sm"
+                                    label="Quantity"
+                                    value={pref.quantity}
+                                    onValueChange={(value) => handlePreferenceFieldChange(visit.masterId, idx, "quantity", value)}
+                                  />
+                                  <Input
+                                    size="sm"
+                                    label="Refills"
+                                    value={pref.refills}
+                                    onValueChange={(value) => handlePreferenceFieldChange(visit.masterId, idx, "refills", value)}
+                                  />
+                                  <Input
+                                    size="sm"
+                                    label="Days Supply"
+                                    value={pref.daysSupply}
+                                    onValueChange={(value) => handlePreferenceFieldChange(visit.masterId, idx, "daysSupply", value)}
+                                  />
+                                </div>
+                                <div className="flex justify-end">
+                                  <Button
+                                    size="sm"
+                                    variant="light"
+                                    color="danger"
+                                    isDisabled={preferenceDraftsByMaster[visit.masterId].length <= 1}
+                                    onPress={() => handleRemovePreference(visit.masterId, idx)}
+                                  >
+                                    Remove
+                                  </Button>
+                                </div>
+                              </div>
+                            ))}
+                            <div className="flex items-center gap-2">
+                              <Button
+                                size="sm"
+                                className="bg-teal-600 text-white"
+                                isLoading={Boolean(preferenceSavingByMaster[visit.masterId])}
+                                onPress={() => handleSavePreferences(visit)}
+                              >
+                                Save Preferences
+                              </Button>
+                              {preferenceResultByMaster[visit.masterId] && (
+                                <p className="text-xs text-foreground-500">{preferenceResultByMaster[visit.masterId]}</p>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
 
                       {/* Prescription History */}
                       <div>
