@@ -197,7 +197,6 @@ function InfoTooltip({ text, subtext }: { text: string; subtext?: string }) {
 }
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
-const ENABLE_PROGRAMS_MOCK_DATA = process.env.NEXT_PUBLIC_ENABLE_PROGRAMS_MOCK_DATA === 'true'
 
 // Helper to get medical company display info
 const getMedicalCompanyInfo = (source?: string) => {
@@ -249,177 +248,6 @@ const inferProgramCategory = (program: Program): keyof typeof categoryLabels => 
     return 'other'
 }
 
-const mockProductsByCategory: Record<string, ProgramProduct[]> = {
-    weight_loss: [
-        { id: 'mock-p-w1', name: 'Semaglutide 2.5mg', medicationRoute: 'injectable', productCost: 119, shippingCost: 15, telehealthCost: 20, telehealthType: 'async', imageUrl: 'https://images.unsplash.com/photo-1587854692152-cbe660dbde88?w=96&h=96&fit=crop' },
-        { id: 'mock-p-w2', name: 'Semaglutide 5mg', medicationRoute: 'injectable', productCost: 139, shippingCost: 15, telehealthCost: 20, telehealthType: 'async', imageUrl: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=96&h=96&fit=crop' },
-        { id: 'mock-p-w3', name: 'Tirzepatide 5mg', medicationRoute: 'injectable', productCost: 169, shippingCost: 15, telehealthCost: 20, telehealthType: 'async', imageUrl: 'https://images.unsplash.com/photo-1559757175-0eb30cd8c063?w=96&h=96&fit=crop' },
-        { id: 'mock-p-w4', name: 'Tirzepatide 10mg', medicationRoute: 'injectable', productCost: 199, shippingCost: 15, telehealthCost: 20, telehealthType: 'async', imageUrl: 'https://images.unsplash.com/photo-1576671081837-49000212a370?w=96&h=96&fit=crop' },
-    ],
-    longevity: [
-        { id: 'mock-p-l1', name: 'NAD+ 250mg', medicationRoute: 'injectable', productCost: 69, shippingCost: 10, telehealthCost: 20, telehealthType: 'async', imageUrl: 'https://images.unsplash.com/photo-1550572017-4fcdbb59cc32?w=96&h=96&fit=crop' },
-        { id: 'mock-p-l2', name: 'NAD+ 500mg', medicationRoute: 'injectable', productCost: 99, shippingCost: 10, telehealthCost: 20, telehealthType: 'async', imageUrl: 'https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?w=96&h=96&fit=crop' },
-        { id: 'mock-p-l3', name: 'BPC-157', medicationRoute: 'injectable', productCost: 89, shippingCost: 10, telehealthCost: 35, telehealthType: 'sync', imageUrl: 'https://images.unsplash.com/photo-1471864190281-a93a3070b6de?w=96&h=96&fit=crop' },
-        { id: 'mock-p-l4', name: 'Sermorelin 3mg', medicationRoute: 'injectable', productCost: 129, shippingCost: 10, telehealthCost: 35, telehealthType: 'sync', imageUrl: 'https://images.unsplash.com/photo-1583947215259-38e31be8751f?w=96&h=96&fit=crop' },
-    ],
-    hair_loss: [
-        { id: 'mock-p-h1', name: 'Finasteride 1mg', medicationRoute: 'oral', productCost: 25, shippingCost: 10, telehealthCost: 20, telehealthType: 'async', imageUrl: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=96&h=96&fit=crop' },
-        { id: 'mock-p-h2', name: 'Dutasteride 0.5mg', medicationRoute: 'oral', productCost: 35, shippingCost: 10, telehealthCost: 20, telehealthType: 'async', imageUrl: 'https://images.unsplash.com/photo-1559757175-0eb30cd8c063?w=96&h=96&fit=crop' },
-        { id: 'mock-p-h3', name: 'Minoxidil 5% Solution', medicationRoute: 'topical', productCost: 28, shippingCost: 10, telehealthCost: 20, telehealthType: 'async', imageUrl: 'https://images.unsplash.com/photo-1576671081837-49000212a370?w=96&h=96&fit=crop' },
-        { id: 'mock-p-h4', name: 'Minoxidil + Fin Combo', medicationRoute: 'topical', productCost: 49, shippingCost: 10, telehealthCost: 20, telehealthType: 'async', imageUrl: 'https://images.unsplash.com/photo-1550572017-4fcdbb59cc32?w=96&h=96&fit=crop' },
-    ],
-    ed: [
-        { id: 'mock-p-e1', name: 'Sildenafil 50mg', medicationRoute: 'oral', productCost: 35, shippingCost: 10, telehealthCost: 20, telehealthType: 'async', imageUrl: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=96&h=96&fit=crop' },
-        { id: 'mock-p-e2', name: 'Sildenafil 100mg', medicationRoute: 'oral', productCost: 45, shippingCost: 10, telehealthCost: 20, telehealthType: 'async', imageUrl: 'https://images.unsplash.com/photo-1471864190281-a93a3070b6de?w=96&h=96&fit=crop' },
-        { id: 'mock-p-e3', name: 'Tadalafil 10mg', medicationRoute: 'oral', productCost: 40, shippingCost: 10, telehealthCost: 20, telehealthType: 'async', imageUrl: 'https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?w=96&h=96&fit=crop' },
-        { id: 'mock-p-e4', name: 'Tadalafil 20mg', medicationRoute: 'oral', productCost: 55, shippingCost: 10, telehealthCost: 20, telehealthType: 'async', imageUrl: 'https://images.unsplash.com/photo-1583947215259-38e31be8751f?w=96&h=96&fit=crop' },
-    ],
-    other: [
-        { id: 'mock-p-o1', name: 'Glutathione 200mg', medicationRoute: 'injectable', productCost: 59, shippingCost: 15, telehealthCost: 20, telehealthType: 'async', imageUrl: 'https://images.unsplash.com/photo-1587854692152-cbe660dbde88?w=96&h=96&fit=crop' },
-        { id: 'mock-p-o2', name: 'Vitamin D3 50,000 IU', medicationRoute: 'oral', productCost: 29, shippingCost: 10, telehealthCost: 20, telehealthType: 'async', imageUrl: 'https://images.unsplash.com/photo-1550572017-4fcdbb59cc32?w=96&h=96&fit=crop' },
-        { id: 'mock-p-o3', name: 'Methylcobalamin B12', medicationRoute: 'injectable', productCost: 39, shippingCost: 10, telehealthCost: 20, telehealthType: 'async', imageUrl: 'https://images.unsplash.com/photo-1471864190281-a93a3070b6de?w=96&h=96&fit=crop' },
-    ],
-}
-
-const MOCK_PROGRAMS: Program[] = [
-    {
-        id: 'mock-1',
-        name: 'Weight Loss Core',
-        description: 'Semaglutide starter program focused on steady weekly progress.',
-        clinicId: 'mock-clinic',
-        medicalTemplateId: 'mock-mt-1',
-        portalDisplayName: 'Semaglutide Weight Loss',
-        isActive: true,
-        isFeatured: true,
-        createdAt: '2026-02-01T10:00:00.000Z',
-        updatedAt: '2026-02-15T12:10:00.000Z',
-        medicalTemplate: { id: 'mock-mt-1', title: 'GLP-1 Intake Flow', description: 'Weight management intake', formTemplateType: 'custom', medicalCompanySource: 'fuse' }
-    },
-    {
-        id: 'mock-2',
-        name: 'Weight Loss Plus',
-        description: 'Advanced GLP-1 plan with additional follow-up checkpoints.',
-        clinicId: 'mock-clinic',
-        medicalTemplateId: 'mock-mt-2',
-        isActive: false,
-        createdAt: '2026-02-01T11:00:00.000Z',
-        updatedAt: '2026-02-16T09:30:00.000Z',
-        medicalTemplate: { id: 'mock-mt-2', title: 'Tirzepatide Intake', description: 'Comprehensive triage', formTemplateType: 'custom', medicalCompanySource: 'md-integrations' }
-    },
-    {
-        id: 'mock-3',
-        name: 'Longevity Essentials',
-        description: 'General wellness and longevity optimization program.',
-        clinicId: 'mock-clinic',
-        medicalTemplateId: 'mock-mt-3',
-        portalDisplayName: 'Longevity & Wellness',
-        isActive: true,
-        isFeatured: true,
-        createdAt: '2026-01-22T11:00:00.000Z',
-        updatedAt: '2026-02-14T18:00:00.000Z',
-        medicalTemplate: { id: 'mock-mt-3', title: 'Longevity Assessment', description: 'Baseline longevity profile', formTemplateType: 'custom', medicalCompanySource: 'beluga' }
-    },
-    {
-        id: 'mock-4',
-        name: 'Longevity Premium',
-        description: 'Expanded anti-aging and wellness program for recurring care.',
-        clinicId: 'mock-clinic',
-        medicalTemplateId: 'mock-mt-4',
-        isActive: false,
-        createdAt: '2026-01-21T11:00:00.000Z',
-        updatedAt: '2026-02-13T15:00:00.000Z',
-        medicalTemplate: { id: 'mock-mt-4', title: 'Advanced Longevity Flow', description: 'Expanded intake', formTemplateType: 'custom', medicalCompanySource: 'fuse' }
-    },
-    {
-        id: 'mock-5',
-        name: 'Hair Loss Starter',
-        description: 'Early-stage hair restoration with finasteride options.',
-        clinicId: 'mock-clinic',
-        medicalTemplateId: 'mock-mt-5',
-        isActive: false,
-        createdAt: '2026-01-19T09:00:00.000Z',
-        updatedAt: '2026-02-13T10:00:00.000Z',
-        medicalTemplate: { id: 'mock-mt-5', title: 'Hair Loss Intake', description: 'Hair profile', formTemplateType: 'custom', medicalCompanySource: 'md-integrations' }
-    },
-    {
-        id: 'mock-6',
-        name: 'Hair Loss Complete',
-        description: 'Combined finasteride + minoxidil treatment pathway.',
-        clinicId: 'mock-clinic',
-        medicalTemplateId: 'mock-mt-6',
-        isActive: true,
-        isFeatured: true,
-        createdAt: '2026-01-20T08:00:00.000Z',
-        updatedAt: '2026-02-12T13:00:00.000Z',
-        medicalTemplate: { id: 'mock-mt-6', title: 'Hair Complete Intake', description: 'Combined regimen intake', formTemplateType: 'custom', medicalCompanySource: 'beluga' }
-    },
-    {
-        id: 'mock-7',
-        name: 'ED Fast Access',
-        description: 'Simple ED screening and sildenafil protocol.',
-        clinicId: 'mock-clinic',
-        medicalTemplateId: 'mock-mt-7',
-        isActive: false,
-        createdAt: '2026-01-25T08:00:00.000Z',
-        updatedAt: '2026-02-11T13:00:00.000Z',
-        medicalTemplate: { id: 'mock-mt-7', title: 'ED Screening Form', description: 'ED short intake', formTemplateType: 'custom', medicalCompanySource: 'fuse' }
-    },
-    {
-        id: 'mock-8',
-        name: 'ED Ongoing Care',
-        description: 'Recurring tadalafil and adherence support program.',
-        clinicId: 'mock-clinic',
-        medicalTemplateId: 'mock-mt-8',
-        isActive: true,
-        createdAt: '2026-01-26T08:00:00.000Z',
-        updatedAt: '2026-02-10T13:00:00.000Z',
-        medicalTemplate: { id: 'mock-mt-8', title: 'ED Ongoing Intake', description: 'Long-term ED intake', formTemplateType: 'custom', medicalCompanySource: 'md-integrations' }
-    },
-    {
-        id: 'mock-9',
-        name: 'Metabolic Reboot',
-        description: 'Comprehensive metabolic wellness and weight-support flow.',
-        clinicId: 'mock-clinic',
-        medicalTemplateId: 'mock-mt-9',
-        isActive: false,
-        createdAt: '2026-01-18T08:00:00.000Z',
-        updatedAt: '2026-02-09T13:00:00.000Z',
-        medicalTemplate: { id: 'mock-mt-9', title: 'Metabolic Assessment', description: 'Metabolic intake', formTemplateType: 'custom', medicalCompanySource: 'beluga' }
-    },
-    {
-        id: 'mock-10',
-        name: 'Performance Wellness',
-        description: 'General performance and vitality optimization program.',
-        clinicId: 'mock-clinic',
-        medicalTemplateId: 'mock-mt-10',
-        isActive: true,
-        createdAt: '2026-01-17T08:00:00.000Z',
-        updatedAt: '2026-02-08T13:00:00.000Z',
-        medicalTemplate: { id: 'mock-mt-10', title: 'Performance Intake', description: 'Performance baseline', formTemplateType: 'custom', medicalCompanySource: 'fuse' }
-    },
-    {
-        id: 'mock-11',
-        name: 'Weight Loss Lite',
-        description: 'Lower-intensity weight loss onboarding experience.',
-        clinicId: 'mock-clinic',
-        medicalTemplateId: 'mock-mt-11',
-        isActive: false,
-        createdAt: '2026-01-14T08:00:00.000Z',
-        updatedAt: '2026-02-07T13:00:00.000Z',
-        medicalTemplate: { id: 'mock-mt-11', title: 'Weight Loss Lite Intake', description: 'Lite intake', formTemplateType: 'custom', medicalCompanySource: 'md-integrations' }
-    },
-    {
-        id: 'mock-12',
-        name: 'Sleep and Recovery',
-        description: 'Recovery-focused care pathway.',
-        clinicId: 'mock-clinic',
-        medicalTemplateId: 'mock-mt-12',
-        isActive: false,
-        createdAt: '2026-01-12T08:00:00.000Z',
-        updatedAt: '2026-02-06T13:00:00.000Z',
-        medicalTemplate: { id: 'mock-mt-12', title: 'Sleep & Recovery Intake', description: 'Recovery baseline', formTemplateType: 'custom', medicalCompanySource: 'fuse' }
-    },
-]
 
 /** Canvas-based image crop — outputs a 400×400 JPEG blob ready for upload */
 async function getCroppedImg(imageSrc: string, pixelCrop: Area): Promise<Blob> {
@@ -514,7 +342,6 @@ export default function Programs() {
     const [cropApplying, setCropApplying] = useState(false)
     const { token, user, subscription } = useAuth()
     const router = useRouter()
-    const isMockMode = ENABLE_PROGRAMS_MOCK_DATA || router.query.mock === '1'
     const { toasts, dismiss, success: toastSuccess, error: toastError } = useToast()
 
     // All brand admins have access to Programs regardless of tier config
@@ -560,7 +387,7 @@ export default function Programs() {
             fetchTemplates()
             fetchTemplateProductsMap()
         }
-    }, [token, hasAccessToPrograms, isMockMode])
+    }, [token, hasAccessToPrograms])
 
     useEffect(() => {
         setSelectedProgramIds((prev) => {
@@ -587,11 +414,6 @@ export default function Programs() {
     }, [])
 
     const fetchPrograms = async () => {
-        if (isMockMode) {
-            setPrograms(MOCK_PROGRAMS)
-            setLoading(false)
-            return
-        }
         if (!token) return
 
         try {
@@ -619,10 +441,6 @@ export default function Programs() {
     }
 
     const fetchTemplates = async () => {
-        if (isMockMode) {
-            setTemplates([])
-            return
-        }
         if (!token) return
 
         try {
@@ -642,10 +460,6 @@ export default function Programs() {
     }
 
     const fetchTemplateProductsMap = async () => {
-        if (isMockMode) {
-            setTemplateProductsByTemplateId({})
-            return
-        }
         if (!token) return
 
         try {
@@ -733,10 +547,6 @@ export default function Programs() {
     }
 
     const updateProgramActiveStatus = async (programId: string, isActive: boolean) => {
-        if (isMockMode) {
-            return { id: programId, isActive }
-        }
-
         const response = await fetch(`${API_URL}/programs/${programId}`, {
             method: 'PUT',
             headers: {
@@ -829,44 +639,27 @@ export default function Programs() {
         // Optimistic update
         setPrograms((prev) => prev.map((p) => p.id === programId ? { ...p, isFeatured: newValue } : p))
 
-        if (!isMockMode) {
-            try {
-                const response = await fetch(`${API_URL}/programs/${programId}`, {
-                    method: 'PUT',
-                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ isFeatured: newValue }),
-                })
-                const data = await response.json()
-                if (!response.ok || !data.success) {
-                    setPrograms((prev) => prev.map((p) => p.id === programId ? { ...p, isFeatured: currentlyFeatured } : p))
-                    toastError(data.error || 'Failed to update featured status')
-                } else {
-                    toastSuccess(newValue ? 'Program featured' : 'Program unfeatured', 'Changes saved')
-                }
-            } catch {
+        try {
+            const response = await fetch(`${API_URL}/programs/${programId}`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ isFeatured: newValue }),
+            })
+            const data = await response.json()
+            if (!response.ok || !data.success) {
                 setPrograms((prev) => prev.map((p) => p.id === programId ? { ...p, isFeatured: currentlyFeatured } : p))
-                toastError('Failed to update featured status')
+                toastError(data.error || 'Failed to update featured status')
+            } else {
+                toastSuccess(newValue ? 'Program featured' : 'Program unfeatured', 'Changes saved')
             }
+        } catch {
+            setPrograms((prev) => prev.map((p) => p.id === programId ? { ...p, isFeatured: currentlyFeatured } : p))
+            toastError('Failed to update featured status')
         }
     }
 
     const handleDuplicateProgram = async (program: Program) => {
-        if (!token || isMockMode) {
-            // Mock mode: create a local copy
-            const copy: Program = {
-                ...program,
-                id: `mock-copy-${Date.now()}`,
-                portalDisplayName: undefined,
-                isActive: false,
-                isFeatured: false,
-                name: `${program.name} (Copy)`,
-            }
-            setPrograms((prev) => [...prev, copy])
-            toastSuccess('Program duplicated', 'Set a custom name and price to activate it.')
-            // Open the copy immediately so user can name it
-            openProgramModal(copy, 'program')
-            return
-        }
+        if (!token) return
         setDuplicating(program.id)
         try {
             const res = await fetch(`${API_URL}/programs/${program.id}/duplicate`, {
@@ -942,10 +735,6 @@ export default function Programs() {
     }
 
     const loadAnalyticsForModal = async (programId: string, medicalTemplateId?: string) => {
-        if (isMockMode || programId.startsWith('mock-')) {
-            setAnalyticsLoading(false)
-            return
-        }
         setAnalyticsLoading(true)
         setAnalyticsEnabledForms([])
         setAnalyticsFormStepLabels([])
@@ -1025,47 +814,6 @@ export default function Programs() {
         setQuickEditHideAdditionalProducts(true)
 
         try {
-            if (isMockMode) {
-                const program = programs.find((p) => p.id === programId)
-                if (!program) throw new Error('Program not found')
-
-                setQuickEditName(program.name || '')
-                setQuickEditPortalDisplayName(program.portalDisplayName || '')
-                setQuickEditProgramHeroImageUrl(program.heroImageUrl || '')
-                setQuickEditHideAdditionalProducts(program.hideAdditionalProducts ?? true)
-                const category = inferProgramCategory(program)
-                const rawProducts = mockProductsByCategory[category] || mockProductsByCategory.other
-                // Apply saved product order if available
-                const savedOrder = program.productOrder ?? []
-                const products = savedOrder.length
-                    ? [...rawProducts].sort((a, b) => {
-                        const ai = savedOrder.indexOf(a.id)
-                        const bi = savedOrder.indexOf(b.id)
-                        return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi)
-                    })
-                    : rawProducts
-                // Auto-select first product as Top Choice if none is saved
-                setQuickEditFeaturedProductId(program.featuredProductId ?? products[0]?.id ?? null)
-                const existingPricing = program.productPricing || {}
-                const initialFees: Record<string, number> = {}
-                const initialPlans: Record<string, Array<{ months: number; discountPercent: number }>> = {}
-                const initialMonthlyDiscounts: Record<string, number> = {}
-                const initialExpandedMultiMonth: Record<string, boolean> = {}
-                products.forEach((p) => {
-                    const pricing = existingPricing[p.id]
-                    initialFees[p.id] = pricing?.nonMedicalServiceFee ?? (program.nonMedicalServiceFee || 0)
-                    initialPlans[p.id] = pricing?.multiMonthPlans ?? []
-                    initialMonthlyDiscounts[p.id] = pricing?.monthlyDiscountPercent ?? 0
-                    initialExpandedMultiMonth[p.id] = (pricing?.multiMonthPlans?.length ?? 0) > 0
-                })
-                setQuickEditProductFees(initialFees)
-                setQuickEditMultiMonthPlans(initialPlans)
-                setQuickEditMonthlyDiscounts(initialMonthlyDiscounts)
-                setExpandedMultiMonth(initialExpandedMultiMonth)
-                setQuickEditProducts(products)
-                return
-            }
-
             const response = await fetch(`${API_URL}/programs/${programId}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             })
@@ -1164,44 +912,6 @@ export default function Programs() {
 
         try {
             setQuickEditSaving(true)
-
-            if (isMockMode) {
-                const updatedProductPricing = Object.fromEntries(
-                    Object.entries(quickEditProductFees).map(([id, fee]) => [
-                        id,
-                        {
-                            nonMedicalServiceFee: fee,
-                            monthlyDiscountPercent: quickEditMonthlyDiscounts[id] ?? 0,
-                            monthlyDiscountMonth1Only: true,
-                            multiMonthPlans: (quickEditMultiMonthPlans[id] ?? []).filter(p => p.months > 0),
-                        },
-                    ])
-                )
-                setPrograms((prev) =>
-                    prev.map((program) =>
-                        program.id === quickEditProgramId
-                            ? {
-                                ...program,
-                                name: quickEditName.trim(),
-                                portalDisplayName: quickEditPortalDisplayName.trim() || undefined,
-                                productPricing: updatedProductPricing,
-                                nonMedicalServiceFee: Math.max(...Object.values(quickEditProductFees), 0),
-                                featuredProductId: quickEditFeaturedProductId,
-                                productOrder: quickEditProducts.map((p) => p.id),
-                                hideAdditionalProducts: quickEditHideAdditionalProducts,
-                            }
-                            : program
-                    )
-                )
-                revokeProductImagePreviews(quickEditProductImagePreviews)
-                setQuickEditProductImagePreviews({})
-                setQuickEditProductImageFiles({})
-                setQuickEditProgramHeroImageUrl('')
-                setProgramModal(null)
-                setQuickEditProgramId(null)
-                toastSuccess('Program updated successfully', 'Changes saved')
-                return
-            }
 
             const response = await fetch(`${API_URL}/programs/${quickEditProgramId}`, {
                 method: 'PUT',
@@ -1427,9 +1137,6 @@ export default function Programs() {
     const featuredCount = programs.filter((p) => p.isFeatured).length
 
     const getProgramProducts = (program: Program): ProgramProduct[] => {
-        if (isMockMode) {
-            return mockProductsByCategory[inferProgramCategory(program)] || mockProductsByCategory.other
-        }
         if (!program.medicalTemplateId) return []
         return templateProductsByTemplateId[program.medicalTemplateId] || []
     }
@@ -1481,24 +1188,12 @@ export default function Programs() {
                             <div>
                                 <div className="flex items-center gap-2 mb-1">
                                     <h1 className="text-2xl font-semibold">Programs</h1>
-                                    {isMockMode && (
-                                        <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full border border-border bg-muted text-muted-foreground">
-                                            <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50" />
-                                            Demo data
-                                        </span>
-                                    )}
                                 </div>
                                 <p className="text-sm text-muted-foreground">
                                     Launch and manage the peptides and telehealth services your brand sells.
                                 </p>
                             </div>
                             <div className="flex items-center gap-2">
-                                <Button
-                                    onClick={() => router.push(isMockMode ? '/programs' : '/programs?mock=1')}
-                                    variant="outline"
-                                >
-                                    {isMockMode ? 'Use Live Data' : 'Use Mock Data'}
-                                </Button>
                                 {templates.length > 0 && (
                                     <Button
                                         onClick={() => setShowTemplatesModal(true)}
@@ -3092,18 +2787,6 @@ export default function Programs() {
                                     <div className="overflow-y-auto flex-1 min-h-0 p-6">
                                         {analyticsLoading ? (
                                             <div className="flex items-center justify-center py-16 text-muted-foreground text-sm">Loading analytics…</div>
-                                        ) : isMockMode || programModal.programId.startsWith('mock-') ? (
-                                            <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
-                                                <BarChart3 className="h-10 w-10 text-muted-foreground/30" />
-                                                <p className="text-sm font-semibold text-foreground">Analytics preview not available in demo mode</p>
-                                                <p className="text-xs text-muted-foreground max-w-xs">Switch to live data to view real form completion rates, drop-off points, and visitor behavior for this program.</p>
-                                                <button
-                                                    onClick={() => { setProgramModal(null); router.push('/programs') }}
-                                                    className="mt-2 text-xs text-primary underline underline-offset-2 hover:opacity-70 transition-opacity"
-                                                >
-                                                    Switch to live data
-                                                </button>
-                                            </div>
                                         ) : analyticsEnabledForms.length === 0 ? (
                                             <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
                                                 <BarChart3 className="h-10 w-10 text-muted-foreground/40" />
