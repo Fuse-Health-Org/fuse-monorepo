@@ -47,6 +47,9 @@ export function Header() {
     const update = () => {
       const remaining = Math.max(0, expiry - Math.floor(Date.now() / 1000))
       setSecondsLeft(remaining)
+      if (remaining === 0) {
+        logout({ message: 'Your session has expired. Please sign in again.' })
+      }
     }
 
     update()
