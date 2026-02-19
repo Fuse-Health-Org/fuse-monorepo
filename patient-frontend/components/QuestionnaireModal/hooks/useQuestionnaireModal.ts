@@ -232,18 +232,7 @@ export function useQuestionnaireModal(
   const belugaIntroStepsOffset = isBeluga ? 2 : 0;
   const isBelugaConsentStep = isBeluga && currentStepIndex === 0;
   const isBelugaPhotoStep = isBeluga && currentStepIndex === 1;
-  const hasKnownProfileData = Boolean(
-    userId ||
-    (
-      typeof answers['firstName'] === 'string' &&
-      answers['firstName'].trim() &&
-      typeof answers['lastName'] === 'string' &&
-      answers['lastName'].trim() &&
-      typeof answers['email'] === 'string' &&
-      answers['email'].trim()
-    )
-  );
-  const shouldSkipUserProfileSteps = Boolean(accountCreated || (isAuthenticatedUser && hasKnownProfileData));
+  const shouldSkipUserProfileSteps = Boolean(accountCreated || userId || isAuthenticatedUser);
 
   const isProductSelectionStep = useCallback((): boolean => {
     if (!questionnaire) return false;
