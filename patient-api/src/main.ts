@@ -391,6 +391,10 @@ app.use((req, res, next) => {
   }
 });
 
+// PHI masking for impersonation sessions (checks req.user at response time)
+import { phiMaskingMiddleware } from "./middleware/phi-masking.middleware";
+app.use(phiMaskingMiddleware);
+
 // Register refactored routes
 app.use("/", sequenceRoutes);
 app.use("/", sequenceWebhookRoutes);
