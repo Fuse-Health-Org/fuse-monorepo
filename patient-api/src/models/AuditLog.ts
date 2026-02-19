@@ -39,6 +39,8 @@ export enum AuditAction {
   // Administrative events
   ROLE_CHANGE = 'ROLE_CHANGE',
   PERMISSION_CHANGE = 'PERMISSION_CHANGE',
+  IMPERSONATE_START = 'IMPERSONATE_START',
+  IMPERSONATE_END = 'IMPERSONATE_END',
 }
 
 export enum AuditResourceType {

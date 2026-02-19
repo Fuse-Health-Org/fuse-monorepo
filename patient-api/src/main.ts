@@ -8019,6 +8019,14 @@ app.post("/admin/impersonate", authenticateJWT, async (req, res) => {
       { expiresIn: "24h" }
     );
 
+    // Audit log: admin impersonation start
+    await AuditService.logImpersonateStart(
+      req,
+      admin.id,
+      targetUser.id,
+      targetUser.email
+    );
+
     res.status(200).json({
       success: true,
       data: {
@@ -8079,6 +8087,13 @@ app.post("/admin/exit-impersonation", authenticateJWT, async (req, res) => {
       },
       process.env.JWT_SECRET!,
       { expiresIn: "24h" }
+    );
+
+    // Audit log: admin impersonation end
+    await AuditService.logImpersonateEnd(
+      req,
+      admin.id,
+      currentUser.id // The user ID that was impersonated
     );
 
     res.status(200).json({

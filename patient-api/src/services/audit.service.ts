@@ -350,6 +350,46 @@ export class AuditService {
             resourceId: templateId,
         });
     }
+
+    /**
+     * Log admin impersonation start
+     */
+    static async logImpersonateStart(
+        req: Request,
+        adminId: string,
+        targetUserId: string,
+        targetUserEmail: string
+    ): Promise<void> {
+        await this.logFromRequest(req, {
+            action: AuditAction.IMPERSONATE_START,
+            resourceType: AuditResourceType.USER,
+            resourceId: targetUserId,
+            details: {
+                adminId,
+                targetUserId,
+                targetUserEmail,
+            },
+        });
+    }
+
+    /**
+     * Log admin impersonation end
+     */
+    static async logImpersonateEnd(
+        req: Request,
+        adminId: string,
+        impersonatedUserId: string
+    ): Promise<void> {
+        await this.logFromRequest(req, {
+            action: AuditAction.IMPERSONATE_END,
+            resourceType: AuditResourceType.USER,
+            resourceId: impersonatedUserId,
+            details: {
+                adminId,
+                impersonatedUserId,
+            },
+        });
+    }
 }
 
 // Export enums for convenience

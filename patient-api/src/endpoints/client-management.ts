@@ -11,6 +11,7 @@ import Order from "../models/Order";
 import Payment from "../models/Payment";
 import Prescription from "../models/Prescription";
 import { createJWTToken } from "../config/jwt";
+import { AuditService } from "../services/audit.service";
 
 export function registerClientManagementEndpoints(
   app: Express,
@@ -847,6 +848,14 @@ export function registerClientManagementEndpoints(
 
         console.log(
           `👤 [Impersonation] Admin impersonating user ID: ${targetUser.id}`
+        );
+
+        // Audit log: admin impersonation start
+        await AuditService.logImpersonateStart(
+          req,
+          adminUser.id,
+          targetUser.id,
+          targetUser.email
         );
 
         res.status(200).json({
