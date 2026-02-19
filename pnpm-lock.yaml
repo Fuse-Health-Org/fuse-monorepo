@@ -407,6 +407,9 @@ importers:
       '@fuse/e2e':
         specifier: workspace:*
         version: link:../packages/e2e
+      '@next/bundle-analyzer':
+        specifier: ^16.1.6
+        version: 16.1.6
       '@types/google.maps':
         specifier: ^3.58.1
         version: 3.58.1

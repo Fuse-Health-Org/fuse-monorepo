@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
+import { serviceUrls } from "@fuse/e2e";
 
-const BASE_URL = process.env.E2E_BASE_URL || "http://localhost:3002";
+const BASE_URL = serviceUrls.adminApp;
 const EMAIL = process.env.E2E_EMAIL;
 const PASSWORD = process.env.E2E_PASSWORD;
 

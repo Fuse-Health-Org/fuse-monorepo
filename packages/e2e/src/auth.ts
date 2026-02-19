@@ -1,4 +1,5 @@
 import { type Page } from "@playwright/test";
+import { serviceUrls } from "./config";
 
 export interface MockUser {
   id: string;
@@ -58,7 +59,7 @@ export async function mockAdminAuth(
     ...DEFAULT_MOCK_SUBSCRIPTION,
     ...options.subscription,
   };
-  const apiUrl = options.apiUrl ?? "http://localhost:3001";
+  const apiUrl = options.apiUrl ?? serviceUrls.api;
 
   // Seed localStorage before the page loads
   await page.addInitScript(
