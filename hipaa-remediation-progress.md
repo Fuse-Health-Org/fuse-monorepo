@@ -35,7 +35,9 @@ All 8 backend P0 issues fixed with atomic commits. Ready for review.
 
 | File | Issue | Status |
 |------|-------|--------|
-| `patient-frontend/.../useQuestionnaireModal.ts` L1372 | Medical questionnaire answers + shipping + name stored unencrypted for 7 days | **Not started** |
+| `patient-frontend/.../useQuestionnaireModal.ts` | Medical questionnaire data in localStorage | ✅ **Not present in current codebase** |
+
+**Finding:** Reviewed all `localStorage.setItem` calls in patient-frontend. Only auth tokens, anonymous IDs, affiliate IDs, and UI preferences are stored. Questionnaire answers are stored in React state only (ephemeral, cleared on modal close). No PHI in localStorage.
 
 ---
 
