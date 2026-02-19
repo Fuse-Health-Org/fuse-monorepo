@@ -10,6 +10,14 @@ import { useBatchLikes } from '../hooks/useLikes';
 import { UniformProductCard } from '../components/UniformProductCard';
 
 // Helper function to extract solid color from gradient or return the color as-is
+const getContrastColor = (hex: string): string => {
+  if (!hex || !hex.startsWith('#') || hex.length < 7) return '#ffffff';
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return (r * 299 + g * 587 + b * 114) / 1000 >= 128 ? '#000000' : '#ffffff';
+};
+
 const extractColorFromGradient = (colorValue: string): string => {
   if (!colorValue) return '';
   // Check if it's a gradient
@@ -408,7 +416,17 @@ export default function LandingPage() {
   const heroTitle = websiteData?.heroTitle || "Premium Peptide Solutions.";
   const heroSubtitle = websiteData?.heroSubtitle || "Distributed with Confidence.";
   const primaryColor = websiteData?.primaryColor || "#7c3aed"; // Default purple if not set
+  const backgroundColor = websiteData?.backgroundColor || DESIGN.colors.white;
   const fontFamily = websiteData?.fontFamily || DESIGN.typography.fontFamily;
+  const navDisplayMode = websiteData?.navDisplayMode || "brandName";
+  const navBrandName = websiteData?.navBrandName || "";
+  const navFooterColor = websiteData?.navFooterColor || websiteData?.footerColor || "#000000";
+  const navFooterTextColor = getContrastColor(navFooterColor);
+  const primaryColorSolid = extractColorFromGradient(primaryColor);
+  const primaryColorText = getContrastColor(primaryColorSolid);
+  const backgroundTextColor = getContrastColor(backgroundColor);
+  const backgroundTextColorSecondary = backgroundTextColor === '#000000' ? '#6b7280' : 'rgba(255,255,255,0.70)';
+  const backgroundTextColorMuted = backgroundTextColor === '#000000' ? '#9ca3af' : 'rgba(255,255,255,0.50)';
 
   const affiliateLogo = websiteData?.logo;
   const parentLogo = clinicInfo?.parentClinicLogo;
@@ -485,6 +503,7 @@ export default function LandingPage() {
 
     const buttonColor = clinicInfo?.defaultFormColor || primaryColor;
     const buttonColorSolid = extractColorFromGradient(buttonColor);
+    const buttonColorText = getContrastColor(buttonColorSolid);
     const firstCategory = product.categories?.[0] || product.category;
 
     return (
@@ -652,11 +671,11 @@ export default function LandingPage() {
               style={{
                 background: 'transparent',
                 color: buttonColorSolid,
-                border: `2px solid ${buttonColorSolid}`,
+                border: `1.5px solid ${buttonColorSolid}`,
                 padding: '0.5rem 1rem',
                 fontSize: '0.8125rem',
                 fontWeight: 500,
-                borderRadius: '20px',
+                borderRadius: '6px',
               }}
             />
           </div>
@@ -671,8 +690,9 @@ export default function LandingPage() {
     const isHovered = hoveredCardIndex === cardId;
     const hasTemplate = !!program.medicalTemplateId;
     const displayImageUrl = program.frontendDisplayProduct?.imageUrl;
-    const buttonColor = clinicInfo?.defaultFormColor || primaryColor;
+    const buttonColor = primaryColor;
     const buttonColorSolid = extractColorFromGradient(buttonColor);
+    const buttonColorText = getContrastColor(buttonColorSolid);
 
     return (
       <div
@@ -829,7 +849,7 @@ export default function LandingPage() {
                   style={{
                     background: buttonColor,
                     padding: '2px',
-                    borderRadius: '20px',
+                    borderRadius: '8px',
                     display: 'inline-flex',
                   }}
                 >
@@ -838,17 +858,13 @@ export default function LandingPage() {
                     onClick={(e) => e.stopPropagation()}
                     onMouseEnter={(e) => {
                       const parent = e.currentTarget.parentElement;
-                      if (parent) {
-                        parent.style.background = buttonColor;
-                      }
+                      if (parent) parent.style.background = buttonColor;
                       e.currentTarget.style.background = buttonColor;
-                      e.currentTarget.style.color = 'white';
+                      e.currentTarget.style.color = buttonColorText;
                     }}
                     onMouseLeave={(e) => {
                       const parent = e.currentTarget.parentElement;
-                      if (parent) {
-                        parent.style.background = buttonColor;
-                      }
+                      if (parent) parent.style.background = buttonColor;
                       e.currentTarget.style.background = 'white';
                       e.currentTarget.style.color = buttonColorSolid;
                     }}
@@ -858,7 +874,7 @@ export default function LandingPage() {
                       padding: '0.5rem 1rem',
                       fontSize: '0.8125rem',
                       fontWeight: 500,
-                      borderRadius: '18px',
+                      borderRadius: '6px',
                       textDecoration: 'none',
                       display: 'inline-flex',
                       alignItems: 'center',
@@ -875,7 +891,7 @@ export default function LandingPage() {
                   onClick={(e) => e.stopPropagation()}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.background = buttonColor;
-                    e.currentTarget.style.color = 'white';
+                    e.currentTarget.style.color = buttonColorText;
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.background = 'transparent';
@@ -884,11 +900,11 @@ export default function LandingPage() {
                   style={{
                     background: 'transparent',
                     color: buttonColorSolid,
-                    border: `2px solid ${buttonColorSolid}`,
+                    border: `1.5px solid ${buttonColorSolid}`,
                     padding: '0.5rem 1rem',
                     fontSize: '0.8125rem',
                     fontWeight: 500,
-                    borderRadius: '20px',
+                    borderRadius: '6px',
                     textDecoration: 'none',
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -935,6 +951,13 @@ export default function LandingPage() {
   return (
     <>
       <Head>
+        {/* Load custom font from Google Fonts if it's not a system font */}
+        {fontFamily && !['Georgia', 'Arial', 'Helvetica', 'Times New Roman'].includes(fontFamily) && (
+          <link
+            rel="stylesheet"
+            href={`https://fonts.googleapis.com/css2?family=${fontFamily.replace(/ /g, '+')}:wght@400;500;600;700&display=swap`}
+          />
+        )}
         <style>{`
           html {
             scroll-behavior: smooth;
@@ -950,13 +973,13 @@ export default function LandingPage() {
       </Head>
       <div style={{ 
         minHeight: '100vh', 
-        backgroundColor: DESIGN.colors.white, 
-        fontFamily: DESIGN.typography.fontFamily,
+        backgroundColor: backgroundColor, 
+        fontFamily: fontFamily,
       }}>
       {/* ========== HEADER ========== */}
       <header style={{
-        backgroundColor: 'white',
-        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+        backgroundColor: navFooterColor,
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.2)',
       }}>
         <div style={{
           maxWidth: '1440px',
@@ -967,19 +990,17 @@ export default function LandingPage() {
           padding: '1rem 3rem',
           height: '72px',
         }}>
-          {/* Logo */}
+          {/* Nav identity — brand name or logo based on portal settings */}
           <div style={{ display: 'flex', alignItems: 'center' }}>
-            {isAffiliate && parentLogo && affiliateLogo ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <img src={parentLogo} alt="Brand Logo" style={{ height: '32px', objectFit: 'contain' }} />
-                <span style={{ color: '#d1d5db', fontSize: '1rem', fontWeight: 300 }}>×</span>
-                <img src={affiliateLogo} alt="Affiliate Logo" style={{ height: '32px', objectFit: 'contain' }} />
-              </div>
-            ) : logo ? (
-              <img src={logo} alt="Logo" style={{ height: '32px', objectFit: 'contain' }} />
+            {navDisplayMode === 'logo' && affiliateLogo ? (
+              <img
+                src={affiliateLogo}
+                alt="Brand logo"
+                style={{ maxHeight: '40px', maxWidth: '160px', objectFit: 'contain' }}
+              />
             ) : (
-              <span style={{ fontSize: '1.25rem', fontWeight: 600, color: DESIGN.colors.text.primary }}>
-                {clinicInfo?.name || 'FUSE'}
+              <span style={{ fontSize: '1.25rem', fontWeight: 600, color: navFooterTextColor, fontFamily: fontFamily }}>
+                {navBrandName || clinicInfo?.name || 'FUSE'}
               </span>
             )}
           </div>
@@ -994,38 +1015,41 @@ export default function LandingPage() {
             transform: 'translateX(-50%)',
           }}>
             <a href="#products" style={{ 
-              color: DESIGN.colors.text.primary, 
+              color: navFooterTextColor, 
               textDecoration: 'none', 
               fontSize: '0.9375rem', 
               fontWeight: 500,
-              transition: 'color 0.2s ease',
+              opacity: 0.85,
+              transition: 'opacity 0.2s ease',
             }}
-            onMouseEnter={(e) => e.currentTarget.style.color = DESIGN.colors.text.secondary}
-            onMouseLeave={(e) => e.currentTarget.style.color = DESIGN.colors.text.primary}
+            onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
+            onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.85')}
             >
               Products
             </a>
             <a href="#how-it-works" style={{ 
-              color: DESIGN.colors.text.primary, 
+              color: navFooterTextColor, 
               textDecoration: 'none', 
               fontSize: '0.9375rem', 
               fontWeight: 500,
-              transition: 'color 0.2s ease',
+              opacity: 0.85,
+              transition: 'opacity 0.2s ease',
             }}
-            onMouseEnter={(e) => e.currentTarget.style.color = DESIGN.colors.text.secondary}
-            onMouseLeave={(e) => e.currentTarget.style.color = DESIGN.colors.text.primary}
+            onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
+            onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.85')}
             >
               How It Works
             </a>
             <a href="#footer" style={{ 
-              color: DESIGN.colors.text.primary, 
+              color: navFooterTextColor, 
               textDecoration: 'none', 
               fontSize: '0.9375rem', 
               fontWeight: 500,
-              transition: 'color 0.2s ease',
+              opacity: 0.85,
+              transition: 'opacity 0.2s ease',
             }}
-            onMouseEnter={(e) => e.currentTarget.style.color = DESIGN.colors.text.secondary}
-            onMouseLeave={(e) => e.currentTarget.style.color = DESIGN.colors.text.primary}
+            onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
+            onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.85')}
             >
               Contact
             </a>
@@ -1037,16 +1061,17 @@ export default function LandingPage() {
               onClick={() => router.push(getDashboardPrefix(clinicInfo))}
               style={{
                 backgroundColor: 'transparent',
-                color: DESIGN.colors.text.primary,
+                color: navFooterTextColor,
                 padding: '0 1rem',
                 border: 'none',
                 cursor: 'pointer',
                 fontSize: '0.9375rem',
                 fontWeight: 500,
-                transition: 'color 0.2s ease',
+                opacity: 0.85,
+                transition: 'opacity 0.2s ease',
               }}
-              onMouseEnter={(e) => e.currentTarget.style.color = DESIGN.colors.text.secondary}
-              onMouseLeave={(e) => e.currentTarget.style.color = DESIGN.colors.text.primary}
+              onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
+              onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.85')}
             >
               Login
             </button>
@@ -1172,6 +1197,7 @@ export default function LandingPage() {
             marginBottom: '1rem',
             lineHeight: 1.2,
             letterSpacing: '-0.01em',
+            whiteSpace: 'pre-line',
           }}>
             {heroTitle}
           </h1>
@@ -1182,6 +1208,7 @@ export default function LandingPage() {
             lineHeight: 1.5,
             maxWidth: '600px',
             margin: '0 auto 2rem',
+            whiteSpace: 'pre-line',
           }}>
             {heroSubtitle}
           </p>
@@ -1200,7 +1227,7 @@ export default function LandingPage() {
               }}
               style={{
                 background: primaryColor,
-                color: 'white',
+                color: primaryColorText,
                 padding: '0.75rem 1.75rem',
                 border: 'none',
                 borderRadius: '0.375rem',
@@ -1255,7 +1282,7 @@ export default function LandingPage() {
       {programs.length > 0 && (
         <section ref={shopSectionRef} id="products" style={{
           padding: '3rem 0',
-          backgroundColor: DESIGN.colors.white,
+          backgroundColor: backgroundColor,
         }}>
           <div style={{ maxWidth: DESIGN.spacing.container, margin: '0 auto', padding: '0 4rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem' }}>
@@ -1263,7 +1290,7 @@ export default function LandingPage() {
                 fontFamily: DESIGN.typography.headingFamily,
                 fontSize: '2rem',
                 fontWeight: 600,
-                color: DESIGN.colors.text.primary,
+                color: backgroundTextColor,
               }}>
                 Top Programs
               </h2>
@@ -1284,7 +1311,7 @@ export default function LandingPage() {
       {/* ========== HOW IT WORKS SECTION ========== */}
       <section id="how-it-works" style={{
         padding: '3rem 0',
-        backgroundColor: DESIGN.colors.white,
+        backgroundColor: backgroundColor,
       }}>
         <div style={{ maxWidth: DESIGN.spacing.container, margin: '0 auto', padding: '0 2rem' }}>
           <div style={{
@@ -1321,7 +1348,7 @@ export default function LandingPage() {
                 <span style={{
                   display: 'inline-block',
                   background: primaryColor,
-                  color: 'white',
+                  color: primaryColorText,
                   width: '2rem',
                   height: '2rem',
                   borderRadius: '50%',
@@ -1460,7 +1487,7 @@ export default function LandingPage() {
                 <span style={{
                   display: 'inline-block',
                   background: primaryColor,
-                  color: 'white',
+                  color: primaryColorText,
                   width: '2rem',
                   height: '2rem',
                   borderRadius: '50%',
@@ -1592,7 +1619,7 @@ export default function LandingPage() {
                 <span style={{
                   display: 'inline-block',
                   background: primaryColor,
-                  color: 'white',
+                  color: primaryColorText,
                   width: '2rem',
                   height: '2rem',
                   borderRadius: '50%',
@@ -1701,7 +1728,7 @@ export default function LandingPage() {
       {/* ========== FULL PRODUCT PORTFOLIO ========== */}
       <section id="full-portfolio" style={{
         padding: '3rem 0',
-        backgroundColor: DESIGN.colors.white,
+        backgroundColor: backgroundColor,
       }}>
         <div style={{ maxWidth: DESIGN.spacing.container, margin: '0 auto', padding: '0 2rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem' }}>
@@ -1710,14 +1737,14 @@ export default function LandingPage() {
                 fontFamily: DESIGN.typography.headingFamily,
                 fontSize: '2rem',
                 fontWeight: 600,
-                color: DESIGN.colors.text.primary,
+                color: backgroundTextColor,
                 marginBottom: '0.75rem',
               }}>
                 Full Peptide Portfolio
               </h2>
               <p style={{
                 fontSize: '0.9375rem',
-                color: DESIGN.colors.text.secondary,
+                color: backgroundTextColorSecondary,
                 lineHeight: 1.6,
                 maxWidth: '700px',
               }}>
@@ -1734,12 +1761,12 @@ export default function LandingPage() {
                   alignItems: 'center',
                   gap: '0.5rem',
                   padding: '0.5rem 1rem',
-                  backgroundColor: DESIGN.colors.white,
-                  border: `1px solid ${DESIGN.colors.text.muted}30`,
+                  backgroundColor: backgroundTextColor === '#000000' ? DESIGN.colors.white : 'rgba(255,255,255,0.10)',
+                  border: `1px solid ${backgroundTextColor === '#000000' ? `${DESIGN.colors.text.muted}30` : 'rgba(255,255,255,0.20)'}`,
                   borderRadius: DESIGN.borderRadius.medium,
                   cursor: 'pointer',
                   fontSize: '0.875rem',
-                  color: DESIGN.colors.text.secondary,
+                  color: backgroundTextColorSecondary,
                   fontWeight: 400,
                 }}
               >
@@ -1803,11 +1830,11 @@ export default function LandingPage() {
 
           {/* Products Grid - Fixed 4 columns (smaller cards) */}
           {productsLoading ? (
-            <div style={{ textAlign: 'center', padding: '3rem', color: DESIGN.colors.text.muted }}>
+            <div style={{ textAlign: 'center', padding: '3rem', color: backgroundTextColorMuted }}>
               Loading products...
             </div>
           ) : filteredProductsForGrid.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '3rem', color: DESIGN.colors.text.muted }}>
+            <div style={{ textAlign: 'center', padding: '3rem', color: backgroundTextColorMuted }}>
               No products available.
             </div>
           ) : (
@@ -1824,7 +1851,7 @@ export default function LandingPage() {
 
       {/* ========== FOOTER ========== */}
       <footer id="footer" style={{
-        backgroundColor: DESIGN.colors.footer,
+        backgroundColor: navFooterColor,
         padding: '4rem 0 2rem',
       }}>
         <div style={{ maxWidth: DESIGN.spacing.container, margin: '0 auto', padding: '0 2rem' }}>
@@ -1839,7 +1866,7 @@ export default function LandingPage() {
               <h3 style={{
                 fontSize: '1.25rem',
                 fontWeight: 600,
-                color: DESIGN.colors.text.primary,
+                color: navFooterTextColor,
                 marginBottom: '1rem',
               }}>
                 {clinicInfo?.name || 'FUSE'}
@@ -1852,7 +1879,7 @@ export default function LandingPage() {
                 <h4 style={{
                   fontSize: '0.75rem',
                   fontWeight: 600,
-                  color: DESIGN.colors.text.primary,
+                  color: navFooterTextColor,
                   textTransform: 'uppercase',
                   letterSpacing: '0.05em',
                   marginBottom: '1rem',
@@ -1868,13 +1895,14 @@ export default function LandingPage() {
                           target={urlItem.url.startsWith('#') || urlItem.url.startsWith('/') ? '_self' : '_blank'}
                           rel="noopener noreferrer"
                           style={{
-                            color: DESIGN.colors.text.secondary,
+                            color: navFooterTextColor,
                             textDecoration: 'none',
                             fontSize: '0.875rem',
-                            transition: 'color 0.2s ease',
+                            opacity: 0.7,
+                            transition: 'opacity 0.2s ease',
                           }}
-                          onMouseEnter={(e) => e.currentTarget.style.color = DESIGN.colors.text.primary}
-                          onMouseLeave={(e) => e.currentTarget.style.color = DESIGN.colors.text.secondary}
+                          onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
+                          onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.7')}
                         >
                           {urlItem.label}
                         </a>
@@ -1889,13 +1917,14 @@ export default function LandingPage() {
           {/* Footer Disclaimer */}
           {websiteData?.footerDisclaimer && (
             <div style={{
-              borderTop: `1px solid ${DESIGN.colors.text.muted}20`,
+              borderTop: `1px solid ${navFooterTextColor}30`,
               paddingTop: '1.5rem',
               marginBottom: '1.5rem',
             }}>
               <p style={{
                 fontSize: '0.75rem',
-                color: DESIGN.colors.text.muted,
+                color: navFooterTextColor,
+                opacity: 0.6,
                 lineHeight: 1.6,
               }}>
                 {websiteData.footerDisclaimer}
@@ -1905,13 +1934,13 @@ export default function LandingPage() {
 
           {/* Copyright */}
           <div style={{
-            borderTop: `1px solid ${DESIGN.colors.text.muted}20`,
+            borderTop: `1px solid ${navFooterTextColor}30`,
             paddingTop: '1.5rem',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
           }}>
-            <p style={{ fontSize: '0.75rem', color: DESIGN.colors.text.muted }}>
+            <p style={{ fontSize: '0.75rem', color: navFooterTextColor, opacity: 0.6 }}>
               © {new Date().getFullYear()} {clinicInfo?.name || 'FUSE Health'}. All rights reserved.
             </p>
 
@@ -1919,35 +1948,35 @@ export default function LandingPage() {
             {websiteData?.socialMediaLinks && (
               <div style={{ display: 'flex', gap: '1rem' }}>
                 {websiteData.socialMediaLinks.instagram?.enabled && websiteData.socialMediaLinks.instagram?.url && (
-                  <a href={ensureProtocol(websiteData.socialMediaLinks.instagram.url)} target="_blank" rel="noopener noreferrer" style={{ color: DESIGN.colors.text.muted }}>
+                  <a href={ensureProtocol(websiteData.socialMediaLinks.instagram.url)} target="_blank" rel="noopener noreferrer" style={{ color: navFooterTextColor, opacity: 0.6 }}>
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
                     </svg>
                   </a>
                 )}
                 {websiteData.socialMediaLinks.facebook?.enabled && websiteData.socialMediaLinks.facebook?.url && (
-                  <a href={ensureProtocol(websiteData.socialMediaLinks.facebook.url)} target="_blank" rel="noopener noreferrer" style={{ color: DESIGN.colors.text.muted }}>
+                  <a href={ensureProtocol(websiteData.socialMediaLinks.facebook.url)} target="_blank" rel="noopener noreferrer" style={{ color: navFooterTextColor, opacity: 0.6 }}>
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
                     </svg>
                   </a>
                 )}
                 {websiteData.socialMediaLinks.twitter?.enabled && websiteData.socialMediaLinks.twitter?.url && (
-                  <a href={ensureProtocol(websiteData.socialMediaLinks.twitter.url)} target="_blank" rel="noopener noreferrer" style={{ color: DESIGN.colors.text.muted }}>
+                  <a href={ensureProtocol(websiteData.socialMediaLinks.twitter.url)} target="_blank" rel="noopener noreferrer" style={{ color: navFooterTextColor, opacity: 0.6 }}>
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
                     </svg>
                   </a>
                 )}
                 {websiteData.socialMediaLinks.tiktok?.enabled && websiteData.socialMediaLinks.tiktok?.url && (
-                  <a href={ensureProtocol(websiteData.socialMediaLinks.tiktok.url)} target="_blank" rel="noopener noreferrer" style={{ color: DESIGN.colors.text.muted }}>
+                  <a href={ensureProtocol(websiteData.socialMediaLinks.tiktok.url)} target="_blank" rel="noopener noreferrer" style={{ color: navFooterTextColor, opacity: 0.6 }}>
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/>
                     </svg>
                   </a>
                 )}
                 {websiteData.socialMediaLinks.youtube?.enabled && websiteData.socialMediaLinks.youtube?.url && (
-                  <a href={ensureProtocol(websiteData.socialMediaLinks.youtube.url)} target="_blank" rel="noopener noreferrer" style={{ color: DESIGN.colors.text.muted }}>
+                  <a href={ensureProtocol(websiteData.socialMediaLinks.youtube.url)} target="_blank" rel="noopener noreferrer" style={{ color: navFooterTextColor, opacity: 0.6 }}>
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
                     </svg>

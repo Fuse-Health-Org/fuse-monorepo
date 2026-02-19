@@ -178,6 +178,7 @@ export default function ClientManagement() {
     retriedProductSelectionForCurrentCycle: false,
     tutorialFinished: false,
     customMaxProducts: null as number | null,
+    customMerchantServiceFeePercent: null as number | null,
     planType: '',
   })
 
@@ -443,6 +444,7 @@ export default function ClientManagement() {
         retriedProductSelectionForCurrentCycle: subscription.retriedProductSelectionForCurrentCycle,
         tutorialFinished: subscription.tutorialFinished,
         customMaxProducts: subscription.customMaxProducts ?? null,
+        customMerchantServiceFeePercent: subscription.customMerchantServiceFeePercent ?? null,
         planType: subscription.planType || '',
       })
     } else {
@@ -451,6 +453,7 @@ export default function ClientManagement() {
         retriedProductSelectionForCurrentCycle: false,
         tutorialFinished: false,
         customMaxProducts: null,
+        customMerchantServiceFeePercent: null,
         planType: '',
       })
     }
@@ -1816,6 +1819,41 @@ export default function ClientManagement() {
                                   Plan ({selectedUser.brandSubscriptions[0].plan.name}) default: {selectedUser.brandSubscriptions[0].plan.maxProducts === -1 ? 'Unlimited' : selectedUser.brandSubscriptions[0].plan.maxProducts}
                                 </p>
                               )}
+                            </div>
+
+                            {/* Custom Merchant Service Fee Override */}
+                            <div>
+                              <label className="block text-sm font-medium text-foreground mb-2">
+                                Merchant Service Fee Override
+                              </label>
+                              <div className="flex items-center gap-3">
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  max="10"
+                                  step="0.1"
+                                  value={formData.customMerchantServiceFeePercent ?? ''}
+                                  onChange={(e) => setFormData({
+                                    ...formData,
+                                    customMerchantServiceFeePercent: e.target.value === '' ? null : parseFloat(e.target.value) || 0
+                                  })}
+                                  placeholder={`Tier default`}
+                                  className="max-w-xs"
+                                />
+                                <span className="text-sm text-muted-foreground">%</span>
+                                {formData.customMerchantServiceFeePercent !== null && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setFormData({ ...formData, customMerchantServiceFeePercent: null })}
+                                  >
+                                    Clear (use tier default)
+                                  </Button>
+                                )}
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Negotiated per-brand override for the merchant service fee. Leave empty to use this brand's tier default.
+                              </p>
                             </div>
 
                             {/* Retried Product Selection */}

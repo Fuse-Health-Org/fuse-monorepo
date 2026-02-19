@@ -81,6 +81,10 @@ interface IndividualProductProgram {
     existingProgramId?: string
 }
 
+interface ProductPricingDraft {
+    sellPrice: number
+}
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
 
 export default function ProgramEditor() {
@@ -112,6 +116,11 @@ export default function ProgramEditor() {
     const [calorieDeficitCalculatorPrice, setCalorieDeficitCalculatorPrice] = useState(0)
     const [hasEasyShopping, setHasEasyShopping] = useState(false)
     const [easyShoppingPrice, setEasyShoppingPrice] = useState(0)
+    const [defaultShippingCost, setDefaultShippingCost] = useState(9.99)
+    const [defaultFacilitationFee, setDefaultFacilitationFee] = useState(12)
+    const [platformRetainedPercent, setPlatformRetainedPercent] = useState(5)
+    const [includePlatformRetainedInCogs, setIncludePlatformRetainedInCogs] = useState(true)
+    const [productPricingDrafts, setProductPricingDrafts] = useState<Record<string, ProductPricingDraft>>({})
 
 
     // Step state for creation flow
@@ -191,15 +200,23 @@ export default function ProgramEditor() {
     const [configModalProductId, setConfigModalProductId] = useState<string | null>(null)
     const [configModalData, setConfigModalData] = useState<IndividualProductProgram | null>(null)
 
-    // Tab state - 4 tabs at top level
-    const [activeTab, setActiveTab] = useState<'details' | 'services' | 'form' | 'analytics'>('details')
+    // Tab state — Form and Analytics only (Details and Services managed in tenant portal)
+    const [activeTab, setActiveTab] = useState<'form' | 'analytics'>('form')
+
+    // When embedded in an iframe (embedded=1), strip all outer chrome.
+    // Must use useState+useEffect so server and client both start with false,
+    // avoiding a hydration mismatch. The value is updated immediately after mount.
+    const [isEmbedded, setIsEmbedded] = useState(false)
+    useEffect(() => {
+        setIsEmbedded(new URLSearchParams(window.location.search).get('embedded') === '1')
+    }, [])
 
     // Initialize active tab from URL query parameter
     useEffect(() => {
         if (!router.isReady) return
         const tabParam = router.query.tab as string
-        if (tabParam && ['details', 'services', 'form', 'analytics'].includes(tabParam)) {
-            setActiveTab(tabParam as 'details' | 'services' | 'form' | 'analytics')
+        if (tabParam && ['form', 'analytics'].includes(tabParam)) {
+            setActiveTab(tabParam as 'form' | 'analytics')
         }
     }, [router.isReady, router.query.tab])
 
@@ -210,6 +227,13 @@ export default function ProgramEditor() {
         
         // For create mode, no need to fetch - just disable loading
         if (isCreateMode) {
+            setLoading(false)
+            return
+        }
+
+        // Mock IDs (e.g. "mock-1") don't exist in the backend — skip the API
+        // call and render with defaults so the embedded form structure shows cleanly.
+        if (typeof id === 'string' && id.startsWith('mock-')) {
             setLoading(false)
             return
         }
@@ -743,6 +767,108 @@ export default function ProgramEditor() {
             currency: 'USD'
         }).format(price)
     }
+
+    const getUnifiedServiceTotal = () => {
+        return (
+            (hasPatientPortal ? patientPortalPrice : 0) +
+            (hasBmiCalculator ? bmiCalculatorPrice : 0) +
+            (hasProteinIntakeCalculator ? proteinIntakeCalculatorPrice : 0) +
+            (hasCalorieDeficitCalculator ? calorieDeficitCalculatorPrice : 0) +
+            (hasEasyShopping ? easyShoppingPrice : 0)
+        )
+    }
+
+    const getPerProductServiceTotal = (productId: string) => {
+        const config = individualProductPrograms[productId]
+        if (!config) return 0
+        return (
+            (config.hasPatientPortal ? config.patientPortalPrice : 0) +
+            (config.hasBmiCalculator ? config.bmiCalculatorPrice : 0) +
+            (config.hasProteinIntakeCalculator ? config.proteinIntakeCalculatorPrice : 0) +
+            (config.hasCalorieDeficitCalculator ? config.calorieDeficitCalculatorPrice : 0) +
+            (config.hasEasyShopping ? config.easyShoppingPrice : 0)
+        )
+    }
+
+    const getProductPricingPreview = (product: TemplateProduct) => {
+        const baseProductCost = product.pharmacyWholesaleCost || product.price || 0
+        const serviceTotal = programMode === 'per_product'
+            ? getPerProductServiceTotal(product.id)
+            : getUnifiedServiceTotal()
+        const subtotalCogs = baseProductCost + defaultShippingCost + defaultFacilitationFee + serviceTotal
+        const platformRetainedCost = includePlatformRetainedInCogs
+            ? subtotalCogs * (platformRetainedPercent / 100)
+            : 0
+        const allInCogs = subtotalCogs + platformRetainedCost
+        const sellPrice = productPricingDrafts[product.id]?.sellPrice ?? allInCogs
+        const net = sellPrice - allInCogs
+        const marginPercent = sellPrice > 0 ? (net / sellPrice) * 100 : 0
+
+        return {
+            baseProductCost,
+            serviceTotal,
+            shippingCost: defaultShippingCost,
+            facilitationFee: defaultFacilitationFee,
+            platformRetainedCost,
+            allInCogs,
+            sellPrice,
+            net,
+            marginPercent,
+        }
+    }
+
+    const updateProductSellPrice = (productId: string, value: string) => {
+        const parsed = parseFloat(value)
+        setProductPricingDrafts((prev) => ({
+            ...prev,
+            [productId]: {
+                sellPrice: Number.isFinite(parsed) ? parsed : 0
+            }
+        }))
+    }
+
+    useEffect(() => {
+        if (!selectedTemplateDetails?.formProducts?.length) return
+
+        setProductPricingDrafts((prev) => {
+            const next = { ...prev }
+            selectedTemplateDetails.formProducts
+                .filter((fp) => fp.product)
+                .forEach((fp) => {
+                    const product = fp.product as TemplateProduct
+                    if (!next[product.id]) {
+                        const baseProductCost = product.pharmacyWholesaleCost || product.price || 0
+                        const serviceTotal = programMode === 'per_product'
+                            ? getPerProductServiceTotal(product.id)
+                            : getUnifiedServiceTotal()
+                        const subtotalCogs = baseProductCost + defaultShippingCost + defaultFacilitationFee + serviceTotal
+                        const platformRetainedCost = includePlatformRetainedInCogs
+                            ? subtotalCogs * (platformRetainedPercent / 100)
+                            : 0
+                        next[product.id] = { sellPrice: subtotalCogs + platformRetainedCost }
+                    }
+                })
+            return next
+        })
+    }, [
+        selectedTemplateDetails,
+        programMode,
+        individualProductPrograms,
+        hasPatientPortal,
+        patientPortalPrice,
+        hasBmiCalculator,
+        bmiCalculatorPrice,
+        hasProteinIntakeCalculator,
+        proteinIntakeCalculatorPrice,
+        hasCalorieDeficitCalculator,
+        calorieDeficitCalculatorPrice,
+        hasEasyShopping,
+        easyShoppingPrice,
+        defaultShippingCost,
+        defaultFacilitationFee,
+        includePlatformRetainedInCogs,
+        platformRetainedPercent
+    ])
     
     // Open modal to configure individual product program
     const openProductConfigModal = (product: TemplateProduct) => {
@@ -811,6 +937,16 @@ export default function ProgramEditor() {
 
     // Show loading state while waiting for router or data
     if (!router.isReady || loading) {
+        if (isEmbedded) {
+            return (
+                <div className="flex items-center justify-center h-full min-h-[200px] py-16">
+                    <div className="text-center">
+                        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+                        <p className="text-sm text-muted-foreground">Loading...</p>
+                    </div>
+                </div>
+            )
+        }
         return (
             <Layout>
                 <div className="min-h-screen bg-background flex items-center justify-center">
@@ -823,67 +959,33 @@ export default function ProgramEditor() {
         )
     }
 
-    return (
-        <Layout>
-            <Head>
-                <title>{isCreateMode ? 'Create Program' : 'Edit Program'} - Fuse Admin</title>
-            </Head>
-            <div className="min-h-screen bg-background text-foreground p-8" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
+    const pageContent = (
+            <div className={`bg-background text-foreground ${isEmbedded ? 'p-6' : 'min-h-screen p-8'}`} style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
                 <div className="max-w-4xl mx-auto">
-                    {/* Back Button */}
-                    <button
+                    {/* Back Button — hidden when embedded in iframe */}
+                    {!isEmbedded && <button
                         onClick={() => router.push('/programs')}
                         className="mb-6 flex items-center gap-2 px-4 py-2 rounded-full border border-border bg-card hover:bg-muted text-sm font-medium transition-all shadow-sm"
                     >
                         <ArrowLeft className="h-4 w-4" />
                         Back to Programs
-                    </button>
+                    </button>}
 
-                    {/* Header */}
-                    <div className="mb-8">
-                        <h1 className="text-3xl font-semibold mb-2">
-                            {isCreateMode ? 'Create New Program' : 'Edit Program'}
-                        </h1>
-                        <p className="text-muted-foreground">
-                            {isCreateMode ? 'Set up a new program with Teleforms' : 'Update program details'}
-                        </p>
-                    </div>
+                    {/* Header — hidden in embedded/modal context since the unified modal header already shows the program name */}
+                    {!isEmbedded && (
+                        <div className="mb-8">
+                            <h1 className="text-3xl font-semibold mb-2">
+                                {isCreateMode ? 'Create New Program' : 'Edit Program'}
+                            </h1>
+                            <p className="text-muted-foreground">
+                                {isCreateMode ? 'Set up a new program with Teleforms' : 'Update program details'}
+                            </p>
+                        </div>
+                    )}
 
-                    {/* Tab Navigation - 4 tabs at top level (only show in edit mode) */}
-                    {!isCreateMode && (
+                    {/* Tab Navigation — Form and Analytics (hidden in embedded/modal context) */}
+                    {!isCreateMode && !isEmbedded && (
                         <div className="flex items-center gap-2 border-b border-gray-200 mb-6">
-                            <button
-                                onClick={() => {
-                                    setActiveTab('details')
-                                    router.push(`/programs/${id}`, undefined, { shallow: true })
-                                }}
-                                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                                    activeTab === 'details'
-                                        ? 'border-primary text-primary'
-                                        : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
-                                }`}
-                            >
-                                <div className="flex items-center gap-2">
-                                    <FileText className="h-4 w-4" />
-                                    Details
-                                </div>
-                            </button>
-                            <button
-                                onClick={() => {
-                                    setActiveTab('services')
-                                    router.push(`/programs/${id}?tab=services`, undefined, { shallow: true })
-                                }}
-                                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                                    activeTab === 'services'
-                                        ? 'border-primary text-primary'
-                                        : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
-                                }`}
-                            >
-                                <div className="flex items-center gap-2">
-                                    <Settings2 className="h-4 w-4" />
-                                    Services
-                                </div>
-                            </button>
                             <button
                                 onClick={() => {
                                     setActiveTab('form')
@@ -896,8 +998,8 @@ export default function ProgramEditor() {
                                 }`}
                             >
                                 <div className="flex items-center gap-2">
-                                    <ExternalLink className="h-4 w-4" />
-                                    Form
+                                    <FileText className="h-4 w-4" />
+                                    Form Structure
                                 </div>
                             </button>
                             {medicalTemplateId && (
@@ -922,14 +1024,14 @@ export default function ProgramEditor() {
                     )}
 
                     {/* Error Messages */}
-                    {error && (
+                    {error && !isEmbedded && (
                         <div className="mb-6 p-4 bg-destructive/10 border border-destructive/30 rounded-lg">
                             <p className="text-sm text-destructive">{error}</p>
                         </div>
                     )}
 
-                    {/* Details Tab Content */}
-                    {activeTab === 'details' && (
+                    {/* Details Tab Content — hidden (managed in tenant portal) */}
+                    {false && activeTab === 'details' && (
                         <>
                             {/* Step Indicator for Create Mode */}
                     {isCreateMode && (
@@ -966,8 +1068,8 @@ export default function ProgramEditor() {
                         </div>
                     )}
 
-                    {/* Step 3: Program Details (or Edit Mode) */}
-                    {(currentStep === 3 || (!isCreateMode && activeTab === 'details')) && (
+                    {/* Step 3: Program Details (or Edit Mode) — hidden in edit mode */}
+                    {(currentStep === 3 || false) && (
                         <div className="bg-card rounded-2xl shadow-sm border border-border p-6 mb-6">
                             <h3 className="text-lg font-semibold mb-4">Program Details</h3>
 
@@ -1204,6 +1306,57 @@ export default function ProgramEditor() {
                                 Choose your pricing mode and configure non-medical services for this program.
                             </p>
 
+                            <div className="bg-muted/40 border border-border rounded-lg p-4 mb-6">
+                                <div className="flex flex-col gap-2 mb-3">
+                                    <h4 className="text-sm font-semibold">All-In COGS Assumptions (editable)</h4>
+                                    <p className="text-xs text-muted-foreground">
+                                        Temporary calculator until fee infra is finalized. Values below apply to all products unless overridden later.
+                                    </p>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                                    <div>
+                                        <label className="text-xs text-muted-foreground mb-1 block">Shipping Cost</label>
+                                        <Input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            value={defaultShippingCost}
+                                            onChange={(e) => setDefaultShippingCost(parseFloat(e.target.value) || 0)}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs text-muted-foreground mb-1 block">Facilitation Fee</label>
+                                        <Input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            value={defaultFacilitationFee}
+                                            onChange={(e) => setDefaultFacilitationFee(parseFloat(e.target.value) || 0)}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs text-muted-foreground mb-1 block">Platform Retained %</label>
+                                        <Input
+                                            type="number"
+                                            min="0"
+                                            step="0.1"
+                                            value={platformRetainedPercent}
+                                            onChange={(e) => setPlatformRetainedPercent(parseFloat(e.target.value) || 0)}
+                                        />
+                                    </div>
+                                    <div className="flex items-end">
+                                        <label className="flex items-center gap-2 text-sm">
+                                            <input
+                                                type="checkbox"
+                                                checked={includePlatformRetainedInCogs}
+                                                onChange={(e) => setIncludePlatformRetainedInCogs(e.target.checked)}
+                                            />
+                                            Include retained fee in COGS
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+
                             {/* Show Products from Selected Template */}
                             {selectedTemplateDetails && selectedTemplateDetails.formProducts && selectedTemplateDetails.formProducts.length > 0 && (
                                 <div className="mb-6">
@@ -1332,12 +1485,34 @@ export default function ProgramEditor() {
                                                                 )}
                                                             </div>
 
-                                                            {/* Wholesale Cost */}
-                                                            <div className="text-right">
-                                                                <div className="text-xs text-muted-foreground uppercase mb-1">Wholesale Cost</div>
-                                                                <div className="text-xl font-bold">
-                                                                    ${product.price ? product.price.toFixed(2) : '0.00'}
-                                                                </div>
+                                                            {/* COGS + Sell Price Preview */}
+                                                            <div className="text-right min-w-[210px]">
+                                                                {(() => {
+                                                                    const pricing = getProductPricingPreview(product)
+                                                                    return (
+                                                                        <div className="space-y-1">
+                                                                            <div className="text-xs text-muted-foreground uppercase">All-In COGS</div>
+                                                                            <div className="text-xl font-bold">{formatPrice(pricing.allInCogs)}</div>
+                                                                            <div className="text-[11px] text-muted-foreground">
+                                                                                Product {formatPrice(pricing.baseProductCost)} + Shipping {formatPrice(pricing.shippingCost)} + Services {formatPrice(pricing.serviceTotal)} + Fees {formatPrice(pricing.facilitationFee + pricing.platformRetainedCost)}
+                                                                            </div>
+                                                                            <div className="flex items-center justify-end gap-2 pt-1">
+                                                                                <span className="text-xs text-muted-foreground">Sell Price</span>
+                                                                                <Input
+                                                                                    type="number"
+                                                                                    min="0"
+                                                                                    step="0.01"
+                                                                                    value={pricing.sellPrice}
+                                                                                    onChange={(e) => updateProductSellPrice(product.id, e.target.value)}
+                                                                                    className="w-24 h-8 text-right"
+                                                                                />
+                                                                            </div>
+                                                                            <div className={`text-xs font-medium ${pricing.net >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                                                                Net: {formatPrice(pricing.net)} ({pricing.marginPercent.toFixed(1)}%)
+                                                                            </div>
+                                                                        </div>
+                                                                    )
+                                                                })()}
                                                             </div>
 
                                                             {/* Configure button for per-product mode */}
@@ -1526,8 +1701,8 @@ export default function ProgramEditor() {
                         </div>
                     )}
 
-                    {/* Edit Mode: Show Teleform Selection */}
-                    {!isCreateMode && activeTab === 'details' && (
+                    {/* Edit Mode: Show Teleform Selection — hidden (managed in tenant portal) */}
+                    {false && !isCreateMode && activeTab === 'details' && (
                         <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
                             <h3 className="text-lg font-semibold mb-4">Teleform</h3>
 
@@ -1936,8 +2111,8 @@ export default function ProgramEditor() {
                         </>
                     )}
 
-                    {/* Edit Mode: Selected Template Products & Form Links */}
-                    {!isCreateMode && activeTab === 'services' && selectedTemplateDetails && selectedTemplateDetails.formProducts && selectedTemplateDetails.formProducts.length > 0 && (
+                    {/* Edit Mode: Selected Template Products & Form Links — hidden (managed in tenant portal) */}
+                    {false && !isCreateMode && activeTab === 'services' && selectedTemplateDetails && selectedTemplateDetails.formProducts && selectedTemplateDetails.formProducts.length > 0 && (
                         <div className="bg-card rounded-2xl shadow-sm border border-border p-6 mt-6">
                             <div className="flex items-center gap-2 mb-2">
                                 <Pill className="h-5 w-5 text-blue-500" />
@@ -2031,6 +2206,57 @@ export default function ProgramEditor() {
                                 )}
                             </div>
 
+                            <div className="bg-muted/40 border border-border rounded-lg p-4 mb-6">
+                                <div className="flex flex-col gap-2 mb-3">
+                                    <h4 className="text-sm font-semibold">All-In COGS Assumptions (editable)</h4>
+                                    <p className="text-xs text-muted-foreground">
+                                        Use this to preview true COGS and estimated net payout while setting sell prices.
+                                    </p>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                                    <div>
+                                        <label className="text-xs text-muted-foreground mb-1 block">Shipping Cost</label>
+                                        <Input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            value={defaultShippingCost}
+                                            onChange={(e) => setDefaultShippingCost(parseFloat(e.target.value) || 0)}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs text-muted-foreground mb-1 block">Facilitation Fee</label>
+                                        <Input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            value={defaultFacilitationFee}
+                                            onChange={(e) => setDefaultFacilitationFee(parseFloat(e.target.value) || 0)}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs text-muted-foreground mb-1 block">Platform Retained %</label>
+                                        <Input
+                                            type="number"
+                                            min="0"
+                                            step="0.1"
+                                            value={platformRetainedPercent}
+                                            onChange={(e) => setPlatformRetainedPercent(parseFloat(e.target.value) || 0)}
+                                        />
+                                    </div>
+                                    <div className="flex items-end">
+                                        <label className="flex items-center gap-2 text-sm">
+                                            <input
+                                                type="checkbox"
+                                                checked={includePlatformRetainedInCogs}
+                                                onChange={(e) => setIncludePlatformRetainedInCogs(e.target.checked)}
+                                            />
+                                            Include retained fee in COGS
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+
                             <div className="space-y-4">
                                 {selectedTemplateDetails.formProducts
                                     .filter(fp => fp.product)
@@ -2106,12 +2332,36 @@ export default function ProgramEditor() {
                                                                 </div>
                                                             )}
                                                         </div>
-                                                        <div className="text-right flex flex-col items-end gap-2">
-                                                            <div>
-                                                                <div className="text-xs text-muted-foreground uppercase tracking-wide">Wholesale Cost</div>
-                                                                <div className="text-lg font-semibold text-foreground">
-                                                                    {formatPrice(product.pharmacyWholesaleCost || product.price || 0)}
-                                                                </div>
+                                                        <div className="text-right flex flex-col items-end gap-2 min-w-[220px]">
+                                                            <div className="text-right">
+                                                                {(() => {
+                                                                    const pricing = getProductPricingPreview(product)
+                                                                    return (
+                                                                        <div>
+                                                                            <div className="text-xs text-muted-foreground uppercase tracking-wide">All-In COGS</div>
+                                                                            <div className="text-lg font-semibold text-foreground">
+                                                                                {formatPrice(pricing.allInCogs)}
+                                                                            </div>
+                                                                            <div className="text-[11px] text-muted-foreground">
+                                                                                Product {formatPrice(pricing.baseProductCost)} + Shipping {formatPrice(pricing.shippingCost)} + Services {formatPrice(pricing.serviceTotal)} + Fees {formatPrice(pricing.facilitationFee + pricing.platformRetainedCost)}
+                                                                            </div>
+                                                                            <div className="flex items-center justify-end gap-2 mt-2">
+                                                                                <span className="text-xs text-muted-foreground">Sell Price</span>
+                                                                                <Input
+                                                                                    type="number"
+                                                                                    min="0"
+                                                                                    step="0.01"
+                                                                                    value={pricing.sellPrice}
+                                                                                    onChange={(e) => updateProductSellPrice(product.id, e.target.value)}
+                                                                                    className="w-24 h-8 text-right"
+                                                                                />
+                                                                            </div>
+                                                                            <div className={`text-xs font-medium mt-1 ${pricing.net >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                                                                Net: {formatPrice(pricing.net)} ({pricing.marginPercent.toFixed(1)}%)
+                                                                            </div>
+                                                                        </div>
+                                                                    )
+                                                                })()}
                                                             </div>
                                                             {/* Activate button for deactivated products */}
                                                             {!isActivated && (
@@ -2317,8 +2567,8 @@ export default function ProgramEditor() {
                         </div>
                     )}
 
-                    {/* Edit Mode: Non-Medical Services (only shown in unified mode) */}
-                    {!isCreateMode && activeTab === 'services' && programMode === 'unified' && (
+                    {/* Edit Mode: Non-Medical Services — hidden (managed in tenant portal) */}
+                    {false && !isCreateMode && activeTab === 'services' && programMode === 'unified' && (
                         <div className="bg-card rounded-2xl shadow-sm border border-border p-6 mt-6">
                             <div className="flex items-center gap-2 mb-2">
                                 <Sparkles className="h-5 w-5 text-primary" />
@@ -2469,7 +2719,6 @@ export default function ProgramEditor() {
                         </div>
                     )}
                 </div>
-            </div>
 
             {/* Warning Dialog for Switching to Unified Mode */}
             {showUnifiedWarning && (
@@ -2754,6 +3003,17 @@ export default function ProgramEditor() {
                     </div>
                 </div>
             )}
+        </div>
+    )
+
+    return isEmbedded ? (
+        <>{pageContent}</>
+    ) : (
+        <Layout>
+            <Head>
+                <title>{isCreateMode ? 'Create Program' : 'Edit Program'} - Fuse Admin</title>
+            </Head>
+            {pageContent}
         </Layout>
     )
 }

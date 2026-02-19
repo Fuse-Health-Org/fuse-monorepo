@@ -1,16 +1,91 @@
 import { useState, useEffect, useRef } from "react"
+import { createPortal } from "react-dom"
+import ReactCrop, { type Crop as RCCrop, type PixelCrop, makeAspectCrop, centerCrop } from "react-image-crop"
 import { useRouter } from "next/router"
 import { useAuth } from "@/contexts/AuthContext"
 import Layout from "@/components/Layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Monitor, Smartphone, Upload, Link as LinkIcon, Globe, Crown, ExternalLink, Trash2, Plus, ChevronDown, GripVertical, Pencil, Check, X, RotateCcw } from "lucide-react"
+import { Monitor, Smartphone, Upload, Link as LinkIcon, Globe, Crown, ExternalLink, Trash2, Plus, ChevronDown, GripVertical, Pencil, Check, X, RotateCcw, Copy, AlertCircle, CheckCircle2, Loader2, Type, ImageIcon } from "lucide-react"
 import { Switch } from "@/components/ui/switch"
 import { ToastManager } from "@/components/ui/toast"
 import { useToast } from "@/hooks/use-toast"
 
+// Aspect ratio presets for logo crop
+const LOGO_ASPECT_PRESETS = [
+  { label: "Square", ratio: 1,    outputW: 400, outputH: 400,  description: "App icon / avatar" },
+  { label: "Standard", ratio: 3,  outputW: 600, outputH: 200,  description: "Horizontal wordmark" },
+  { label: "Wide", ratio: 5,      outputW: 800, outputH: 160,  description: "Wide banner logo" },
+  { label: "Landscape", ratio: 16/9, outputW: 640, outputH: 360, description: "16:9 image" },
+] as const
+
+type LogoAspectPreset = typeof LOGO_ASPECT_PRESETS[number]
+
+/**
+ * Crops a logo by loading a fresh Image (avoiding browser CORS-cache poisoning
+ * that taints the canvas when the same URL was previously loaded without crossOrigin).
+ *
+ * - data: URLs (new file uploads) are read as-is — no CORS needed.
+ * - Remote URLs (existing S3 logos) get a cache-busting param + crossOrigin="anonymous".
+ *
+ * displayW/H = rendered dimensions of the img element in the crop dialog,
+ * used to convert react-image-crop's display-pixel coordinates to natural image pixels.
+ */
+async function cropLogoToBlob(
+  src: string,
+  displayCrop: PixelCrop,
+  outputW: number,
+  outputH: number,
+  displayW: number,
+  displayH: number,
+): Promise<Blob> {
+  const isDataUrl = src.startsWith("data:")
+  const loadSrc = isDataUrl
+    ? src
+    : `${src}${src.includes("?") ? "&" : "?"}_t=${Date.now()}`
+
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image()
+    if (!isDataUrl) image.crossOrigin = "anonymous"
+    image.onload = () => resolve(image)
+    image.onerror = reject
+    image.src = loadSrc
+  })
+
+  const scaleX = img.naturalWidth / displayW
+  const scaleY = img.naturalHeight / displayH
+  const canvas = document.createElement("canvas")
+  canvas.width = outputW
+  canvas.height = outputH
+  const ctx = canvas.getContext("2d")!
+  ctx.drawImage(
+    img,
+    displayCrop.x * scaleX,
+    displayCrop.y * scaleY,
+    displayCrop.width * scaleX,
+    displayCrop.height * scaleY,
+    0, 0, outputW, outputH,
+  )
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => { if (!blob) { reject(new Error("Canvas produced empty blob")); return }; resolve(blob) },
+      "image/png", 1.0,
+    )
+  })
+}
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
+
+// Build a properly-centered crop rectangle for a given aspect ratio and image dimensions.
+// react-image-crop requires explicit coordinates — changing the `aspect` prop alone is not enough.
+function makeCenteredAspectCrop(ratio: number, imgW: number, imgH: number): RCCrop {
+  return centerCrop(
+    makeAspectCrop({ unit: "%", width: 90 }, ratio, imgW, imgH),
+    imgW,
+    imgH,
+  )
+}
 
 // Plan types that have access to Portal customization
 const PORTAL_ALLOWED_PLAN_TYPES = ['standard', 'professional', 'enterprise']
@@ -25,6 +100,17 @@ const FONT_OPTIONS = [
   { value: "Lora", label: "Lora", description: "Balanced serif with calligraphic roots" },
   { value: "Open Sans", label: "Open Sans", description: "Humanist sans-serif, excellent legibility" },
 ]
+
+// Google Fonts families that need to be loaded (Georgia is a system font, skip it)
+const GOOGLE_FONT_FAMILIES: Record<string, string> = {
+  "Playfair Display": "Playfair+Display:wght@400;600;700",
+  "Inter": "Inter:wght@400;500;600;700",
+  "Poppins": "Poppins:wght@400;500;600;700",
+  "Merriweather": "Merriweather:wght@400;700",
+  "Roboto": "Roboto:wght@400;500;700",
+  "Lora": "Lora:wght@400;600;700",
+  "Open Sans": "Open+Sans:wght@400;500;600;700",
+}
 
 interface FooterCategoryUrl {
   label: string
@@ -48,8 +134,12 @@ interface PortalSettings {
   portalTitle: string
   portalDescription: string
   primaryColor: string
+  backgroundColor: string
+  navFooterColor: string
   defaultFormColor?: string
   fontFamily: string
+  navDisplayMode: "brandName" | "logo"
+  navBrandName: string
   logo: string
   heroImageUrl: string
   heroTitle: string
@@ -67,6 +157,15 @@ interface PortalSettings {
     tiktok?: { enabled: boolean; url: string }
     youtube?: { enabled: boolean; url: string }
   }
+}
+
+/** Returns black or white depending on which contrasts better against the given hex background. */
+function getContrastColor(hex: string): string {
+  if (!hex || !hex.startsWith("#") || hex.length < 7) return "#ffffff"
+  const r = parseInt(hex.slice(1, 3), 16)
+  const g = parseInt(hex.slice(3, 5), 16)
+  const b = parseInt(hex.slice(5, 7), 16)
+  return (r * 299 + g * 587 + b * 114) / 1000 >= 128 ? "#000000" : "#ffffff"
 }
 
 export default function PortalPage() {
@@ -90,20 +189,35 @@ export default function PortalPage() {
   const [heroInputMode, setHeroInputMode] = useState<"file" | "url">("url")
   const logoFileInputRef = useRef<HTMLInputElement | null>(null)
   const heroFileInputRef = useRef<HTMLInputElement | null>(null)
+
+  // Logo crop dialog state (unified — react-image-crop for all modes)
+  const [logoCropOpen, setLogoCropOpen] = useState(false)
+  const [logoCropSrc, setLogoCropSrc] = useState("")
+  // Original file data URL kept in memory so "Edit Image" always re-opens the full source, not the cropped S3 version
+  const [logoOriginalSrc, setLogoOriginalSrc] = useState<string | null>(null)
+  const [logoCropApplying, setLogoCropApplying] = useState(false)
+  const [logoCropPreset, setLogoCropPreset] = useState<LogoAspectPreset>(LOGO_ASPECT_PRESETS[1])
+  const [logoCropIsCustom, setLogoCropIsCustom] = useState(true)
+  const [logoCrop, setLogoCrop] = useState<RCCrop>({ unit: "%", x: 5, y: 5, width: 90, height: 90 })
+  const [logoCropPixels, setLogoCropPixels] = useState<PixelCrop | null>(null)
+  const logoCropImgRef = useRef<HTMLImageElement | null>(null)
   
   // Primary color gradient state
-  const [primaryColorMode, setPrimaryColorMode] = useState<"solid" | "gradient">("solid")
-  const [primaryGradientStops, setPrimaryGradientStops] = useState<Array<{ color: string; position: number }>>([
+  const DEFAULT_GRADIENT_STOPS = [
     { color: "#FF751F", position: 0 },
     { color: "#B11FFF", position: 100 },
-  ])
+  ]
+
+  const [primaryColorMode, setPrimaryColorMode] = useState<"solid" | "gradient">("solid")
+  const [primaryGradientStops, setPrimaryGradientStops] = useState<Array<{ color: string; position: number }>>(
+    DEFAULT_GRADIENT_STOPS.map((s) => ({ ...s }))
+  )
   
   // Form color gradient state
   const [formColorMode, setFormColorMode] = useState<"solid" | "gradient">("solid")
-  const [formGradientStops, setFormGradientStops] = useState<Array<{ color: string; position: number }>>([
-    { color: "#FF751F", position: 0 },
-    { color: "#B11FFF", position: 100 },
-  ])
+  const [formGradientStops, setFormGradientStops] = useState<Array<{ color: string; position: number }>>(
+    DEFAULT_GRADIENT_STOPS.map((s) => ({ ...s }))
+  )
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -114,8 +228,12 @@ export default function PortalPage() {
     portalTitle: "Welcome to Our Portal",
     portalDescription: "Your trusted healthcare partner. Browse our products and services below.",
     primaryColor: "#000000",
+    backgroundColor: "#FFFFFF",
+    navFooterColor: "#000000",
     defaultFormColor: "",
     fontFamily: "Playfair Display",
+    navDisplayMode: "brandName",
+    navBrandName: "",
     logo: "",
     heroImageUrl: "https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=1920&q=80",
     heroTitle: "Your Daily Health, Simplified",
@@ -136,6 +254,7 @@ export default function PortalPage() {
   })
   const [isTogglingActive, setIsTogglingActive] = useState(false)
   const [clinicSlug, setClinicSlug] = useState<string | null>(null)
+  const [clinicName, setClinicName] = useState<string | null>(null)
   const [customDomain, setCustomDomain] = useState<string | null>(null)
   const [isCustomDomain, setIsCustomDomain] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState("")
@@ -149,6 +268,13 @@ export default function PortalPage() {
   const [editingUrlLabel, setEditingUrlLabel] = useState("")
   const [editingUrlValue, setEditingUrlValue] = useState("")
   const [defaultDisclaimer, setDefaultDisclaimer] = useState<string>("")
+
+  // Vanity domain state
+  const [vanityDomainInput, setVanityDomainInput] = useState("")
+  const [isActivatingDomain, setIsActivatingDomain] = useState(false)
+  const [domainError, setDomainError] = useState<string | null>(null)
+  const [isRemovingDomain, setIsRemovingDomain] = useState(false)
+  const [copiedCname, setCopiedCname] = useState(false)
 
   // Check if user has access to Portal based on tier config, custom features, or plan type
   const hasPortalAccess =
@@ -216,6 +342,21 @@ export default function PortalPage() {
     }
   }, [settings.defaultFormColor])
 
+  // Load Google Font into the admin page whenever the selected font changes
+  useEffect(() => {
+    const family = GOOGLE_FONT_FAMILIES[settings.fontFamily]
+    if (!family) return // system font (e.g. Georgia), no need to fetch
+    const id = "portal-preview-google-font"
+    let link = document.getElementById(id) as HTMLLinkElement | null
+    if (!link) {
+      link = document.createElement("link")
+      link.id = id
+      link.rel = "stylesheet"
+      document.head.appendChild(link)
+    }
+    link.href = `https://fonts.googleapis.com/css2?family=${family}&display=swap`
+  }, [settings.fontFamily])
+
   useEffect(() => {
     if (hasPortalAccess) {
       loadSettings()
@@ -239,6 +380,8 @@ export default function PortalPage() {
               if (data.data.defaultFormColor) {
                 setSettings(prev => ({ ...prev, defaultFormColor: data.data.defaultFormColor }))
               }
+              // Capture clinic name for the nav preview
+              if (data.data.name) setClinicName(data.data.name)
             }
           }
         } catch (error) {
@@ -287,8 +430,12 @@ export default function PortalPage() {
             portalTitle: data.data.portalTitle || settings.portalTitle,
             portalDescription: data.data.portalDescription || settings.portalDescription,
             primaryColor: data.data.primaryColor || settings.primaryColor,
+            backgroundColor: data.data.backgroundColor || settings.backgroundColor || "#FFFFFF",
+            navFooterColor: data.data.navFooterColor || data.data.footerColor || settings.navFooterColor || "#000000",
             defaultFormColor: data.data.defaultFormColor || settings.defaultFormColor || "",
             fontFamily: data.data.fontFamily || settings.fontFamily,
+            navDisplayMode: (data.data.navDisplayMode as "brandName" | "logo") || "brandName",
+            navBrandName: data.data.navBrandName || "",
             logo: data.data.logo || settings.logo,
             heroImageUrl: data.data.heroImageUrl || settings.heroImageUrl,
             heroTitle: data.data.heroTitle || settings.heroTitle,
@@ -380,7 +527,7 @@ export default function PortalPage() {
 
       // Also save defaultFormColor to clinic/organization settings
       if (settings.defaultFormColor) {
-        await authenticatedFetch(`${API_URL}/organization`, {
+        await authenticatedFetch(`${API_URL}/organization/update`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ defaultFormColor: settings.defaultFormColor }),
@@ -405,6 +552,67 @@ export default function PortalPage() {
     } finally {
       setIsSaving(false)
     }
+  }
+
+  const handleActivateDomain = async () => {
+    const domain = vanityDomainInput.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/$/, "")
+    if (!domain) return
+    setDomainError(null)
+    setIsActivatingDomain(true)
+    try {
+      const response = await authenticatedFetch(`${API_URL}/organization`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ customDomain: domain, isCustomDomain: true }),
+      })
+      const data = await response.json()
+      if (response.ok && data.success) {
+        setCustomDomain(domain)
+        setIsCustomDomain(true)
+        setVanityDomainInput("")
+        success("Vanity domain activated successfully!", "Domain Activated")
+      } else {
+        setDomainError(data.message || "Failed to activate domain. Please try again.")
+      }
+    } catch (err) {
+      setDomainError("An error occurred. Please try again.")
+    } finally {
+      setIsActivatingDomain(false)
+    }
+  }
+
+  const handleRemoveDomain = async () => {
+    if (!confirm("Are you sure you want to remove your custom domain? Your portal will revert to the default Fuse Health URL.")) return
+    setIsRemovingDomain(true)
+    try {
+      const response = await authenticatedFetch(`${API_URL}/organization`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isCustomDomain: false }),
+      })
+      const data = await response.json()
+      if (response.ok && data.success) {
+        const prev = customDomain || ""
+        setCustomDomain(null)
+        setIsCustomDomain(false)
+        setVanityDomainInput(prev)
+        setDomainError(null)
+        success("Custom domain removed.", "Domain Removed")
+      } else {
+        error(data.message || "Failed to remove domain.", "Error")
+      }
+    } catch (err) {
+      error("An error occurred. Please try again.", "Error")
+    } finally {
+      setIsRemovingDomain(false)
+    }
+  }
+
+  const handleCopyCname = () => {
+    if (!clinicSlug) return
+    navigator.clipboard.writeText(`${clinicSlug}.fuse.health`)
+    setCopiedCname(true)
+    setTimeout(() => setCopiedCname(false), 2000)
   }
 
   const handleResetFooter = async () => {
@@ -658,34 +866,122 @@ export default function PortalPage() {
     setDraggedCategoryIndex(null)
   }
 
-  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoEditExisting = async () => {
+    if (!settings.logo) return
+
+    // If we still have the original data URL in memory (uploaded this session), use it directly.
+    // Otherwise fetch through our backend proxy so the browser never touches the S3 URL
+    // with crossOrigin — which would fail if the bucket doesn't have CORS headers set up.
+    let src = logoOriginalSrc
+    if (!src) {
+      try {
+        const resp = await authenticatedFetch(`${API_URL}/custom-website/logo-proxy`)
+        if (resp.ok) {
+          const blob = await resp.blob()
+          src = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader()
+            reader.onload = (e) => resolve(e.target?.result as string)
+            reader.onerror = reject
+            reader.readAsDataURL(blob)
+          })
+        }
+      } catch (e) {
+        console.error("Failed to load logo via proxy:", e)
+      }
+    }
+
+    // Last-resort: use the S3 URL directly (works if CORS is configured on the bucket)
+    if (!src) src = settings.logo
+
+    setLogoCropSrc(src)
+    setLogoCropIsCustom(true)
+    setLogoCrop({ unit: "%", x: 5, y: 5, width: 90, height: 90 })
+    setLogoCropPixels(null)
+    setLogoCropOpen(true)
+  }
+
+  const handleLogoFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+    const reader = new FileReader()
+    reader.addEventListener("load", () => {
+      const dataUrl = reader.result as string
+      setLogoOriginalSrc(dataUrl)   // remember the original so Edit Image can re-open it
+      setLogoCropSrc(dataUrl)
+      setLogoCropIsCustom(true)
+      setLogoCrop({ unit: "%", x: 5, y: 5, width: 90, height: 90 })
+      setLogoCropPixels(null)
+      setLogoCropOpen(true)
+    })
+    reader.readAsDataURL(file)
+    e.target.value = ""
+  }
 
-    setIsUploadingLogo(true)
+  const handleLogoCropApply = async () => {
+    if (!logoCropPixels || !logoCropImgRef.current) return
+    setLogoCropApplying(true)
+    const displayW = logoCropImgRef.current.width
+    const displayH = logoCropImgRef.current.height
+    const naturalW = logoCropImgRef.current.naturalWidth
+    const naturalH = logoCropImgRef.current.naturalHeight
     try {
+      let outputW: number, outputH: number
+      if (logoCropIsCustom) {
+        // Scale selection to natural image pixels, guarantee ≥800px on the longer side
+        const scaleX = naturalW / displayW
+        const scaleY = naturalH / displayH
+        const nw = logoCropPixels.width * scaleX
+        const nh = logoCropPixels.height * scaleY
+        const MIN = 800
+        if (nw >= nh) {
+          outputW = Math.max(MIN, Math.round(nw))
+          outputH = Math.round(outputW * nh / nw)
+        } else {
+          outputH = Math.max(MIN, Math.round(nh))
+          outputW = Math.round(outputH * nw / nh)
+        }
+      } else {
+        outputW = logoCropPreset.outputW
+        outputH = logoCropPreset.outputH
+      }
+      const blob = await cropLogoToBlob(logoCropSrc, logoCropPixels, outputW, outputH, displayW, displayH)
       const formData = new FormData()
-      formData.append('logo', file)
-
+      formData.append("logo", blob, `logo-${logoCropIsCustom ? "custom" : logoCropPreset.label.toLowerCase()}.png`)
+      setIsUploadingLogo(true)
       const response = await authenticatedFetch(`${API_URL}/custom-website/upload-logo`, {
-        method: 'POST',
+        method: "POST",
         body: formData,
       })
-
       if (response.ok) {
         const data = await response.json()
         if (data.success && data.data.logoUrl) {
-          setSettings({ ...settings, logo: data.data.logoUrl })
+          setSettings((prev) => ({ ...prev, logo: data.data.logoUrl }))
         }
+        setLogoCropApplying(false)
+        setIsUploadingLogo(false)
+        setLogoCropOpen(false)
+        setLogoCropSrc("")
       } else {
-        alert('Failed to upload logo')
+        error("Failed to upload logo")
+        setLogoCropApplying(false)
+        setIsUploadingLogo(false)
       }
-    } catch (error) {
-      console.error('Error uploading logo:', error)
-      alert('Error uploading logo')
-    } finally {
+    } catch (err) {
+      console.error("Logo crop/upload error:", err)
+      // If canvas is tainted (remote image without CORS), prompt the user to upload the file directly
+      if (err instanceof Error && (err.message.includes("tainted") || err.message.includes("cross-origin") || err.message.includes("SecurityError"))) {
+        error("Could not re-crop the existing image. Please use 'Use new image' to upload your logo file directly.")
+      } else {
+        error("Something went wrong. Please try again or upload a new file.")
+      }
+      setLogoCropApplying(false)
       setIsUploadingLogo(false)
     }
+  }
+
+  const handleLogoCloseDialog = () => {
+    setLogoCropOpen(false)
+    setLogoCropSrc("")
   }
 
   const handleHeroImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -752,543 +1048,524 @@ export default function PortalPage() {
 
   return (
     <Layout>
-      <div className="p-6">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold">Portal Customization</h1>
-          <p className="text-muted-foreground">Customize your patient-facing landing page</p>
+      {/* Sticky save bar */}
+      <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm border-b px-6 py-3 flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-lg font-bold leading-tight">Portal Customization</h1>
+          <p className="text-xs text-muted-foreground">Customize your patient-facing landing page</p>
         </div>
+        <Button onClick={handleSave} disabled={isSaving} className="shrink-0">
+          {isSaving ? "Saving..." : "Save Changes"}
+        </Button>
+      </div>
 
-        {/* Custom Website Activation Toggle */}
-        <Card className={`mb-6 ${settings.isActive ? 'border-green-200 dark:border-green-800 bg-green-50/30 dark:bg-green-900/20' : 'border-border'}`}>
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className={`p-3 rounded-full ${settings.isActive ? 'bg-green-100 dark:bg-green-900/40' : 'bg-muted'}`}>
-                  <Globe className={`h-6 w-6 ${settings.isActive ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`} />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-foreground">Custom Website</h3>
-                  <p className="text-sm text-muted-foreground">
-                    {settings.isActive
-                      ? "Your custom landing page is live and visible to visitors"
-                      : "Enable to show your custom landing page to visitors"}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className={`text-sm font-medium ${settings.isActive ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}>
-                  {settings.isActive ? "Activated" : "Deactivated"}
-                </span>
-                <Switch
-                  checked={settings.isActive}
-                  onCheckedChange={handleToggleActive}
-                  disabled={isTogglingActive}
-                  className="data-[state=checked]:bg-green-600"
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="p-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
           {/* Settings Panel */}
-          <div className="space-y-4">
-            {/* Portal Title */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base font-semibold tracking-tight">Portal Title</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Input
-                  value={settings.portalTitle}
-                  onChange={(e) => setSettings({ ...settings, portalTitle: e.target.value })}
-                  placeholder="Enter portal title"
-                />
-              </CardContent>
-            </Card>
+          <div className="space-y-6">
 
-            {/* Portal Description */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base font-semibold tracking-tight">Portal Description</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <textarea
-                  className="w-full p-3 border border-input bg-background text-foreground rounded-md text-sm min-h-[80px] resize-none focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                  value={settings.portalDescription}
-                  onChange={(e) => setSettings({ ...settings, portalDescription: e.target.value })}
-                  placeholder="Enter portal description"
-                />
-              </CardContent>
-            </Card>
+            {/* ── Section: Brand Identity ───────────────────── */}
+            <div className="flex items-center gap-3">
+              <h2 className="text-sm font-semibold text-foreground whitespace-nowrap">Brand Identity</h2>
+              <div className="flex-1 h-px bg-border" />
+            </div>
 
-            {/* Primary Color */}
+            {/* Logo Section */}
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-base font-semibold tracking-tight">Primary Color</CardTitle>
-                <CardDescription>Set the primary brand color for headers and CTAs</CardDescription>
+                <CardTitle className="text-base font-semibold tracking-tight">Logo Section</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Color Mode Toggle */}
-                <div className="flex items-center gap-2 p-1 bg-muted/50 rounded-lg w-fit">
+
+                {/* Hidden file input — always present so logo uploads still work for intake forms */}
+                <input
+                  ref={logoFileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+                  onChange={handleLogoFileSelect}
+                  className="hidden"
+                />
+
+                {/* Option cards — mutually exclusive committed choice */}
+                <div className="grid grid-cols-2 gap-3">
                   <button
                     type="button"
-                    onClick={() => setPrimaryColorMode("solid")}
-                    className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                      primaryColorMode === "solid"
-                        ? "bg-background shadow-sm"
-                        : "text-muted-foreground hover:text-foreground"
+                    onClick={() => setSettings({ ...settings, navDisplayMode: "brandName" })}
+                    className={`relative flex flex-col items-center justify-center gap-2 rounded-xl border-2 py-5 px-3 text-center transition-all ${
+                      settings.navDisplayMode === "brandName"
+                        ? "border-foreground bg-foreground/5"
+                        : "border-border bg-background hover:border-muted-foreground/40 hover:bg-muted/30"
                     }`}
                   >
-                    Solid Color
+                    {settings.navDisplayMode === "brandName" && (
+                      <span className="absolute top-2 right-2 flex h-4 w-4 items-center justify-center rounded-full bg-foreground">
+                        <Check className="h-2.5 w-2.5 text-background" />
+                      </span>
+                    )}
+                    <Type className={`w-5 h-5 ${settings.navDisplayMode === "brandName" ? "text-foreground" : "text-muted-foreground"}`} />
+                    <span className={`text-xs font-semibold ${settings.navDisplayMode === "brandName" ? "text-foreground" : "text-muted-foreground"}`}>
+                      Brand Name
+                    </span>
                   </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSettings({ ...settings, navDisplayMode: "logo" })}
+                    className={`relative flex flex-col items-center justify-center gap-2 rounded-xl border-2 py-5 px-3 text-center transition-all ${
+                      settings.navDisplayMode === "logo"
+                        ? "border-foreground bg-foreground/5"
+                        : "border-border bg-background hover:border-muted-foreground/40 hover:bg-muted/30"
+                    }`}
+                  >
+                    {settings.navDisplayMode === "logo" && (
+                      <span className="absolute top-2 right-2 flex h-4 w-4 items-center justify-center rounded-full bg-foreground">
+                        <Check className="h-2.5 w-2.5 text-background" />
+                      </span>
+                    )}
+                    <ImageIcon className={`w-5 h-5 ${settings.navDisplayMode === "logo" ? "text-foreground" : "text-muted-foreground"}`} />
+                    <span className={`text-xs font-semibold ${settings.navDisplayMode === "logo" ? "text-foreground" : "text-muted-foreground"}`}>
+                      Logo
+                    </span>
+                  </button>
+                </div>
+
+                {/* Brand Name mode */}
+                {settings.navDisplayMode === "brandName" && (
+                  <div className="space-y-2">
+                    <Input
+                      value={settings.navBrandName}
+                      onChange={(e) => setSettings({ ...settings, navBrandName: e.target.value })}
+                      placeholder="Your brand here"
+                    />
+                    <p className="text-[11px] text-muted-foreground">
+                      Leave blank to display your registered business name. Does not affect intake forms.
+                    </p>
+                  </div>
+                )}
+
+                {/* Logo mode */}
+                {settings.navDisplayMode === "logo" && (
+                  <div className="space-y-3">
+                    {/* Logo preview with hover-edit overlay */}
+                    {settings.logo ? (
+                      <div className="group relative rounded-lg bg-muted/30 border border-border flex items-center justify-center min-h-[80px] overflow-hidden">
+                        <img
+                          src={settings.logo}
+                          alt="Logo preview"
+                          className="max-h-16 max-w-full object-contain px-4 py-3"
+                        />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                          <button
+                            type="button"
+                            onClick={handleLogoEditExisting}
+                            className="flex items-center gap-1.5 bg-white/90 hover:bg-white text-neutral-800 text-xs font-semibold px-3 py-1.5 rounded-full transition-colors"
+                          >
+                            <Pencil className="w-3 h-3" />
+                            Edit image
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setSettings({ ...settings, logo: "" }); setLogoOriginalSrc(null) }}
+                            className="flex items-center gap-1 bg-white/20 hover:bg-red-500 text-white text-xs font-semibold px-2.5 py-1.5 rounded-full transition-colors"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => { setLogoInputMode("file"); logoFileInputRef.current?.click() }}
+                        className="w-full rounded-lg border-2 border-dashed border-border hover:border-primary/50 bg-muted/20 hover:bg-primary/5 transition-all flex flex-col items-center justify-center gap-2 py-8 text-muted-foreground hover:text-primary"
+                      >
+                        <Upload className="w-5 h-5" />
+                        <span className="text-xs font-medium">Click to upload your logo</span>
+                      </button>
+                    )}
+
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => settings.logo ? handleLogoEditExisting() : logoFileInputRef.current?.click()}
+                        disabled={isUploadingLogo}
+                      >
+                        <Upload className="w-4 h-4 mr-2" />
+                        {isUploadingLogo ? "Uploading…" : settings.logo ? "Edit logo" : "Upload a file"}
+                      </Button>
+                      <Button
+                        variant={logoInputMode === "url" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setLogoInputMode("url")}
+                      >
+                        <LinkIcon className="w-4 h-4 mr-2" />
+                        Enter URL
+                      </Button>
+                    </div>
+
+                    {logoInputMode === "url" && (
+                      <Input
+                        value={settings.logo}
+                        onChange={(e) => setSettings({ ...settings, logo: e.target.value })}
+                        placeholder="https://example.com/logo.png"
+                      />
+                    )}
+
+                    <p className="text-[11px] text-muted-foreground">
+                      PNG, JPG, WebP or SVG. Also appears in intake forms.
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Colors — 2×2 grid: Nav/Footer | Background (top) · Brand | Form (bottom) */}
+            <div className="grid grid-cols-2 gap-4">
+
+              {/* Nav & Footer Color */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base font-semibold tracking-tight">Nav &amp; Footer</CardTitle>
+                  <CardDescription>Navigation bar &amp; footer background</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="space-y-2">
+                    <div className="relative w-full h-12 rounded-lg border border-input overflow-hidden cursor-pointer"
+                      style={{ backgroundColor: settings.navFooterColor || "#000000" }}>
+                      <input
+                        type="color"
+                        value={settings.navFooterColor || "#000000"}
+                        onChange={(e) => setSettings({ ...settings, navFooterColor: e.target.value })}
+                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                      />
+                    </div>
+                    <Input
+                      value={settings.navFooterColor || ""}
+                      onChange={(e) => { const v = e.target.value; if (v === "" || /^#[0-9A-Fa-f]{0,6}$/.test(v)) setSettings({ ...settings, navFooterColor: v }) }}
+                      placeholder="#000000"
+                      className="font-mono text-sm"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Background Color */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base font-semibold tracking-tight">Background Color</CardTitle>
+                  <CardDescription>Page &amp; section background</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="space-y-2">
+                    <div className="relative w-full h-12 rounded-lg border border-input overflow-hidden cursor-pointer"
+                      style={{ backgroundColor: settings.backgroundColor || "#FFFFFF" }}>
+                      <input
+                        type="color"
+                        value={settings.backgroundColor || "#FFFFFF"}
+                        onChange={(e) => setSettings({ ...settings, backgroundColor: e.target.value })}
+                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                      />
+                    </div>
+                    <Input
+                      value={settings.backgroundColor || ""}
+                      onChange={(e) => { const v = e.target.value; if (v === "" || /^#[0-9A-Fa-f]{0,6}$/.test(v)) setSettings({ ...settings, backgroundColor: v }) }}
+                      placeholder="#FFFFFF"
+                      className="font-mono text-sm"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Button Color */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base font-semibold tracking-tight">Button Color</CardTitle>
+                  <CardDescription>Buttons, headers &amp; CTAs</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {/* Solid / Gradient segmented control */}
+                  <div className="flex p-0.5 bg-muted rounded-lg">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPrimaryColorMode("solid")
+                        setPrimaryGradientStops(DEFAULT_GRADIENT_STOPS.map((s) => ({ ...s })))
+                        setSettings({ ...settings, primaryColor: primaryGradientStops[0]?.color || "#000000" })
+                      }}
+                      className={`flex-1 py-1 text-xs font-medium rounded-md transition-colors ${
+                        primaryColorMode === "solid"
+                          ? "bg-background text-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      Solid
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPrimaryColorMode("gradient")
+                        if (!settings.primaryColor?.includes("linear-gradient")) {
+                          const defaultGradient = `linear-gradient(90deg, ${primaryGradientStops.map((s) => `${s.color} ${s.position}%`).join(", ")})`
+                          setSettings({ ...settings, primaryColor: defaultGradient })
+                        }
+                      }}
+                      className={`flex-1 py-1 text-xs font-medium rounded-md transition-colors ${
+                        primaryColorMode === "gradient"
+                          ? "bg-background text-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      Gradient
+                    </button>
+                  </div>
+                  {primaryColorMode === "solid" ? (
+                    <div className="space-y-2">
+                      <div className="relative w-full h-12 rounded-lg border border-input overflow-hidden cursor-pointer"
+                        style={{ backgroundColor: settings.primaryColor || "#000000" }}>
+                        <input
+                          type="color"
+                          value={settings.primaryColor || "#000000"}
+                          onChange={(e) => { setPrimaryColorMode("solid"); setSettings({ ...settings, primaryColor: e.target.value }) }}
+                          className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                        />
+                      </div>
+                      <Input
+                        value={settings.primaryColor || ""}
+                        onChange={(e) => { const v = e.target.value; if (v === "" || /^#[0-9A-Fa-f]{0,6}$/.test(v)) setSettings({ ...settings, primaryColor: v }) }}
+                        placeholder="#000000"
+                        className="font-mono text-sm"
+                      />
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="h-12 rounded-lg border border-input"
+                        style={{ background: `linear-gradient(90deg, ${primaryGradientStops.slice().sort((a, b) => a.position - b.position).map((s) => `${s.color} ${s.position}%`).join(", ")})` }} />
+                      <div className="space-y-1.5">
+                        {primaryGradientStops.map((stop, index) => (
+                          <div key={index} className="flex items-center gap-2">
+                            <div className="relative w-7 h-7 rounded border border-input shrink-0 cursor-pointer overflow-hidden" style={{ backgroundColor: stop.color }}>
+                              <input type="color" value={stop.color}
+                                onChange={(e) => {
+                                  const newStops = [...primaryGradientStops]; newStops[index].color = e.target.value; setPrimaryGradientStops(newStops)
+                                  setSettings({ ...settings, primaryColor: `linear-gradient(90deg, ${newStops.slice().sort((a, b) => a.position - b.position).map((s) => `${s.color} ${s.position}%`).join(", ")})` })
+                                }}
+                                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" />
+                            </div>
+                            <Input value={stop.color}
+                              onChange={(e) => {
+                                const newStops = [...primaryGradientStops]; newStops[index].color = e.target.value; setPrimaryGradientStops(newStops)
+                                setSettings({ ...settings, primaryColor: `linear-gradient(90deg, ${newStops.slice().sort((a, b) => a.position - b.position).map((s) => `${s.color} ${s.position}%`).join(", ")})` })
+                              }}
+                              className="font-mono text-xs flex-1" placeholder="#000000" />
+                            <Input type="number" min="0" max="100" value={stop.position}
+                              onChange={(e) => {
+                                const v = Math.min(100, Math.max(0, parseInt(e.target.value) || 0))
+                                const newStops = [...primaryGradientStops]; newStops[index].position = v; setPrimaryGradientStops(newStops)
+                                setSettings({ ...settings, primaryColor: `linear-gradient(90deg, ${newStops.slice().sort((a, b) => a.position - b.position).map((s) => `${s.color} ${s.position}%`).join(", ")})` })
+                              }}
+                              className="w-12 text-center text-xs shrink-0" />
+                            <span className="text-xs text-muted-foreground shrink-0">%</span>
+                            {primaryGradientStops.length > 2 && (
+                              <button type="button" onClick={() => {
+                                const newStops = primaryGradientStops.filter((_, i) => i !== index); setPrimaryGradientStops(newStops)
+                                setSettings({ ...settings, primaryColor: `linear-gradient(90deg, ${newStops.slice().sort((a, b) => a.position - b.position).map((s) => `${s.color} ${s.position}%`).join(", ")})` })
+                              }} className="text-muted-foreground hover:text-destructive shrink-0 transition-colors">
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                        <button type="button" onClick={() => {
+                          const newStops = [...primaryGradientStops, { color: "#10B981", position: 50 }]; setPrimaryGradientStops(newStops)
+                          setSettings({ ...settings, primaryColor: `linear-gradient(90deg, ${newStops.slice().sort((a, b) => a.position - b.position).map((s) => `${s.color} ${s.position}%`).join(", ")})` })
+                        }} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                          <Plus className="h-3 w-3" />Add stop
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Form Color */}
+              <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base font-semibold tracking-tight">Form Color</CardTitle>
+                <CardDescription>Intake form buttons &amp; accents</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {/* Solid / Gradient segmented control */}
+                <div className="flex p-0.5 bg-muted rounded-lg">
                   <button
                     type="button"
                     onClick={() => {
-                      setPrimaryColorMode("gradient")
-                      if (!settings.primaryColor?.includes("linear-gradient")) {
-                        const defaultGradient = `linear-gradient(90deg, ${primaryGradientStops
-                          .map((s) => `${s.color} ${s.position}%`)
-                          .join(", ")})`
-                        setSettings({ ...settings, primaryColor: defaultGradient })
-                      }
+                      setFormColorMode("solid")
+                      setFormGradientStops(DEFAULT_GRADIENT_STOPS.map((s) => ({ ...s })))
+                      setSettings({ ...settings, defaultFormColor: formGradientStops[0]?.color || "#0EA5E9" })
                     }}
-                    className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                      primaryColorMode === "gradient"
-                        ? "bg-background shadow-sm"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    Linear Gradient
-                  </button>
-                </div>
-
-                {/* Solid Color Picker */}
-                {primaryColorMode === "solid" && (
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="color"
-                      value={settings.primaryColor || "#000000"}
-                      onChange={(e) => {
-                        setPrimaryColorMode("solid")
-                        setSettings({ ...settings, primaryColor: e.target.value })
-                      }}
-                      className="w-10 h-10 rounded cursor-pointer border-0"
-                    />
-                    <div
-                      className="w-10 h-10 rounded border border-input"
-                      style={{ backgroundColor: settings.primaryColor || "#000000" }}
-                    />
-                    <Input
-                      value={settings.primaryColor || ""}
-                      onChange={(e) => {
-                        const value = e.target.value
-                        if (value === "" || /^#[0-9A-Fa-f]{0,6}$/.test(value)) {
-                          setSettings({ ...settings, primaryColor: value })
-                        }
-                      }}
-                      placeholder="#000000"
-                      className="w-28 font-mono text-sm"
-                    />
-                  </div>
-                )}
-
-                {/* Gradient Editor */}
-                {primaryColorMode === "gradient" && (
-                  <div className="space-y-3 p-3 bg-muted/30 rounded-lg border border-border">
-                    {/* Gradient Preview */}
-                    <div
-                      className="h-12 rounded-lg border-2 border-border"
-                      style={{
-                        background: `linear-gradient(90deg, ${primaryGradientStops
-                          .sort((a, b) => a.position - b.position)
-                          .map((stop) => `${stop.color} ${stop.position}%`)
-                          .join(", ")})`,
-                      }}
-                    />
-
-                    {/* Gradient Stops */}
-                    <div className="space-y-2">
-                      {primaryGradientStops.map((stop, index) => (
-                        <div key={index} className="flex items-center gap-2 p-2 bg-background rounded border border-border">
-                          <input
-                            type="color"
-                            value={stop.color}
-                            onChange={(e) => {
-                              const newStops = [...primaryGradientStops]
-                              newStops[index].color = e.target.value
-                              setPrimaryGradientStops(newStops)
-                              const gradientCSS = `linear-gradient(90deg, ${newStops
-                                .sort((a, b) => a.position - b.position)
-                                .map((s) => `${s.color} ${s.position}%`)
-                                .join(", ")})`
-                              setSettings({ ...settings, primaryColor: gradientCSS })
-                            }}
-                            className="h-8 w-16 rounded cursor-pointer border-2 border-border"
-                          />
-                          <Input
-                            type="number"
-                            min="0"
-                            max="100"
-                            value={stop.position}
-                            onChange={(e) => {
-                              const value = Math.min(100, Math.max(0, parseInt(e.target.value) || 0))
-                              const newStops = [...primaryGradientStops]
-                              newStops[index].position = value
-                              setPrimaryGradientStops(newStops)
-                              const gradientCSS = `linear-gradient(90deg, ${newStops
-                                .sort((a, b) => a.position - b.position)
-                                .map((s) => `${s.color} ${s.position}%`)
-                                .join(", ")})`
-                              setSettings({ ...settings, primaryColor: gradientCSS })
-                            }}
-                            className="w-16 text-center text-sm"
-                          />
-                          <span className="text-xs text-muted-foreground">%</span>
-                          {primaryGradientStops.length > 2 && (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                const newStops = primaryGradientStops.filter((_, i) => i !== index)
-                                setPrimaryGradientStops(newStops)
-                                const gradientCSS = `linear-gradient(90deg, ${newStops
-                                  .sort((a, b) => a.position - b.position)
-                                  .map((s) => `${s.color} ${s.position}%`)
-                                  .join(", ")})`
-                                setSettings({ ...settings, primaryColor: gradientCSS })
-                              }}
-                              className="text-destructive hover:text-destructive ml-auto"
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
-                      ))}
-
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          const newStops = [...primaryGradientStops, { color: "#10B981", position: 50 }]
-                          setPrimaryGradientStops(newStops)
-                          const gradientCSS = `linear-gradient(90deg, ${newStops
-                            .sort((a, b) => a.position - b.position)
-                            .map((s) => `${s.color} ${s.position}%`)
-                            .join(", ")})`
-                          setSettings({ ...settings, primaryColor: gradientCSS })
-                        }}
-                        className="w-full"
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Stop
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Form Color */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base font-semibold tracking-tight">Form Color</CardTitle>
-                <CardDescription>Set the color for form buttons and CTAs</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Color Mode Toggle */}
-                <div className="flex items-center gap-2 p-1 bg-muted/50 rounded-lg w-fit">
-                  <button
-                    type="button"
-                    onClick={() => setFormColorMode("solid")}
-                    className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                    className={`flex-1 py-1 text-xs font-medium rounded-md transition-colors ${
                       formColorMode === "solid"
-                        ? "bg-background shadow-sm"
+                        ? "bg-background text-foreground shadow-sm"
                         : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
-                    Solid Color
+                    Solid
                   </button>
                   <button
                     type="button"
                     onClick={() => {
                       setFormColorMode("gradient")
                       if (!settings.defaultFormColor?.includes("linear-gradient")) {
-                        const defaultGradient = `linear-gradient(90deg, ${formGradientStops
-                          .map((s) => `${s.color} ${s.position}%`)
-                          .join(", ")})`
+                        const defaultGradient = `linear-gradient(90deg, ${formGradientStops.map((s) => `${s.color} ${s.position}%`).join(", ")})`
                         setSettings({ ...settings, defaultFormColor: defaultGradient })
                       }
                     }}
-                    className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                    className={`flex-1 py-1 text-xs font-medium rounded-md transition-colors ${
                       formColorMode === "gradient"
-                        ? "bg-background shadow-sm"
+                        ? "bg-background text-foreground shadow-sm"
                         : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
-                    Linear Gradient
+                    Gradient
                   </button>
                 </div>
-
-                {/* Solid Color Picker */}
-                {formColorMode === "solid" && (
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="color"
-                      value={settings.defaultFormColor || "#0EA5E9"}
-                      onChange={(e) => {
-                        setFormColorMode("solid")
-                        setSettings({ ...settings, defaultFormColor: e.target.value })
-                      }}
-                      className="w-10 h-10 rounded cursor-pointer border-0"
-                    />
-                    <div
-                      className="w-10 h-10 rounded border border-input"
-                      style={{ backgroundColor: settings.defaultFormColor || "#0EA5E9" }}
-                    />
+                {formColorMode === "solid" ? (
+                  <div className="space-y-2">
+                    <div className="relative w-full h-12 rounded-lg border border-input overflow-hidden cursor-pointer"
+                      style={{ backgroundColor: settings.defaultFormColor || "#0EA5E9" }}>
+                      <input
+                        type="color"
+                        value={settings.defaultFormColor || "#0EA5E9"}
+                        onChange={(e) => { setFormColorMode("solid"); setSettings({ ...settings, defaultFormColor: e.target.value }) }}
+                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                      />
+                    </div>
                     <Input
                       value={settings.defaultFormColor || ""}
-                      onChange={(e) => {
-                        const value = e.target.value
-                        if (value === "" || /^#[0-9A-Fa-f]{0,6}$/.test(value)) {
-                          setSettings({ ...settings, defaultFormColor: value })
-                        }
-                      }}
+                      onChange={(e) => { const v = e.target.value; if (v === "" || /^#[0-9A-Fa-f]{0,6}$/.test(v)) setSettings({ ...settings, defaultFormColor: v }) }}
                       placeholder="#0EA5E9"
-                      className="w-28 font-mono text-sm"
+                      className="font-mono text-sm"
                     />
                   </div>
-                )}
-
-                {/* Gradient Editor */}
-                {formColorMode === "gradient" && (
-                  <div className="space-y-3 p-3 bg-muted/30 rounded-lg border border-border">
-                    {/* Gradient Preview */}
-                    <div
-                      className="h-12 rounded-lg border-2 border-border"
-                      style={{
-                        background: `linear-gradient(90deg, ${formGradientStops
-                          .sort((a, b) => a.position - b.position)
-                          .map((stop) => `${stop.color} ${stop.position}%`)
-                          .join(", ")})`,
-                      }}
-                    />
-
-                    {/* Gradient Stops */}
-                    <div className="space-y-2">
+                ) : (
+                  <div className="space-y-2">
+                    <div className="h-12 rounded-lg border border-input"
+                      style={{ background: `linear-gradient(90deg, ${formGradientStops.slice().sort((a, b) => a.position - b.position).map((s) => `${s.color} ${s.position}%`).join(", ")})` }} />
+                    <div className="space-y-1.5">
                       {formGradientStops.map((stop, index) => (
-                        <div key={index} className="flex items-center gap-2 p-2 bg-background rounded border border-border">
-                          <input
-                            type="color"
-                            value={stop.color}
-                            onChange={(e) => {
-                              const newStops = [...formGradientStops]
-                              newStops[index].color = e.target.value
-                              setFormGradientStops(newStops)
-                              const gradientCSS = `linear-gradient(90deg, ${newStops
-                                .sort((a, b) => a.position - b.position)
-                                .map((s) => `${s.color} ${s.position}%`)
-                                .join(", ")})`
-                              setSettings({ ...settings, defaultFormColor: gradientCSS })
-                            }}
-                            className="h-8 w-16 rounded cursor-pointer border-2 border-border"
-                          />
-                          <Input
-                            type="number"
-                            min="0"
-                            max="100"
-                            value={stop.position}
-                            onChange={(e) => {
-                              const value = Math.min(100, Math.max(0, parseInt(e.target.value) || 0))
-                              const newStops = [...formGradientStops]
-                              newStops[index].position = value
-                              setFormGradientStops(newStops)
-                              const gradientCSS = `linear-gradient(90deg, ${newStops
-                                .sort((a, b) => a.position - b.position)
-                                .map((s) => `${s.color} ${s.position}%`)
-                                .join(", ")})`
-                              setSettings({ ...settings, defaultFormColor: gradientCSS })
-                            }}
-                            className="w-16 text-center text-sm"
-                          />
-                          <span className="text-xs text-muted-foreground">%</span>
-                          {formGradientStops.length > 2 && (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                const newStops = formGradientStops.filter((_, i) => i !== index)
-                                setFormGradientStops(newStops)
-                                const gradientCSS = `linear-gradient(90deg, ${newStops
-                                  .sort((a, b) => a.position - b.position)
-                                  .map((s) => `${s.color} ${s.position}%`)
-                                  .join(", ")})`
-                                setSettings({ ...settings, defaultFormColor: gradientCSS })
+                        <div key={index} className="flex items-center gap-2">
+                          <div className="relative w-7 h-7 rounded border border-input shrink-0 cursor-pointer overflow-hidden" style={{ backgroundColor: stop.color }}>
+                            <input type="color" value={stop.color}
+                              onChange={(e) => {
+                                const newStops = [...formGradientStops]; newStops[index].color = e.target.value; setFormGradientStops(newStops)
+                                setSettings({ ...settings, defaultFormColor: `linear-gradient(90deg, ${newStops.slice().sort((a, b) => a.position - b.position).map((s) => `${s.color} ${s.position}%`).join(", ")})` })
                               }}
-                              className="text-destructive hover:text-destructive ml-auto"
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
+                              className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" />
+                          </div>
+                          <Input value={stop.color}
+                            onChange={(e) => {
+                              const newStops = [...formGradientStops]; newStops[index].color = e.target.value; setFormGradientStops(newStops)
+                              setSettings({ ...settings, defaultFormColor: `linear-gradient(90deg, ${newStops.slice().sort((a, b) => a.position - b.position).map((s) => `${s.color} ${s.position}%`).join(", ")})` })
+                            }}
+                            className="font-mono text-xs flex-1" placeholder="#0EA5E9" />
+                          <Input type="number" min="0" max="100" value={stop.position}
+                            onChange={(e) => {
+                              const v = Math.min(100, Math.max(0, parseInt(e.target.value) || 0))
+                              const newStops = [...formGradientStops]; newStops[index].position = v; setFormGradientStops(newStops)
+                              setSettings({ ...settings, defaultFormColor: `linear-gradient(90deg, ${newStops.slice().sort((a, b) => a.position - b.position).map((s) => `${s.color} ${s.position}%`).join(", ")})` })
+                            }}
+                            className="w-12 text-center text-xs shrink-0" />
+                          <span className="text-xs text-muted-foreground shrink-0">%</span>
+                          {formGradientStops.length > 2 && (
+                            <button type="button" onClick={() => {
+                              const newStops = formGradientStops.filter((_, i) => i !== index); setFormGradientStops(newStops)
+                              setSettings({ ...settings, defaultFormColor: `linear-gradient(90deg, ${newStops.slice().sort((a, b) => a.position - b.position).map((s) => `${s.color} ${s.position}%`).join(", ")})` })
+                            }} className="text-muted-foreground hover:text-destructive shrink-0 transition-colors">
+                              <X className="h-3.5 w-3.5" />
+                            </button>
                           )}
                         </div>
                       ))}
-
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          const newStops = [...formGradientStops, { color: "#10B981", position: 50 }]
-                          setFormGradientStops(newStops)
-                          const gradientCSS = `linear-gradient(90deg, ${newStops
-                            .sort((a, b) => a.position - b.position)
-                            .map((s) => `${s.color} ${s.position}%`)
-                            .join(", ")})`
-                          setSettings({ ...settings, defaultFormColor: gradientCSS })
-                        }}
-                        className="w-full"
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Stop
-                      </Button>
+                      <button type="button" onClick={() => {
+                        const newStops = [...formGradientStops, { color: "#10B981", position: 50 }]; setFormGradientStops(newStops)
+                        setSettings({ ...settings, defaultFormColor: `linear-gradient(90deg, ${newStops.slice().sort((a, b) => a.position - b.position).map((s) => `${s.color} ${s.position}%`).join(", ")})` })
+                      }} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                        <Plus className="h-3 w-3" />Add stop
+                      </button>
                     </div>
                   </div>
                 )}
               </CardContent>
             </Card>
 
-            {/* Font Selection */}
+            </div>{/* end 2×2 color grid */}
+
+            {/* Title, Description & Typography — consolidated */}
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-base font-semibold tracking-tight">Choose a Font</CardTitle>
-                <CardDescription>Previews update in real-time</CardDescription>
+                <CardTitle className="text-base font-semibold tracking-tight">Content & Typography</CardTitle>
+                <CardDescription>Landing page headline, supporting text, and font</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <select
-                  className="w-full p-3 border border-input bg-background text-foreground rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                  value={settings.fontFamily}
-                  onChange={(e) => setSettings({ ...settings, fontFamily: e.target.value })}
-                >
-                  {FONT_OPTIONS.map((font) => (
-                    <option key={font.value} value={font.value}>
-                      {font.label}
-                    </option>
-                  ))}
-                </select>
-                <p className="text-xs text-muted-foreground">
-                  {FONT_OPTIONS.find((f) => f.value === settings.fontFamily)?.description}
-                </p>
-
-                {/* Font Preview */}
-                <div className="p-4 border rounded-md bg-muted/30">
-                  <p className="text-xs text-muted-foreground mb-2">Preview:</p>
-                  <h3
-                    className="text-xl font-semibold mb-1"
-                    style={{ fontFamily: settings.fontFamily }}
-                  >
-                    {settings.portalTitle || "Sample Title"}
-                  </h3>
-                  <p
-                    className="text-sm text-muted-foreground"
-                    style={{ fontFamily: settings.fontFamily }}
-                  >
-                    We're looking for talented professionals to join our growing team. Apply today and start your
-                    journey with us!
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Logo */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base font-semibold tracking-tight">Logo</CardTitle>
-                <CardDescription>Upload your brand logo (recommended: 200x60px)</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {settings.logo && (
-                  <div className="mb-3 p-4 bg-muted/30 rounded-lg flex items-center justify-center">
-                    <img
-                      src={settings.logo}
-                      alt="Logo preview"
-                      className="h-12 object-contain max-w-[200px]"
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-foreground">Title</label>
+                    <textarea
+                      rows={2}
+                      value={settings.heroTitle}
+                      onChange={(e) => setSettings({ ...settings, heroTitle: e.target.value })}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && (e.target as HTMLTextAreaElement).value.includes("\n")) {
+                          e.preventDefault()
+                        }
+                      }}
+                      placeholder="Enter title"
+                      className="w-full px-3 py-2 border border-input bg-background text-foreground rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 resize-none leading-snug"
                     />
                   </div>
-                )}
-
-                <input
-                  ref={logoFileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleLogoUpload}
-                  disabled={isUploadingLogo}
-                  className="hidden"
-                />
-
-                <div className="flex gap-2 mb-3">
-                  <Button
-                    variant={logoInputMode === "file" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => {
-                      setLogoInputMode("file")
-                      // Open file selector immediately when clicking "Upload a file"
-                      setTimeout(() => {
-                        logoFileInputRef.current?.click()
-                      }, 0)
-                    }}
-                  >
-                    <Upload className="w-4 h-4 mr-2" />
-                    Upload a file
-                  </Button>
-                  <Button
-                    variant={logoInputMode === "url" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setLogoInputMode("url")}
-                  >
-                    <LinkIcon className="w-4 h-4 mr-2" />
-                    Enter URL
-                  </Button>
-                </div>
-
-                {/* Hidden file input that opens when clicking "Upload a file" */}
-                <input
-                  ref={logoFileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleLogoUpload}
-                  disabled={isUploadingLogo}
-                  className="hidden"
-                />
-
-                {logoInputMode === "file" ? (
-                  <div>
-                    {isUploadingLogo && (
-                      <p className="text-xs text-blue-600 mb-2">Uploading to S3...</p>
-                    )}
-                    <p className="text-xs text-muted-foreground">Accepted formats: PNG, JPG, SVG. Max size: 2MB</p>
-                    <p className="text-xs text-muted-foreground mt-1">Click "Upload a file" above to select an image</p>
-                  </div>
-                ) : (
-                  <div className="flex gap-2">
-                    <Input
-                      value={settings.logo}
-                      onChange={(e) => setSettings({ ...settings, logo: e.target.value })}
-                      placeholder="https://example.com/logo.png"
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-foreground">Description</label>
+                    <textarea
+                      rows={2}
+                      value={settings.heroSubtitle}
+                      onChange={(e) => setSettings({ ...settings, heroSubtitle: e.target.value })}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && (e.target as HTMLTextAreaElement).value.includes("\n")) {
+                          e.preventDefault()
+                        }
+                      }}
+                      placeholder="Enter description"
+                      className="w-full px-3 py-2 border border-input bg-background text-foreground rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 resize-none leading-snug"
                     />
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setSettings({ ...settings, logo: "" })}
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-foreground">Font</label>
+                  <div className="flex items-center gap-2">
+                    <select
+                      className="flex-1 px-2.5 py-1.5 border border-input bg-background text-foreground rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1"
+                      value={settings.fontFamily}
+                      onChange={(e) => setSettings({ ...settings, fontFamily: e.target.value })}
                     >
-                      Clear
-                    </Button>
+                      {FONT_OPTIONS.map((font) => (
+                        <option key={font.value} value={font.value}>
+                          {font.label}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="text-sm text-muted-foreground shrink-0 w-6 text-center" style={{ fontFamily: settings.fontFamily }}>
+                      Aa
+                    </span>
                   </div>
-                )}
+                </div>
               </CardContent>
             </Card>
+
+            {/* ── Section: Homepage Hero ───────────────────── */}
+            <div className="flex items-center gap-3 pt-2">
+              <h2 className="text-sm font-semibold text-foreground whitespace-nowrap">Homepage Hero</h2>
+              <div className="flex-1 h-px bg-border" />
+            </div>
 
             {/* Hero Image */}
             <Card>
@@ -1378,89 +1655,32 @@ export default function PortalPage() {
               </CardContent>
             </Card>
 
-            {/* Hero Title */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base font-semibold tracking-tight">Hero Title</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Input
-                  value={settings.heroTitle}
-                  onChange={(e) => setSettings({ ...settings, heroTitle: e.target.value })}
-                  placeholder="Enter hero title"
-                />
-              </CardContent>
-            </Card>
+            {/* ── Section: Footer & Social ─────────────────── */}
+            <div className="flex items-center gap-3 pt-2">
+              <h2 className="text-sm font-semibold text-foreground whitespace-nowrap">Footer & Social</h2>
+              <div className="flex-1 h-px bg-border" />
+            </div>
 
-            {/* Hero Subtitle */}
+            {/* Footer Links */}
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-base font-semibold tracking-tight">Hero Subtitle</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Input
-                  value={settings.heroSubtitle}
-                  onChange={(e) => setSettings({ ...settings, heroSubtitle: e.target.value })}
-                  placeholder="Enter hero subtitle"
-                />
-              </CardContent>
-            </Card>
-
-            {/* Footer Customization */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium">Footer</CardTitle>
-                <CardDescription>Customize footer colors and visibility of footer sections</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Footer Color */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Footer Background Color</label>
-                  <div className="flex gap-2 items-center">
-                    <Input
-                      type="color"
-                      value={settings.footerColor || "#000000"}
-                      onChange={(e) => setSettings({ ...settings, footerColor: e.target.value })}
-                      className="w-20 h-10 cursor-pointer"
-                    />
-                    <Input
-                      value={settings.footerColor || "#000000"}
-                      onChange={(e) => setSettings({ ...settings, footerColor: e.target.value })}
-                      placeholder="#000000"
-                      className="flex-1"
-                    />
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-base font-semibold tracking-tight">Footer Links</CardTitle>
+                    <CardDescription>Navigation sections shown in the footer</CardDescription>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button variant="ghost" size="sm" onClick={handleResetFooter} disabled={isResettingFooter} className="h-7 px-2 text-muted-foreground hover:text-foreground">
+                      <RotateCcw className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => setIsAddingCategory(true)} disabled={(settings.footerCategories || []).length >= 4} className="h-7 text-xs">
+                      <Plus className="h-3 w-3 mr-1" />
+                      Add
+                    </Button>
                   </div>
                 </div>
-
-                {/* Footer Sections Visibility */}
-                <div className="space-y-3 pt-2 border-t">
-                  <div className="flex items-center justify-between">
-                    <label className="text-sm font-medium">Footer Sections</label>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleResetFooter}
-                        className="h-8"
-                        disabled={isResettingFooter}
-                        title="Reset to default footer"
-                      >
-                        <RotateCcw className="h-4 w-4 mr-1" />
-                        {isResettingFooter ? "Resetting..." : "Reset"}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setIsAddingCategory(true)}
-                        className="h-8"
-                        disabled={(settings.footerCategories || []).length >= 4}
-                        title={(settings.footerCategories || []).length >= 4 ? "Maximum 4 sections allowed" : "Add Category"}
-                      >
-                        <Plus className="h-4 w-4 mr-1" />
-                        Add Category
-                      </Button>
-                    </div>
-                  </div>
+              </CardHeader>
+              <CardContent className="space-y-2">
                   <div className="space-y-2">
                     {(settings.footerCategories || []).map((category, index) => {
                       const isExpanded = expandedCategories.has(index)
@@ -1731,244 +1951,111 @@ export default function PortalPage() {
                       </div>
                     )}
                   </div>
-                </div>
-
-                {/* Footer Disclaimer Text */}
-                <div className="space-y-3 pt-4 border-t">
-                  <label className="text-sm font-medium">Footer Disclaimer Text</label>
-                  <CardDescription className="text-xs">This text appears in the middle section of the footer</CardDescription>
-
-                  {/* Toggle for default vs custom disclaimer */}
-                  <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border border-border">
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-foreground">Use Default Disclaimer</p>
-                      <p className="text-xs text-muted-foreground">Use the global default disclaimer set by your organization</p>
-                    </div>
-                    <Switch
-                      checked={settings.useDefaultDisclaimer ?? true}
-                      onCheckedChange={(checked) => setSettings({ ...settings, useDefaultDisclaimer: checked })}
-                    />
-                  </div>
-
-                  {/* Custom disclaimer textarea - only shown when not using default */}
-                  {!settings.useDefaultDisclaimer && (
-                    <div className="space-y-2">
-                      <label className="text-xs text-muted-foreground">Custom Disclaimer Text</label>
-                      <textarea
-                        value={settings.footerDisclaimer || ""}
-                        onChange={(e) => setSettings({ ...settings, footerDisclaimer: e.target.value })}
-                        placeholder="Enter your custom disclaimer text..."
-                        className="w-full min-h-[150px] p-3 text-sm border border-input bg-background text-foreground rounded-md resize-y focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                        rows={6}
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        {(settings.footerDisclaimer || "").length} characters
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Social Media Links */}
-                <div className="space-y-3 pt-4 border-t">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <label className="text-sm font-medium">Social Media Links</label>
-                      <CardDescription className="text-xs">Configure which social media icons appear and their links</CardDescription>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleResetSocialMedia}
-                      className="h-8"
-                      disabled={isResettingSocialMedia}
-                      title="Reset to default social media settings"
-                    >
-                      <RotateCcw className="h-4 w-4 mr-1" />
-                      {isResettingSocialMedia ? "Resetting..." : "Reset"}
-                    </Button>
-                  </div>
-
-                  {/* Social Media Section Title */}
-                  <div className="space-y-2">
-                    <label className="text-xs text-muted-foreground">Section Title</label>
-                    <Input
-                      value={settings.socialMediaSection || "SOCIAL MEDIA"}
-                      onChange={(e) => setSettings({ ...settings, socialMediaSection: e.target.value })}
-                      placeholder="SOCIAL MEDIA"
-                    />
-                  </div>
-
-                  {/* Instagram */}
-                  <div className="flex items-center gap-3 p-2 border rounded-md">
-                    <div className="flex items-center gap-2 w-24">
-                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
-                      </svg>
-                      <span className="text-sm">Instagram</span>
-                    </div>
-                    <Input
-                      value={settings.socialMediaLinks?.instagram?.url || ""}
-                      onChange={(e) => setSettings({
-                        ...settings,
-                        socialMediaLinks: {
-                          ...settings.socialMediaLinks,
-                          instagram: { ...settings.socialMediaLinks?.instagram, enabled: settings.socialMediaLinks?.instagram?.enabled ?? true, url: e.target.value }
-                        }
-                      })}
-                      placeholder="https://instagram.com/..."
-                      className="flex-1"
-                    />
-                    <Switch
-                      checked={settings.socialMediaLinks?.instagram?.enabled ?? true}
-                      onCheckedChange={(checked) => setSettings({
-                        ...settings,
-                        socialMediaLinks: {
-                          ...settings.socialMediaLinks,
-                          instagram: { ...settings.socialMediaLinks?.instagram, url: settings.socialMediaLinks?.instagram?.url || "", enabled: checked }
-                        }
-                      })}
-                    />
-                  </div>
-
-                  {/* Facebook */}
-                  <div className="flex items-center gap-3 p-2 border rounded-md">
-                    <div className="flex items-center gap-2 w-24">
-                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-                      </svg>
-                      <span className="text-sm">Facebook</span>
-                    </div>
-                    <Input
-                      value={settings.socialMediaLinks?.facebook?.url || ""}
-                      onChange={(e) => setSettings({
-                        ...settings,
-                        socialMediaLinks: {
-                          ...settings.socialMediaLinks,
-                          facebook: { ...settings.socialMediaLinks?.facebook, enabled: settings.socialMediaLinks?.facebook?.enabled ?? true, url: e.target.value }
-                        }
-                      })}
-                      placeholder="https://facebook.com/..."
-                      className="flex-1"
-                    />
-                    <Switch
-                      checked={settings.socialMediaLinks?.facebook?.enabled ?? true}
-                      onCheckedChange={(checked) => setSettings({
-                        ...settings,
-                        socialMediaLinks: {
-                          ...settings.socialMediaLinks,
-                          facebook: { ...settings.socialMediaLinks?.facebook, url: settings.socialMediaLinks?.facebook?.url || "", enabled: checked }
-                        }
-                      })}
-                    />
-                  </div>
-
-                  {/* Twitter/X */}
-                  <div className="flex items-center gap-3 p-2 border rounded-md">
-                    <div className="flex items-center gap-2 w-24">
-                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-                      </svg>
-                      <span className="text-sm">X (Twitter)</span>
-                    </div>
-                    <Input
-                      value={settings.socialMediaLinks?.twitter?.url || ""}
-                      onChange={(e) => setSettings({
-                        ...settings,
-                        socialMediaLinks: {
-                          ...settings.socialMediaLinks,
-                          twitter: { ...settings.socialMediaLinks?.twitter, enabled: settings.socialMediaLinks?.twitter?.enabled ?? true, url: e.target.value }
-                        }
-                      })}
-                      placeholder="https://x.com/..."
-                      className="flex-1"
-                    />
-                    <Switch
-                      checked={settings.socialMediaLinks?.twitter?.enabled ?? true}
-                      onCheckedChange={(checked) => setSettings({
-                        ...settings,
-                        socialMediaLinks: {
-                          ...settings.socialMediaLinks,
-                          twitter: { ...settings.socialMediaLinks?.twitter, url: settings.socialMediaLinks?.twitter?.url || "", enabled: checked }
-                        }
-                      })}
-                    />
-                  </div>
-
-                  {/* TikTok */}
-                  <div className="flex items-center gap-3 p-2 border rounded-md">
-                    <div className="flex items-center gap-2 w-24">
-                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z" />
-                      </svg>
-                      <span className="text-sm">TikTok</span>
-                    </div>
-                    <Input
-                      value={settings.socialMediaLinks?.tiktok?.url || ""}
-                      onChange={(e) => setSettings({
-                        ...settings,
-                        socialMediaLinks: {
-                          ...settings.socialMediaLinks,
-                          tiktok: { ...settings.socialMediaLinks?.tiktok, enabled: settings.socialMediaLinks?.tiktok?.enabled ?? true, url: e.target.value }
-                        }
-                      })}
-                      placeholder="https://tiktok.com/@..."
-                      className="flex-1"
-                    />
-                    <Switch
-                      checked={settings.socialMediaLinks?.tiktok?.enabled ?? true}
-                      onCheckedChange={(checked) => setSettings({
-                        ...settings,
-                        socialMediaLinks: {
-                          ...settings.socialMediaLinks,
-                          tiktok: { ...settings.socialMediaLinks?.tiktok, url: settings.socialMediaLinks?.tiktok?.url || "", enabled: checked }
-                        }
-                      })}
-                    />
-                  </div>
-
-                  {/* YouTube */}
-                  <div className="flex items-center gap-3 p-2 border rounded-md">
-                    <div className="flex items-center gap-2 w-24">
-                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
-                      </svg>
-                      <span className="text-sm">YouTube</span>
-                    </div>
-                    <Input
-                      value={settings.socialMediaLinks?.youtube?.url || ""}
-                      onChange={(e) => setSettings({
-                        ...settings,
-                        socialMediaLinks: {
-                          ...settings.socialMediaLinks,
-                          youtube: { ...settings.socialMediaLinks?.youtube, enabled: settings.socialMediaLinks?.youtube?.enabled ?? true, url: e.target.value }
-                        }
-                      })}
-                      placeholder="https://youtube.com/..."
-                      className="flex-1"
-                    />
-                    <Switch
-                      checked={settings.socialMediaLinks?.youtube?.enabled ?? true}
-                      onCheckedChange={(checked) => setSettings({
-                        ...settings,
-                        socialMediaLinks: {
-                          ...settings.socialMediaLinks,
-                          youtube: { ...settings.socialMediaLinks?.youtube, url: settings.socialMediaLinks?.youtube?.url || "", enabled: checked }
-                        }
-                      })}
-                    />
-                  </div>
-                </div>
               </CardContent>
             </Card>
 
-            {/* Save Button */}
-            <Button onClick={handleSave} className="w-full" disabled={isSaving}>
-              {isSaving ? "Saving..." : "Save Changes"}
-            </Button>
-          </div>
+            {/* Disclaimer */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base font-semibold tracking-tight">Disclaimer</CardTitle>
+                <CardDescription>Legal text displayed in the footer</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center justify-between rounded-lg border border-border px-4 py-3">
+                  <div>
+                    <p className="text-sm font-medium">Use default disclaimer</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Set by your organization</p>
+                  </div>
+                  <Switch
+                    checked={settings.useDefaultDisclaimer ?? true}
+                    onCheckedChange={(checked) => setSettings({ ...settings, useDefaultDisclaimer: checked })}
+                  />
+                </div>
+                {!settings.useDefaultDisclaimer && (
+                  <div className="space-y-1.5">
+                    <textarea
+                      value={settings.footerDisclaimer || ""}
+                      onChange={(e) => setSettings({ ...settings, footerDisclaimer: e.target.value })}
+                      placeholder="Enter your custom disclaimer text…"
+                      className="w-full min-h-[120px] p-3 text-sm border border-input bg-background text-foreground rounded-md resize-y focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1"
+                      rows={5}
+                    />
+                    <p className="text-[11px] text-muted-foreground text-right">{(settings.footerDisclaimer || "").length} characters</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
-          {/* Live Preview Panel */}
-          <div className="space-y-4">
+            {/* Social Media */}
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-base font-semibold tracking-tight">Social Media</CardTitle>
+                    <CardDescription>Icons &amp; links shown in the footer</CardDescription>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={handleResetSocialMedia} disabled={isResettingSocialMedia} className="h-7 px-2 text-muted-foreground hover:text-foreground">
+                    <RotateCcw className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-1.5">
+                {([
+                  {
+                    key: "instagram", label: "Instagram",
+                    icon: <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />,
+                    placeholder: "instagram.com/yourbrand",
+                  },
+                  {
+                    key: "facebook", label: "Facebook",
+                    icon: <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />,
+                    placeholder: "facebook.com/yourbrand",
+                  },
+                  {
+                    key: "twitter", label: "X (Twitter)",
+                    icon: <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />,
+                    placeholder: "x.com/yourbrand",
+                  },
+                  {
+                    key: "tiktok", label: "TikTok",
+                    icon: <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z" />,
+                    placeholder: "tiktok.com/@yourbrand",
+                  },
+                  {
+                    key: "youtube", label: "YouTube",
+                    icon: <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />,
+                    placeholder: "youtube.com/@yourbrand",
+                  },
+                ] as { key: keyof NonNullable<typeof settings.socialMediaLinks>; label: string; icon: React.ReactNode; placeholder: string }[]).map(({ key, label, icon, placeholder }) => {
+                  const platform = settings.socialMediaLinks?.[key]
+                  const isEnabled = platform?.enabled ?? true
+                  return (
+                    <div key={key} className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-colors ${isEnabled ? "border-border bg-background" : "border-border/50 bg-muted/30"}`}>
+                      <svg className={`w-4 h-4 shrink-0 transition-opacity ${isEnabled ? "opacity-80" : "opacity-30"}`} viewBox="0 0 24 24" fill="currentColor">{icon}</svg>
+                      <span className={`text-xs font-medium w-20 shrink-0 transition-opacity ${isEnabled ? "text-foreground" : "text-muted-foreground"}`}>{label}</span>
+                      <Input
+                        value={platform?.url || ""}
+                        onChange={(e) => setSettings({ ...settings, socialMediaLinks: { ...settings.socialMediaLinks, [key]: { ...platform, enabled: isEnabled, url: e.target.value } } })}
+                        placeholder={placeholder}
+                        disabled={!isEnabled}
+                        className={`flex-1 h-8 text-xs transition-opacity ${!isEnabled ? "opacity-40" : ""}`}
+                      />
+                      <Switch
+                        checked={isEnabled}
+                        onCheckedChange={(checked) => setSettings({ ...settings, socialMediaLinks: { ...settings.socialMediaLinks, [key]: { ...platform, url: platform?.url || "", enabled: checked } } })}
+                      />
+                    </div>
+                  )
+                })}
+              </CardContent>
+            </Card>
+
+            {/* ── Section: Domain & Publishing ─────────────── */}
+            <div className="flex items-center gap-3 pt-2">
+              <h2 className="text-sm font-semibold text-foreground whitespace-nowrap">Domain & Publishing</h2>
+              <div className="flex-1 h-px bg-border" />
+            </div>
+
             {/* Your Portal URL Section */}
             <Card id="brand-portal-url-section">
               <CardContent className="py-4">
@@ -2024,106 +2111,341 @@ export default function PortalPage() {
               </CardContent>
             </Card>
 
-            <Card className="sticky top-6">
+            {/* Custom Vanity Domain Card */}
+            <Card>
               <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="text-base font-semibold tracking-tight">Portal Preview</CardTitle>
-                    <CardDescription>Share this link with your patients to direct them to your portal</CardDescription>
+                <div className="flex items-center gap-2">
+                  <Globe className="h-4 w-4 text-muted-foreground" />
+                  <CardTitle className="text-base font-semibold tracking-tight">Custom Domain</CardTitle>
+                </div>
+                <CardDescription>Connect your own domain and control portal visibility</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {isCustomDomain && customDomain ? (
+                  /* ── Activated state ── */
+                  <div className="space-y-3">
+                    <div className="flex items-start gap-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                      <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-green-800">Vanity Domain Activated</p>
+                        <p className="text-xs font-mono text-green-700 mt-0.5 truncate">{customDomain}</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => window.open(`https://${customDomain}`, "_blank")}
+                      >
+                        <ExternalLink className="w-4 h-4 mr-2" />
+                        Preview Site
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 text-destructive hover:text-destructive"
+                        onClick={handleRemoveDomain}
+                        disabled={isRemovingDomain}
+                      >
+                        {isRemovingDomain ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <X className="w-4 h-4 mr-2" />}
+                        Remove
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex gap-1 p-1 bg-muted rounded-lg">
-                    <Button
-                      variant={previewMode === "desktop" ? "default" : "ghost"}
-                      size="sm"
-                      onClick={() => setPreviewMode("desktop")}
-                    >
-                      <Monitor className="w-4 h-4 mr-1" />
-                      Desktop
-                    </Button>
-                    <Button
-                      variant={previewMode === "mobile" ? "default" : "ghost"}
-                      size="sm"
-                      onClick={() => setPreviewMode("mobile")}
-                    >
-                      <Smartphone className="w-4 h-4 mr-1" />
-                      Mobile
-                    </Button>
+                ) : (
+                  /* ── Input + DNS setup state ── */
+                  <div className="space-y-4">
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium">Your Domain</label>
+                      <Input
+                        value={vanityDomainInput}
+                        onChange={(e) => { setVanityDomainInput(e.target.value); setDomainError(null) }}
+                        placeholder="shop.yourbrand.com"
+                        className="font-mono"
+                      />
+                      <p className="text-xs text-muted-foreground">Enter your domain without <span className="font-mono">https://</span></p>
+                    </div>
+
+                    {vanityDomainInput.trim() && (
+                      <>
+                        {/* DNS Record Table */}
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-1.5">
+                            <AlertCircle className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" />
+                            <p className="text-xs font-medium text-amber-700">Add this DNS record with your domain registrar before activating:</p>
+                          </div>
+                          <div className="rounded-lg border overflow-hidden text-xs">
+                            <div className="grid grid-cols-3 bg-muted/60 px-3 py-2 border-b font-medium text-muted-foreground">
+                              <span>Type</span>
+                              <span>Name / Host</span>
+                              <span>Value / Points To</span>
+                            </div>
+                            <div className="grid grid-cols-3 px-3 py-3 items-center gap-x-2">
+                              <span className="font-semibold text-foreground">CNAME</span>
+                              <span className="font-mono text-foreground truncate">
+                                {(() => {
+                                  const d = vanityDomainInput.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/$/, "")
+                                  const parts = d.split(".")
+                                  return parts.length > 2 ? parts.slice(0, -2).join(".") : "@"
+                                })()}
+                              </span>
+                              <div className="flex items-center gap-1 min-w-0">
+                                <span className="font-mono text-foreground truncate">{clinicSlug ? `${clinicSlug}.fuse.health` : "…"}</span>
+                                <button
+                                  onClick={handleCopyCname}
+                                  title="Copy value"
+                                  className="flex-shrink-0 p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                                >
+                                  {copiedCname ? <Check className="h-3 w-3 text-green-600" /> : <Copy className="h-3 w-3" />}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                          <p className="text-xs text-muted-foreground leading-relaxed">
+                            DNS changes can take up to 24–48 hours to propagate. Click <strong>Activate</strong> once your DNS is configured.
+                          </p>
+                        </div>
+
+                        {domainError && (
+                          <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                            <AlertCircle className="h-4 w-4 text-red-500 flex-shrink-0 mt-0.5" />
+                            <p className="text-xs text-red-700">{domainError}</p>
+                          </div>
+                        )}
+
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1"
+                            onClick={() => {
+                              const slug = clinicSlug
+                              if (slug) window.open(`https://${slug}.fuse.health`, "_blank")
+                            }}
+                          >
+                            <ExternalLink className="w-4 h-4 mr-2" />
+                            Preview
+                          </Button>
+                          <Button
+                            size="sm"
+                            className="flex-1"
+                            onClick={handleActivateDomain}
+                            disabled={isActivatingDomain || !vanityDomainInput.trim()}
+                          >
+                            {isActivatingDomain ? (
+                              <>
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                Activating…
+                              </>
+                            ) : (
+                              "Activate"
+                            )}
+                          </Button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {/* Portal visibility toggle */}
+                <div className="pt-3 border-t">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium">Portal Visibility</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {settings.isActive
+                          ? "Your portal is live and visible to patients"
+                          : "Your portal is hidden from patients"}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={settings.isActive}
+                      onCheckedChange={handleToggleActive}
+                      disabled={isTogglingActive}
+                      className="data-[state=checked]:bg-green-600 flex-shrink-0"
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+          </div>
+
+          {/* Live Preview Panel — sticky as user scrolls */}
+          <div className="sticky top-[60px] self-start space-y-0">
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <CardTitle className="text-base font-semibold tracking-tight">Portal Preview</CardTitle>
+                    <CardDescription>Live preview of your patient-facing portal</CardDescription>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {clinicSlug && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          let url: string
+                          if (typeof window !== 'undefined' && window.location.hostname.includes('localhost')) {
+                            url = `http://${clinicSlug}.localhost:3000`
+                          } else if (isCustomDomain && customDomain) {
+                            url = `https://${customDomain}`
+                          } else {
+                            url = `https://${clinicSlug}.fusehealth.com`
+                          }
+                          window.open(url, '_blank', 'noopener,noreferrer')
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium border border-border bg-background text-foreground hover:bg-muted transition-colors"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        Preview
+                      </button>
+                    )}
+                    <div className="flex gap-1 p-1 bg-muted rounded-lg">
+                      <button
+                        type="button"
+                        onClick={() => setPreviewMode("desktop")}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                          previewMode === "desktop"
+                            ? "bg-white text-foreground shadow-sm"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        <Monitor className="w-4 h-4" />
+                        Desktop
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPreviewMode("mobile")}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                          previewMode === "mobile"
+                            ? "bg-white text-foreground shadow-sm"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        <Smartphone className="w-4 h-4" />
+                        Mobile
+                      </button>
+                    </div>
                   </div>
                 </div>
               </CardHeader>
               <CardContent>
                 <div
-                  className={`bg-white border rounded-lg overflow-hidden shadow-sm ${previewMode === "mobile" ? "max-w-[375px] mx-auto" : ""
+                  className={`border rounded-lg overflow-hidden shadow-sm ${previewMode === "mobile" ? "max-w-[375px] mx-auto" : ""
                     }`}
-                  style={{ fontFamily: settings.fontFamily }}
+                  style={{ fontFamily: settings.fontFamily, backgroundColor: settings.backgroundColor || "#FFFFFF" }}
                 >
-                  {/* Preview Header */}
-                  <div className="border-b bg-white p-3 flex items-center justify-between">
-                    {settings.logo ? (
-                      <img src={settings.logo} alt="Logo" className="h-6 object-contain" />
-                    ) : (
-                      <span className="font-bold text-sm" style={{ color: settings.primaryColor?.includes("linear-gradient") ? "#000000" : settings.primaryColor }}>
-                        {settings.portalTitle?.split(" ")[0] || "BRAND"}
-                      </span>
-                    )}
-                    <Button
-                      size="sm"
-                      style={{ background: settings.primaryColor }}
-                      className="text-white text-xs"
-                    >
-                      Apply Now
-                    </Button>
-                  </div>
+                  {/* Preview Header — mirrors live portal structure */}
+                  {(() => {
+                    const navTextColor = getContrastColor(settings.navFooterColor || "#000000")
+                    const isGradientBtn = settings.primaryColor?.includes("linear-gradient")
+                    return (
+                      <div className="px-3 flex items-center justify-between" style={{ backgroundColor: settings.navFooterColor || "#000000", height: "40px" }}>
+                        {/* Left: brand name or logo */}
+                        {settings.navDisplayMode === "logo" && settings.logo ? (
+                          <img src={settings.logo} alt="Nav logo" className="max-h-5 max-w-[72px] object-contain" />
+                        ) : (
+                          <span className="font-semibold text-[11px] tracking-tight" style={{ fontFamily: settings.fontFamily, color: navTextColor }}>
+                            {settings.navBrandName || clinicName || "Business Name"}
+                          </span>
+                        )}
+
+                        {/* Center: nav links */}
+                        <div className="flex items-center gap-3">
+                          {["Products", "How It Works", "Contact"].map((label) => (
+                            <span key={label} className="text-[9px] font-medium" style={{ color: navTextColor, opacity: 0.85 }}>
+                              {label}
+                            </span>
+                          ))}
+                        </div>
+
+                        {/* Right: Login + Order now */}
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[9px] font-medium" style={{ color: navTextColor, opacity: 0.85 }}>Login</span>
+                          {isGradientBtn ? (
+                            <span style={{ background: settings.primaryColor, padding: "1.5px", borderRadius: "6px", display: "inline-flex" }}>
+                              <span style={{ borderRadius: "4.5px", color: settings.primaryColor?.match(/#[0-9A-Fa-f]{6}/)?.[0] || "#000", backgroundColor: "white", fontSize: "9px", fontWeight: 500, padding: "2px 7px" }}>
+                                Order now
+                              </span>
+                            </span>
+                          ) : (
+                            <span style={{ border: `1.5px solid ${settings.primaryColor}`, color: settings.primaryColor, backgroundColor: "transparent", borderRadius: "5px", fontSize: "9px", fontWeight: 500, padding: "2px 7px" }}>
+                              Order now
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })()}
 
                   {/* Preview Hero */}
                   <div
-                    className="relative h-64 bg-cover bg-center flex items-center justify-center"
+                    className="relative h-80 bg-cover bg-center flex items-center justify-center"
                     style={{ backgroundImage: `url(${settings.heroImageUrl})` }}
                   >
                     <div className="absolute inset-0 bg-black/40" />
                     <div className="relative z-10 text-center text-white px-4">
                       <h2
-                        className="text-2xl font-bold mb-2"
+                        className="text-2xl font-bold mb-2 whitespace-pre-line"
                         style={{ fontFamily: settings.fontFamily }}
                       >
                         {settings.heroTitle}
                       </h2>
-                      <p className="text-sm opacity-90 mb-4">{settings.heroSubtitle}</p>
+                      <p className="text-sm opacity-90 mb-4 whitespace-pre-line">{settings.heroSubtitle}</p>
                       <div className="flex gap-2 justify-center">
-                        <Button
-                          size="sm"
-                          style={{ background: settings.primaryColor }}
-                          className="text-white"
+                        <button
+                          style={{
+                            background: settings.primaryColor,
+                            color: getContrastColor(settings.primaryColor?.match(/#[0-9A-Fa-f]{6}/)?.[0] || (settings.primaryColor?.includes('linear-gradient') ? '#000' : settings.primaryColor) || "#000000"),
+                            padding: "0.375rem 0.875rem",
+                            border: "none",
+                            borderRadius: "0.375rem",
+                            fontSize: "0.6875rem",
+                            fontWeight: 600,
+                            cursor: "pointer",
+                          }}
                         >
-                          View All Products →
-                        </Button>
-                        <Button size="sm" variant="outline" className="bg-white/10 border-white text-white">
-                          Learn More →
-                        </Button>
+                          View all products
+                        </button>
+                        <button
+                          style={{
+                            backgroundColor: "white",
+                            color: "#1f2937",
+                            padding: "0.375rem 0.875rem",
+                            border: "none",
+                            borderRadius: "0.375rem",
+                            fontSize: "0.6875rem",
+                            fontWeight: 600,
+                            cursor: "pointer",
+                          }}
+                        >
+                          Learn More
+                        </button>
                       </div>
                     </div>
                   </div>
 
-                  {/* Preview Content */}
-                  <div className="p-4">
-                    <h3 className="text-lg font-semibold mb-2">{settings.portalTitle}</h3>
-                    <p className="text-sm text-gray-600 mb-4">{settings.portalDescription}</p>
-
-                    {/* Sample Product Cards */}
-                    <div className="grid grid-cols-2 gap-3">
+                  {/* Top Programs — matches live portal section below hero */}
+                  <div className="px-5 py-4" style={{ backgroundColor: settings.backgroundColor || "#FFFFFF" }}>
+                    <h3 className="text-sm font-bold mb-3" style={{ fontFamily: settings.fontFamily, color: getContrastColor(settings.backgroundColor || "#FFFFFF") }}>Top Programs</h3>
+                    <div className="grid grid-cols-4 gap-2">
                       {[1, 2, 3, 4].map((i) => (
-                        <div key={i} className="border rounded-lg p-2">
+                        <div key={i} className="rounded-lg overflow-hidden border border-border/50">
                           <div
-                            className="h-20 rounded mb-2"
-                            style={{ 
-                              background: settings.primaryColor?.includes("linear-gradient") 
-                                ? settings.primaryColor 
-                                : `${settings.primaryColor}20`,
-                              opacity: settings.primaryColor?.includes("linear-gradient") ? 0.2 : 1
+                            className="h-14"
+                            style={{
+                              background: settings.primaryColor?.includes("linear-gradient")
+                                ? settings.primaryColor
+                                : `${settings.primaryColor}25`,
+                              opacity: settings.primaryColor?.includes("linear-gradient") ? 0.35 : 1,
                             }}
                           />
-                          <div className="h-3 bg-gray-200 rounded w-3/4 mb-1" />
-                          <div className="h-2 bg-gray-100 rounded w-1/2" />
+                          <div className="p-1.5">
+                            <div className="h-2 bg-gray-200 rounded w-3/4 mb-1" />
+                            <div className="h-1.5 bg-gray-100 rounded w-1/2" />
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -2131,8 +2453,8 @@ export default function PortalPage() {
 
                   {/* Preview Footer */}
                   <div
-                    className="text-white p-4 text-xs"
-                    style={{ backgroundColor: settings.footerColor || "#000000" }}
+                    className="p-4 text-xs"
+                    style={{ backgroundColor: settings.navFooterColor || "#000000", color: getContrastColor(settings.navFooterColor || "#000000") }}
                   >
                     {/* 3-column grid layout matching actual footer */}
                     <div className="grid grid-cols-4 gap-3">
@@ -2230,6 +2552,137 @@ export default function PortalPage() {
         )}
       </div>
       <ToastManager toasts={toasts} onDismiss={dismiss} />
+
+      {/* ── Logo Crop Dialog ── */}
+      {logoCropOpen && typeof document !== "undefined" && createPortal(
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="w-full max-w-lg bg-card rounded-2xl shadow-2xl ring-1 ring-border overflow-hidden flex flex-col">
+
+            {/* Header */}
+            <div className="px-5 pt-4 pb-2 flex items-center justify-between border-b border-border">
+              <h3 className="text-sm font-semibold text-foreground">Crop Logo</h3>
+              <button
+                onClick={handleLogoCloseDialog}
+                className="p-1.5 rounded-full hover:bg-muted transition-colors"
+              >
+                <X className="h-4 w-4 text-muted-foreground" />
+              </button>
+            </div>
+
+            {/* Aspect ratio chips */}
+            <div className="px-5 pt-3 pb-2 flex items-center gap-1">
+              <button
+                onClick={() => {
+                  setLogoCropIsCustom(true)
+                  // Reset to a full-image free selection
+                  setLogoCrop({ unit: "%", x: 5, y: 5, width: 90, height: 90 })
+                  setLogoCropPixels(null)
+                }}
+                className={`text-[11px] font-medium px-3 py-1 rounded-full border transition-all ${
+                  logoCropIsCustom
+                    ? "bg-foreground text-background border-foreground"
+                    : "text-muted-foreground border-border hover:border-foreground/30 hover:text-foreground"
+                }`}
+              >
+                Free
+              </button>
+              {([
+                { label: "1:1", preset: LOGO_ASPECT_PRESETS[0] },
+                { label: "3:1", preset: LOGO_ASPECT_PRESETS[1] },
+                { label: "5:1", preset: LOGO_ASPECT_PRESETS[2] },
+                { label: "16:9", preset: LOGO_ASPECT_PRESETS[3] },
+              ] as const).map(({ label, preset }) => {
+                const isActive = !logoCropIsCustom && logoCropPreset.label === preset.label
+                return (
+                  <button
+                    key={label}
+                    onClick={() => {
+                      if (isActive) {
+                        // Clicking the active ratio returns to Free
+                        setLogoCropIsCustom(true)
+                        setLogoCrop({ unit: "%", x: 5, y: 5, width: 90, height: 90 })
+                        setLogoCropPixels(null)
+                      } else {
+                        setLogoCropIsCustom(false)
+                        setLogoCropPreset(preset)
+                        setLogoCropPixels(null)
+                        // Use image dimensions if the img is already mounted, else fall back
+                        const img = logoCropImgRef.current
+                        if (img && img.naturalWidth) {
+                          setLogoCrop(makeCenteredAspectCrop(preset.ratio, img.width, img.height))
+                        } else {
+                          setLogoCrop({ unit: "%", x: 5, y: 5, width: 90, height: 90 })
+                        }
+                      }
+                    }}
+                    className={`text-[11px] font-medium px-3 py-1 rounded-full border transition-all ${
+                      isActive
+                        ? "bg-foreground text-background border-foreground"
+                        : "text-muted-foreground border-border hover:border-foreground/30 hover:text-foreground"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Crop canvas — neutral background works for both light and dark logos */}
+            <div className="bg-muted/60 flex items-center justify-center overflow-auto border-y border-border" style={{ minHeight: 280, maxHeight: 440 }}>
+              {logoCropSrc && (
+                <ReactCrop
+                  crop={logoCrop}
+                  onChange={(c) => setLogoCrop(c)}
+                  onComplete={(px) => setLogoCropPixels(px)}
+                  aspect={logoCropIsCustom ? undefined : logoCropPreset.ratio}
+                >
+                  <img
+                    ref={logoCropImgRef}
+                    src={logoCropSrc}
+                    alt="Crop preview"
+                    onLoad={() => {
+                      // Always start in Free mode regardless of any previous state
+                      setLogoCropIsCustom(true)
+                      setLogoCrop({ unit: "%", x: 5, y: 5, width: 90, height: 90 })
+                      setLogoCropPixels(null)
+                    }}
+                    style={{ maxHeight: 440, maxWidth: "100%", display: "block" }}
+                  />
+                </ReactCrop>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-5 py-4 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => { handleLogoCloseDialog(); logoFileInputRef.current?.click() }}
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Use different image
+              </button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleLogoCloseDialog}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={logoCropApplying || !logoCropPixels}
+                  onClick={handleLogoCropApply}
+                >
+                  {logoCropApplying ? "Saving…" : "Done"}
+                </Button>
+              </div>
+            </div>
+
+          </div>
+        </div>,
+        document.body
+      )}
     </Layout>
   )
 }

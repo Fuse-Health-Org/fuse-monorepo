@@ -2,12 +2,13 @@ import type { AppProps } from 'next/app'
 import Head from 'next/head'
 import { useRouter } from 'next/router'
 import { Analytics } from "@vercel/analytics/next"
-import { useState, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { ThemeProvider } from '@/contexts/ThemeContext'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import { ToastManager } from '@/components/ui/toast'
 import "../styles/globals.css"
+import "react-image-crop/dist/ReactCrop.css"
 
 // Pages that don't require authentication
 const publicPages = ['/signin', '/signup', '/verify-email', '/terms', '/privacy', '/privacy-notice', '/forgot-password']
@@ -15,6 +16,13 @@ const publicPages = ['/signin', '/signup', '/verify-email', '/terms', '/privacy'
 export default function App({ Component, pageProps }: AppProps & { showToast?: (type: 'success' | 'error', message: string) => void }) {
   const router = useRouter()
   const isPublicPage = publicPages.includes(router.pathname)
+  // Embedded pages (?embedded=1) skip ProtectedRoute so the auth loading
+  // screen and full sidebar never flash inside the iframe.
+  // useState+useEffect keeps server/client in sync (avoids hydration mismatch).
+  const [isEmbedded, setIsEmbedded] = useState(false)
+  useEffect(() => {
+    setIsEmbedded(new URLSearchParams(window.location.search).get('embedded') === '1')
+  }, [])
 
   const [toasts, setToasts] = useState<Array<{ id: string; type: 'success' | 'error'; message: string }>>([])
 
@@ -32,7 +40,7 @@ export default function App({ Component, pageProps }: AppProps & { showToast?: (
 
   const content = (
     <div className="font-sans">
-      {isPublicPage ? (
+      {isPublicPage || isEmbedded ? (
         <Component {...pageProps} showToast={showToast} />
       ) : (
         <ProtectedRoute>

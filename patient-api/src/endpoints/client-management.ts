@@ -360,6 +360,7 @@ export function registerClientManagementEndpoints(
           retriedProductSelectionForCurrentCycle,
           tutorialFinished,
           customMaxProducts,
+          customMerchantServiceFeePercent,
           planType,
         } = req.body;
 
@@ -398,6 +399,14 @@ export function registerClientManagementEndpoints(
             customMaxProducts === null || customMaxProducts === ""
               ? null
               : parseInt(customMaxProducts as string);
+        }
+
+        // Allow setting a per-brand negotiated merchant service fee (null = use tier default)
+        if (customMerchantServiceFeePercent !== undefined) {
+          updates.customMerchantServiceFeePercent =
+            customMerchantServiceFeePercent === null || customMerchantServiceFeePercent === ""
+              ? null
+              : parseFloat(customMerchantServiceFeePercent as string);
         }
 
         // Allow changing planType

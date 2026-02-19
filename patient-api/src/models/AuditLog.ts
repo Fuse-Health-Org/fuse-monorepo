@@ -56,6 +56,7 @@ export enum AuditResourceType {
   CLINIC = 'Clinic',
   PRODUCT = 'Product',
   DOCUMENT = 'Document',
+  PROGRAM = 'Program',
 }
 
 @Table({

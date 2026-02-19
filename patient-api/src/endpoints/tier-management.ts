@@ -29,8 +29,11 @@ export function registerTierManagementEndpoints(
       const { planId } = req.params;
       const { maxProducts, name, monthlyPrice, introMonthlyPrice, introMonthlyPriceDurationMonths, stripePriceId, introMonthlyPriceStripeId } = req.body;
 
+      console.log(`🔍 [Plan PATCH] planId=${planId} body=`, req.body);
+
       const plan = await BrandSubscriptionPlans.findByPk(planId);
       if (!plan) {
+        console.warn(`⚠️ [Plan PATCH] Plan not found: ${planId}`);
         return res.status(404).json({ success: false, message: "Plan not found" });
       }
 
@@ -44,11 +47,13 @@ export function registerTierManagementEndpoints(
         updates.name = name.trim();
       }
 
-      // monthlyPrice: allow setting a valid positive number
+      // monthlyPrice: allow setting a valid positive number (including 0)
       if (monthlyPrice !== undefined && monthlyPrice !== null) {
-        const parsed = parseFloat(monthlyPrice);
+        const parsed = parseFloat(String(monthlyPrice));
         if (!isNaN(parsed) && parsed >= 0) {
           updates.monthlyPrice = parsed;
+        } else {
+          console.warn(`⚠️ [Plan PATCH] Invalid monthlyPrice value: ${monthlyPrice}`);
         }
       }
 
@@ -75,11 +80,13 @@ export function registerTierManagementEndpoints(
       }
 
       if (Object.keys(updates).length === 0) {
+        console.warn(`⚠️ [Plan PATCH] No valid fields to update for planId=${planId}`);
         return res.status(400).json({ success: false, message: "No valid fields to update" });
       }
 
-      await plan.update(updates);
-      console.log(`✅ Updated plan ${plan.name}:`, updates);
+      console.log(`📝 [Plan PATCH] Applying updates to ${plan.name}:`, updates);
+      await plan.update(updates, { validate: false });
+      console.log(`✅ [Plan PATCH] Updated plan ${plan.name}:`, updates);
 
       res.status(200).json({
         success: true,
@@ -87,11 +94,9 @@ export function registerTierManagementEndpoints(
         data: plan.toJSON(),
       });
     } catch (error) {
-      console.error(
-        "❌ Error updating plan:",
-        error instanceof Error ? error.message : String(error)
-      );
-      res.status(500).json({ success: false, message: "Failed to update plan" });
+      console.error("❌ [Plan PATCH] Error updating plan:", error);
+      const message = error instanceof Error ? error.message : String(error);
+      res.status(500).json({ success: false, message: `Failed to update plan: ${message}` });
     }
   });
 
@@ -195,6 +200,7 @@ export function registerTierManagementEndpoints(
           customTierCardText,
           isCustomTierCardTextActive,
           fuseFeePercent,
+          merchantServiceFeePercent,
         } = req.body;
 
         // Check if plan exists
@@ -249,6 +255,10 @@ export function registerTierManagementEndpoints(
               typeof fuseFeePercent === "number"
                 ? fuseFeePercent
                 : null,
+            merchantServiceFeePercent:
+              typeof merchantServiceFeePercent === "number"
+                ? merchantServiceFeePercent
+                : null,
           });
           console.log(`✅ Created TierConfiguration for plan: ${plan.name}`);
         } else {
@@ -290,6 +300,10 @@ export function registerTierManagementEndpoints(
 
           if (fuseFeePercent !== undefined) {
             updates.fuseFeePercent = typeof fuseFeePercent === "number" ? fuseFeePercent : null;
+          }
+
+          if (merchantServiceFeePercent !== undefined) {
+            updates.merchantServiceFeePercent = typeof merchantServiceFeePercent === "number" ? merchantServiceFeePercent : null;
           }
 
           await config.update(updates);
