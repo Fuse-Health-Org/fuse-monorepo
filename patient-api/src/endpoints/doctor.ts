@@ -719,6 +719,12 @@ export function registerDoctorEndpoints(
           });
         }
 
+        // Audit log: Prescription viewing (PHI access)
+        // Log view for each prescription found
+        for (const prescription of prescriptions) {
+          await AuditService.logPrescriptionView(req, prescription.id);
+        }
+
         // Calculate prescription days from the first prescription (they should all have the same duration)
         const firstPrescription = prescriptions[0];
         const writtenAt = new Date(firstPrescription.writtenAt);
@@ -905,6 +911,22 @@ export function registerDoctorEndpoints(
         console.log(
           `✅ Created ${createdExtensions.length} prescription extension(s) for order ${order.orderNumber}`
         );
+
+        // Audit log: Prescription extension creation (PHI modification)
+        for (const ext of createdExtensions) {
+          await AuditService.logFromRequest(req, {
+            action: AuditAction.CREATE,
+            resourceType: AuditResourceType.PRESCRIPTION,
+            resourceId: ext.id,
+            details: {
+              operation: 'prescription_extension',
+              originalPrescriptionId: ext.prescriptionId,
+              extensionDays,
+              previousExpiresAt: ext.previousExpiresAt,
+              newExpiresAt: ext.expiresAt
+            }
+          });
+        }
 
         return res.json({
           success: true,
