@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "pnpm with-env next dev -p 3030",
+    "dev": "wait-on tcp:localhost:3001 && pnpm with-env next dev -p 3030",
     "build": "NODE_ENV=production pnpm with-env next build",
     "build:windows": "cross-env NODE_ENV=production pnpm with-env next build",
     "start": "next start -p 3030",
