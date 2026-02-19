@@ -166,6 +166,7 @@ function BelugaDashboardPage() {
   const [messageResults, setMessageResults] = React.useState<Record<string, string>>({});
   const [chatMessagesByMaster, setChatMessagesByMaster] = React.useState<Record<string, BelugaChatMessage[]>>({});
   const [chatLoadingByMaster, setChatLoadingByMaster] = React.useState<Record<string, boolean>>({});
+  const [selectedChatMasterId, setSelectedChatMasterId] = React.useState("");
   const [nameFirst, setNameFirst] = React.useState("");
   const [nameLast, setNameLast] = React.useState("");
   const [accountResult, setAccountResult] = React.useState<string | null>(null);
@@ -182,6 +183,7 @@ function BelugaDashboardPage() {
       const visitList: BelugaVisit[] = Array.isArray((res.data as any)?.data) ? (res.data as any).data : [];
       setVisits(visitList);
       setSelectedMasterId(visitList[0]?.masterId || "");
+      setSelectedChatMasterId((prev) => prev || visitList[0]?.masterId || "");
       setNameFirst(user?.firstName || "");
       setNameLast(user?.lastName || "");
     } catch (err: any) {
@@ -221,12 +223,14 @@ function BelugaDashboardPage() {
 
   React.useEffect(() => {
     if (activeTab !== "messages" || visits.length === 0) return;
-    visits.forEach((visit) => {
-      if (!chatMessagesByMaster[visit.masterId]) {
-        loadChatMessages(visit.masterId);
-      }
-    });
-  }, [activeTab, visits, chatMessagesByMaster, loadChatMessages]);
+    if (!selectedChatMasterId || !visits.some((visit) => visit.masterId === selectedChatMasterId)) {
+      setSelectedChatMasterId(visits[0].masterId);
+      return;
+    }
+    if (!chatMessagesByMaster[selectedChatMasterId]) {
+      loadChatMessages(selectedChatMasterId);
+    }
+  }, [activeTab, visits, selectedChatMasterId, chatMessagesByMaster, loadChatMessages]);
 
   const handleSendMessage = async (masterId: string, customerService = false) => {
     const draft = customerService ? csDrafts[masterId] : messageDrafts[masterId];
@@ -280,6 +284,8 @@ function BelugaDashboardPage() {
   const totalRx = visits.reduce((acc, item) => acc + item.rxHistory.length, 0);
   const activeVisits = visits.filter((v) => v.visitStatus && ["active", "pending", "holding", "admin"].includes(v.visitStatus.toLowerCase())).length;
   const resolvedVisits = visits.filter((v) => (v.resolvedStatus || "").toLowerCase() === "closed").length;
+  const selectedChatVisit = visits.find((visit) => visit.masterId === selectedChatMasterId) || null;
+  const selectedChatMessages = selectedChatMasterId ? (chatMessagesByMaster[selectedChatMasterId] || []) : [];
   const isOutboundMessage = (message: BelugaChatMessage) => message.source === "outbound";
   const getSenderLabel = (message: BelugaChatMessage) => {
     if (isOutboundMessage(message)) return "You";
@@ -478,7 +484,7 @@ function BelugaDashboardPage() {
             )}
 
             {activeTab === "messages" && (
-              <div className="max-w-4xl mx-auto space-y-4">
+              <div className="max-w-6xl mx-auto space-y-4">
                 {loading && (
                   <Card>
                     <CardBody className="p-6 text-sm text-foreground-500">
@@ -493,127 +499,179 @@ function BelugaDashboardPage() {
                     </CardBody>
                   </Card>
                 )}
-                {visits.map((visit) => (
-                  <Card key={`chat-${visit.masterId}`}>
-                    <CardBody className="p-6 space-y-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <h3 className="font-semibold">
-                            {visit.formObj?.patientPreference?.map(p => p.name).filter(Boolean).join(", ") || "Beluga Visit"}
-                          </h3>
-                          <p className="text-xs text-foreground-400 mt-0.5">masterId: {visit.masterId}</p>
-                        </div>
-                        <span className="text-xs px-2 py-1 rounded bg-content2">
-                          {(visit.visitStatus || "pending").toUpperCase()}
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                        <div className="rounded-xl bg-content2 p-3 space-y-3">
-                          <div className="flex items-center justify-between">
-                            <h4 className="text-sm font-semibold text-foreground-700">Provider Chat</h4>
-                            <span className="text-[11px] text-foreground-500">patient_chat</span>
+                {visits.length > 0 && (
+                  <Card>
+                    <CardBody className="p-0 md:p-0">
+                      <div className="grid grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)] min-h-[560px]">
+                        <div className="border-b lg:border-b-0 lg:border-r border-content3 bg-content1">
+                          <div className="px-4 py-3 border-b border-content3">
+                            <h3 className="text-sm font-semibold text-foreground-700">Conversations</h3>
+                            <p className="text-xs text-foreground-500">{visits.length} master IDs</p>
                           </div>
-                          <div className="max-h-72 overflow-y-auto space-y-2 rounded-lg bg-content1 p-3">
-                            {chatLoadingByMaster[visit.masterId] ? (
-                              <p className="text-xs text-foreground-400">Loading provider conversation...</p>
-                            ) : (chatMessagesByMaster[visit.masterId] || []).filter((message) => message.channel === "patient_chat").length > 0 ? (
-                              (chatMessagesByMaster[visit.masterId] || [])
-                                .filter((message) => message.channel === "patient_chat")
-                                .map((message) => {
-                                  const outbound = isOutboundMessage(message);
-                                  return (
-                                    <div key={message.id} className={`flex ${outbound ? "justify-end" : "justify-start"}`}>
-                                      <div className={`max-w-[85%] rounded-2xl px-3 py-2 ${outbound ? "bg-teal-600 text-white" : "bg-content2 text-foreground-700"}`}>
-                                        <p className={`text-[11px] font-semibold ${outbound ? "text-white/90" : "text-foreground-500"}`}>
-                                          {getSenderLabel(message)}
-                                        </p>
-                                        <p className={`text-sm ${outbound ? "text-white" : "text-foreground-700"}`}>
-                                          {message.message || "(no text)"}
-                                        </p>
-                                        <p className={`text-[11px] mt-1 ${outbound ? "text-white/80" : "text-foreground-400"}`}>
-                                          {new Date(message.createdAt).toLocaleString()}
-                                        </p>
-                                      </div>
-                                    </div>
-                                  );
-                                })
-                            ) : (
-                              <p className="text-xs text-foreground-400">No provider messages for this visit yet.</p>
-                            )}
+                          <div className="max-h-[520px] overflow-y-auto p-2 space-y-2">
+                            {visits.map((visit) => {
+                              const isSelected = visit.masterId === selectedChatMasterId;
+                              const visitMessages = chatMessagesByMaster[visit.masterId] || [];
+                              const lastMessage = visitMessages[visitMessages.length - 1];
+                              return (
+                                <button
+                                  key={`chat-nav-${visit.masterId}`}
+                                  type="button"
+                                  className={`w-full text-left rounded-lg p-3 border transition ${
+                                    isSelected
+                                      ? "bg-teal-500/10 border-teal-500/30"
+                                      : "bg-content1 border-content3 hover:bg-content2"
+                                  }`}
+                                  onClick={() => {
+                                    setSelectedChatMasterId(visit.masterId);
+                                    if (!chatMessagesByMaster[visit.masterId]) {
+                                      loadChatMessages(visit.masterId);
+                                    }
+                                  }}
+                                >
+                                  <p className="text-xs text-foreground-400 truncate">masterId</p>
+                                  <p className="text-sm font-medium text-foreground-700 truncate">{visit.masterId}</p>
+                                  <p className="text-xs text-foreground-500 mt-1 truncate">
+                                    {visit.formObj?.patientPreference?.map((p) => p.name).filter(Boolean).join(", ") || "Beluga Visit"}
+                                  </p>
+                                  <p className="text-[11px] text-foreground-400 mt-1 truncate">
+                                    {lastMessage?.message || "No messages yet"}
+                                  </p>
+                                </button>
+                              );
+                            })}
                           </div>
-                          <Textarea
-                            label="Message to Provider"
-                            value={messageDrafts[visit.masterId] || ""}
-                            onValueChange={(value) =>
-                              setMessageDrafts((prev) => ({ ...prev, [visit.masterId]: value }))
-                            }
-                            placeholder="Type message for Beluga doctor..."
-                          />
-                          <Button
-                            className="bg-teal-600 text-white"
-                            onPress={() => handleSendMessage(visit.masterId, false)}
-                            isDisabled={!messageDrafts[visit.masterId]?.trim()}
-                          >
-                            Send Patient Message
-                          </Button>
                         </div>
 
-                        <div className="rounded-xl bg-content2 p-3 space-y-3">
-                          <div className="flex items-center justify-between">
-                            <h4 className="text-sm font-semibold text-foreground-700">Customer Service Chat</h4>
-                            <span className="text-[11px] text-foreground-500">customer_service</span>
-                          </div>
-                          <div className="max-h-72 overflow-y-auto space-y-2 rounded-lg bg-content1 p-3">
-                            {chatLoadingByMaster[visit.masterId] ? (
-                              <p className="text-xs text-foreground-400">Loading customer service conversation...</p>
-                            ) : (chatMessagesByMaster[visit.masterId] || []).filter((message) => message.channel === "customer_service").length > 0 ? (
-                              (chatMessagesByMaster[visit.masterId] || [])
-                                .filter((message) => message.channel === "customer_service")
-                                .map((message) => {
-                                  const outbound = isOutboundMessage(message);
-                                  return (
-                                    <div key={message.id} className={`flex ${outbound ? "justify-end" : "justify-start"}`}>
-                                      <div className={`max-w-[85%] rounded-2xl px-3 py-2 ${outbound ? "bg-teal-600 text-white" : "bg-content2 text-foreground-700"}`}>
-                                        <p className={`text-[11px] font-semibold ${outbound ? "text-white/90" : "text-foreground-500"}`}>
-                                          {getSenderLabel(message)}
-                                        </p>
-                                        <p className={`text-sm ${outbound ? "text-white" : "text-foreground-700"}`}>
-                                          {message.message || "(no text)"}
-                                        </p>
-                                        <p className={`text-[11px] mt-1 ${outbound ? "text-white/80" : "text-foreground-400"}`}>
-                                          {new Date(message.createdAt).toLocaleString()}
-                                        </p>
-                                      </div>
-                                    </div>
-                                  );
-                                })
-                            ) : (
-                              <p className="text-xs text-foreground-400">No CS messages for this visit yet.</p>
-                            )}
-                          </div>
-                          <Textarea
-                            label="Message to Customer Service"
-                            value={csDrafts[visit.masterId] || ""}
-                            onValueChange={(value) =>
-                              setCsDrafts((prev) => ({ ...prev, [visit.masterId]: value }))
-                            }
-                            placeholder="Type message for Beluga admin..."
-                          />
-                          <Button
-                            variant="flat"
-                            onPress={() => handleSendMessage(visit.masterId, true)}
-                            isDisabled={!csDrafts[visit.masterId]?.trim()}
-                          >
-                            Send CS Message
-                          </Button>
+                        <div className="p-4 md:p-6 space-y-4">
+                          {selectedChatVisit ? (
+                            <>
+                              <div className="flex items-center justify-between gap-3">
+                                <div>
+                                  <h3 className="font-semibold">
+                                    {selectedChatVisit.formObj?.patientPreference?.map((p) => p.name).filter(Boolean).join(", ") || "Beluga Visit"}
+                                  </h3>
+                                  <p className="text-xs text-foreground-400 mt-0.5">masterId: {selectedChatVisit.masterId}</p>
+                                </div>
+                                <span className="text-xs px-2 py-1 rounded bg-content2">
+                                  {(selectedChatVisit.visitStatus || "pending").toUpperCase()}
+                                </span>
+                              </div>
+
+                              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                                <div className="rounded-xl bg-content2 p-3 space-y-3">
+                                  <div className="flex items-center justify-between">
+                                    <h4 className="text-sm font-semibold text-foreground-700">Provider Chat</h4>
+                                    <span className="text-[11px] text-foreground-500">patient_chat</span>
+                                  </div>
+                                  <div className="max-h-72 overflow-y-auto space-y-2 rounded-lg bg-content1 p-3">
+                                    {chatLoadingByMaster[selectedChatVisit.masterId] ? (
+                                      <p className="text-xs text-foreground-400">Loading provider conversation...</p>
+                                    ) : selectedChatMessages.filter((message) => message.channel === "patient_chat").length > 0 ? (
+                                      selectedChatMessages
+                                        .filter((message) => message.channel === "patient_chat")
+                                        .map((message) => {
+                                          const outbound = isOutboundMessage(message);
+                                          return (
+                                            <div key={message.id} className={`flex ${outbound ? "justify-end" : "justify-start"}`}>
+                                              <div className={`max-w-[85%] rounded-2xl px-3 py-2 ${outbound ? "bg-teal-600 text-white" : "bg-content2 text-foreground-700"}`}>
+                                                <p className={`text-[11px] font-semibold ${outbound ? "text-white/90" : "text-foreground-500"}`}>
+                                                  {getSenderLabel(message)}
+                                                </p>
+                                                <p className={`text-sm ${outbound ? "text-white" : "text-foreground-700"}`}>
+                                                  {message.message || "(no text)"}
+                                                </p>
+                                                <p className={`text-[11px] mt-1 ${outbound ? "text-white/80" : "text-foreground-400"}`}>
+                                                  {new Date(message.createdAt).toLocaleString()}
+                                                </p>
+                                              </div>
+                                            </div>
+                                          );
+                                        })
+                                    ) : (
+                                      <p className="text-xs text-foreground-400">No provider messages for this visit yet.</p>
+                                    )}
+                                  </div>
+                                  <Textarea
+                                    label="Message to Provider"
+                                    value={messageDrafts[selectedChatVisit.masterId] || ""}
+                                    onValueChange={(value) =>
+                                      setMessageDrafts((prev) => ({ ...prev, [selectedChatVisit.masterId]: value }))
+                                    }
+                                    placeholder="Type message for Beluga doctor..."
+                                  />
+                                  <Button
+                                    className="bg-teal-600 text-white"
+                                    onPress={() => handleSendMessage(selectedChatVisit.masterId, false)}
+                                    isDisabled={!messageDrafts[selectedChatVisit.masterId]?.trim()}
+                                  >
+                                    Send Patient Message
+                                  </Button>
+                                </div>
+
+                                <div className="rounded-xl bg-content2 p-3 space-y-3">
+                                  <div className="flex items-center justify-between">
+                                    <h4 className="text-sm font-semibold text-foreground-700">Customer Service Chat</h4>
+                                    <span className="text-[11px] text-foreground-500">customer_service</span>
+                                  </div>
+                                  <div className="max-h-72 overflow-y-auto space-y-2 rounded-lg bg-content1 p-3">
+                                    {chatLoadingByMaster[selectedChatVisit.masterId] ? (
+                                      <p className="text-xs text-foreground-400">Loading customer service conversation...</p>
+                                    ) : selectedChatMessages.filter((message) => message.channel === "customer_service").length > 0 ? (
+                                      selectedChatMessages
+                                        .filter((message) => message.channel === "customer_service")
+                                        .map((message) => {
+                                          const outbound = isOutboundMessage(message);
+                                          return (
+                                            <div key={message.id} className={`flex ${outbound ? "justify-end" : "justify-start"}`}>
+                                              <div className={`max-w-[85%] rounded-2xl px-3 py-2 ${outbound ? "bg-teal-600 text-white" : "bg-content2 text-foreground-700"}`}>
+                                                <p className={`text-[11px] font-semibold ${outbound ? "text-white/90" : "text-foreground-500"}`}>
+                                                  {getSenderLabel(message)}
+                                                </p>
+                                                <p className={`text-sm ${outbound ? "text-white" : "text-foreground-700"}`}>
+                                                  {message.message || "(no text)"}
+                                                </p>
+                                                <p className={`text-[11px] mt-1 ${outbound ? "text-white/80" : "text-foreground-400"}`}>
+                                                  {new Date(message.createdAt).toLocaleString()}
+                                                </p>
+                                              </div>
+                                            </div>
+                                          );
+                                        })
+                                    ) : (
+                                      <p className="text-xs text-foreground-400">No CS messages for this visit yet.</p>
+                                    )}
+                                  </div>
+                                  <Textarea
+                                    label="Message to Customer Service"
+                                    value={csDrafts[selectedChatVisit.masterId] || ""}
+                                    onValueChange={(value) =>
+                                      setCsDrafts((prev) => ({ ...prev, [selectedChatVisit.masterId]: value }))
+                                    }
+                                    placeholder="Type message for Beluga admin..."
+                                  />
+                                  <Button
+                                    variant="flat"
+                                    onPress={() => handleSendMessage(selectedChatVisit.masterId, true)}
+                                    isDisabled={!csDrafts[selectedChatVisit.masterId]?.trim()}
+                                  >
+                                    Send CS Message
+                                  </Button>
+                                </div>
+                              </div>
+
+                              {messageResults[selectedChatVisit.masterId] && (
+                                <p className="text-sm text-foreground-500">{messageResults[selectedChatVisit.masterId]}</p>
+                              )}
+                            </>
+                          ) : (
+                            <p className="text-sm text-foreground-500">Select a conversation to view messages.</p>
+                          )}
                         </div>
                       </div>
-                      {messageResults[visit.masterId] && (
-                        <p className="text-sm text-foreground-500">{messageResults[visit.masterId]}</p>
-                      )}
                     </CardBody>
                   </Card>
-                ))}
+                )}
               </div>
             )}
 
