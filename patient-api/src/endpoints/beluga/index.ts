@@ -1360,14 +1360,6 @@ router.post("/visits/:masterId/preferences", authenticateJWT, async (req: Reques
       });
     }
 
-    const masterIds = await getBelugaPatientMasterIdsByPhone(phone);
-    if (!masterIds.includes(masterId)) {
-      return res.status(404).json({
-        success: false,
-        message: "Beluga visit not found for current user",
-      });
-    }
-
     const visitResponse = await belugaRequest(`/visit/externalFetch/${encodeURIComponent(masterId)}`, { method: "GET" }, { allowHttpErrors: true });
     if (visitResponse.statusCode >= 400 || visitResponse.payload?.status !== 200) {
       return res.status(404).json({
@@ -1376,6 +1368,44 @@ router.post("/visits/:masterId/preferences", authenticateJWT, async (req: Reques
         details: visitResponse.payload || null,
       });
     }
+
+    const masterIds = await getBelugaPatientMasterIdsByPhone(phone);
+    const belongsByPhoneList = masterIds.includes(masterId);
+    const visitPhone = onlyDigits(toNonEmptyString(visitResponse.payload?.data?.formObj?.phone || "") || "");
+    const belongsByVisitPhone = visitPhone.length === 10 && visitPhone === phone;
+    const order = await findBelugaOrderByMasterId(masterId);
+    const belongsByOrder = Boolean(order && String((order as any).userId) === String(currentUser.id));
+    if (!belongsByPhoneList && !belongsByVisitPhone && !belongsByOrder) {
+      return res.status(404).json({
+        success: false,
+        message: "Beluga visit not found for current user",
+      });
+    }
+
+    const existingVisitPreferences = normalizeBelugaPatientPreferenceArray(
+      visitResponse.payload?.data?.formObj?.patientPreference
+    );
+    if (existingVisitPreferences.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Beluga visit has no existing patientPreference to update",
+      });
+    }
+    if (patientPreference.length !== existingVisitPreferences.length) {
+      return res.status(400).json({
+        success: false,
+        message: "patientPreference length must match existing Beluga visit preferences",
+      });
+    }
+
+    const sanitizedPatientPreference = existingVisitPreferences.map((existing, index) => {
+      const incoming = patientPreference[index];
+      return {
+        ...incoming,
+        // medId must remain immutable for the existing visit preference slot.
+        medId: existing.medId,
+      };
+    });
 
     const pharmacyId =
       requestedPharmacyId ||
@@ -1396,7 +1426,7 @@ router.post("/visits/:masterId/preferences", authenticateJWT, async (req: Reques
         body: {
           masterId,
           pharmacyId,
-          patientPreference,
+          patientPreference: sanitizedPatientPreference,
           apiKey: resolveBelugaApiKey(),
         },
       },

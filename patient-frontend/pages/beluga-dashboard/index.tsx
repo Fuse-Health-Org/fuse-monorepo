@@ -340,21 +340,6 @@ function BelugaDashboardPage() {
     });
   };
 
-  const handleAddPreference = (masterId: string) => {
-    setPreferenceDraftsByMaster((prev) => ({
-      ...prev,
-      [masterId]: [...(prev[masterId] || []), toDraftPreference()],
-    }));
-  };
-
-  const handleRemovePreference = (masterId: string, index: number) => {
-    setPreferenceDraftsByMaster((prev) => {
-      const current = prev[masterId] || [];
-      const next = current.filter((_, itemIndex) => itemIndex !== index);
-      return { ...prev, [masterId]: next.length > 0 ? next : [toDraftPreference()] };
-    });
-  };
-
   const handleSavePreferences = async (visit: BelugaVisit) => {
     const masterId = visit.masterId;
     const draftRows = preferenceDraftsByMaster[masterId] || [];
@@ -658,14 +643,9 @@ function BelugaDashboardPage() {
                               Edit Preferences
                             </Button>
                           ) : (
-                            <div className="flex items-center gap-2">
-                              <Button size="sm" variant="light" onPress={() => handleAddPreference(visit.masterId)}>
-                                Add Medication
-                              </Button>
-                              <Button size="sm" variant="light" onPress={() => handleCancelPreferenceEdit(visit.masterId)}>
-                                Cancel
-                              </Button>
-                            </div>
+                            <Button size="sm" variant="light" onPress={() => handleCancelPreferenceEdit(visit.masterId)}>
+                              Cancel
+                            </Button>
                           )}
                         </div>
 
@@ -684,7 +664,8 @@ function BelugaDashboardPage() {
                                     size="sm"
                                     label="Med ID"
                                     value={pref.medId}
-                                    onValueChange={(value) => handlePreferenceFieldChange(visit.masterId, idx, "medId", value)}
+                                    isReadOnly
+                                    description="Med ID is fixed and cannot be edited."
                                   />
                                   <Input
                                     size="sm"
@@ -710,17 +691,6 @@ function BelugaDashboardPage() {
                                     value={pref.daysSupply}
                                     onValueChange={(value) => handlePreferenceFieldChange(visit.masterId, idx, "daysSupply", value)}
                                   />
-                                </div>
-                                <div className="flex justify-end">
-                                  <Button
-                                    size="sm"
-                                    variant="light"
-                                    color="danger"
-                                    isDisabled={preferenceDraftsByMaster[visit.masterId].length <= 1}
-                                    onPress={() => handleRemovePreference(visit.masterId, idx)}
-                                  >
-                                    Remove
-                                  </Button>
                                 </div>
                               </div>
                             ))}
