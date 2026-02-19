@@ -991,6 +991,19 @@ visitStatus: String (ONLY: “active”, “pending”, “admin”, “resolved
 updateTimestamp: Date (datetime format YYYY-MM-DDTHH:mm:ss.sssZ),
 resolvedStatus: String (ONLY: “open”, “closed”),
 resolvedTimestamp: Date (datetime format YYYY-MM-DDTHH:mm:ss.sssZ) (ONLY included if resolvedStatus = “closed”),
+"labResults": [
+      {
+        "screeningDate": String,
+        "testName": String,
+        "testResult": String,
+        "testResultUnits": String,
+        "refRange": String,
+        "statusIndicator": String,
+        "reportDate": String,
+        "deviceType": String
+      },
+      ...
+],
 data: {
 formObj: {
 consentsSigned: Boolean,

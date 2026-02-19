@@ -948,6 +948,11 @@ router.get("/my-visits", authenticateJWT, async (req: Request, res: Response) =>
           visitStatus: visitData?.visitStatus || null,
           resolvedStatus: visitData?.resolvedStatus || null,
           updateTimestamp: visitData?.updateTimestamp || null,
+          labResults: Array.isArray(visitData?.labResults)
+            ? visitData.labResults
+            : Array.isArray(visitData?.data?.labResults)
+              ? visitData.data.labResults
+              : [],
           visitType: visitData?.data?.visitType || null,
           formObj: visitData?.data?.formObj || null,
           rxHistory: Array.isArray(visitData?.data?.rxHistory) ? visitData.data.rxHistory : [],

@@ -47,6 +47,16 @@ interface BelugaVisit {
     }>;
     intakeResults?: Array<{ question: string; answer: string }>;
   } | null;
+  labResults: Array<{
+    screeningDate?: string;
+    testName?: string;
+    testResult?: string;
+    testResultUnits?: string;
+    refRange?: string;
+    statusIndicator?: string;
+    reportDate?: string;
+    deviceType?: string;
+  }>;
   rxHistory: Array<{
     rxTimestamp?: string;
     name?: string;
@@ -727,6 +737,32 @@ function BelugaDashboardPage() {
                                     rx.quantity && `Qty: ${rx.quantity}`,
                                     rx.refills && `Refills: ${rx.refills}`,
                                     rx.pharmacyName && `Pharmacy: ${rx.pharmacyName}`,
+                                  ].filter(Boolean).join(" · ")}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Lab Results */}
+                      <div>
+                        <p className="text-xs font-medium text-foreground-500 mb-1.5 uppercase tracking-wide">Lab Results</p>
+                        {visit.labResults.length === 0 ? (
+                          <p className="text-sm text-foreground-400">No lab results available for this visit.</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {visit.labResults.map((lab, idx) => (
+                              <div key={`${visit.masterId}-lab-${idx}`} className="p-3 rounded-lg bg-content2 text-sm">
+                                <p className="font-medium">{lab.testName || "Lab Test"}</p>
+                                <p className="text-foreground-500 text-xs mt-0.5">
+                                  {[
+                                    lab.testResult && `Result: ${lab.testResult}${lab.testResultUnits ? ` ${lab.testResultUnits}` : ""}`,
+                                    lab.refRange && `Ref Range: ${lab.refRange}`,
+                                    lab.statusIndicator && `Status: ${lab.statusIndicator}`,
+                                    lab.reportDate && `Reported: ${new Date(lab.reportDate).toLocaleDateString()}`,
+                                    lab.screeningDate && `Screened: ${new Date(lab.screeningDate).toLocaleDateString()}`,
+                                    lab.deviceType && `Device: ${lab.deviceType}`,
                                   ].filter(Boolean).join(" · ")}
                                 </p>
                               </div>
