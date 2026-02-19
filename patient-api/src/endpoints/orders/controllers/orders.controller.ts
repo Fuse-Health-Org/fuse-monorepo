@@ -27,6 +27,7 @@ import { Op } from "sequelize";
 const orderService = new OrderService();
 
 
+/** @deprecated Not used by any frontend. Order creation goes through main.ts checkout flow. */
 export const createPaymentIntent = async (req: Request, res: Response) => {
     try {
         const currentUser = getCurrentUser(req);
