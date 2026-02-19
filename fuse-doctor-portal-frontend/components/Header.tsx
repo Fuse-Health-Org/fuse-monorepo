@@ -1,12 +1,45 @@
-import { Search, MoreHorizontal, LogOut, Sun, Moon } from "lucide-react"
+import { Search, MoreHorizontal, LogOut, Sun, Moon, Timer } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useAuth } from "@/contexts/AuthContext"
 import { useTheme } from "@/contexts/ThemeContext"
+import { useState, useEffect } from "react"
+
+function getTokenExpiry(token: string): number | null {
+    try {
+        const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))
+        return typeof payload.exp === 'number' ? payload.exp : null
+    } catch { return null }
+}
+
+function formatCountdown(s: number): string {
+    if (s <= 0) return 'Expired'
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60
+    if (h > 0) return `${h}h ${String(m).padStart(2,'0')}m ${String(sec).padStart(2,'0')}s`
+    return `${String(m).padStart(2,'0')}m ${String(sec).padStart(2,'0')}s`
+}
 
 export function Header() {
-    const { user, logout } = useAuth()
+    const { user, token, logout } = useAuth()
     const { theme, toggleTheme } = useTheme()
+    const [secondsLeft, setSecondsLeft] = useState<number | null>(null)
+
+    useEffect(() => {
+        const activeToken = localStorage.getItem('doctor_token') || token
+        if (!activeToken) { setSecondsLeft(null); return }
+        const expiry = getTokenExpiry(activeToken)
+        if (!expiry) { setSecondsLeft(null); return }
+        const update = () => {
+            const remaining = Math.max(0, expiry - Math.floor(Date.now() / 1000))
+            setSecondsLeft(remaining)
+            if (remaining === 0) logout({ message: 'Your session has expired. Please sign in again.' })
+        }
+        update()
+        const id = setInterval(update, 1000)
+        return () => clearInterval(id)
+    }, [token])
+
+    const isExpiringSoon = secondsLeft !== null && secondsLeft > 0 && secondsLeft <= 300
 
     return (
         <header className="border-b border-border bg-background px-6 py-4">
@@ -21,6 +54,16 @@ export function Header() {
 
                 {/* Right side */}
                 <div className="flex items-center space-x-4">
+                    {secondsLeft !== null && (
+                        <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono font-medium tabular-nums border transition-colors ${
+                            secondsLeft === 0 ? 'bg-red-500/10 border-red-500/30 text-red-500'
+                            : isExpiringSoon ? 'bg-amber-500/10 border-amber-500/30 text-amber-500'
+                            : 'bg-muted/40 border-border/50 text-muted-foreground'}`}
+                            title="Time until your session expires">
+                            <Timer className="h-3 w-3 shrink-0" />
+                            {formatCountdown(secondsLeft)}
+                        </div>
+                    )}
                     {/* Theme Toggle */}
                     <Button
                         variant="ghost"

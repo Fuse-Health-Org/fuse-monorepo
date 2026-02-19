@@ -26,7 +26,9 @@ export default function SignIn() {
   const [resendCooldown, setResendCooldown] = React.useState(0);
   const mfaInputRefs = React.useRef<(HTMLInputElement | null)[]>([]);
   const router = useRouter();
-  const { refreshUser } = useAuth();
+  const { refreshUser, overrideToken } = useAuth();
+  const [shortSession, setShortSession] = React.useState(false);
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
   // Check for error message from query params
   React.useEffect(() => {
@@ -70,6 +72,14 @@ export default function SignIn() {
       const token = result.data?.token || result.data?.data?.token;
       if (token) {
         localStorage.setItem('auth-token', token);
+        if (shortSession) {
+          const res = await fetch(`${API_BASE_URL}/auth/debug/short-token`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const data = await res.json();
+          if (data.success && data.token) overrideToken(data.token);
+        }
         console.log('✅ Token stored in localStorage from signin component');
         
         // Verify token was stored
@@ -449,6 +459,19 @@ export default function SignIn() {
                     </Link>
                   </div>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShortSession(v => !v)}
+                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-medium transition-colors ${
+                    shortSession
+                      ? 'bg-secondary-100 border-secondary-300 text-secondary-700'
+                      : 'border-default-300 text-default-500 hover:text-default-700 hover:bg-default-100'
+                  }`}
+                >
+                  <Icon icon="lucide:flask-conical" className="h-3.5 w-3.5 shrink-0" />
+                  {shortSession ? 'Short session active — token expires in 1 min' : 'Short session (debug)'}
+                </button>
 
                 <Button
                   type="submit"

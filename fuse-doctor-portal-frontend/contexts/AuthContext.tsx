@@ -36,6 +36,7 @@ interface AuthContextType {
     mfa: MfaState
     signup: (email: string, password: string, name: string) => Promise<boolean>
     logout: (options?: { message?: string }) => void
+    overrideToken: (newToken: string) => void
     authenticatedFetch: (input: RequestInfo | URL, init?: RequestInit & { skipLogoutOn401?: boolean }) => Promise<Response>
     apiClient: ApiClient
     isLoading: boolean
@@ -340,6 +341,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 mfa,
                 signup,
                 logout,
+                overrideToken: (newToken: string) => {
+                    localStorage.setItem('doctor_token', newToken)
+                    setToken(newToken)
+                },
                 authenticatedFetch,
                 apiClient,
                 isLoading,

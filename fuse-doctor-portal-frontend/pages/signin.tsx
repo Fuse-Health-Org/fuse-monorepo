@@ -5,15 +5,18 @@ import Link from 'next/link'
 import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Eye, EyeOff, Stethoscope, Mail, ArrowLeft, RefreshCw } from 'lucide-react'
+import { Eye, EyeOff, Stethoscope, Mail, ArrowLeft, RefreshCw, FlaskConical } from 'lucide-react'
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
 
 export default function SignIn() {
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [showPassword, setShowPassword] = useState(false)
+    const [shortSession, setShortSession] = useState(false)
     const [mfaCode, setMfaCode] = useState(['', '', '', '', '', ''])
     const [resendCooldown, setResendCooldown] = useState(0)
-    const { login, verifyMfa, resendMfaCode, cancelMfa, mfa, isLoading, error, user } = useAuth()
+    const { login, verifyMfa, resendMfaCode, cancelMfa, mfa, overrideToken, isLoading, error, user } = useAuth()
     const router = useRouter()
     const [successMessage, setSuccessMessage] = useState<string | null>(null)
     const mfaInputRefs = useRef<(HTMLInputElement | null)[]>([])
@@ -56,6 +59,15 @@ export default function SignIn() {
 
         const result = await login(email, password)
         if (result === true) {
+            if (shortSession) {
+                const freshToken = localStorage.getItem('doctor_token')
+                const res = await fetch(`${API_BASE_URL}/auth/debug/short-token`, {
+                    method: 'POST',
+                    headers: { Authorization: `Bearer ${freshToken}` },
+                })
+                const data = await res.json()
+                if (data.success && data.token) overrideToken(data.token)
+            }
             router.push('/')
         }
     }
@@ -339,6 +351,19 @@ export default function SignIn() {
                                         </button>
                                     </div>
                                 </div>
+
+                                <button
+                                    type="button"
+                                    onClick={() => setShortSession(v => !v)}
+                                    className={`w-full flex items-center gap-2 px-3 py-2 rounded-md border text-xs font-medium transition-colors ${
+                                        shortSession
+                                            ? 'bg-purple-500/10 border-purple-500/30 text-purple-600'
+                                            : 'border-border text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                                    }`}
+                                >
+                                    <FlaskConical className="h-3.5 w-3.5 shrink-0" />
+                                    {shortSession ? 'Short session active — token expires in 1 min' : 'Short session (debug)'}
+                                </button>
 
                                 <Button
                                     type="submit"

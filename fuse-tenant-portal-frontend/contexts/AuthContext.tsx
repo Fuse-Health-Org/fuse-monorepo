@@ -24,6 +24,7 @@ interface AuthContextType {
   cancelMfa: () => void
   mfa: MfaState
   logout: () => void
+  overrideToken: (newToken: string) => void
   isLoading: boolean
   error: string | null
 }
@@ -230,6 +231,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       cancelMfa,
       mfa,
       logout,
+      overrideToken: (newToken: string) => {
+        localStorage.setItem('tenant_token', newToken)
+        setToken(newToken)
+      },
       isLoading,
       error
     }}>

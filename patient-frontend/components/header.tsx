@@ -15,8 +15,38 @@ interface Patient {
   lastName?: string;
 }
 
+function getTokenExpiry(token: string): number | null {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))
+    return typeof payload.exp === 'number' ? payload.exp : null
+  } catch { return null }
+}
+
+function formatCountdown(s: number): string {
+  if (s <= 0) return 'Expired'
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60
+  if (h > 0) return `${h}h ${String(m).padStart(2,'0')}m ${String(sec).padStart(2,'0')}s`
+  return `${String(m).padStart(2,'0')}m ${String(sec).padStart(2,'0')}s`
+}
+
 export const Header: React.FC = () => {
   const { user, signOut } = useAuth();
+  const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
+
+  useEffect(() => {
+    const token = localStorage.getItem('auth-token');
+    if (!token) { setSecondsLeft(null); return; }
+    const expiry = getTokenExpiry(token);
+    if (!expiry) { setSecondsLeft(null); return; }
+    const update = () => {
+      const remaining = Math.max(0, expiry - Math.floor(Date.now() / 1000));
+      setSecondsLeft(remaining);
+      if (remaining === 0) signOut();
+    };
+    update();
+    const id = setInterval(update, 1000);
+    return () => clearInterval(id);
+  }, []);
   const primaryRole = getPrimaryRole(user);
   const isSuperAdmin = hasRole(user, "superAdmin");
 
@@ -180,6 +210,16 @@ export const Header: React.FC = () => {
         )}
 
         <div className="flex items-center gap-4">
+          {secondsLeft !== null && (
+            <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono font-medium tabular-nums border transition-colors ${
+              secondsLeft === 0 ? 'bg-danger-100 border-danger-300 text-danger'
+              : secondsLeft <= 300 ? 'bg-warning-100 border-warning-300 text-warning-700'
+              : 'bg-default-100 border-default-300 text-default-600'}`}
+              title="Time until your session expires">
+              <Icon icon="lucide:timer" className="h-3 w-3 shrink-0" />
+              {formatCountdown(secondsLeft)}
+            </div>
+          )}
           {/* Dashboard Selector - Switch between Fuse and MDI dashboards */}
           <DashboardSelector />
           {/* User Profile Dropdown */}
