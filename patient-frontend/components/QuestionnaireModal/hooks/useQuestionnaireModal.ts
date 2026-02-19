@@ -232,7 +232,9 @@ export function useQuestionnaireModal(
   const belugaIntroStepsOffset = isBeluga ? 2 : 0;
   const isBelugaConsentStep = isBeluga && currentStepIndex === 0;
   const isBelugaPhotoStep = isBeluga && currentStepIndex === 1;
-  const shouldSkipUserProfileSteps = Boolean(accountCreated || userId || isAuthenticatedUser);
+  // Skip user_profile only after this flow has a confirmed user context.
+  // A leftover auth token alone should not skip "Create Your Account".
+  const shouldSkipUserProfileSteps = Boolean(accountCreated || userId);
 
   const isProductSelectionStep = useCallback((): boolean => {
     if (!questionnaire) return false;
