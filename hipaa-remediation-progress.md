@@ -21,16 +21,13 @@
 ---
 
 | `patient-api/src/services/mdIntegration/MDWebhook.service.ts` | Raw JSON.stringify dumps of full Rx/offering payloads (sig, clinical_note, directions, instructions, accessLink) | `10fec0b` | **Done** |
+| `patient-api/src/endpoints/olympia-pharmacy/olympia-admin.ts` | Full req.body/response dumps for patient create/search/update/prescription (name, DOB, email, allergies, sig) | `048a1d9` | **Done** |
 
 ---
 
-### ⏳ Pending — Requires Review Before Proceeding
+## ✅ P0 Backend PHI Remediation Complete
 
-| File | Issue | Risk | Notes |
-|------|-------|------|-------|
-| `patient-api/src/endpoints/olympia-pharmacy/olympia-admin.ts` | L66-131: Full `req.body`/response logged for patient create/search/update/prescription | **CRITICAL** | Review all endpoints in this file before editing |
-
-**→ Review this file and define a plan before editing.**
+All 8 backend P0 issues fixed with atomic commits. Ready for review.
 
 ---
 
