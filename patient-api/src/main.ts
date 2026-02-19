@@ -4,7 +4,6 @@ import helmet from "helmet";
 import cors from "cors";
 import multer from "multer";
 import dns from "dns/promises";
-import jwt from "jsonwebtoken";
 import { initializeDatabase } from "./config/database";
 import { MedicalCompanySlug } from "@fuse/enums";
 import { MailsSender } from "@services/mailsSender";
@@ -128,6 +127,7 @@ import payoutsRoutes from "@endpoints/payouts/routes/payouts.routes";
 import { tenantRoutes } from "@endpoints/tenant";
 import refundsRoutes from "@endpoints/refunds";
 import refundRequestsRoutes from "@endpoints/refund-requests";
+import { impersonationRoutes } from "@endpoints/impersonation";
 import belugaProductsRoutes from "@endpoints/beluga-products";
 import RefundRequest from "@models/RefundRequest";
 import BelugaProduct from "@models/BelugaProduct";
@@ -405,6 +405,7 @@ app.use("/", payoutsRoutes);
 app.use("/", tenantRoutes);
 app.use("/", refundsRoutes);
 app.use("/", refundRequestsRoutes);
+app.use("/", impersonationRoutes);
 // Clone 'doctor' steps from master_template into a target questionnaire (preserve order)
 app.post(
   "/questionnaires/clone-doctor-from-master",
@@ -7968,145 +7969,6 @@ app.get("/admin/patients/list", authenticateJWT, async (req, res) => {
       console.error("❌ Error listing patients:", error);
     }
     res.status(500).json({ success: false, message: "Failed to list patients" });
-  }
-});
-
-// Admin: Start impersonating a user
-app.post("/admin/impersonate", authenticateJWT, async (req, res) => {
-  try {
-    const currentUser = getCurrentUser(req);
-    if (!currentUser) {
-      return res.status(401).json({ success: false, message: "Not authenticated" });
-    }
-
-    // Only superAdmins can impersonate
-    const admin = await User.findByPk(currentUser.id, {
-      include: [{ model: UserRoles, as: "userRoles", required: false }],
-    });
-    if (!admin || !admin.hasRoleSync("superAdmin")) {
-      return res.status(403).json({ success: false, message: "Forbidden: SuperAdmin access required" });
-    }
-
-    const { userId } = req.body;
-    if (!userId) {
-      return res.status(400).json({ success: false, message: "userId is required" });
-    }
-
-    // Fetch the user to impersonate
-    const targetUser = await User.findByPk(userId, {
-      include: [{ model: UserRoles, as: "userRoles", required: false }],
-    });
-    if (!targetUser) {
-      return res.status(404).json({ success: false, message: "User not found" });
-    }
-
-    // Only allow impersonating patients
-    if (!targetUser.hasRoleSync("patient")) {
-      return res.status(400).json({ success: false, message: "Can only impersonate patients" });
-    }
-
-    // Create impersonation JWT token
-    const impersonationToken = jwt.sign(
-      {
-        userId: targetUser.id,
-        userRole: "patient", // Always patient for impersonation
-        clinicId: targetUser.clinicId,
-        loginTime: new Date().toISOString(),
-        impersonatedBy: admin.id, // Store original admin ID
-        impersonating: true,
-      },
-      process.env.JWT_SECRET!,
-      { expiresIn: "24h" }
-    );
-
-    // Audit log: admin impersonation start
-    await AuditService.logImpersonateStart(
-      req,
-      admin.id,
-      targetUser.id,
-      targetUser.email
-    );
-
-    res.status(200).json({
-      success: true,
-      data: {
-        token: impersonationToken,
-        impersonatedUser: {
-          id: targetUser.id,
-          email: targetUser.email,
-          firstName: targetUser.firstName,
-          lastName: targetUser.lastName,
-        },
-      },
-    });
-  } catch (error) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("❌ Error starting impersonation:", error);
-    }
-    res.status(500).json({ success: false, message: "Failed to start impersonation" });
-  }
-});
-
-// Admin: Exit impersonation and return to original admin account
-app.post("/admin/exit-impersonation", authenticateJWT, async (req, res) => {
-  try {
-    const currentUser = getCurrentUser(req);
-    if (!currentUser) {
-      return res.status(401).json({ success: false, message: "Not authenticated" });
-    }
-
-    // Check if currently impersonating
-    const impersonatedBy = (req as any).user?.impersonatedBy;
-    if (!impersonatedBy) {
-      return res.status(400).json({ success: false, message: "Not currently impersonating" });
-    }
-
-    // Fetch the original admin user
-    const admin = await User.findByPk(impersonatedBy, {
-      include: [{ model: UserRoles, as: "userRoles", required: false }],
-    });
-    if (!admin) {
-      return res.status(404).json({ success: false, message: "Original admin user not found" });
-    }
-
-    // Determine admin role for JWT
-    let adminRole: string = "admin";
-    if (admin.hasRoleSync("superAdmin")) {
-      adminRole = "superAdmin";
-    } else if (admin.hasRoleSync("admin")) {
-      adminRole = "admin";
-    }
-
-    // Create new JWT token for original admin
-    const adminToken = jwt.sign(
-      {
-        userId: admin.id,
-        userRole: adminRole,
-        clinicId: admin.clinicId,
-        loginTime: new Date().toISOString(),
-      },
-      process.env.JWT_SECRET!,
-      { expiresIn: "24h" }
-    );
-
-    // Audit log: admin impersonation end
-    await AuditService.logImpersonateEnd(
-      req,
-      admin.id,
-      currentUser.id // The user ID that was impersonated
-    );
-
-    res.status(200).json({
-      success: true,
-      data: {
-        token: adminToken,
-      },
-    });
-  } catch (error) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("❌ Error exiting impersonation:", error);
-    }
-    res.status(500).json({ success: false, message: "Failed to exit impersonation" });
   }
 });
 
