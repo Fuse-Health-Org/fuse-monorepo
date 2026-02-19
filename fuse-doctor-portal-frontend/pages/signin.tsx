@@ -270,7 +270,7 @@ export default function SignIn() {
                         </CardHeader>
                         <CardContent>
                             <form onSubmit={handleSubmit} className="space-y-4">
-                                {error && (
+                                {error && !successMessage && (
                                     <div className={`p-4 text-sm rounded-md ${
                                         error.includes('under review') || error.includes('pending')
                                             ? 'text-blue-800 bg-blue-50 border border-blue-200'
@@ -295,7 +295,11 @@ export default function SignIn() {
                                 )}
 
                                 {successMessage && (
-                                    <div className="p-3 text-sm text-green-600 bg-green-50 border border-green-200 rounded-md">
+                                    <div className={`p-3 text-sm rounded-md border ${
+                                        successMessage.toLowerCase().includes('expired') || successMessage.toLowerCase().includes('session')
+                                            ? 'text-amber-700 bg-amber-50 border-amber-200'
+                                            : 'text-green-600 bg-green-50 border-green-200'
+                                    }`}>
                                         {successMessage}
                                     </div>
                                 )}
