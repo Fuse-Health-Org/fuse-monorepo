@@ -12,6 +12,7 @@ import Payment from "../models/Payment";
 import Prescription from "../models/Prescription";
 import { createJWTToken } from "../config/jwt";
 import { AuditService } from "../services/audit.service";
+import { AuditAction, AuditResourceType } from "../models/AuditLog";
 
 export function registerClientManagementEndpoints(
   app: Express,
@@ -616,6 +617,11 @@ export function registerClientManagementEndpoints(
         where: { userId }
       });
 
+      // Track which roles changed for audit log
+      const changedRoles: string[] = [];
+      const oldRoleValues: Record<string, boolean> = {};
+      const newRoleValues: Record<string, boolean> = {};
+
       if (!userRoles) {
         // Create new UserRoles record
         userRoles = await UserRoles.create({
@@ -628,27 +634,101 @@ export function registerClientManagementEndpoints(
           affiliate: affiliate ?? false,
         });
         console.log(`✅ [Client Mgmt] Created UserRoles for user ${userId}`);
-      } else {
-        // Update existing roles
-        const updates: any = {};
-        if (typeof patient === "boolean") updates.patient = patient;
-        if (typeof doctor === "boolean") updates.doctor = doctor;
-        if (typeof admin === "boolean") updates.admin = admin;
-        if (typeof brand === "boolean") updates.brand = brand;
-        if (typeof superAdmin === "boolean") updates.superAdmin = superAdmin;
-        if (typeof affiliate === "boolean") updates.affiliate = affiliate;
 
-        await userRoles.update(updates);
-        console.log(
-          `✅ [Client Mgmt] Updated UserRoles for user ${userId}:`,
-          updates
-        );
+        // All provided roles are "changed" since this is a new record
+        if (typeof patient === "boolean") {
+          changedRoles.push("patient");
+          newRoleValues.patient = patient;
+        }
+        if (typeof doctor === "boolean") {
+          changedRoles.push("doctor");
+          newRoleValues.doctor = doctor;
+        }
+        if (typeof admin === "boolean") {
+          changedRoles.push("admin");
+          newRoleValues.admin = admin;
+        }
+        if (typeof brand === "boolean") {
+          changedRoles.push("brand");
+          newRoleValues.brand = brand;
+        }
+        if (typeof superAdmin === "boolean") {
+          changedRoles.push("superAdmin");
+          newRoleValues.superAdmin = superAdmin;
+        }
+        if (typeof affiliate === "boolean") {
+          changedRoles.push("affiliate");
+          newRoleValues.affiliate = affiliate;
+        }
+      } else {
+        // Update existing roles - track changes
+        const updates: any = {};
+
+        if (typeof patient === "boolean" && userRoles.patient !== patient) {
+          updates.patient = patient;
+          changedRoles.push("patient");
+          oldRoleValues.patient = userRoles.patient;
+          newRoleValues.patient = patient;
+        }
+        if (typeof doctor === "boolean" && userRoles.doctor !== doctor) {
+          updates.doctor = doctor;
+          changedRoles.push("doctor");
+          oldRoleValues.doctor = userRoles.doctor;
+          newRoleValues.doctor = doctor;
+        }
+        if (typeof admin === "boolean" && userRoles.admin !== admin) {
+          updates.admin = admin;
+          changedRoles.push("admin");
+          oldRoleValues.admin = userRoles.admin;
+          newRoleValues.admin = admin;
+        }
+        if (typeof brand === "boolean" && userRoles.brand !== brand) {
+          updates.brand = brand;
+          changedRoles.push("brand");
+          oldRoleValues.brand = userRoles.brand;
+          newRoleValues.brand = brand;
+        }
+        if (typeof superAdmin === "boolean" && userRoles.superAdmin !== superAdmin) {
+          updates.superAdmin = superAdmin;
+          changedRoles.push("superAdmin");
+          oldRoleValues.superAdmin = userRoles.superAdmin;
+          newRoleValues.superAdmin = superAdmin;
+        }
+        if (typeof affiliate === "boolean" && userRoles.affiliate !== affiliate) {
+          updates.affiliate = affiliate;
+          changedRoles.push("affiliate");
+          oldRoleValues.affiliate = userRoles.affiliate;
+          newRoleValues.affiliate = affiliate;
+        }
+
+        if (Object.keys(updates).length > 0) {
+          await userRoles.update(updates);
+          console.log(
+            `✅ [Client Mgmt] Updated UserRoles for user ${userId}:`,
+            updates
+          );
+        }
       }
 
       // Also update the deprecated role field to the first active role for backwards compatibility
       const activeRoles = userRoles.getActiveRoles();
       if (activeRoles.length > 0) {
         await targetUser.update({ role: activeRoles[0] });
+      }
+
+      // Audit log: Role change (CRITICAL for security)
+      if (changedRoles.length > 0) {
+        await AuditService.logFromRequest(req, {
+          action: AuditAction.ROLE_CHANGE,
+          resourceType: AuditResourceType.USER,
+          resourceId: targetUser.id,
+          details: {
+            changedRoles,
+            oldValues: oldRoleValues,
+            newValues: newRoleValues,
+            targetUserEmail: targetUser.email
+          }
+        });
       }
 
       res.status(200).json({
@@ -714,6 +794,12 @@ export function registerClientManagementEndpoints(
         where: { userId }
       });
 
+      // Track changed roles for audit log
+      const changedRoles: string[] = [];
+      const oldRoleValues: Record<string, boolean> = {};
+      const newRoleValues: Record<string, boolean> = {};
+      const oldRole = targetUser.role;
+
       if (!userRoles) {
         userRoles = await UserRoles.create({
           userId,
@@ -723,14 +809,51 @@ export function registerClientManagementEndpoints(
           brand: role === "brand",
           affiliate: role === "affiliate",
         });
+
+        // Track all role changes (all are being set)
+        changedRoles.push("patient", "doctor", "admin", "brand", "affiliate");
+        newRoleValues.patient = role === "patient";
+        newRoleValues.doctor = role === "doctor";
+        newRoleValues.admin = role === "admin";
+        newRoleValues.brand = role === "brand";
+        newRoleValues.affiliate = role === "affiliate";
       } else {
-        await userRoles.update({
+        // Track what actually changed
+        const newValues = {
           patient: role === "patient",
           doctor: role === "doctor",
           admin: role === "admin",
           brand: role === "brand",
           affiliate: role === "affiliate",
-        });
+        };
+
+        if (userRoles.patient !== newValues.patient) {
+          changedRoles.push("patient");
+          oldRoleValues.patient = userRoles.patient;
+          newRoleValues.patient = newValues.patient;
+        }
+        if (userRoles.doctor !== newValues.doctor) {
+          changedRoles.push("doctor");
+          oldRoleValues.doctor = userRoles.doctor;
+          newRoleValues.doctor = newValues.doctor;
+        }
+        if (userRoles.admin !== newValues.admin) {
+          changedRoles.push("admin");
+          oldRoleValues.admin = userRoles.admin;
+          newRoleValues.admin = newValues.admin;
+        }
+        if (userRoles.brand !== newValues.brand) {
+          changedRoles.push("brand");
+          oldRoleValues.brand = userRoles.brand;
+          newRoleValues.brand = newValues.brand;
+        }
+        if (userRoles.affiliate !== newValues.affiliate) {
+          changedRoles.push("affiliate");
+          oldRoleValues.affiliate = userRoles.affiliate;
+          newRoleValues.affiliate = newValues.affiliate;
+        }
+
+        await userRoles.update(newValues);
       }
 
       // Update the deprecated role field for backwards compatibility
@@ -739,6 +862,24 @@ export function registerClientManagementEndpoints(
       console.log(
         `✅ [Client Mgmt] Updated user ${userId} role to ${role} (legacy endpoint)`
       );
+
+      // Audit log: Role change (CRITICAL for security)
+      if (changedRoles.length > 0) {
+        await AuditService.logFromRequest(req, {
+          action: AuditAction.ROLE_CHANGE,
+          resourceType: AuditResourceType.USER,
+          resourceId: targetUser.id,
+          details: {
+            endpoint: "legacy_single_role",
+            changedRoles,
+            oldValues: oldRoleValues,
+            newValues: newRoleValues,
+            oldDeprecatedRole: oldRole,
+            newDeprecatedRole: role,
+            targetUserEmail: targetUser.email
+          }
+        });
+      }
 
       res.status(200).json({
         success: true,
