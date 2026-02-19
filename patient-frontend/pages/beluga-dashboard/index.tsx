@@ -1,6 +1,6 @@
 import React from "react";
 import { motion } from "framer-motion";
-import { Button, Avatar, Card, CardBody, Input, Textarea } from "@heroui/react";
+import { Button, Avatar, Card, CardBody, Input } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { ProtectedRoute } from "../../components/ProtectedRoute";
 import { useAuth } from "../../contexts/AuthContext";
@@ -545,128 +545,166 @@ function BelugaDashboardPage() {
                           </div>
                         </div>
 
-                        <div className="p-4 md:p-6 space-y-4">
+                        <div className="p-4 md:p-6 h-full">
                           {selectedChatVisit ? (
-                            <>
+                            <div className="h-full flex flex-col gap-4">
                               <div className="flex items-center justify-between gap-3">
                                 <div>
-                                  <h3 className="font-semibold">
+                                  <h2 className="text-2xl font-semibold">
+                                    {selectedChatChannel === "patient_chat" ? "Chat with your Doctor" : "Customer Service Chat"}
+                                  </h2>
+                                  <p className="text-sm text-foreground-500 mt-1">
                                     {selectedChatVisit.formObj?.patientPreference?.map((p) => p.name).filter(Boolean).join(", ") || "Beluga Visit"}
-                                  </h3>
-                                  <p className="text-xs text-foreground-400 mt-0.5">masterId: {selectedChatVisit.masterId}</p>
+                                  </p>
+                                  <p className="text-xs text-foreground-400 mt-1">masterId: {selectedChatVisit.masterId}</p>
                                 </div>
                                 <span className="text-xs px-2 py-1 rounded bg-content2">
                                   {(selectedChatVisit.visitStatus || "pending").toUpperCase()}
                                 </span>
                               </div>
 
-                              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                                <div className="rounded-xl bg-content2 p-3 space-y-3 xl:col-span-2">
-                                  <div className="flex items-center justify-between">
-                                    <h4 className="text-sm font-semibold text-foreground-700">
-                                      {selectedChatChannel === "patient_chat" ? "Provider Chat" : "Customer Service Chat"}
-                                    </h4>
-                                    <span className="text-[11px] text-foreground-500">{selectedChatChannel}</span>
-                                  </div>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  size="sm"
+                                  variant={selectedChatChannel === "patient_chat" ? "flat" : "light"}
+                                  className={selectedChatChannel === "patient_chat" ? "bg-teal-600 text-white" : ""}
+                                  onPress={() => setSelectedChatChannel("patient_chat")}
+                                >
+                                  Patient Chat
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant={selectedChatChannel === "customer_service" ? "flat" : "light"}
+                                  className={selectedChatChannel === "customer_service" ? "bg-teal-600 text-white" : ""}
+                                  onPress={() => setSelectedChatChannel("customer_service")}
+                                >
+                                  CS Chat
+                                </Button>
+                              </div>
 
-                                  <div className="flex items-center gap-2">
-                                    <Button
-                                      size="sm"
-                                      variant={selectedChatChannel === "patient_chat" ? "flat" : "light"}
-                                      className={selectedChatChannel === "patient_chat" ? "bg-teal-600 text-white" : ""}
-                                      onPress={() => setSelectedChatChannel("patient_chat")}
-                                    >
-                                      Patient Chat
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant={selectedChatChannel === "customer_service" ? "flat" : "light"}
-                                      className={selectedChatChannel === "customer_service" ? "bg-teal-600 text-white" : ""}
-                                      onPress={() => setSelectedChatChannel("customer_service")}
-                                    >
-                                      CS Chat
-                                    </Button>
-                                  </div>
-
-                                  <div className="max-h-80 overflow-y-auto space-y-2 rounded-lg bg-content1 p-3">
-                                    {chatLoadingByMaster[selectedChatVisit.masterId] ? (
-                                      <p className="text-xs text-foreground-400">
-                                        {selectedChatChannel === "patient_chat"
-                                          ? "Loading provider conversation..."
-                                          : "Loading customer service conversation..."}
+                              <Card className="flex-1 border border-content3 overflow-hidden">
+                                <CardBody className="p-0 flex flex-col h-full">
+                                  <div className="flex items-center gap-3 p-4 border-b border-content3">
+                                    <Avatar
+                                      name={selectedChatChannel === "patient_chat" ? "Provider" : "Customer Service"}
+                                      size="md"
+                                      fallback={
+                                        <span className="text-xl">
+                                          {selectedChatChannel === "patient_chat" ? "👨‍⚕️" : "🛟"}
+                                        </span>
+                                      }
+                                    />
+                                    <div className="flex-1">
+                                      <h3 className="font-medium">
+                                        {selectedChatChannel === "patient_chat" ? "Beluga Provider" : "Beluga Customer Service"}
+                                      </h3>
+                                      <p className="text-sm text-foreground-500">
+                                        {selectedChatChannel === "patient_chat" ? "Doctor" : "Support"}
                                       </p>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-content1">
+                                    {chatLoadingByMaster[selectedChatVisit.masterId] ? (
+                                      <div className="flex justify-center items-center h-full">
+                                        <p className="text-xs text-foreground-400">
+                                          {selectedChatChannel === "patient_chat"
+                                            ? "Loading provider conversation..."
+                                            : "Loading customer service conversation..."}
+                                        </p>
+                                      </div>
                                     ) : selectedChannelMessages.length > 0 ? (
                                       selectedChannelMessages.map((message) => {
                                         const outbound = isOutboundMessage(message);
                                         return (
                                           <div key={message.id} className={`flex ${outbound ? "justify-end" : "justify-start"}`}>
-                                            <div className={`max-w-[85%] rounded-2xl px-3 py-2 ${outbound ? "bg-teal-600 text-white" : "bg-content2 text-foreground-700"}`}>
-                                              <p className={`text-[11px] font-semibold ${outbound ? "text-white/90" : "text-foreground-500"}`}>
-                                                {getSenderLabel(message)}
-                                              </p>
-                                              <p className={`text-sm ${outbound ? "text-white" : "text-foreground-700"}`}>
-                                                {message.message || "(no text)"}
-                                              </p>
-                                              <p className={`text-[11px] mt-1 ${outbound ? "text-white/80" : "text-foreground-400"}`}>
-                                                {new Date(message.createdAt).toLocaleString()}
-                                              </p>
+                                            <div className={`max-w-[80%] ${outbound ? "" : "flex gap-3"}`}>
+                                              {!outbound && (
+                                                <Avatar
+                                                  name={getSenderLabel(message)}
+                                                  size="sm"
+                                                  className="mt-1"
+                                                  fallback={
+                                                    <span className="text-sm">
+                                                      {selectedChatChannel === "patient_chat" ? "👨‍⚕️" : "🛟"}
+                                                    </span>
+                                                  }
+                                                />
+                                              )}
+                                              <div>
+                                                {!outbound && (
+                                                  <div className="flex items-center gap-2 mb-1">
+                                                    <span className="font-medium text-sm">{getSenderLabel(message)}</span>
+                                                  </div>
+                                                )}
+                                                <div
+                                                  className={`p-3 rounded-lg ${outbound
+                                                    ? "bg-teal-600 text-white"
+                                                    : "bg-content2 text-foreground"
+                                                    }`}
+                                                >
+                                                  <p>{message.message || "(no text)"}</p>
+                                                </div>
+                                                <div className="text-xs text-foreground-400 mt-1">
+                                                  {new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                                </div>
+                                              </div>
                                             </div>
                                           </div>
                                         );
                                       })
                                     ) : (
-                                      <p className="text-xs text-foreground-400">
+                                      <div className="flex justify-center items-center h-full text-sm text-foreground-400">
                                         {selectedChatChannel === "patient_chat"
-                                          ? "No provider messages for this visit yet."
-                                          : "No CS messages for this visit yet."}
-                                      </p>
+                                          ? "No provider messages yet. Write the first one!"
+                                          : "No customer service messages yet. Write the first one!"}
+                                      </div>
                                     )}
                                   </div>
 
-                                  {selectedChatChannel === "patient_chat" ? (
-                                    <>
-                                      <Textarea
-                                        label="Message to Provider"
-                                        value={messageDrafts[selectedChatVisit.masterId] || ""}
-                                        onValueChange={(value) =>
-                                          setMessageDrafts((prev) => ({ ...prev, [selectedChatVisit.masterId]: value }))
-                                        }
-                                        placeholder="Type message for Beluga doctor..."
+                                  <div className="p-3 border-t border-content3">
+                                    <div className="flex gap-2 items-center">
+                                      <Input
+                                        placeholder={selectedChatChannel === "patient_chat"
+                                          ? "Type a message to provider..."
+                                          : "Type a message to customer service..."}
+                                        value={selectedChatChannel === "patient_chat"
+                                          ? (messageDrafts[selectedChatVisit.masterId] || "")
+                                          : (csDrafts[selectedChatVisit.masterId] || "")}
+                                        onValueChange={(value) => {
+                                          if (selectedChatChannel === "patient_chat") {
+                                            setMessageDrafts((prev) => ({ ...prev, [selectedChatVisit.masterId]: value }));
+                                          } else {
+                                            setCsDrafts((prev) => ({ ...prev, [selectedChatVisit.masterId]: value }));
+                                          }
+                                        }}
+                                        onKeyDown={(e) => {
+                                          if (e.key === "Enter" && !e.shiftKey) {
+                                            e.preventDefault();
+                                            handleSendMessage(selectedChatVisit.masterId, selectedChatChannel === "customer_service");
+                                          }
+                                        }}
+                                        className="w-full"
                                       />
                                       <Button
+                                        isIconOnly
                                         className="bg-teal-600 text-white"
-                                        onPress={() => handleSendMessage(selectedChatVisit.masterId, false)}
-                                        isDisabled={!messageDrafts[selectedChatVisit.masterId]?.trim()}
+                                        onPress={() => handleSendMessage(selectedChatVisit.masterId, selectedChatChannel === "customer_service")}
+                                        isDisabled={selectedChatChannel === "patient_chat"
+                                          ? !messageDrafts[selectedChatVisit.masterId]?.trim()
+                                          : !csDrafts[selectedChatVisit.masterId]?.trim()}
                                       >
-                                        Send Patient Message
+                                        <Icon icon="lucide:send" />
                                       </Button>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Textarea
-                                        label="Message to Customer Service"
-                                        value={csDrafts[selectedChatVisit.masterId] || ""}
-                                        onValueChange={(value) =>
-                                          setCsDrafts((prev) => ({ ...prev, [selectedChatVisit.masterId]: value }))
-                                        }
-                                        placeholder="Type message for Beluga admin..."
-                                      />
-                                      <Button
-                                        variant="flat"
-                                        onPress={() => handleSendMessage(selectedChatVisit.masterId, true)}
-                                        isDisabled={!csDrafts[selectedChatVisit.masterId]?.trim()}
-                                      >
-                                        Send CS Message
-                                      </Button>
-                                    </>
-                                  )}
-                                </div>
-                              </div>
+                                    </div>
+                                  </div>
+                                </CardBody>
+                              </Card>
 
                               {messageResults[selectedChatVisit.masterId] && (
                                 <p className="text-sm text-foreground-500">{messageResults[selectedChatVisit.masterId]}</p>
                               )}
-                            </>
+                            </div>
                           ) : (
                             <p className="text-sm text-foreground-500">Select a conversation to view messages.</p>
                           )}
