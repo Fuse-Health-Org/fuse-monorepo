@@ -251,7 +251,7 @@ export function registerAuthEndpoints(
             );
 
             if (!emailSent) {
-                console.error("❌ Failed to resend MFA code to:", mfaRecord.email);
+                console.error("❌ Failed to resend MFA code");
                 return res.status(500).json({
                     success: false,
                     message: "Failed to send verification code. Please try again.",
