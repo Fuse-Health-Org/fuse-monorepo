@@ -13504,6 +13504,14 @@ async function startServer() {
     console.log("⚠️  BelugaProduct sync:", syncErr instanceof Error ? syncErr.message : syncErr);
   }
 
+  try {
+    const BelugaEvent = (await import('./models/BelugaEvent')).default;
+    await BelugaEvent.sync({ alter: true });
+    console.log("✅ BelugaEvent table synced");
+  } catch (syncErr) {
+    console.log("⚠️  BelugaEvent sync:", syncErr instanceof Error ? syncErr.message : syncErr);
+  }
+
   // ============================================
   // Start server & initialize services
   // (AFTER all routes are registered)
