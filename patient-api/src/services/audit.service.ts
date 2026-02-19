@@ -103,10 +103,6 @@ export class AuditService {
         try {
             const user = this.getUserFromRequest(req);
 
-            // SuperAdmins are never logged
-            if (await this.isSuperAdmin(user?.id)) {
-                return null;
-            }
 
             return await AuditLog.log({
                 userId: user?.id || null,
