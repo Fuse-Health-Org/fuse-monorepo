@@ -47,6 +47,24 @@ export const createJWTToken = (user: any): string => {
   });
 };
 
+// Create impersonation JWT token (separate function to prevent accidental impersonation field injection)
+export const createImpersonationToken = (targetUser: any, impersonatorId: string): string => {
+  const payload: JWTPayload = {
+    userId: targetUser.id,
+    userRole: targetUser.role,
+    clinicId: targetUser.clinicId,
+    loginTime: Date.now(),
+    impersonating: true,
+    impersonatedBy: impersonatorId,
+  };
+
+  return jwt.sign(payload, JWT_SECRET, {
+    expiresIn: JWT_EXPIRES_IN,
+    issuer: 'patient-portal-api',
+    audience: 'patient-portal-frontend',
+  });
+};
+
 // Verify JWT token
 export const verifyJWTToken = (token: string): JWTPayload | null => {
   try {

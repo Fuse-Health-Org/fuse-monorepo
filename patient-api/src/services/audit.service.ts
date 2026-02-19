@@ -103,6 +103,16 @@ export class AuditService {
         try {
             const user = this.getUserFromRequest(req);
 
+            // Auto-enrich details when request comes from an impersonation session
+            const reqUser = (req as any).user;
+            let details = params.details || null;
+            if (reqUser?.impersonating && reqUser?.impersonatedBy) {
+                details = {
+                    ...(details || {}),
+                    impersonatedBy: reqUser.impersonatedBy,
+                    isImpersonationSession: true,
+                };
+            }
 
             return await AuditLog.log({
                 userId: user?.id || null,
@@ -112,7 +122,7 @@ export class AuditService {
                 resourceId: params.resourceId || null,
                 ipAddress: this.getClientIp(req),
                 userAgent: this.getUserAgent(req),
-                details: params.details || null,
+                details,
                 clinicId: user?.clinicId || null,
                 success: params.success ?? true,
                 errorMessage: params.errorMessage || null,
@@ -141,8 +151,11 @@ export class AuditService {
         errorMessage?: string | null;
     }): Promise<AuditLog | null> {
         try {
-            // SuperAdmins are never logged
-            if (await this.isSuperAdmin(params.userId)) {
+            // SuperAdmins are never logged — except for impersonation events
+            const isImpersonationEvent =
+                params.action === AuditAction.IMPERSONATE_START ||
+                params.action === AuditAction.IMPERSONATE_END;
+            if (!isImpersonationEvent && await this.isSuperAdmin(params.userId)) {
                 return null;
             }
 
