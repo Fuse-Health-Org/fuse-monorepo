@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@amplitude/analytics-browser": "catalog:",
+    "@amplitude/plugin-session-replay-browser": "catalog:",
     "@fuse/tsconfig": "workspace:*"
   },
   "peerDependencies": {

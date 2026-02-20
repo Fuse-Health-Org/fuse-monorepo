@@ -1,4 +1,5 @@
 import * as amplitude from "@amplitude/analytics-browser";
+import { sessionReplayPlugin } from "@amplitude/plugin-session-replay-browser";
 import { AmplitudeConfig, AmplitudeEvent, AmplitudeUser } from "./types";
 
 let initialized = false;
@@ -48,12 +49,24 @@ export const initAmplitude = (config: AmplitudeConfig): void => {
       : amplitude.Types.LogLevel.None,
   });
 
+  if (config.sessionReplay) {
+    const replay = sessionReplayPlugin({
+      sampleRate: config.sessionReplay.sampleRate ?? 0.01,
+      privacyConfig: {
+        defaultMaskLevel: "conservative",
+        blockSelector: config.sessionReplay.blockSelector ?? [],
+        maskSelector: config.sessionReplay.maskSelector ?? [],
+      },
+    });
+    amplitude.add(replay);
+  }
+
   currentAppName = config.appName;
   sampleRate = config.sampleRate ?? 0.1;
   initialized = true;
 
   if (config.debug) {
-    console.log(`[Amplitude] Initialized for ${config.appName}`);
+    console.log(`[Amplitude] Initialized for ${config.appName}${config.sessionReplay ? " (session replay enabled)" : ""}`);
   }
 };
 

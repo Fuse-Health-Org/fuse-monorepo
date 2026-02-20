@@ -155,7 +155,87 @@ Placed **inside** `AuthProvider` (so `useAuth()` works) and **around** the rest 
 
 ---
 
-## Step 4: Environment variables
+## Step 4: Add Session Replay Plugin
+
+### Overview
+
+Add `@amplitude/plugin-session-replay-browser` to `@fuse/amplitude` with **conservative masking** for HIPAA compliance. The plugin records user sessions as replayable videos while masking all text, inputs, and sensitive DOM content.
+
+### Files to modify
+
+**`pnpm-workspace.yaml`** — Add to `catalog:` Analytics section:
+```yaml
+"@amplitude/plugin-session-replay-browser": ^1.12.0
+```
+
+**`packages/amplitude/package.json`** — Add dependency:
+```json
+"@amplitude/plugin-session-replay-browser": "catalog:"
+```
+
+**`packages/amplitude/src/types.ts`** — Add session replay config to `AmplitudeConfig`:
+```ts
+export interface SessionReplayConfig {
+  /** Fraction of sessions to record (0–1). Defaults to 0.01 (1%). */
+  sampleRate?: number;
+  /** Additional CSS selectors to completely block from replay. */
+  blockSelector?: string[];
+  /** Additional CSS selectors to mask text content. */
+  maskSelector?: string[];
+}
+
+export interface AmplitudeConfig {
+  // ... existing fields ...
+  /** Session replay configuration. Omit to disable session replay entirely. */
+  sessionReplay?: SessionReplayConfig;
+}
+```
+
+**`packages/amplitude/src/tracker.ts`** — Add session replay initialization:
+```ts
+import { sessionReplayPlugin } from "@amplitude/plugin-session-replay-browser";
+
+// Inside initAmplitude(), after amplitude.init():
+if (config.sessionReplay) {
+  const replay = sessionReplayPlugin({
+    sampleRate: config.sessionReplay.sampleRate ?? 0.01,
+    privacyConfig: {
+      defaultMaskLevel: "conservative",
+      blockSelector: config.sessionReplay.blockSelector ?? [],
+      maskSelector: config.sessionReplay.maskSelector ?? [],
+    },
+  });
+  amplitude.add(replay);
+}
+```
+
+### HIPAA Safeguards for Session Replay
+
+- `defaultMaskLevel: "conservative"` — masks **all** text, inputs, and links by default
+- `blockSelector` — apps can pass additional selectors like `[data-patient]`, `.phi-content` to fully hide sensitive components
+- `sampleRate: 0.01` (1%) default — minimizes data collection surface
+- Opt-in: session replay only activates if `sessionReplay` config is provided
+
+### Per-app AmplitudeWrapper update
+
+Each app's `AmplitudeWrapper` adds the `sessionReplay` config:
+```tsx
+<AmplitudeProvider
+  config={{
+    apiKey: process.env.NEXT_PUBLIC_AMPLITUDE_API_KEY || '',
+    appName: '<app-name>',
+    debug: process.env.NODE_ENV === 'development',
+    sessionReplay: {
+      sampleRate: 0.01,
+    },
+  }}
+  // ...
+>
+```
+
+---
+
+## Step 5: Environment variables
 
 **File: `.env.example`** — Add:
 ```
@@ -189,7 +269,7 @@ The `@fuse/amplitude` package enforces these protections:
 1. **PHI-free identify calls** — `identifyUser()` only sends `userId` (UUID), `role`, `clinicId`, and `app_name`. Never email, name, DOB, address, or phone.
 2. **URL sanitization** — `trackPageView()` runs all URLs through `sanitizeUrl()` which strips query parameters: `email`, `name`, `patientId`, `dob`, `phone`, `address` before sending to Amplitude.
 3. **Autocapture disabled** — `autocapture: false` prevents Amplitude from automatically capturing DOM elements, form values, or text content.
-4. **No session replay** — Amplitude Session Replay is not enabled. If enabled in the future, it **must** be configured with text and input masking equivalent to PostHog's `maskTextContent: true` / `maskAllInputs: true`.
+4. **Session replay with conservative masking** — `@amplitude/plugin-session-replay-browser` is enabled with `defaultMaskLevel: "conservative"`, which masks all text, inputs, and links. Only 1% of sessions are recorded by default. Apps can add `blockSelector` for components displaying patient data.
 
 ### Risk Assessment by App
 
@@ -206,7 +286,8 @@ The `@fuse/amplitude` package enforces these protections:
 - [x] No PHI in `identify()` calls (userId, role, clinicId only)
 - [x] Autocapture disabled (no DOM/text/input capture)
 - [x] URL sanitization strips PHI-related query parameters from page views
-- [x] No session replay enabled
+- [x] Session replay uses `defaultMaskLevel: "conservative"` (all text/inputs masked)
+- [x] Session replay sample rate defaults to 1%
 - [ ] BAA signed with Amplitude (required if using Amplitude Cloud)
 - [ ] Document Amplitude usage in HIPAA compliance records
 
@@ -224,7 +305,7 @@ The `@fuse/amplitude` package enforces these protections:
 | `packages/amplitude/src/tracker.ts` | Create |
 | `packages/amplitude/src/provider.tsx` | Create |
 | `packages/amplitude/src/hooks.ts` | Create |
-| `pnpm-workspace.yaml` | Edit — add `@amplitude/analytics-browser` to catalog |
+| `pnpm-workspace.yaml` | Edit — add `@amplitude/analytics-browser` + `@amplitude/plugin-session-replay-browser` to catalog |
 | `patient-frontend/package.json` | Edit — add `@fuse/amplitude` dep |
 | `patient-frontend/pages/_app.tsx` | Edit — add AmplitudeWrapper |
 | `fuse-admin-frontend/package.json` | Edit — add `@fuse/amplitude` dep |

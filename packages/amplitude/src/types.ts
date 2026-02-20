@@ -21,12 +21,23 @@ export interface AmplitudeUserProperties {
   appName: string;
 }
 
+export interface SessionReplayConfig {
+  /** Fraction of sessions to record (0–1). Defaults to 0.01 (1%). */
+  sampleRate?: number;
+  /** Additional CSS selectors to completely block from replay (e.g. '[data-patient]', '.phi-content'). */
+  blockSelector?: string[];
+  /** Additional CSS selectors to mask text content in replay. */
+  maskSelector?: string[];
+}
+
 export interface AmplitudeConfig {
   apiKey: string;
   appName: string;
   debug?: boolean;
   /** Fraction of events to send (0–1). Defaults to 0.1 (10%). */
   sampleRate?: number;
+  /** Session replay configuration. Omit to disable session replay entirely. */
+  sessionReplay?: SessionReplayConfig;
 }
 
 export interface AmplitudeUser {

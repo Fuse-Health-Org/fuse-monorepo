@@ -6,4 +6,5 @@ export type {
   AmplitudeConfig,
   AmplitudeUser,
   AmplitudeUserProperties,
+  SessionReplayConfig,
 } from "./types";

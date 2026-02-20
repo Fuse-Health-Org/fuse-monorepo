@@ -107,6 +107,7 @@ function AmplitudeWrapper({ children }: { children: React.ReactNode }) {
                 apiKey: process.env.NEXT_PUBLIC_AMPLITUDE_API_KEY || '',
                 appName: 'patient',
                 debug: process.env.NODE_ENV === 'development',
+                sessionReplay: { sampleRate: 0.01 },
             }}
             user={user ? { id: user.id, role: user.role, clinicId: user.clinicId } : null}
         >
