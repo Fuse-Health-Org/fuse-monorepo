@@ -22,7 +22,10 @@
     "deploy:doctor": "turbo run pm2:reload --filter=@fuse/doctor-portal-frontend || (cd fuse-doctor-portal-frontend && pnpm pm2:start) && pm2 logs doctor-portal-frontend",
     "deploy:affiliate": "turbo run pm2:reload --filter=@fuse/affiliate-portal-frontend || (cd fuse-affiliate-portal-frontend && pnpm pm2:start) && pm2 logs affiliate-portal-frontend",
     "migrate": "pnpm --filter @fuse/api run migrate",
-    "test:e2e": "turbo run test:e2e"
+    "test:e2e": "turbo run test:e2e",
+    "test:e2e:ui": "turbo run test:e2e:ui",
+    "test:e2e:report": "playwright show-report",
+    "test:e2e:report:admin": "cd fuse-admin-frontend && pnpm exec playwright show-report"
   },
   "devDependencies": {
     "@playwright/test": "^1.54.2",
