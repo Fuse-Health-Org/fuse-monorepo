@@ -61,7 +61,21 @@ export function trackEvent(
   });
 }
 
+/** HIPAA: Strip potential PHI from query parameters before tracking */
+function sanitizeUrl(url: string): string {
+  try {
+    const parsed = new URL(url, "http://placeholder");
+    for (const param of ["email", "name", "patientId", "dob", "phone", "address"]) {
+      parsed.searchParams.delete(param);
+    }
+    // Return pathname + sanitized search (without the placeholder origin)
+    return parsed.pathname + parsed.search;
+  } catch {
+    return url;
+  }
+}
+
 export function trackPageView(url: string): void {
   if (!initialized) return;
-  trackEvent(AmplitudeEvent.PAGE_VIEW, { page_path: url });
+  trackEvent(AmplitudeEvent.PAGE_VIEW, { page_path: sanitizeUrl(url) });
 }

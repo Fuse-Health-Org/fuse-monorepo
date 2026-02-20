@@ -83,7 +83,8 @@ export * from "./src/index";
 - `identifyUser(userId, userProperties)` — Sets Amplitude user ID + properties
 - `resetUser()` — Calls `amplitude.reset()` on logout
 - `trackEvent(eventName, options?)` — Tracks with `app_name` auto-appended
-- `trackPageView(url)` — Tracks `Page Viewed` with `page_path`
+- `sanitizeUrl(url)` — Internal helper that strips PHI-related query params (email, name, patientId, dob, phone, address) before tracking
+- `trackPageView(url)` — Tracks `Page Viewed` with sanitized `page_path`
 
 **`packages/amplitude/src/provider.tsx`** — React provider component
 - `AmplitudeProvider` accepts `config`, `user`, `children` props
@@ -170,9 +171,46 @@ One key shared across all 5 apps. All apps get Amplitude integration.
 1. **Follows existing package conventions** — `dist/` compiled output with `tsc` build, CommonJS module, same tsconfig/package.json structure as `@fuse/stripe`
 2. **Provider accepts `user` prop** (not calling `useAuth()` internally) — keeps the package decoupled from each app's AuthContext shape
 3. **No-op when API key is empty** — no errors, no console warnings in prod; graceful degradation
-4. **HIPAA compliant** — only sends user UUID, role, clinicId (all opaque). No PII (names, email, DOB, addresses)
+4. **HIPAA compliant** — only sends user UUID, role, clinicId (all opaque). No PII (names, email, DOB, addresses). URL sanitization strips PHI from page view tracking
 5. **Manual page view tracking** — Amplitude's auto page tracking doesn't work well with Next.js client-side routing. We use `router.events.routeChangeComplete` instead
 6. **Existing analytics untouched** — patient-frontend's custom form analytics (`lib/analytics.ts`) and Vercel Analytics coexist with Amplitude
+
+## HIPAA Compliance Safeguards
+
+Amplitude analytics is HIPAA-compatible with the following safeguards in place:
+
+### BAA Requirement
+If using **Amplitude Cloud**, a signed **Business Associate Agreement (BAA)** is required (available on Growth/Enterprise plans). Contact Amplitude sales to execute the BAA before sending any production data.
+
+### Data Protection
+
+The `@fuse/amplitude` package enforces these protections:
+
+1. **PHI-free identify calls** — `identifyUser()` only sends `userId` (UUID), `role`, `clinicId`, and `app_name`. Never email, name, DOB, address, or phone.
+2. **URL sanitization** — `trackPageView()` runs all URLs through `sanitizeUrl()` which strips query parameters: `email`, `name`, `patientId`, `dob`, `phone`, `address` before sending to Amplitude.
+3. **Autocapture disabled** — `autocapture: false` prevents Amplitude from automatically capturing DOM elements, form values, or text content.
+4. **No session replay** — Amplitude Session Replay is not enabled. If enabled in the future, it **must** be configured with text and input masking equivalent to PostHog's `maskTextContent: true` / `maskAllInputs: true`.
+
+### Risk Assessment by App
+
+| App | Risk Level | Notes |
+|-----|-----------|-------|
+| patient-frontend | Medium | URL sanitization protects against PHI in routes. No DOM capture. |
+| admin-frontend | Medium | May have patient data in URL params. Sanitized. |
+| doctor-portal | Medium | Clinical data in URL params possible. Sanitized. |
+| tenant-portal | Low | System-level configuration, no patient data in URLs. |
+| affiliate-portal | Low | Aggregate referral data only. |
+
+### HIPAA Compliance Checklist
+
+- [x] No PHI in `identify()` calls (userId, role, clinicId only)
+- [x] Autocapture disabled (no DOM/text/input capture)
+- [x] URL sanitization strips PHI-related query parameters from page views
+- [x] No session replay enabled
+- [ ] BAA signed with Amplitude (required if using Amplitude Cloud)
+- [ ] Document Amplitude usage in HIPAA compliance records
+
+---
 
 ## Files Modified
 
