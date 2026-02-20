@@ -83,6 +83,7 @@ catalog:
   recharts: 2.15.4
 
   # Analytics
+  "@amplitude/analytics-browser": ^2.11.0
   "@vercel/analytics": 1.3.1
 
   # Authentication & Security
