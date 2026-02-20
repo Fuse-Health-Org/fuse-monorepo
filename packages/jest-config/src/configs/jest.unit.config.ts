@@ -20,6 +20,7 @@ const config: Config = {
       tsconfig: {
         esModuleInterop: true,
         allowSyntheticDefaultImports: true,
+        types: ['jest', 'node'],
       },
     }],
   },
@@ -35,7 +36,7 @@ const config: Config = {
   coverageReporters: ['text', 'lcov', 'html'],
 
   // Setup files
-  setupFilesAfterEnv: ['<rootDir>/../../node_modules/@fuse/jest-config/dist/setup/unit-setup.js'],
+  setupFilesAfterEnv: ['<rootDir>/node_modules/@fuse/jest-config/dist/setup/unit-setup.js'],
 
   // Clear mocks between tests
   clearMocks: true,
