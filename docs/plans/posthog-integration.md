@@ -79,7 +79,8 @@ export interface IdentifyUserParams {
 - **Guard: no-ops when `apiKey` is empty OR `enabled` is false** — renders children only (transparent wrapper). This is what makes local dev automatically silent.
 - Initializes `posthog-js` in a `useEffect` (client-side only)
 - Uses `useRef` to prevent double-init in React 18 strict mode
-- HIPAA-safe defaults: `session_recording: { maskAllInputs: true }`
+- HIPAA-safe defaults: `session_recording: { maskAllInputs: true, maskTextContent: true }`
+- `sanitize_properties` callback strips potential PHI from captured URLs (email, name, patientId, dob, phone, address query params)
 - `capture_pageview: false` — manually captures `$pageview` on Next.js `routeChangeComplete` events (Pages Router SPA navigation)
 - Captures initial pageview on mount
 - Wraps children in `PostHogProvider` from `posthog-js/react` when active
@@ -212,6 +213,45 @@ NEXT_PUBLIC_POSTHOG_KEY=phc_staging_project_key_here
 ```
 NEXT_PUBLIC_POSTHOG_KEY=phc_production_project_key_here
 ```
+
+---
+
+## HIPAA Compliance Safeguards
+
+PostHog analytics is HIPAA-compatible with the following safeguards in place:
+
+### BAA Requirement
+If using **PostHog Cloud**, a signed **Business Associate Agreement (BAA)** is required (available on Teams/Enterprise plans). If self-hosting PostHog, the BAA is not needed since data stays on your infrastructure.
+
+### Data Protection in Provider
+
+The `PostHogAnalyticsProvider` enforces these protections automatically:
+
+1. **`maskAllInputs: true`** — All form input values are masked in session recordings
+2. **`maskTextContent: true`** — All rendered text content on screen is masked in session recordings, preventing PHI leakage from patient names, DOBs, or addresses displayed in tables/views
+3. **`sanitize_properties`** — A callback that strips potential PHI from captured URLs by removing query parameters: `email`, `name`, `patientId`, `dob`, `phone`, `address`
+4. **Identify calls** only send `userId`, `role`, and `clinicId` — never email, name, DOB, address, or phone
+
+### Risk Assessment by App
+
+| App | Session Recording Risk | Notes |
+|-----|----------------------|-------|
+| patient-frontend | High | PHI displayed on screen (patient dashboard) |
+| admin-frontend | Medium | May display patient data in tables |
+| doctor-portal | High | Clinical data visible (prescriptions, cases) |
+| tenant-portal | Low | System-level configuration only |
+| affiliate-portal | Low | Aggregate referral data only |
+
+All apps use `maskTextContent: true` globally, which mitigates screen-capture PHI risk across the board. For additional safety, individual apps can disable session recording entirely by adding `disable_session_recording: true` to the PostHog init config.
+
+### HIPAA Compliance Checklist
+
+- [x] No PHI in `identify()` calls (userId, role, clinicId only)
+- [x] All form inputs masked in session recordings
+- [x] All text content masked in session recordings
+- [x] URL sanitization strips PHI-related query parameters
+- [ ] BAA signed with PostHog (required if using PostHog Cloud)
+- [ ] Document PostHog usage in HIPAA compliance records
 
 ---
 

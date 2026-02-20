@@ -28,6 +28,22 @@ export function PostHogAnalyticsProvider({
       capture_pageleave: true,
       session_recording: {
         maskAllInputs: true, // HIPAA: mask all form inputs
+        maskTextContent: true, // HIPAA: mask all rendered text in session recordings
+      },
+      sanitize_properties: (properties, _event) => {
+        // HIPAA: Strip potential PHI from captured URLs
+        if (properties["$current_url"]) {
+          try {
+            const url = new URL(properties["$current_url"]);
+            for (const param of ["email", "name", "patientId", "dob", "phone", "address"]) {
+              url.searchParams.delete(param);
+            }
+            properties["$current_url"] = url.toString();
+          } catch {
+            // If URL parsing fails, keep the original
+          }
+        }
+        return properties;
       },
     });
 
