@@ -28,7 +28,7 @@ export const PostHogAnalyticsProvider = ({
       capture_pageleave: true,
       session_recording: {
         maskAllInputs: true, // HIPAA: mask all form inputs
-        maskTextContent: true, // HIPAA: mask all rendered text in session recordings
+        maskTextSelector: "*", // HIPAA: mask all rendered text in session recordings
       },
       sanitize_properties: (properties, _event) => {
         // HIPAA: Strip potential PHI from captured URLs

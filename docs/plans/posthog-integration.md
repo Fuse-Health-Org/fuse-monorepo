@@ -79,7 +79,7 @@ export interface IdentifyUserParams {
 - **Guard: no-ops when `apiKey` is empty OR `enabled` is false** — renders children only (transparent wrapper). This is what makes local dev automatically silent.
 - Initializes `posthog-js` in a `useEffect` (client-side only)
 - Uses `useRef` to prevent double-init in React 18 strict mode
-- HIPAA-safe defaults: `session_recording: { maskAllInputs: true, maskTextContent: true }`
+- HIPAA-safe defaults: `session_recording: { maskAllInputs: true, maskTextSelector: '*' }`
 - `sanitize_properties` callback strips potential PHI from captured URLs (email, name, patientId, dob, phone, address query params)
 - `capture_pageview: false` — manually captures `$pageview` on Next.js `routeChangeComplete` events (Pages Router SPA navigation)
 - Captures initial pageview on mount
@@ -228,7 +228,7 @@ If using **PostHog Cloud**, a signed **Business Associate Agreement (BAA)** is r
 The `PostHogAnalyticsProvider` enforces these protections automatically:
 
 1. **`maskAllInputs: true`** — All form input values are masked in session recordings
-2. **`maskTextContent: true`** — All rendered text content on screen is masked in session recordings, preventing PHI leakage from patient names, DOBs, or addresses displayed in tables/views
+2. **`maskTextSelector: '*'`** — All rendered text content on screen is masked in session recordings, preventing PHI leakage from patient names, DOBs, or addresses displayed in tables/views
 3. **`sanitize_properties`** — A callback that strips potential PHI from captured URLs by removing query parameters: `email`, `name`, `patientId`, `dob`, `phone`, `address`
 4. **Identify calls** only send `userId`, `role`, and `clinicId` — never email, name, DOB, address, or phone
 
@@ -242,7 +242,7 @@ The `PostHogAnalyticsProvider` enforces these protections automatically:
 | tenant-portal | Low | System-level configuration only |
 | affiliate-portal | Low | Aggregate referral data only |
 
-All apps use `maskTextContent: true` globally, which mitigates screen-capture PHI risk across the board. For additional safety, individual apps can disable session recording entirely by adding `disable_session_recording: true` to the PostHog init config.
+All apps use `maskTextSelector: '*'` globally, which mitigates screen-capture PHI risk across the board. For additional safety, individual apps can disable session recording entirely by adding `disable_session_recording: true` to the PostHog init config.
 
 ### HIPAA Compliance Checklist
 
