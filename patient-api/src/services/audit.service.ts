@@ -103,10 +103,6 @@ export class AuditService {
         try {
             const user = this.getUserFromRequest(req);
 
-            // SuperAdmins are never logged
-            if (await this.isSuperAdmin(user?.id)) {
-                return null;
-            }
 
             return await AuditLog.log({
                 userId: user?.id || null,
@@ -348,6 +344,46 @@ export class AuditService {
             action: AuditAction.DELETE,
             resourceType: AuditResourceType.QUESTIONNAIRE_TEMPLATE,
             resourceId: templateId,
+        });
+    }
+
+    /**
+     * Log admin impersonation start
+     */
+    static async logImpersonateStart(
+        req: Request,
+        adminId: string,
+        targetUserId: string,
+        targetUserEmail: string
+    ): Promise<void> {
+        await this.logFromRequest(req, {
+            action: AuditAction.IMPERSONATE_START,
+            resourceType: AuditResourceType.USER,
+            resourceId: targetUserId,
+            details: {
+                adminId,
+                targetUserId,
+                targetUserEmail,
+            },
+        });
+    }
+
+    /**
+     * Log admin impersonation end
+     */
+    static async logImpersonateEnd(
+        req: Request,
+        adminId: string,
+        impersonatedUserId: string
+    ): Promise<void> {
+        await this.logFromRequest(req, {
+            action: AuditAction.IMPERSONATE_END,
+            resourceType: AuditResourceType.USER,
+            resourceId: impersonatedUserId,
+            details: {
+                adminId,
+                impersonatedUserId,
+            },
         });
     }
 }

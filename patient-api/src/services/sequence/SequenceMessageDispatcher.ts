@@ -272,7 +272,7 @@ class SmsProvider {
       throw new Error(`Twilio SMS failed with status ${response.status}`)
     }
 
-    console.log('📱 SMS sent via Twilio:', { to })
+    console.log('📱 SMS sent via Twilio')
   }
 }
 
@@ -317,7 +317,7 @@ class EmailProvider {
     }
 
     await sgMail.send(msg)
-    console.log('📧 Email sent via SendGrid with tracking:', { to, subject, trackingRunId })
+    console.log('📧 Email sent via SendGrid with tracking:', { runId: trackingRunId })
   }
 }
 
@@ -374,12 +374,14 @@ export default class SequenceMessageDispatcher {
     const email = (userDetails?.email || userDetails?.userEmail || payload?.userEmail || '') as string
     const phone = (userDetails?.phoneNumber || payload?.phoneNumber || '') as string
     
-    console.log(`📧 Extracted contact info for run ${run.id}:`, {
-      email,
-      phone,
-      hasUserDetails: !!payload?.userDetails,
-      payloadKeys: payload ? Object.keys(payload) : []
-    })
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`📧 Extracted contact info for run ${run.id}:`, {
+        hasEmail: !!email,
+        hasPhone: !!phone,
+        hasUserDetails: !!payload?.userDetails,
+        payloadKeys: payload ? Object.keys(payload) : []
+      })
+    }
     
     // Check opt-out status before sending
     if (email) {
@@ -388,12 +390,12 @@ export default class SequenceMessageDispatcher {
       if (user) {
         // Check if user has opted out from the specific channel
         if (stepType === 'email' && user.emailOptedOut) {
-          console.log(`⛔ Skipping email send - user ${email} has opted out (run ${run.id})`)
+          console.log(`⛔ Skipping email send - user opted out (run ${run.id})`)
           return
         }
-        
+
         if (stepType === 'sms' && user.smsOptedOut) {
-          console.log(`⛔ Skipping SMS send - user ${email} has opted out (run ${run.id})`)
+          console.log(`⛔ Skipping SMS send - user opted out (run ${run.id})`)
           return
         }
       }
@@ -403,13 +405,13 @@ export default class SequenceMessageDispatcher {
     const mergeFields = template.mergeFields || []
     const context = buildTemplateContext(run, sequence, mergeFields)
     
-    // Debug log
-    console.log(`🔍 Template context for run ${run.id}:`, {
-      mergeFields: template.mergeFields,
-      availableFields: Object.keys(context),
-      contextValues: context,
-      useCustomText
-    })
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`🔍 Template context built for run ${run.id}:`, {
+        mergeFields: template.mergeFields,
+        availableFields: Object.keys(context),
+        useCustomText
+      })
+    }
 
     if (stepType === 'sms') {
       // Parse template body for SMS (text only, no images)

@@ -27,6 +27,7 @@ import { Op } from "sequelize";
 const orderService = new OrderService();
 
 
+/** @deprecated Not used by any frontend. Order creation goes through main.ts checkout flow. */
 export const createPaymentIntent = async (req: Request, res: Response) => {
     try {
         const currentUser = getCurrentUser(req);
@@ -516,6 +517,19 @@ export const createPaymentIntent = async (req: Request, res: Response) => {
             paymentIntentId: paymentIntent.id,
             amount: paymentIntent.amount,
             userId: currentUser.id,
+        });
+
+        // Audit log: Order creation (PHI record created)
+        await AuditService.logFromRequest(req, {
+            action: AuditAction.CREATE,
+            resourceType: AuditResourceType.ORDER,
+            resourceId: order.id,
+            details: {
+                operation: 'create_order',
+                orderNumber: orderNumber,
+                totalAmount: Number(amount) + visitFeeAmount,
+                orderType: programId ? 'program_order' : 'treatment_order'
+            }
         });
 
         res.status(200).json({

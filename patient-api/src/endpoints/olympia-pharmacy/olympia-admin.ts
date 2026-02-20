@@ -63,9 +63,9 @@ export function registerOlympiaAdminEndpoints(
   // Create Patient
   app.post("/olympia/patients", authenticateJWT, async (req, res) => {
     try {
-      console.log("📥 [Olympia] Create Patient - Request:", JSON.stringify(req.body, null, 2));
+      console.log("📥 [Olympia] create patient");
       const result = await olympiaPharmacyApiService.createPatient(req.body);
-      console.log("📤 [Olympia] Create Patient - Response:", JSON.stringify(result, null, 2));
+      console.log("📤 [Olympia] patient created", { uuid: result.uuid });
       res.json({ success: true, data: result });
     } catch (error: any) {
       console.error("❌ [Olympia] Create Patient - Error:", error.response?.data || error.message);
@@ -80,9 +80,9 @@ export function registerOlympiaAdminEndpoints(
   // Search Patients
   app.post("/olympia/patients/search", authenticateJWT, async (req, res) => {
     try {
-      console.log("📥 [Olympia] Search Patients - Request:", JSON.stringify(req.body, null, 2));
+      console.log("📥 [Olympia] search patients", { searchFields: Object.keys(req.body) });
       const results = await olympiaPharmacyApiService.searchPatients(req.body);
-      console.log("📤 [Olympia] Search Patients - Response:", JSON.stringify(results, null, 2));
+      console.log("📤 [Olympia] search results", { count: results.length });
       res.json({ success: true, data: results });
     } catch (error: any) {
       console.error("❌ [Olympia] Search Patients - Error:", error.response?.data || error.message);
@@ -96,12 +96,12 @@ export function registerOlympiaAdminEndpoints(
   // Update Patient
   app.put("/olympia/patients/:uuid", authenticateJWT, async (req, res) => {
     try {
-      console.log("📥 [Olympia] Update Patient - UUID:", req.params.uuid, "Request:", JSON.stringify(req.body, null, 2));
+      console.log("📥 [Olympia] update patient", { uuid: req.params.uuid });
       const result = await olympiaPharmacyApiService.updatePatient({
         uuid: req.params.uuid,
         ...req.body,
       });
-      console.log("📤 [Olympia] Update Patient - Response:", JSON.stringify(result, null, 2));
+      console.log("📤 [Olympia] patient updated", { uuid: result.uuid });
       res.json({ success: true, data: result });
     } catch (error: any) {
       console.error("❌ [Olympia] Update Patient - Error:", error.response?.data || error.message);
@@ -126,9 +126,9 @@ export function registerOlympiaAdminEndpoints(
         });
       }
 
-      console.log("📥 [Olympia] Create Prescription - Request:", JSON.stringify(req.body, null, 2));
+      console.log("📥 [Olympia] create prescription", { vendor_order_id: req.body.vendor_order_id });
       const result = await olympiaPharmacyApiService.createPrescription(req.body);
-      console.log("📤 [Olympia] Create Prescription - Response:", JSON.stringify(result, null, 2));
+      console.log("📤 [Olympia] prescription created", { prescriptionID: result.prescriptionID });
       res.json({ success: true, data: result });
     } catch (error: any) {
       console.error("❌ [Olympia] Create Prescription - Error:", error.response?.data || error.message);

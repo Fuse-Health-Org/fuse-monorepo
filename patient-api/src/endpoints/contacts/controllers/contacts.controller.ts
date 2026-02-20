@@ -8,6 +8,8 @@ import { MailsSender } from '../../../services/mailsSender';
 import Clinic from '../../../models/Clinic';
 import UserTag from '../../../models/UserTag';
 import Tag from '../../../models/Tag';
+import { AuditService } from '../../../services/audit.service';
+import { AuditAction, AuditResourceType } from '../../../models/AuditLog';
 
 /**
  * GET /contacts
@@ -128,10 +130,10 @@ export const listContacts = async (req: Request, res: Response) => {
       contacts.map(async (contact) => {
         const lastContactDate = await getLastContactDate(contact.id);
         const contactJSON = contact.toJSON() as any;
-        
+
         // Extract tags from userTags
         const tags = contactJSON.userTags?.map((ut: any) => ut.tag).filter((tag: any) => tag) || [];
-        
+
         return {
           ...contactJSON,
           lastContactDate,
@@ -139,6 +141,21 @@ export const listContacts = async (req: Request, res: Response) => {
         };
       })
     );
+
+    // Audit log: Bulk patient list access (PHI)
+    await AuditService.logFromRequest(req, {
+      action: AuditAction.VIEW,
+      resourceType: AuditResourceType.PATIENT,
+      details: {
+        operation: 'bulk_list',
+        count,
+        filters: {
+          search: search || null,
+          optOutStatus: optOutStatus || null,
+          tagId: tagId || null
+        }
+      }
+    });
 
     res.status(200).json({
       success: true,
@@ -206,6 +223,11 @@ export const getContact = async (req: Request, res: Response) => {
         message: "Contact not found"
       });
     }
+
+    // Audit log: Individual patient view (PHI access)
+    await AuditService.logPatientView(req, contact.id, {
+      operation: 'view_contact_details'
+    });
 
     // Get engagement stats
     const engagementStats = await getUserEngagementStats(contact.id);
@@ -301,16 +323,30 @@ export const updateContact = async (req: Request, res: Response) => {
       }
     }
 
+    // Track changed fields for audit log
+    const changedFields: string[] = [];
+    if (contact.firstName !== firstName.trim()) changedFields.push('firstName');
+    if (contact.lastName !== lastName.trim()) changedFields.push('lastName');
+    if (contact.email !== email.trim().toLowerCase()) changedFields.push('email');
+    if (phoneNumber !== undefined && contact.phoneNumber !== (phoneNumber?.trim() || null)) {
+      changedFields.push('phoneNumber');
+    }
+
     // Update contact
     contact.firstName = firstName.trim();
     contact.lastName = lastName.trim();
     contact.email = email.trim().toLowerCase();
-    
+
     if (phoneNumber !== undefined) {
       contact.phoneNumber = phoneNumber?.trim() || null;
     }
 
     await contact.save();
+
+    // Audit log: Patient record update (PHI modification)
+    if (changedFields.length > 0) {
+      await AuditService.logPatientUpdate(req, contact.id, changedFields);
+    }
 
     res.status(200).json({
       success: true,
@@ -364,6 +400,11 @@ export const getContactHistory = async (req: Request, res: Response) => {
         message: "Contact not found"
       });
     }
+
+    // Audit log: Patient history view (PHI access)
+    await AuditService.logPatientView(req, contact.id, {
+      operation: 'view_contact_history'
+    });
 
     // Get all sequence runs for this contact
     // Note: This is a simplified version - in production you'd want a better way to link users to runs
@@ -508,6 +549,16 @@ export const createContact = async (req: Request, res: Response) => {
     });
 
     console.log(`✅ Contact created: ${newContact.firstName} ${newContact.lastName} (${newContact.email})`);
+
+    // Audit log: Patient record creation
+    await AuditService.logFromRequest(req, {
+      action: AuditAction.CREATE,
+      resourceType: AuditResourceType.PATIENT,
+      resourceId: newContact.id,
+      details: {
+        operation: 'create_contact'
+      }
+    });
 
     // Get clinic name for email
     let clinicName = 'Your Healthcare Provider';
@@ -775,6 +826,20 @@ export const uploadCSV = async (req: Request, res: Response) => {
       });
 
       imported = createdContacts.length;
+
+      // Audit log: Bulk patient creation
+      if (imported > 0) {
+        await AuditService.logFromRequest(req, {
+          action: AuditAction.CREATE,
+          resourceType: AuditResourceType.PATIENT,
+          details: {
+            operation: 'bulk_create_csv',
+            importedCount: imported,
+            totalRows: contacts.length,
+            skippedRows: errors.length
+          }
+        });
+      }
 
       // Get clinic name for emails
       let clinicName = 'Your Healthcare Provider';

@@ -193,7 +193,6 @@ class MDWebhookService {
             idx,
             id: p?.id,
             title: p?.title ?? p?.name,
-            directions: p?.directions,
             quantity: p?.quantity,
             refills: p?.refills,
             product_id: p?.product_id
@@ -304,13 +303,6 @@ class MDWebhookService {
 
       console.log('[MD-WH] processing intro video', { userId: user.id });
 
-      console.log('[MD-WH] intro video details', {
-        userId: user.id,
-        patientId: eventData.patient_id,
-        accessLink: eventData.access_link,
-        metadata: eventData.metadata
-      });
-
       // Try to find the order from metadata or get the most recent order with mdCaseId
       let order: Order | null = null;
 
@@ -345,10 +337,7 @@ class MDWebhookService {
             }
           }
         });
-        console.log('[MD-WH] ✅ saved intro video pending action', {
-          orderNumber: (order as any).orderNumber,
-          accessLink: eventData.access_link
-        });
+        console.log('[MD-WH] ✅ saved intro video pending action', { orderNumber: (order as any).orderNumber });
       } else {
         console.log('[MD-WH] ⚠️ no order found for intro video request', { userId: user.id });
       }
@@ -374,14 +363,6 @@ class MDWebhookService {
       }
 
       console.log('[MD-WH] processing drivers license', { userId: user.id });
-
-      console.log('[MD-WH] drivers license details', {
-        userId: user.id,
-        patientId: eventData.patient_id,
-        accessLink: eventData.access_link,
-        timestamp: eventData.timestamp,
-        metadata: eventData.metadata
-      });
 
       // Try to find the order from metadata or get the most recent order with mdCaseId
       let order: Order | null = null;
@@ -417,10 +398,7 @@ class MDWebhookService {
             }
           }
         });
-        console.log('[MD-WH] ✅ saved drivers license pending action', {
-          orderNumber: (order as any).orderNumber,
-          accessLink: eventData.access_link
-        });
+        console.log('[MD-WH] ✅ saved drivers license pending action', { orderNumber: (order as any).orderNumber });
       } else {
         console.log('[MD-WH] ⚠️ no order found for drivers license request', { userId: user.id });
       }
@@ -569,11 +547,10 @@ class MDWebhookService {
           const payloadPrescriptions = (eventData as any)?.prescriptions;
           const payloadOfferings = (eventData as any)?.offerings ?? (eventData as any)?.services;
 
-          console.error('\n[MD-WH] ===== SAVING MDI DATA =====');
-          console.error('[MD-WH] payloadPrescriptions:', payloadPrescriptions ? 'present' : 'MISSING');
-          console.error('[MD-WH] payloadOfferings:', payloadOfferings ? 'present' : 'MISSING');
-          console.error('[MD-WH] Raw prescriptions:', JSON.stringify(payloadPrescriptions, null, 2));
-          console.error('[MD-WH] Raw offerings:', JSON.stringify(payloadOfferings, null, 2));
+          console.log('[MD-WH] saving MDI data', {
+            hasPrescriptions: payloadPrescriptions ? 'present' : 'MISSING',
+            hasOfferings: payloadOfferings ? 'present' : 'MISSING',
+          });
 
           if (payloadPrescriptions || payloadOfferings) {
             await order.update({
@@ -583,9 +560,10 @@ class MDWebhookService {
 
             // Verify the data was saved by reloading
             await order.reload();
-            console.error('[MD-WH] ✅ AFTER SAVE - mdPrescriptions:', order.getDataValue('mdPrescriptions') ? 'saved' : 'NULL');
-            console.error('[MD-WH] ✅ AFTER SAVE - mdOfferings:', order.getDataValue('mdOfferings') ? 'saved' : 'NULL');
-            console.error('[MD-WH] ✅ AFTER SAVE - mdOfferings data:', JSON.stringify(order.getDataValue('mdOfferings'), null, 2));
+            console.log('[MD-WH] ✅ after save', {
+              mdPrescriptions: order.getDataValue('mdPrescriptions') ? 'saved' : 'NULL',
+              mdOfferings: order.getDataValue('mdOfferings') ? 'saved' : 'NULL',
+            });
 
             console.log('[MD-WH] 📝 saved rx/offerings from webhook payload', {
               orderNumber: order.orderNumber,
@@ -593,41 +571,27 @@ class MDWebhookService {
               offerings_count: Array.isArray(payloadOfferings) ? payloadOfferings.length : 0
             });
 
-            if (Array.isArray(payloadPrescriptions)) {
-              payloadPrescriptions.forEach((p: any, idx: number) => {
-                // Log ALL fields to see what MDI sends
-                console.log('[MD-WH] 💊 prescription ALL FIELDS', {
-                  idx,
-                  allKeys: Object.keys(p || {}),
-                  fullObject: JSON.stringify(p, null, 2)
-                });
-                console.log('[MD-WH] 💊 prescription details', {
+            if (process.env.NODE_ENV === 'development') {
+              payloadPrescriptions?.forEach((p: any, idx: number) => {
+                console.log('[MD-WH] 💊 prescription', {
                   idx,
                   id: p?.id,
                   title: p?.title ?? p?.name,
-                  directions: p?.directions,
                   quantity: p?.quantity,
                   refills: p?.refills,
                   days_supply: p?.days_supply,
-                  pharmacy_notes: p?.pharmacy_notes,
                   dosespot_prescription_id: p?.dosespot_prescription_id,
-                  // Additional fields that might contain SIG/notes
-                  sig: p?.sig,
-                  clinical_note: p?.clinical_note,
-                  thank_you_note: p?.thank_you_note,
-                  instructions: p?.instructions,
                   dispense_unit: p?.dispense_unit,
                 });
               });
-            }
-
-            // Also log offerings if present
-            if (Array.isArray(payloadOfferings)) {
-              payloadOfferings.forEach((o: any, idx: number) => {
-                console.log('[MD-WH] 🩺 offering ALL FIELDS', {
+              payloadOfferings?.forEach((o: any, idx: number) => {
+                console.log('[MD-WH] 🩺 offering', {
                   idx,
-                  allKeys: Object.keys(o || {}),
-                  fullObject: JSON.stringify(o, null, 2)
+                  id: o?.id,
+                  case_offering_id: o?.case_offering_id,
+                  title: o?.title ?? o?.name,
+                  status: o?.status,
+                  product_id: o?.product_id,
                 });
               });
             }

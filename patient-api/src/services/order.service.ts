@@ -23,6 +23,8 @@ import Prescription from "../models/Prescription";
 import PrescriptionProducts from "../models/PrescriptionProducts";
 import Program from "../models/Program";
 import { Op } from "sequelize";
+import { AuditService } from "./audit.service";
+import { AuditAction, AuditResourceType } from "../models/AuditLog";
 
 interface ListOrdersByClinicResult {
   success: boolean;
@@ -911,6 +913,22 @@ class OrderService {
           console.log(
             `✅ [Prescription] Created prescription for ${medicationName}`
           );
+
+          // Audit log: Prescription creation (PHI creation)
+          await AuditService.log({
+            userId: doctorId,
+            action: AuditAction.CREATE,
+            resourceType: AuditResourceType.PRESCRIPTION,
+            resourceId: prescription.id,
+            details: {
+              operation: 'prescription_created',
+              orderId: order.id,
+              orderNumber: order.orderNumber,
+              patientId: order.userId,
+              medicationName,
+              daysValid
+            }
+          });
 
           // Get product ID from coverage
           const productId =

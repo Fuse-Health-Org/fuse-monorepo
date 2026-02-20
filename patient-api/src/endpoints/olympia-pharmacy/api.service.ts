@@ -145,7 +145,7 @@ class OlympiaPharmacyApiService {
    */
   async createPatient(data: CreatePatientRequest): Promise<CreatePatientResponse> {
     try {
-      console.log('👤 Creating patient in Olympia Pharmacy:', data.email);
+      console.log('👤 Creating patient in Olympia Pharmacy');
 
       const client = await olympiaPharmacyAuthService.getAuthenticatedClient();
 
@@ -181,7 +181,7 @@ class OlympiaPharmacyApiService {
    */
   async searchPatients(searchCriteria: SearchPatientsRequest): Promise<OlympiaPatient[]> {
     try {
-      console.log('🔍 Searching patients in Olympia Pharmacy:', JSON.stringify(searchCriteria));
+      console.log('🔍 Searching patients in Olympia Pharmacy:', Object.keys(searchCriteria));
 
       const client = await olympiaPharmacyAuthService.getAuthenticatedClient();
 
@@ -281,8 +281,8 @@ class OlympiaPharmacyApiService {
       // Remove pt_team_username if it slips through - not needed for this integration
       delete (payload as any).pt_team_username;
 
-      console.log('💊 Creating prescription in Olympia Pharmacy for patient:', payload.patient_id);
-      console.log('💊 Enforced defaults - ship_method: overnight, bill_to: physician, allergies:', payload.allergies, ', med_cond:', payload.med_cond);
+      console.log('💊 Creating prescription in Olympia Pharmacy');
+      console.log('💊 Enforced defaults - ship_method: overnight, bill_to: physician');
 
       // Get authenticated axios client
       const client = await olympiaPharmacyAuthService.getAuthenticatedClient();

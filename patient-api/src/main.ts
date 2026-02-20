@@ -8059,6 +8059,14 @@ app.post("/admin/impersonate", authenticateJWT, async (req, res) => {
       { expiresIn: "24h" }
     );
 
+    // Audit log: admin impersonation start
+    await AuditService.logImpersonateStart(
+      req,
+      admin.id,
+      targetUser.id,
+      targetUser.email
+    );
+
     res.status(200).json({
       success: true,
       data: {
@@ -8119,6 +8127,13 @@ app.post("/admin/exit-impersonation", authenticateJWT, async (req, res) => {
       },
       process.env.JWT_SECRET!,
       { expiresIn: "24h" }
+    );
+
+    // Audit log: admin impersonation end
+    await AuditService.logImpersonateEnd(
+      req,
+      admin.id,
+      currentUser.id // The user ID that was impersonated
     );
 
     res.status(200).json({
@@ -12228,6 +12243,16 @@ app.put("/users/profile", authenticateJWT, async (req, res) => {
       await user.update({
         passwordHash: hashedPassword,
         temporaryPasswordHash: null // Clear temporary password after change
+      });
+
+      // Audit log: Password change (CRITICAL security event)
+      await AuditService.logFromRequest(req, {
+        action: AuditAction.PASSWORD_CHANGE,
+        resourceType: AuditResourceType.USER,
+        resourceId: user.id,
+        details: {
+          operation: "in_session_password_change"
+        }
       });
     }
 
