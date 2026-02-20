@@ -1,0 +1,101 @@
+name: PR Checks
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+    types: [opened, synchronize, reopened]
+
+jobs:
+  build-and-test:
+    name: Build and Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Free disk space
+        uses: insightsengineering/disk-space-reclaimer@v1
+        with:
+          tools-cache: true
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.5.2
+
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Setup environment variables
+        run: |
+          cat > .env.local << 'EOF'
+          NODE_ENV=production
+          PORT=3001
+          DATABASE_URL=postgresql://test:test@localhost:5432/test_db
+          JWT_SECRET=test-jwt-secret-for-ci
+          SESSION_SECRET=test-session-secret-for-ci
+          STRIPE_SECRET_KEY=sk_test_ci_placeholder
+          NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_ci_placeholder
+          STRIPE_WEBHOOK_SECRET=whsec_ci_placeholder
+          STRIPE_SUBSCRIPTION_PRODUCT=prod_ci_placeholder
+          STRIPE_SUBSCRIPTION_PRICE=price_ci_placeholder
+          AWS_REGION=us-east-1
+          AWS_ACCESS_KEY_ID=ci_placeholder
+          AWS_SECRET_ACCESS_KEY=ci_placeholder
+          AWS_PUBLIC_BUCKET=ci-placeholder-bucket
+          SENDGRID_API_KEY=SG.ci_placeholder
+          PHARMACY_API_KEY=00000000-0000-0000-0000-000000000000
+          PHARMACY_CLINIC_ID=ci-placeholder
+          MD_INTEGRATIONS_CLIENT_ID=ci_placeholder
+          MD_INTEGRATIONS_CLIENT_SECRET=ci_placeholder
+          FRONTEND_URL=http://localhost:3000
+          NEXT_PUBLIC_BASE_URL=http://localhost:3002
+          NEXT_PUBLIC_API_URL=http://localhost:3001
+          APP_WEBHOOK_SECRET=ci-webhook-secret
+          EOF
+
+      - name: Build project
+        run: pnpm build
+
+      - name: Run unit tests
+        run: pnpm test:unit
+
+      - name: Upload build artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-errors
+          path: |
+            **/dist
+            **/.turbo
+          retention-days: 5

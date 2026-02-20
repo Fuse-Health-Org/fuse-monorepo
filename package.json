@@ -7,6 +7,8 @@
     "dev": "turbo run dev",
     "build": "turbo run build",
     "build:windows": "turbo run build:windows",
+    "test:unit": "turbo run test:unit",
+    "test:integration": "turbo run test:integration",
     "clean": "git clean -xdf node_modules",
     "clean:workspaces": "turbo run clean",
     "build:tenant": "cd /home/ec2-user/fuse-monorepo && pnpm --filter @fuse/tenant-portal-frontend run build",
