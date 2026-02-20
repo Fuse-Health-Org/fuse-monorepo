@@ -12253,12 +12253,12 @@ const PORT = process.env.PORT || 3001;
 
 // Initialize database connection and start server
 async function startServer() {
-  const dbConnected = await initializeDatabase();
+  // const dbConnected = await initializeDatabase();
 
-  if (!dbConnected) {
-    console.error("❌ Failed to connect to database. Exiting...");
-    process.exit(1);
-  }
+  // if (!dbConnected) {
+  //   console.error("❌ Failed to connect to database. Exiting...");
+  //   process.exit(1);
+  // }
 
   // Import WebSocket service early so route handlers can reference it
   const WebSocketService = (await import("./services/websocket.service"))
@@ -13542,6 +13542,14 @@ async function startServer() {
     console.log("✅ BelugaProduct table synced");
   } catch (syncErr) {
     console.log("⚠️  BelugaProduct sync:", syncErr instanceof Error ? syncErr.message : syncErr);
+  }
+
+  try {
+    const BelugaEvent = (await import('./models/BelugaEvent')).default;
+    await BelugaEvent.sync({ alter: true });
+    console.log("✅ BelugaEvent table synced");
+  } catch (syncErr) {
+    console.log("⚠️  BelugaEvent sync:", syncErr instanceof Error ? syncErr.message : syncErr);
   }
 
   // ============================================

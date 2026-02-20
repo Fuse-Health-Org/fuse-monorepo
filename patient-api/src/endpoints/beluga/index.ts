@@ -26,6 +26,15 @@ interface BelugaAPIProduct {
   raw?: any;
 }
 
+interface BelugaPatientPreference {
+  name: string;
+  strength: string;
+  quantity: string;
+  refills: string;
+  daysSupply: string;
+  medId: string;
+}
+
 const DEFAULT_BELUGA_BASE_URL =
   process.env.NODE_ENV === "production"
     ? "https://api.belugahealth.com"
@@ -655,6 +664,50 @@ const getBelugaPatientHistoryHints = async (phone: string): Promise<{ visitType?
   }
 };
 
+const getBelugaPatientMasterIdsByPhone = async (phone: string): Promise<string[]> => {
+  try {
+    const patientResponse = await belugaRequest(`/patient/externalFetch/${phone}`, { method: "GET" }, { allowHttpErrors: true });
+    if (patientResponse.statusCode >= 400 || patientResponse.payload?.status !== 200) {
+      return [];
+    }
+
+    const visits = Array.isArray(patientResponse.payload?.data?.visits) ? patientResponse.payload.data.visits : [];
+    return visits
+      .map((item: unknown) => toNonEmptyString(String(item ?? "")))
+      .filter((item): item is string => Boolean(item));
+  } catch {
+    return [];
+  }
+};
+
+const normalizeBelugaPatientPreferenceArray = (value: unknown): BelugaPatientPreference[] => {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((item: any): BelugaPatientPreference | null => {
+      const name = toNonEmptyString(item?.name);
+      const strength = toNonEmptyString(item?.strength);
+      const quantity = toNonEmptyString(item?.quantity);
+      const refills = toNonEmptyString(item?.refills);
+      const daysSupply = toNonEmptyString(item?.daysSupply);
+      const medId = toNonEmptyString(item?.medId);
+
+      if (!name || !strength || !quantity || !refills || !daysSupply || !medId) {
+        return null;
+      }
+
+      return {
+        name,
+        strength,
+        quantity,
+        refills,
+        daysSupply,
+        medId,
+      };
+    })
+    .filter((item): item is BelugaPatientPreference => Boolean(item));
+};
+
 const normalizeBelugaPhotos = (input: unknown): Array<{ mime: "image/jpeg"; data: string }> => {
   if (!Array.isArray(input)) return [];
 
@@ -842,6 +895,9 @@ router.get("/my-visits", authenticateJWT, async (req: Request, res: Response) =>
       return res.status(401).json({ success: false, message: "Unauthorized" });
     }
 
+    const user = await User.findByPk(currentUser.id);
+    const userPhone = onlyDigits(toNonEmptyString((user as any)?.phoneNumber || "") || "");
+
     const orders = await Order.findAll({
       where: {
         userId: currentUser.id,
@@ -851,36 +907,64 @@ router.get("/my-visits", authenticateJWT, async (req: Request, res: Response) =>
       order: [["createdAt", "DESC"]],
     });
 
+    const orderByMasterId = new Map<string, Order>();
+    for (const order of orders) {
+      const masterId = toNonEmptyString(String((order as any).belugaMasterId || ""));
+      if (!masterId || orderByMasterId.has(masterId)) continue;
+      orderByMasterId.set(masterId, order);
+    }
+
+    if (userPhone.length === 10) {
+      const phoneMasterIds = await getBelugaPatientMasterIdsByPhone(userPhone);
+      for (const masterId of phoneMasterIds) {
+        if (!orderByMasterId.has(masterId)) {
+          orderByMasterId.set(masterId, null as any);
+        }
+      }
+    }
+
+    const masterIds = Array.from(orderByMasterId.keys());
     const visits = await Promise.all(
-      orders.map(async (order) => {
-        const masterId = (order as any).belugaMasterId as string;
-        const belugaVisitId = (order as any).belugaVisitId as string | undefined;
+      masterIds.map(async (masterId) => {
+        const order = orderByMasterId.get(masterId) || null;
+        const belugaVisitId = toNonEmptyString(String((order as any)?.belugaVisitId || ""));
 
         let visitData: any = null;
         try {
-          const response = await belugaRequest(`/visit/externalFetch/${encodeURIComponent(masterId)}`);
+          const response = await belugaRequest(`/visit/externalFetch/${encodeURIComponent(masterId)}`, { method: "GET" }, { allowHttpErrors: true });
           if (response.statusCode === 200 && response.payload?.status === 200) {
             visitData = response.payload;
           }
         } catch {
-          // Visit data unavailable; return what we have from our DB
+          // Visit data unavailable; return what we have
         }
 
         return {
-          orderId: order.id,
+          orderId: String((order as any)?.id || masterId),
           masterId,
-          belugaVisitId: belugaVisitId || null,
-          orderStatus: (order as any).status,
-          orderCreatedAt: (order as any).createdAt,
+          belugaVisitId: belugaVisitId || toNonEmptyString(visitData?.data?.visitId) || null,
+          orderStatus: (order as any)?.status || null,
+          orderCreatedAt: (order as any)?.createdAt || null,
           visitStatus: visitData?.visitStatus || null,
           resolvedStatus: visitData?.resolvedStatus || null,
           updateTimestamp: visitData?.updateTimestamp || null,
+          labResults: Array.isArray(visitData?.labResults)
+            ? visitData.labResults
+            : Array.isArray(visitData?.data?.labResults)
+              ? visitData.data.labResults
+              : [],
           visitType: visitData?.data?.visitType || null,
           formObj: visitData?.data?.formObj || null,
           rxHistory: Array.isArray(visitData?.data?.rxHistory) ? visitData.data.rxHistory : [],
         };
       })
     );
+
+    visits.sort((a, b) => {
+      const aTime = new Date(a.orderCreatedAt || a.updateTimestamp || 0).getTime();
+      const bTime = new Date(b.orderCreatedAt || b.updateTimestamp || 0).getTime();
+      return bTime - aTime;
+    });
 
     return res.json({ success: true, data: visits });
   } catch (error: any) {
@@ -1250,6 +1334,160 @@ router.post("/patients/:masterId/name", authenticateJWT, async (req: Request, re
     return res.status(error?.statusCode || 500).json({
       success: false,
       message: "Failed to update Beluga patient name",
+      details: error?.payload || error?.message || null,
+    });
+  }
+});
+
+router.post("/visits/:masterId/preferences", authenticateJWT, async (req: Request, res: Response) => {
+  try {
+    const currentUser = getCurrentUser(req);
+    if (!currentUser?.id) {
+      return res.status(401).json({ success: false, message: "Not authenticated" });
+    }
+
+    const masterId = toNonEmptyString(req.params.masterId);
+    const patientPreference = normalizeBelugaPatientPreferenceArray(req.body?.patientPreference);
+    const requestedPharmacyId = toNonEmptyString(req.body?.pharmacyId);
+    if (!masterId || patientPreference.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "masterId and patientPreference[] with required fields are required",
+      });
+    }
+
+    const user = await User.findByPk(currentUser.id);
+    const phone = onlyDigits(toNonEmptyString((user as any)?.phoneNumber || "") || "");
+    if (phone.length !== 10) {
+      return res.status(400).json({
+        success: false,
+        message: "Current user must have a valid 10-digit phone number to update Beluga preferences",
+      });
+    }
+
+    const visitResponse = await belugaRequest(`/visit/externalFetch/${encodeURIComponent(masterId)}`, { method: "GET" }, { allowHttpErrors: true });
+    if (visitResponse.statusCode >= 400 || visitResponse.payload?.status !== 200) {
+      return res.status(404).json({
+        success: false,
+        message: "Beluga visit not found",
+        details: visitResponse.payload || null,
+      });
+    }
+
+    const masterIds = await getBelugaPatientMasterIdsByPhone(phone);
+    const belongsByPhoneList = masterIds.includes(masterId);
+    const visitPhone = onlyDigits(toNonEmptyString(visitResponse.payload?.data?.formObj?.phone || "") || "");
+    const belongsByVisitPhone = visitPhone.length === 10 && visitPhone === phone;
+    const order = await findBelugaOrderByMasterId(masterId);
+    const belongsByOrder = Boolean(order && String((order as any).userId) === String(currentUser.id));
+    if (!belongsByPhoneList && !belongsByVisitPhone && !belongsByOrder) {
+      return res.status(404).json({
+        success: false,
+        message: "Beluga visit not found for current user",
+      });
+    }
+
+    const existingVisitPreferences = normalizeBelugaPatientPreferenceArray(
+      visitResponse.payload?.data?.formObj?.patientPreference
+    );
+    if (existingVisitPreferences.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Beluga visit has no existing patientPreference to update",
+      });
+    }
+    if (patientPreference.length !== existingVisitPreferences.length) {
+      return res.status(400).json({
+        success: false,
+        message: "patientPreference length must match existing Beluga visit preferences",
+      });
+    }
+
+    const sanitizedPatientPreference = existingVisitPreferences.map((existing, index) => {
+      const incoming = patientPreference[index];
+      return {
+        ...incoming,
+        // medId must remain immutable for the existing visit preference slot.
+        medId: existing.medId,
+      };
+    });
+
+    const visitFormObj = visitResponse.payload?.data?.formObj || {};
+    const fallbackZip = onlyDigits(
+      toNonEmptyString(visitFormObj?.zip) ||
+        toNonEmptyString((user as any)?.zipCode) ||
+        ""
+    );
+    const fallbackCity =
+      toNonEmptyString(visitFormObj?.city) ||
+      toNonEmptyString((user as any)?.city) ||
+      undefined;
+    const fallbackState =
+      toNonEmptyString(visitFormObj?.state) ||
+      toNonEmptyString((user as any)?.state) ||
+      undefined;
+    const fallbackPharmacyCandidates = await resolveBelugaPharmacyCandidates({
+      requestedPharmacyId,
+      zip: fallbackZip,
+      city: fallbackCity,
+      state: fallbackState,
+    });
+    const pharmacyId =
+      toNonEmptyString(requestedPharmacyId) ||
+      toNonEmptyString(visitResponse.payload?.data?.pharmacyId) ||
+      toNonEmptyString(visitResponse.payload?.pharmacyId) ||
+      fallbackPharmacyCandidates[0];
+
+    if (!pharmacyId) {
+      return res.status(400).json({
+        success: false,
+        message: "pharmacyId is required to update visit preferences",
+        details: {
+          hint: "Pass pharmacyId explicitly or ensure visit/user address has valid zip/city/state for pharmacy lookup",
+        },
+      });
+    }
+
+    const updateResponse = await belugaRequest(
+      "/external/updateVisit",
+      {
+        method: "POST",
+        body: {
+          masterId,
+          pharmacyId,
+          patientPreference: sanitizedPatientPreference,
+          apiKey: resolveBelugaApiKey(),
+        },
+      },
+      { allowHttpErrors: true }
+    );
+
+    if (updateResponse.statusCode >= 400) {
+      return res.status(updateResponse.statusCode).json({
+        success: false,
+        message: "Beluga visit preference update failed",
+        details: updateResponse.payload || null,
+      });
+    }
+
+    const statusValue = toNonEmptyString(String(updateResponse.payload?.status || ""));
+    const successStatuses = new Set(["VISIT_DATA_UPDATED", "NEW_RX_SENT", "200"]);
+    if (!statusValue || !successStatuses.has(statusValue)) {
+      return res.status(400).json({
+        success: false,
+        message: "Beluga did not accept visit preference update",
+        details: updateResponse.payload || null,
+      });
+    }
+
+    return res.json({
+      success: true,
+      data: updateResponse.payload,
+    });
+  } catch (error: any) {
+    return res.status(error?.statusCode || 500).json({
+      success: false,
+      message: "Failed to update Beluga visit preferences",
       details: error?.payload || error?.message || null,
     });
   }
