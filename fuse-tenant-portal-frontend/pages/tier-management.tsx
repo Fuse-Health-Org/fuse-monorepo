@@ -18,6 +18,7 @@ interface TierConfig {
   isCustomTierCardTextActive: boolean;
   fuseFeePercent: number | null;
   nonMedicalProfitPercent: number | null;
+  merchantServiceFeePercent: number | null;
 }
 
 interface Plan {
@@ -41,7 +42,7 @@ interface TierWithConfig {
 }
 
 export default function TierManagement() {
-  const { token } = useAuth();
+  const { token, handleUnauthorized } = useAuth();
   const [tiers, setTiers] = useState<TierWithConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
@@ -53,6 +54,8 @@ export default function TierManagement() {
   const [fuseFeeDraft, setFuseFeeDraft] = useState<number | null>(null);
   const [editingNonMedicalProfit, setEditingNonMedicalProfit] = useState<string | null>(null);
   const [nonMedicalProfitDraft, setNonMedicalProfitDraft] = useState<number | null>(null);
+  const [editingMerchantFee, setEditingMerchantFee] = useState<string | null>(null);
+  const [merchantFeeDraft, setMerchantFeeDraft] = useState<number | null>(null);
   const [editingName, setEditingName] = useState<string | null>(null);
   const [nameDraft, setNameDraft] = useState<string>('');
   const [editingIntroPrice, setEditingIntroPrice] = useState<string | null>(null);
@@ -83,6 +86,12 @@ export default function TierManagement() {
       });
 
       console.log('📡 [Tier Frontend] Response status:', response.status);
+
+      if (response.status === 401) {
+        console.warn('⚠️ [Tier Frontend] Session expired, redirecting to sign-in');
+        handleUnauthorized();
+        return;
+      }
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -375,6 +384,37 @@ export default function TierManagement() {
     setNonMedicalProfitDraft(null);
   };
 
+  const handleStartEditingMerchantFee = (planId: string, current: number | null) => {
+    setEditingMerchantFee(planId);
+    setMerchantFeeDraft(current);
+  };
+
+  const handleSaveMerchantFee = async (planId: string) => {
+    if (!token) return;
+    setSaving(planId);
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/tiers/${planId}/config`, {
+        method: 'PATCH',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ merchantServiceFeePercent: merchantFeeDraft }),
+      });
+      if (!response.ok) throw new Error('Failed to update merchant service fee');
+      const result = await response.json();
+      setTiers(prev => prev.map(t => t.plan.id === planId ? { ...t, config: result.data } : t));
+      setEditingMerchantFee(null);
+    } catch (error) {
+      console.error('Error updating merchant service fee:', error);
+      alert('Failed to update merchant service fee');
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  const handleCancelEditingMerchantFee = () => {
+    setEditingMerchantFee(null);
+    setMerchantFeeDraft(null);
+  };
+
   const handleStartEditingName = (planId: string, currentName: string) => {
     setEditingName(planId);
     setNameDraft(currentName);
@@ -466,7 +506,8 @@ export default function TierManagement() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => null);
-        throw new Error(errorData?.message || 'Failed to update price');
+        console.error('❌ Price save failed:', response.status, errorData);
+        throw new Error(errorData?.message || `Failed to update price (${response.status})`);
       }
 
       const result = await response.json();
@@ -700,6 +741,7 @@ export default function TierManagement() {
                                 type="text"
                                 value={nameDraft}
                                 onChange={(e) => setNameDraft(e.target.value)}
+                                onBlur={() => handleSaveName(tier.plan.id)}
                                 onKeyDown={(e) => {
                                   if (e.key === 'Enter') handleSaveName(tier.plan.id);
                                   if (e.key === 'Escape') handleCancelEditingName();
@@ -707,21 +749,6 @@ export default function TierManagement() {
                                 className="text-lg font-semibold px-2 py-1 border border-input rounded focus:outline-none focus:ring-2 focus:ring-[#4FA59C] bg-background text-foreground"
                                 autoFocus
                               />
-                              <button
-                                onClick={() => handleSaveName(tier.plan.id)}
-                                disabled={saving === tier.plan.id}
-                                className="p-1 text-[#4FA59C] hover:bg-teal-50 dark:hover:bg-teal-900/30 rounded transition-colors disabled:opacity-50"
-                                title="Save"
-                              >
-                                <Save className="h-4 w-4" />
-                              </button>
-                              <button
-                                onClick={handleCancelEditingName}
-                                className="p-1 text-muted-foreground hover:bg-muted rounded transition-colors"
-                                title="Cancel"
-                              >
-                                <X className="h-4 w-4" />
-                              </button>
                             </div>
                           ) : (
                             <div className="flex items-center gap-2 group">
@@ -738,7 +765,7 @@ export default function TierManagement() {
                             </div>
                           )}
                           <span className="px-3 py-1 text-xs font-medium text-[#4FA59C] bg-teal-50 dark:bg-teal-900/30 rounded-full">
-                            {tier.plan.planType}
+                            {tier.plan.planType === 'entry' ? 'trial' : tier.plan.planType === 'standard' ? 'growth' : tier.plan.planType === 'premium' ? 'pro' : tier.plan.planType}
                           </span>
                         </div>
                         <p className="text-sm text-muted-foreground mb-3">
@@ -748,39 +775,23 @@ export default function TierManagement() {
                           <div className="flex items-center gap-2">
                             <span className="text-muted-foreground">Price:</span>{' '}
                             {editingPrice === tier.plan.id ? (
-                              <div className="flex items-center gap-2">
-                                <div className="flex items-center gap-1">
-                                  <span className="text-xs text-muted-foreground">$</span>
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    value={priceDraft}
-                                    onChange={(e) => setPriceDraft(e.target.value)}
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter') handleSavePrice(tier.plan.id);
-                                      if (e.key === 'Escape') handleCancelEditingPrice();
-                                    }}
-                                    className="w-28 px-2 py-1 text-sm border border-input rounded focus:outline-none focus:ring-2 focus:ring-[#4FA59C] bg-background text-foreground"
-                                    placeholder="e.g., 500.00"
-                                    autoFocus
-                                  />
-                                  <span className="text-xs text-muted-foreground">/month</span>
-                                </div>
-                                <button
-                                  onClick={() => handleSavePrice(tier.plan.id)}
-                                  disabled={saving === tier.plan.id}
-                                  className="p-1 text-[#4FA59C] hover:bg-teal-50 dark:hover:bg-teal-900/30 rounded transition-colors disabled:opacity-50"
-                                  title="Save"
-                                >
-                                  <Save className="h-4 w-4" />
-                                </button>
-                                <button
-                                  onClick={handleCancelEditingPrice}
-                                  className="p-1 text-muted-foreground hover:bg-muted rounded transition-colors"
-                                  title="Cancel"
-                                >
-                                  <X className="h-4 w-4" />
-                                </button>
+                              <div className="flex items-center gap-1">
+                                <span className="text-xs text-muted-foreground">$</span>
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={priceDraft}
+                                  onChange={(e) => setPriceDraft(e.target.value)}
+                                  onBlur={() => handleSavePrice(tier.plan.id)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') handleSavePrice(tier.plan.id);
+                                    if (e.key === 'Escape') handleCancelEditingPrice();
+                                  }}
+                                  className="w-28 px-2 py-1 text-sm border border-input rounded focus:outline-none focus:ring-2 focus:ring-[#4FA59C] bg-background text-foreground"
+                                  placeholder="e.g., 500.00"
+                                  autoFocus
+                                />
+                                <span className="text-xs text-muted-foreground">/month</span>
                               </div>
                             ) : (
                               <>
@@ -801,42 +812,35 @@ export default function TierManagement() {
                           <div className="flex items-center gap-2">
                             <span className="text-muted-foreground">Intro Price:</span>{' '}
                             {editingIntroPrice === tier.plan.id ? (
-                              <div className="flex items-center gap-2">
-                                <div className="flex items-center gap-1">
-                                  <span className="text-xs text-muted-foreground">$</span>
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    value={introPriceDraft ?? ''}
-                                    onChange={(e) => setIntroPriceDraft(e.target.value ? parseFloat(e.target.value) : null)}
-                                    className="w-24 px-2 py-1 text-sm border border-input rounded focus:outline-none focus:ring-2 focus:ring-[#4FA59C] bg-background text-foreground"
-                                    placeholder="e.g., 250.00"
-                                  />
-                                  <span className="text-xs text-muted-foreground">/mo for</span>
-                                  <input
-                                    type="number"
-                                    value={introMonthsDraft ?? ''}
-                                    onChange={(e) => setIntroMonthsDraft(e.target.value ? parseInt(e.target.value) : null)}
-                                    className="w-16 px-2 py-1 text-sm border border-input rounded focus:outline-none focus:ring-2 focus:ring-[#4FA59C] bg-background text-foreground"
-                                    placeholder="e.g., 3"
-                                  />
-                                  <span className="text-xs text-muted-foreground">months</span>
-                                </div>
-                                <button
-                                  onClick={() => handleSaveIntroPrice(tier.plan.id)}
-                                  disabled={saving === tier.plan.id}
-                                  className="p-1 text-[#4FA59C] hover:bg-teal-50 dark:hover:bg-teal-900/30 rounded transition-colors disabled:opacity-50"
-                                  title="Save"
-                                >
-                                  <Save className="h-4 w-4" />
-                                </button>
-                                <button
-                                  onClick={handleCancelEditingIntroPrice}
-                                  className="p-1 text-muted-foreground hover:bg-muted rounded transition-colors"
-                                  title="Cancel"
-                                >
-                                  <X className="h-4 w-4" />
-                                </button>
+                              <div className="flex items-center gap-1">
+                                <span className="text-xs text-muted-foreground">$</span>
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={introPriceDraft ?? ''}
+                                  onChange={(e) => setIntroPriceDraft(e.target.value ? parseFloat(e.target.value) : null)}
+                                  onBlur={() => handleSaveIntroPrice(tier.plan.id)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') handleSaveIntroPrice(tier.plan.id);
+                                    if (e.key === 'Escape') handleCancelEditingIntroPrice();
+                                  }}
+                                  className="w-24 px-2 py-1 text-sm border border-input rounded focus:outline-none focus:ring-2 focus:ring-[#4FA59C] bg-background text-foreground"
+                                  placeholder="e.g., 250.00"
+                                />
+                                <span className="text-xs text-muted-foreground">/mo for</span>
+                                <input
+                                  type="number"
+                                  value={introMonthsDraft ?? ''}
+                                  onChange={(e) => setIntroMonthsDraft(e.target.value ? parseInt(e.target.value) : null)}
+                                  onBlur={() => handleSaveIntroPrice(tier.plan.id)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') handleSaveIntroPrice(tier.plan.id);
+                                    if (e.key === 'Escape') handleCancelEditingIntroPrice();
+                                  }}
+                                  className="w-16 px-2 py-1 text-sm border border-input rounded focus:outline-none focus:ring-2 focus:ring-[#4FA59C] bg-background text-foreground"
+                                  placeholder="e.g., 3"
+                                />
+                                <span className="text-xs text-muted-foreground">months</span>
                               </div>
                             ) : (
                               <>
@@ -867,24 +871,14 @@ export default function TierManagement() {
                                   type="number"
                                   value={maxProductsDraft}
                                   onChange={(e) => setMaxProductsDraft(parseInt(e.target.value) || 0)}
+                                  onBlur={() => handleSaveMaxProducts(tier.plan.id)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') handleSaveMaxProducts(tier.plan.id);
+                                    if (e.key === 'Escape') handleCancelEditingMaxProducts();
+                                  }}
                                   className="w-20 px-2 py-1 text-sm border border-input rounded focus:outline-none focus:ring-2 focus:ring-[#4FA59C] bg-background text-foreground"
                                   placeholder="-1 for unlimited"
                                 />
-                                <button
-                                  onClick={() => handleSaveMaxProducts(tier.plan.id)}
-                                  disabled={saving === tier.plan.id}
-                                  className="p-1 text-[#4FA59C] hover:bg-teal-50 dark:hover:bg-teal-900/30 rounded transition-colors disabled:opacity-50"
-                                  title="Save"
-                                >
-                                  <Save className="h-4 w-4" />
-                                </button>
-                                <button
-                                  onClick={handleCancelEditingMaxProducts}
-                                  className="p-1 text-muted-foreground hover:bg-muted rounded transition-colors"
-                                  title="Cancel"
-                                >
-                                  <X className="h-4 w-4" />
-                                </button>
                               </div>
                             ) : (
                               <>
@@ -905,31 +899,21 @@ export default function TierManagement() {
                           <div className="flex items-center gap-2">
                             <span className="text-muted-foreground">Fuse Fee:</span>{' '}
                             {editingFuseFee === tier.plan.id ? (
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-1">
                                 <input
                                   type="number"
                                   step="0.01"
                                   value={fuseFeeDraft ?? ''}
                                   onChange={(e) => setFuseFeeDraft(e.target.value ? parseFloat(e.target.value) : null)}
+                                  onBlur={() => handleSaveFuseFee(tier.plan.id)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') handleSaveFuseFee(tier.plan.id);
+                                    if (e.key === 'Escape') handleCancelEditingFuseFee();
+                                  }}
                                   className="w-24 px-2 py-1 text-sm border border-input rounded focus:outline-none focus:ring-2 focus:ring-[#4FA59C] bg-background text-foreground"
                                   placeholder="e.g., 5.0 or 17.0"
                                 />
                                 <span className="text-xs text-muted-foreground">%</span>
-                                <button
-                                  onClick={() => handleSaveFuseFee(tier.plan.id)}
-                                  disabled={saving === tier.plan.id}
-                                  className="p-1 text-[#4FA59C] hover:bg-teal-50 dark:hover:bg-teal-900/30 rounded transition-colors disabled:opacity-50"
-                                  title="Save"
-                                >
-                                  <Save className="h-4 w-4" />
-                                </button>
-                                <button
-                                  onClick={handleCancelEditingFuseFee}
-                                  className="p-1 text-muted-foreground hover:bg-muted rounded transition-colors"
-                                  title="Cancel"
-                                >
-                                  <X className="h-4 w-4" />
-                                </button>
                               </div>
                             ) : (
                               <>
@@ -991,6 +975,44 @@ export default function TierManagement() {
                             )}
                           </div>
                         </div>
+                        {/* Merchant Service Fee Row */}
+                        <div className="flex items-center gap-2 text-sm mt-2">
+                          <span className="text-muted-foreground">Merchant Service Fee:</span>{' '}
+                          {editingMerchantFee === tier.plan.id ? (
+                            <div className="flex items-center gap-1">
+                              <input
+                                type="number"
+                                min="0"
+                                max="10"
+                                step="0.1"
+                                value={merchantFeeDraft ?? ''}
+                                onChange={(e) => setMerchantFeeDraft(e.target.value === '' ? null : parseFloat(e.target.value))}
+                                onBlur={() => handleSaveMerchantFee(tier.plan.id)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') handleSaveMerchantFee(tier.plan.id);
+                                  if (e.key === 'Escape') handleCancelEditingMerchantFee();
+                                }}
+                                className="w-24 px-2 py-1 text-sm border border-input rounded focus:outline-none focus:ring-2 focus:ring-[#4FA59C] bg-background text-foreground"
+                                placeholder="e.g. 2.0"
+                                autoFocus
+                              />
+                              <span className="text-xs text-muted-foreground">%</span>
+                            </div>
+                          ) : (
+                            <>
+                              <span className="font-semibold text-foreground">
+                                {tier.config?.merchantServiceFeePercent != null ? `${tier.config.merchantServiceFeePercent}%` : 'Not set (default 2%)'}
+                              </span>
+                              <button
+                                onClick={() => handleStartEditingMerchantFee(tier.plan.id, tier.config?.merchantServiceFeePercent ?? null)}
+                                className="p-1 text-muted-foreground hover:text-[#4FA59C] hover:bg-teal-50 dark:hover:bg-teal-900/30 rounded transition-colors"
+                                title="Edit merchant service fee"
+                              >
+                                <Edit2 className="h-3 w-3" />
+                              </button>
+                            </>
+                          )}
+                        </div>
                         {/* Stripe IDs Row */}
                         <div className="flex items-center flex-wrap gap-x-6 gap-y-2 text-sm mt-2">
                           {/* Stripe Price ID */}
@@ -1002,6 +1024,7 @@ export default function TierManagement() {
                                   type="text"
                                   value={stripePriceIdDraft}
                                   onChange={(e) => setStripePriceIdDraft(e.target.value)}
+                                  onBlur={() => handleSaveStripePriceId(tier.plan.id)}
                                   onKeyDown={(e) => {
                                     if (e.key === 'Enter') handleSaveStripePriceId(tier.plan.id);
                                     if (e.key === 'Escape') handleCancelEditingStripePriceId();
@@ -1010,21 +1033,6 @@ export default function TierManagement() {
                                   placeholder="price_..."
                                   autoFocus
                                 />
-                                <button
-                                  onClick={() => handleSaveStripePriceId(tier.plan.id)}
-                                  disabled={saving === tier.plan.id}
-                                  className="p-1 text-[#4FA59C] hover:bg-teal-50 dark:hover:bg-teal-900/30 rounded transition-colors disabled:opacity-50"
-                                  title="Save"
-                                >
-                                  <Save className="h-4 w-4" />
-                                </button>
-                                <button
-                                  onClick={handleCancelEditingStripePriceId}
-                                  className="p-1 text-muted-foreground hover:bg-muted rounded transition-colors"
-                                  title="Cancel"
-                                >
-                                  <X className="h-4 w-4" />
-                                </button>
                               </div>
                             ) : (
                               <>
@@ -1050,6 +1058,7 @@ export default function TierManagement() {
                                   type="text"
                                   value={introStripeIdDraft}
                                   onChange={(e) => setIntroStripeIdDraft(e.target.value)}
+                                  onBlur={() => handleSaveIntroStripeId(tier.plan.id)}
                                   onKeyDown={(e) => {
                                     if (e.key === 'Enter') handleSaveIntroStripeId(tier.plan.id);
                                     if (e.key === 'Escape') handleCancelEditingIntroStripeId();
@@ -1058,21 +1067,6 @@ export default function TierManagement() {
                                   placeholder="price_... (leave empty to clear)"
                                   autoFocus
                                 />
-                                <button
-                                  onClick={() => handleSaveIntroStripeId(tier.plan.id)}
-                                  disabled={saving === tier.plan.id}
-                                  className="p-1 text-[#4FA59C] hover:bg-teal-50 dark:hover:bg-teal-900/30 rounded transition-colors disabled:opacity-50"
-                                  title="Save"
-                                >
-                                  <Save className="h-4 w-4" />
-                                </button>
-                                <button
-                                  onClick={handleCancelEditingIntroStripeId}
-                                  className="p-1 text-muted-foreground hover:bg-muted rounded transition-colors"
-                                  title="Cancel"
-                                >
-                                  <X className="h-4 w-4" />
-                                </button>
                               </div>
                             ) : (
                               <>

@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { DataTypes } from 'sequelize';
+import multer from 'multer';
 import Program from '../models/Program';
 import Questionnaire from '../models/Questionnaire';
 import FormProducts from '../models/FormProducts';
@@ -9,6 +10,17 @@ import TenantProductForm from '../models/TenantProductForm';
 import Clinic from '../models/Clinic';
 import MedicalCompany from '../models/MedicalCompany';
 import { authenticateJWT, getCurrentUser } from '../config/jwt';
+import AuditLog, { AuditAction, AuditResourceType } from '../models/AuditLog';
+import { uploadToS3, deleteFromS3, isValidImageFile, isValidFileSize } from '../config/s3';
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (isValidImageFile(file.mimetype)) cb(null, true);
+    else cb(new Error('Invalid file type'));
+  },
+});
 
 const router = Router();
 
@@ -69,9 +81,223 @@ async function ensureProgramFormStepOrderColumn(): Promise<void> {
   return programFormStepOrderColumnPromise;
 }
 
+let programIsFeaturedColumnReady = false;
+let programIsFeaturedColumnPromise: Promise<void> | null = null;
+
+async function ensureProgramIsFeaturedColumn(): Promise<void> {
+  if (programIsFeaturedColumnReady) return;
+  if (programIsFeaturedColumnPromise) return programIsFeaturedColumnPromise;
+
+  programIsFeaturedColumnPromise = (async () => {
+    const sequelize = Program.sequelize;
+    if (!sequelize) return;
+
+    const queryInterface = sequelize.getQueryInterface();
+    const table = await queryInterface.describeTable('Program');
+    if (!table.isFeatured) {
+      await queryInterface.addColumn('Program', 'isFeatured', {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+      });
+      console.log('✅ Added Program.isFeatured column automatically');
+    }
+
+    programIsFeaturedColumnReady = true;
+  })()
+    .catch((error) => {
+      console.error('❌ Failed ensuring Program.isFeatured column:', error);
+      throw error;
+    })
+    .finally(() => {
+      programIsFeaturedColumnPromise = null;
+    });
+
+  return programIsFeaturedColumnPromise;
+}
+
+let programPortalDisplayNameColumnReady = false;
+let programPortalDisplayNameColumnPromise: Promise<void> | null = null;
+
+async function ensureProgramPortalDisplayNameColumn(): Promise<void> {
+  if (programPortalDisplayNameColumnReady) return;
+  if (programPortalDisplayNameColumnPromise) return programPortalDisplayNameColumnPromise;
+
+  programPortalDisplayNameColumnPromise = (async () => {
+    const sequelize = Program.sequelize;
+    if (!sequelize) return;
+
+    const queryInterface = sequelize.getQueryInterface();
+    const table = await queryInterface.describeTable('Program');
+    if (!table.portalDisplayName) {
+      await queryInterface.addColumn('Program', 'portalDisplayName', {
+        type: DataTypes.STRING,
+        allowNull: true,
+      });
+      console.log('✅ Added Program.portalDisplayName column automatically');
+    }
+
+    programPortalDisplayNameColumnReady = true;
+  })()
+    .catch((error) => {
+      console.error('❌ Failed ensuring Program.portalDisplayName column:', error);
+      throw error;
+    })
+    .finally(() => {
+      programPortalDisplayNameColumnPromise = null;
+    });
+
+  return programPortalDisplayNameColumnPromise;
+}
+
+let programHideAdditionalProductsColumnReady = false;
+let programHideAdditionalProductsColumnPromise: Promise<void> | null = null;
+
+async function ensureProgramHideAdditionalProductsColumn(): Promise<void> {
+  if (programHideAdditionalProductsColumnReady) return;
+  if (programHideAdditionalProductsColumnPromise) return programHideAdditionalProductsColumnPromise;
+
+  programHideAdditionalProductsColumnPromise = (async () => {
+    const sequelize = Program.sequelize;
+    if (!sequelize) return;
+
+    const queryInterface = sequelize.getQueryInterface();
+    const table = await queryInterface.describeTable('Program');
+    if (!table.hideAdditionalProducts) {
+      await queryInterface.addColumn('Program', 'hideAdditionalProducts', {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+      });
+      console.log('✅ Added Program.hideAdditionalProducts column automatically');
+    }
+
+    programHideAdditionalProductsColumnReady = true;
+  })()
+    .catch((error) => {
+      console.error('❌ Failed ensuring Program.hideAdditionalProducts column:', error);
+      throw error;
+    })
+    .finally(() => {
+      programHideAdditionalProductsColumnPromise = null;
+    });
+
+  return programHideAdditionalProductsColumnPromise;
+}
+
+let programHeroImageUrlColumnReady = false;
+let programHeroImageUrlColumnPromise: Promise<void> | null = null;
+
+async function ensureProgramHeroImageUrlColumn(): Promise<void> {
+  if (programHeroImageUrlColumnReady) return;
+  if (programHeroImageUrlColumnPromise) return programHeroImageUrlColumnPromise;
+
+  programHeroImageUrlColumnPromise = (async () => {
+    const sequelize = Program.sequelize;
+    if (!sequelize) return;
+
+    const queryInterface = sequelize.getQueryInterface();
+    const table = await queryInterface.describeTable('Program');
+    if (!table.heroImageUrl) {
+      await queryInterface.addColumn('Program', 'heroImageUrl', {
+        type: DataTypes.TEXT,
+        allowNull: true,
+      });
+      console.log('✅ Added Program.heroImageUrl column automatically');
+    }
+
+    programHeroImageUrlColumnReady = true;
+  })()
+    .catch((error) => {
+      console.error('❌ Failed ensuring Program.heroImageUrl column:', error);
+      throw error;
+    })
+    .finally(() => {
+      programHeroImageUrlColumnPromise = null;
+    });
+
+  return programHeroImageUrlColumnPromise;
+}
+
+let programProductPricingColumnReady = false;
+let programProductPricingColumnPromise: Promise<void> | null = null;
+
+async function ensureProgramProductPricingColumn(): Promise<void> {
+  if (programProductPricingColumnReady) return;
+  if (programProductPricingColumnPromise) return programProductPricingColumnPromise;
+
+  programProductPricingColumnPromise = (async () => {
+    const sequelize = Program.sequelize;
+    if (!sequelize) return;
+
+    const queryInterface = sequelize.getQueryInterface();
+    const table = await queryInterface.describeTable('Program');
+    if (!table.productPricing) {
+      await queryInterface.addColumn('Program', 'productPricing', {
+        type: DataTypes.JSON,
+        allowNull: true,
+        defaultValue: null,
+      });
+      console.log('✅ Added Program.productPricing column automatically');
+    }
+
+    programProductPricingColumnReady = true;
+  })()
+    .catch((error) => {
+      console.error('❌ Failed ensuring Program.productPricing column:', error);
+      throw error;
+    })
+    .finally(() => {
+      programProductPricingColumnPromise = null;
+    });
+
+  return programProductPricingColumnPromise;
+}
+
+let programNonMedicalServiceFeeColumnReady = false;
+let programNonMedicalServiceFeeColumnPromise: Promise<void> | null = null;
+
+async function ensureProgramNonMedicalServiceFeeColumn(): Promise<void> {
+  if (programNonMedicalServiceFeeColumnReady) return;
+  if (programNonMedicalServiceFeeColumnPromise) return programNonMedicalServiceFeeColumnPromise;
+
+  programNonMedicalServiceFeeColumnPromise = (async () => {
+    const sequelize = Program.sequelize;
+    if (!sequelize) return;
+
+    const queryInterface = sequelize.getQueryInterface();
+    const table = await queryInterface.describeTable('Program');
+    if (!table.nonMedicalServiceFee) {
+      await queryInterface.addColumn('Program', 'nonMedicalServiceFee', {
+        type: DataTypes.DECIMAL(10, 2),
+        allowNull: false,
+        defaultValue: 0,
+      });
+      console.log('✅ Added Program.nonMedicalServiceFee column automatically');
+    }
+
+    programNonMedicalServiceFeeColumnReady = true;
+  })()
+    .catch((error) => {
+      console.error('❌ Failed ensuring Program.nonMedicalServiceFee column:', error);
+      throw error;
+    })
+    .finally(() => {
+      programNonMedicalServiceFeeColumnPromise = null;
+    });
+
+  return programNonMedicalServiceFeeColumnPromise;
+}
+
 router.use(async (_req, _res, next) => {
   try {
     await ensureProgramFormStepOrderColumn();
+    await ensureProgramIsFeaturedColumn();
+    await ensureProgramPortalDisplayNameColumn();
+    await ensureProgramNonMedicalServiceFeeColumn();
+    await ensureProgramProductPricingColumn();
+    await ensureProgramHeroImageUrlColumn();
+    await ensureProgramHideAdditionalProductsColumn();
     next();
   } catch (error) {
     next(error);
@@ -1140,11 +1366,13 @@ router.put('/programs/:id', authenticateJWT, async (req: Request, res: Response)
     const {
       name,
       description,
+      portalDisplayName,
       medicalTemplateId,
       individualProductId,
       parentProgramId,
       formStepOrder,
       isActive,
+      isFeatured,
       frontendDisplayProductId,
       // Non-medical services
       hasPatientPortal,
@@ -1157,6 +1385,10 @@ router.put('/programs/:id', authenticateJWT, async (req: Request, res: Response)
       calorieDeficitCalculatorPrice,
       hasEasyShopping,
       easyShoppingPrice,
+      nonMedicalServiceFee,
+      productPricing,
+      heroImageUrl,
+      hideAdditionalProducts,
     } = req.body;
 
     const program = await Program.findOne({
@@ -1203,14 +1435,52 @@ router.put('/programs/:id', authenticateJWT, async (req: Request, res: Response)
       }
     }
 
+    // Enforce unique portalDisplayName per clinic (case-insensitive)
+    if (portalDisplayName && portalDisplayName.trim()) {
+      const { Op } = require('sequelize');
+      const conflict = await Program.findOne({
+        where: {
+          clinicId,
+          id: { [Op.ne]: id },
+          portalDisplayName: { [Op.iLike]: portalDisplayName.trim() },
+        },
+      });
+      if (conflict) {
+        return res.status(422).json({
+          success: false,
+          error: `A program named "${portalDisplayName.trim()}" already exists. Choose a different name.`,
+          code: 'DUPLICATE_NAME',
+        });
+      }
+    }
+
+    // Enforce max 3 featured programs per clinic
+    if (isFeatured === true && !program.isFeatured) {
+      const featuredCount = await Program.count({ where: { clinicId, isFeatured: true } });
+      if (featuredCount >= 3) {
+        return res.status(422).json({
+          success: false,
+          error: 'You can only feature up to 3 programs. Please unfeature one before featuring another.',
+        });
+      }
+    }
+
+    // Track changes for audit log
+    const changes: Record<string, { from: any; to: any }> = {};
+    const track = (field: string, from: any, to: any) => {
+      if (to !== undefined && String(from ?? '') !== String(to ?? '')) changes[field] = { from, to };
+    };
+
     // Update fields
-    if (name !== undefined) program.name = name;
-    if (description !== undefined) program.description = description;
+    if (name !== undefined) { track('name', program.name, name); program.name = name; }
+    if (description !== undefined) { track('description', program.description, description); program.description = description; }
+    if (portalDisplayName !== undefined) { track('portalDisplayName', program.portalDisplayName, portalDisplayName); program.portalDisplayName = portalDisplayName || null; }
     if (medicalTemplateId !== undefined) program.medicalTemplateId = medicalTemplateId;
     if (individualProductId !== undefined) program.individualProductId = individualProductId || null;
     if (parentProgramId !== undefined) program.parentProgramId = parentProgramId || null;
     if (formStepOrder !== undefined) program.formStepOrder = normalizeProgramFormStepOrder(formStepOrder);
-    if (isActive !== undefined) program.isActive = isActive;
+    if (isActive !== undefined) { track('isActive', program.isActive, isActive); program.isActive = isActive; }
+    if (isFeatured !== undefined) { track('isFeatured', program.isFeatured, isFeatured); program.isFeatured = isFeatured; }
     if (frontendDisplayProductId !== undefined) program.frontendDisplayProductId = frontendDisplayProductId || null;
 
     // Update non-medical services
@@ -1224,8 +1494,26 @@ router.put('/programs/:id', authenticateJWT, async (req: Request, res: Response)
     if (calorieDeficitCalculatorPrice !== undefined) program.calorieDeficitCalculatorPrice = calorieDeficitCalculatorPrice;
     if (hasEasyShopping !== undefined) program.hasEasyShopping = hasEasyShopping;
     if (easyShoppingPrice !== undefined) program.easyShoppingPrice = easyShoppingPrice;
+    if (nonMedicalServiceFee !== undefined) program.nonMedicalServiceFee = parseFloat(nonMedicalServiceFee) || 0;
+    if (productPricing !== undefined) program.productPricing = productPricing ?? null;
+    if (heroImageUrl !== undefined) { track('heroImageUrl', program.heroImageUrl, heroImageUrl); program.heroImageUrl = heroImageUrl || null; }
+    if (hideAdditionalProducts !== undefined) { track('hideAdditionalProducts', program.hideAdditionalProducts, hideAdditionalProducts); program.hideAdditionalProducts = Boolean(hideAdditionalProducts); }
 
     await program.save();
+
+    // Fire-and-forget audit log — never blocks the response
+    AuditLog.log({
+      userId: (currentUser as any).id || null,
+      userEmail: (currentUser as any).email || null,
+      action: AuditAction.UPDATE,
+      resourceType: AuditResourceType.PROGRAM,
+      resourceId: program.id,
+      clinicId: clinicId || null,
+      ipAddress: (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket?.remoteAddress || null,
+      userAgent: req.headers['user-agent'] || null,
+      details: { changes, programName: program.name },
+      success: true,
+    }).catch((err) => console.error('⚠️ Failed to write audit log for program update:', err));
 
     // Fetch with relationships
     const programWithRelations = await Program.findByPk(program.id, {
@@ -1260,6 +1548,55 @@ router.put('/programs/:id', authenticateJWT, async (req: Request, res: Response)
       success: false,
       error: 'Failed to update program',
     });
+  }
+});
+
+/**
+ * Duplicate a program — creates an inactive copy the clinic must name before activating
+ * POST /programs/:id/duplicate
+ */
+router.post('/programs/:id/duplicate', authenticateJWT, async (req: Request, res: Response) => {
+  try {
+    const currentUser = getCurrentUser(req);
+    if (!currentUser) return res.status(401).json({ success: false, error: 'Authentication required' });
+
+    const clinicId = (currentUser as any).clinicId;
+    const { id } = req.params;
+
+    const source = await Program.findOne({ where: { id, clinicId } });
+    if (!source) return res.status(404).json({ success: false, error: 'Program not found' });
+
+    // Build copy — strip identity/live fields so the brand must configure it
+    const copy = await Program.create({
+      clinicId,
+      name: source.name,
+      description: source.description ?? undefined,
+      medicalTemplateId: source.medicalTemplateId ?? undefined,
+      individualProductId: source.individualProductId ?? undefined,
+      templateId: source.templateId ?? undefined,
+      parentProgramId: source.parentProgramId ?? undefined,
+      productPricing: source.productPricing ?? undefined,
+      nonMedicalServiceFee: source.nonMedicalServiceFee ?? 0,
+      productOrder: (source as any).productOrder ?? undefined,
+      featuredProductId: (source as any).featuredProductId ?? undefined,
+      heroImageUrl: source.heroImageUrl ?? undefined,
+      formStepOrder: source.formStepOrder ?? undefined,
+      hasPatientPortal: source.hasPatientPortal ?? false,
+      patientPortalPrice: source.patientPortalPrice ?? 0,
+      hasBmiCalculator: source.hasBmiCalculator ?? false,
+      bmiCalculatorPrice: source.bmiCalculatorPrice ?? 0,
+      hasProteinIntakeCalculator: source.hasProteinIntakeCalculator ?? false,
+      proteinIntakeCalculatorPrice: source.proteinIntakeCalculatorPrice ?? 0,
+      // Never copy these — must be set fresh by the brand
+      portalDisplayName: null,
+      isActive: false,
+      isFeatured: false,
+    } as any);
+
+    return res.status(201).json({ success: true, data: copy });
+  } catch (err) {
+    console.error('Error duplicating program:', err);
+    return res.status(500).json({ success: false, error: 'Failed to duplicate program' });
   }
 });
 
@@ -1446,5 +1783,64 @@ const calculateVisitFeeHandler = async (req: Request, res: Response) => {
  */
 router.post('/calculate-visit-fee', calculateVisitFeeHandler);
 router.post('/programs/calculate-visit-fee', calculateVisitFeeHandler);
+
+/**
+ * Upload a custom hero image for a program.
+ * Images are stored in S3 scoped to the brand's clinic: brands/{clinicId}/programs/{id}/
+ * The imageUrl is saved on program.heroImageUrl.
+ * POST /programs/:id/upload-image
+ */
+router.post('/programs/:id/upload-image', authenticateJWT, upload.single('image'), async (req: Request, res: Response) => {
+  try {
+    const currentUser = getCurrentUser(req);
+    if (!currentUser) {
+      return res.status(401).json({ success: false, message: 'Not authenticated' });
+    }
+
+    const clinicId = (currentUser as any).clinicId;
+    const { id } = req.params;
+
+    const program = await Program.findOne({ where: { id, clinicId } });
+    if (!program) {
+      return res.status(404).json({ success: false, message: 'Program not found' });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No file uploaded' });
+    }
+
+    if (!isValidFileSize(req.file.size)) {
+      return res.status(400).json({ success: false, message: 'File too large. Maximum size is 5 MB.' });
+    }
+
+    // Delete old hero image from S3 if present (1 program = 1 hero image policy)
+    if (program.heroImageUrl) {
+      try {
+        await deleteFromS3(program.heroImageUrl);
+      } catch {
+        // Non-fatal: proceed even if old image cleanup fails
+      }
+    }
+
+    // Upload new hero image scoped to this brand's clinic
+    const folder = `brands/${clinicId}/programs/${id}`;
+    const imageUrl = await uploadToS3(req.file.buffer, req.file.originalname, req.file.mimetype, folder);
+
+    await program.update({ heroImageUrl: imageUrl });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Program hero image uploaded successfully',
+      data: { id: program.id, heroImageUrl: imageUrl },
+    });
+  } catch (error) {
+    if (process.env.NODE_ENV === 'development') {
+      console.error('❌ Error uploading program hero image:', error);
+    } else {
+      console.error('❌ Error uploading program hero image');
+    }
+    return res.status(500).json({ success: false, message: 'Failed to upload program hero image' });
+  }
+});
 
 export default router;

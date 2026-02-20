@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, DeleteObjectCommand, HeadObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import dotenv from 'dotenv';
 
 // Load environment variables
@@ -133,6 +133,25 @@ function extractKeyFromS3Url(url: string): string | null {
   } catch (error) {
     // HIPAA: Do not log URL details
     return null;
+  }
+}
+
+// Fetch a file from S3 and return its stream + content type (for proxying)
+export async function getFileFromS3(fileUrl: string): Promise<{ body: NodeJS.ReadableStream; contentType: string }> {
+  const key = extractKeyFromS3Url(fileUrl)
+  if (!key) throw new Error('Invalid S3 URL format')
+
+  const command = new GetObjectCommand({
+    Bucket: BUCKET_NAME,
+    Key: key,
+  })
+
+  const response = await s3Client.send(command)
+  if (!response.Body) throw new Error('Empty response from S3')
+
+  return {
+    body: response.Body as NodeJS.ReadableStream,
+    contentType: response.ContentType || 'image/png',
   }
 }
 

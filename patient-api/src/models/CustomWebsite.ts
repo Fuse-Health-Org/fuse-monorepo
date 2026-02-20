@@ -73,6 +73,33 @@ export default class CustomWebsite extends Entity {
     declare isActive: boolean;
 
     @Column({
+        type: DataType.STRING(255), // Hex color for the portal page background
+        allowNull: true,
+        defaultValue: '#FFFFFF',
+    })
+    declare backgroundColor?: string;
+
+    @Column({
+        type: DataType.STRING(255),
+        allowNull: true,
+        defaultValue: '#000000',
+    })
+    declare navFooterColor?: string;
+
+    @Column({
+        type: DataType.STRING(50), // "brandName" | "logo"
+        allowNull: true,
+        defaultValue: 'brandName',
+    })
+    declare navDisplayMode?: string;
+
+    @Column({
+        type: DataType.STRING(255),
+        allowNull: true,
+    })
+    declare navBrandName?: string;
+
+    @Column({
         type: DataType.STRING(255), // Hex color format #RRGGBB or linear gradient
         allowNull: true,
         defaultValue: '#000000',
