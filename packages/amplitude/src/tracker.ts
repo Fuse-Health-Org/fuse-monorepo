@@ -3,6 +3,38 @@ import { AmplitudeConfig, AmplitudeEvent, AmplitudeUser } from "./types";
 
 let initialized = false;
 let currentAppName = "";
+let sampleRate = 0.1;
+
+/** HIPAA: Property keys that must never be sent to Amplitude */
+const PHI_KEYS = new Set([
+  "email", "name", "firstName", "first_name", "lastName", "last_name",
+  "fullName", "full_name", "phone", "phoneNumber", "phone_number",
+  "dob", "dateOfBirth", "date_of_birth", "birthDate", "birth_date",
+  "address", "streetAddress", "street_address", "city", "state", "zip",
+  "zipCode", "zip_code", "postalCode", "postal_code",
+  "ssn", "socialSecurity", "social_security",
+  "insuranceId", "insurance_id", "memberId", "member_id",
+  "patientName", "patient_name", "patientEmail", "patient_email",
+]);
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_RE = /^[\d\s().+-]{7,}$/;
+
+/** HIPAA: Strip PHI keys and redact values that look like emails/phones */
+const sanitizeProperties = (
+  props: Record<string, unknown>
+): Record<string, unknown> => {
+  const sanitized: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(props)) {
+    if (PHI_KEYS.has(key)) continue;
+    if (typeof value === "string" && (EMAIL_RE.test(value) || PHONE_RE.test(value))) {
+      sanitized[key] = "[REDACTED]";
+    } else {
+      sanitized[key] = value;
+    }
+  }
+  return sanitized;
+};
 
 export const initAmplitude = (config: AmplitudeConfig): void => {
   if (!config.apiKey) {
@@ -17,6 +49,7 @@ export const initAmplitude = (config: AmplitudeConfig): void => {
   });
 
   currentAppName = config.appName;
+  sampleRate = config.sampleRate ?? 0.1;
   initialized = true;
 
   if (config.debug) {
@@ -55,10 +88,9 @@ export const trackEvent = (
   properties?: Record<string, unknown>
 ): void => {
   if (!initialized) return;
-  amplitude.track(eventName, {
-    ...properties,
-    app_name: currentAppName,
-  });
+  if (Math.random() > sampleRate) return;
+  const raw = { ...properties, app_name: currentAppName };
+  amplitude.track(eventName, sanitizeProperties(raw));
 };
 
 /** HIPAA: Strip potential PHI from query parameters before tracking */

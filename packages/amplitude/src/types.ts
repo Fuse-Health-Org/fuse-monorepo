@@ -25,6 +25,8 @@ export interface AmplitudeConfig {
   apiKey: string;
   appName: string;
   debug?: boolean;
+  /** Fraction of events to send (0–1). Defaults to 0.1 (10%). */
+  sampleRate?: number;
 }
 
 export interface AmplitudeUser {
