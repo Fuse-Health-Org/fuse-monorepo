@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/AuthContext"
 import Link from "next/link"
 import { useRouter } from "next/router"
-import { useEffect, useState, useCallback, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import {
   BarChart3,
   Users,
@@ -24,7 +24,9 @@ import {
   Globe,
   UserPlus,
 } from "lucide-react"
-import Tutorial from "./ui/tutorial"
+import dynamic from "next/dynamic"
+
+const Tutorial = dynamic(() => import("./ui/tutorial"), { ssr: false })
 
 const navigation = [
   { name: "Overview", icon: BarChart3, current: true, href: "/", id: "tutorial-step-overview" },
@@ -103,77 +105,75 @@ export function Sidebar() {
     subscription?.customFeatures?.hasPrograms ||
     subscription?.tierConfig?.hasPrograms ||
     false;
-  useEffect(() => {
-    const fetchSubscriptionBasicInfo = async () => {
-      // Prevent multiple simultaneous calls
-      if (hasCheckedTutorial.current) {
-        return;
-      }
-      
-      hasCheckedTutorial.current = true;
-      
-      try {
-        const response = await authenticatedFetch(`${API_URL}/brand-subscriptions/basic-info`, {
-          method: "GET",
-          skipLogoutOn401: true,
-        });
+  const fetchSubscriptionBasicInfo = async () => {
+    try {
+      const response = await authenticatedFetch(`${API_URL}/brand-subscriptions/basic-info`, {
+        method: "GET",
+        skipLogoutOn401: true,
+      });
 
-        if (response.ok) {
-          const data = await response.json();
-          console.log("📍 Response data:", data);
-          if (data.success) {
-            console.log("data.data", data.data);
-            const needsTutorial = data.data.tutorialFinished === false && data.data.status === "active" && data.data.stripeCustomerId !== null;
-            console.log("needsTutorial", needsTutorial);
+      if (response.ok) {
+        const data = await response.json();
+        console.log("📍 Response data:", data);
+        if (data.success) {
+          console.log("data.data", data.data);
+          const needsTutorial = data.data.tutorialFinished === false && data.data.status === "active" && data.data.stripeCustomerId !== null;
+          console.log("needsTutorial", needsTutorial);
 
-            const skipTutorialRedirect =
-              typeof window !== "undefined" &&
-              localStorage.getItem("skipTutorialRedirectOnce") === "1";
-            if (skipTutorialRedirect) {
-              localStorage.removeItem("skipTutorialRedirectOnce");
-              setRunTutorial(false);
-              return;
-            }
-
-            // Set tutorial step from DB, default to 0 if not set
-            const step = data.data.tutorialStep || 0;
-            console.log("📍 Tutorial step from DB:", step);
-            setTutorialStep(step);
-
-            // If tutorial needs to run and we're at step 0 or 1, redirect to settings page
-            // because those steps' target elements are on the settings page
-            console.log("📍 Checking redirect condition:", { needsTutorial, step, pathname: router.pathname });
-            if (needsTutorial && step <= 1 && router.pathname !== '/settings') {
-              console.log("📍 Tutorial step", step, "requires settings page, redirecting...");
-              router.push('/settings');
-              // Don't start tutorial yet - it will start after redirect when this runs again
-              return;
-            }
-
-            console.log("📍 Passed redirect check, now checking if should run tutorial");
-            // Add small delay to ensure page elements are rendered before starting tutorial
-            if (needsTutorial) {
-              console.log("📍 Setting runTutorial to true in 500ms for step", step);
-              setTimeout(() => {
-                console.log("📍 NOW setting runTutorial to TRUE");
-                setRunTutorial(true);
-              }, 500);
-            } else {
-              console.log("📍 Setting runTutorial to false");
-              setRunTutorial(false);
-            }
-          } else {
-            console.log("📍 data.success is false");
+          const skipTutorialRedirect =
+            typeof window !== "undefined" &&
+            localStorage.getItem("skipTutorialRedirectOnce") === "1";
+          if (skipTutorialRedirect) {
+            localStorage.removeItem("skipTutorialRedirectOnce");
+            setRunTutorial(false);
+            return;
           }
-        }
-      } catch (error) {
-        console.error("Error fetching subscription basic info:", error);
-      }
-    };
 
-    fetchSubscriptionBasicInfo()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+          // Set tutorial step from DB, default to 0 if not set
+          const step = data.data.tutorialStep || 0;
+          console.log("📍 Tutorial step from DB:", step);
+          setTutorialStep(step);
+
+          // If tutorial needs to run and we're at step 0 or 1, redirect to settings page
+          // because those steps' target elements are on the settings page
+          console.log("📍 Checking redirect condition:", { needsTutorial, step, pathname: router.pathname });
+          if (needsTutorial && step <= 1 && router.pathname !== '/settings') {
+            console.log("📍 Tutorial step", step, "requires settings page, redirecting...");
+            router.push('/settings');
+            // Don't start tutorial yet - it will start after redirect when this runs again
+            return;
+          }
+
+          console.log("📍 Passed redirect check, now checking if should run tutorial");
+          // Add small delay to ensure page elements are rendered before starting tutorial
+          if (needsTutorial) {
+            console.log("📍 Setting runTutorial to true in 500ms for step", step);
+            setTimeout(() => {
+              console.log("📍 NOW setting runTutorial to TRUE");
+              setRunTutorial(true);
+            }, 500);
+          } else {
+            console.log("📍 Setting runTutorial to false");
+            setRunTutorial(false);
+          }
+        } else {
+          console.log("📍 data.success is false");
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching subscription basic info:", error);
+    }
+  };
+
+  const lastSubscriptionFetchRef = useRef<number>(0);
+  useEffect(() => {
+    const now = Date.now();
+    // Only refetch if more than 5 minutes have elapsed since last fetch
+    if (now - lastSubscriptionFetchRef.current > 5 * 60 * 1000) {
+      lastSubscriptionFetchRef.current = now;
+      fetchSubscriptionBasicInfo();
+    }
+  }, [router.pathname])
 
   // Fetch clinic/organization information for branding
   useEffect(() => {
@@ -386,7 +386,7 @@ export function Sidebar() {
 
   return (
     <div className="w-64 flex-shrink-0 h-full bg-sidebar border-r border-sidebar-border flex flex-col overflow-hidden">
-      <Tutorial runTutorial={runTutorial} setRunTutorial={setRunTutorial} initialStep={tutorialStep} />
+      {runTutorial && <Tutorial runTutorial={runTutorial} setRunTutorial={setRunTutorial} initialStep={tutorialStep} />}
       {/* Logo with Brand Icon */}
       <div className="p-6 flex-shrink-0">
         <div className="flex items-center gap-3">
