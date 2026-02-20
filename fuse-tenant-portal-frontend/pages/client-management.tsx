@@ -42,6 +42,7 @@ interface BrandSubscription {
   retriedProductSelectionForCurrentCycle: boolean
   tutorialFinished: boolean
   customMaxProducts?: number | null
+  customMerchantServiceFeePercent?: number | null
   createdAt: string
   updatedAt: string
   plan?: BrandSubscriptionPlan

@@ -29,6 +29,7 @@ import {
     GripVertical,
     Settings,
     Copy,
+    Stethoscope,
 } from 'lucide-react'
 
 interface Program {
