@@ -18,6 +18,7 @@
     "with-env": "dotenv -e ../.env.local --"
   },
   "dependencies": {
+    "@fuse/amplitude": "workspace:*",
     "@fuse/enums": "workspace:*",
     "@heroui/react": "^2.8.3",
     "@iconify/react": "^6.0.1",
