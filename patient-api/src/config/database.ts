@@ -74,13 +74,23 @@ import { MigrationService } from '../services/migration.service';
 // Load environment variables from .env.local
 dotenv.config({ path: '.env.local' });
 
-// Use DEV_DATABASE_URL for development environment, otherwise use DATABASE_URL
-const databaseUrl = process.env.NODE_ENV === 'development'
+// Use appropriate database URL based on environment:
+// - test: TEST_DATABASE_URL (separate test database)
+// - development: DEV_DATABASE_URL or DATABASE_URL
+// - production: DATABASE_URL
+const databaseUrl = process.env.NODE_ENV === 'test'
+  ? process.env.TEST_DATABASE_URL
+  : process.env.NODE_ENV === 'development'
   ? process.env.DEV_DATABASE_URL || process.env.DATABASE_URL
   : process.env.DATABASE_URL;
 
 if (!databaseUrl) {
-  throw new Error('DATABASE_URL (or DEV_DATABASE_URL for development) environment variable is required');
+  const envName = process.env.NODE_ENV === 'test'
+    ? 'TEST_DATABASE_URL'
+    : process.env.NODE_ENV === 'development'
+    ? 'DEV_DATABASE_URL or DATABASE_URL'
+    : 'DATABASE_URL';
+  throw new Error(`${envName} environment variable is required`);
 }
 
 // Check if we're connecting to localhost
@@ -119,8 +129,8 @@ const sequelizeConfig = {
     // SSL configuration for HIPAA compliance:
     // - Production: ALWAYS require SSL with strict certificate verification
     // - Development: Allow localhost without SSL, but require SSL for remote connections
-    ssl: isLocalhost && process.env.NODE_ENV === 'development'
-      ? false  // Local development only
+    ssl: isLocalhost && (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test')
+      ? false  // Local development and testing only
       : {
         require: true,
         rejectUnauthorized: true, // ALWAYS verify certificates in non-local environments
