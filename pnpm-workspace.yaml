@@ -97,6 +97,12 @@ catalog:
   "@turbo/gen": ^2.5.4
   turbo: ^2.5.4
 
+  # Testing
+  jest: ^29.7.0
+  "@types/jest": ^29.5.14
+  ts-jest: ^29.2.5
+  jest-mock-extended: ^3.0.7
+
 catalogs:
   react18:
     react: 18.3.1

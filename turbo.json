@@ -52,6 +52,12 @@
       "dependsOn": [
         "^build"
       ]
+    },
+    "test:unit": {
+      "cache": false
+    },
+    "test:integration": {
+      "cache": false
     }
   },
   "globalDependencies": [
