@@ -3,7 +3,8 @@ import Head from 'next/head'
 import { useRouter } from 'next/router'
 import { Analytics } from "@vercel/analytics/next"
 import { useState, useCallback } from 'react'
-import { AuthProvider } from '@/contexts/AuthContext'
+import { AuthProvider, useAuth } from '@/contexts/AuthContext'
+import { AmplitudeProvider } from '@fuse/amplitude'
 import { ThemeProvider } from '@/contexts/ThemeContext'
 import { WebSocketProvider } from '@/contexts/WebSocketContext'
 import ProtectedRoute from '@/components/ProtectedRoute'
@@ -13,6 +14,22 @@ import "../styles/globals.css"
 
 // Pages that don't require authentication
 const publicPages = ['/signin', '/signup', '/verify-email', '/forgot-password']
+
+function AmplitudeWrapper({ children }: { children: React.ReactNode }) {
+    const { user } = useAuth()
+    return (
+        <AmplitudeProvider
+            config={{
+                apiKey: process.env.NEXT_PUBLIC_AMPLITUDE_API_KEY || '',
+                appName: 'doctor',
+                debug: process.env.NODE_ENV === 'development',
+            }}
+            user={user ? { id: user.id, role: user.role } : null}
+        >
+            {children}
+        </AmplitudeProvider>
+    )
+}
 
 export default function App({ Component, pageProps }: AppProps & { showToast?: (type: 'success' | 'error', message: string) => void }) {
     const router = useRouter()
@@ -54,11 +71,13 @@ export default function App({ Component, pageProps }: AppProps & { showToast?: (
             </Head>
             <ThemeProvider>
                 <AuthProvider>
-                    <WebSocketProvider>
-                        {content}
-                        <ToastManager toasts={toasts} onDismiss={dismissToast} />
-                        <Toaster position="top-right" richColors />
-                    </WebSocketProvider>
+                    <AmplitudeWrapper>
+                        <WebSocketProvider>
+                            {content}
+                            <ToastManager toasts={toasts} onDismiss={dismissToast} />
+                            <Toaster position="top-right" richColors />
+                        </WebSocketProvider>
+                    </AmplitudeWrapper>
                 </AuthProvider>
             </ThemeProvider>
         </>
