@@ -47,6 +47,7 @@ export const ProductSelectionStepView: React.FC<ProductSelectionStepViewProps> =
   const isProgramFlow = !!programData;
   const productOfferType = programData?.productOfferType || programData?.medicalTemplate?.productOfferType || "single_choice";
   const isSingleChoice = productOfferType === "single_choice";
+  const [hoveredProductId, setHoveredProductId] = useState<string | null>(null);
 
   const [showAdditionalOptions, setShowAdditionalOptions] = useState(true);
 
@@ -92,13 +93,17 @@ export const ProductSelectionStepView: React.FC<ProductSelectionStepViewProps> =
                 </div>
                 <div
                   className={`bg-white rounded-2xl border-2 p-6 transition-all duration-200 cursor-pointer hover:scale-[1.02] ${
-                    selectedProgramProducts[programData.products[0].id]
-                      ? "shadow-md"
-                      : "border-gray-300 hover:border-gray-400 hover:shadow-sm"
+                    selectedProgramProducts[programData.products[0].id] ? "shadow-md" : "hover:shadow-sm"
                   }`}
-                  style={selectedProgramProducts[programData.products[0].id] ? {
-                    borderColor: themeSolidColor,
-                  } : {}}
+                  style={
+                    selectedProgramProducts[programData.products[0].id]
+                      ? { borderColor: themeSolidColor, boxShadow: `0 0 0 1px ${themeSolidColor}` }
+                      : hoveredProductId === programData.products[0].id
+                        ? { borderColor: theme.primaryLight }
+                        : { borderColor: '#e5e7eb' }
+                  }
+                  onMouseEnter={() => setHoveredProductId(programData.products[0].id)}
+                  onMouseLeave={() => setHoveredProductId(null)}
                   onClick={() => onProgramProductToggle?.(programData.products[0].id)}
                 >
                   <div className="flex items-center justify-between gap-6">
@@ -144,13 +149,17 @@ export const ProductSelectionStepView: React.FC<ProductSelectionStepViewProps> =
                     <div
                       key={product.id}
                       className={`bg-white rounded-2xl border-2 p-4 transition-all duration-200 cursor-pointer hover:scale-[1.02] ${
-                        selectedProgramProducts[product.id]
-                          ? "shadow-md"
-                          : "border-gray-200 hover:border-gray-300 hover:shadow-sm"
+                        selectedProgramProducts[product.id] ? "shadow-md" : "hover:shadow-sm"
                       }`}
-                      style={selectedProgramProducts[product.id] ? {
-                        borderColor: themeSolidColor,
-                      } : {}}
+                      style={
+                        selectedProgramProducts[product.id]
+                          ? { borderColor: themeSolidColor, boxShadow: `0 0 0 1px ${themeSolidColor}` }
+                          : hoveredProductId === product.id
+                            ? { borderColor: theme.primaryLight }
+                            : { borderColor: '#e5e7eb' }
+                      }
+                      onMouseEnter={() => setHoveredProductId(product.id)}
+                      onMouseLeave={() => setHoveredProductId(null)}
                       onClick={() => onProgramProductToggle?.(product.id)}
                     >
                       <div className="flex items-center justify-between gap-4">

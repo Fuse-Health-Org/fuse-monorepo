@@ -1,6 +1,6 @@
 import React from "react";
 import { motion } from "framer-motion";
-import { Button, Avatar, Card, CardBody, Input, Textarea } from "@heroui/react";
+import { Button, Avatar, Card, CardBody, Input } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { ProtectedRoute } from "../../components/ProtectedRoute";
 import { useAuth } from "../../contexts/AuthContext";
@@ -47,6 +47,16 @@ interface BelugaVisit {
     }>;
     intakeResults?: Array<{ question: string; answer: string }>;
   } | null;
+  labResults: Array<{
+    screeningDate?: string;
+    testName?: string;
+    testResult?: string;
+    testResultUnits?: string;
+    refRange?: string;
+    statusIndicator?: string;
+    reportDate?: string;
+    deviceType?: string;
+  }>;
   rxHistory: Array<{
     rxTimestamp?: string;
     name?: string;
@@ -56,6 +66,15 @@ interface BelugaVisit {
     strength?: string;
     pharmacyName?: string;
   }>;
+}
+
+interface BelugaPreferenceDraft {
+  name: string;
+  strength: string;
+  quantity: string;
+  refills: string;
+  daysSupply: string;
+  medId: string;
 }
 
 interface BelugaChatMessage {
@@ -166,6 +185,13 @@ function BelugaDashboardPage() {
   const [messageResults, setMessageResults] = React.useState<Record<string, string>>({});
   const [chatMessagesByMaster, setChatMessagesByMaster] = React.useState<Record<string, BelugaChatMessage[]>>({});
   const [chatLoadingByMaster, setChatLoadingByMaster] = React.useState<Record<string, boolean>>({});
+  const [selectedChatMasterId, setSelectedChatMasterId] = React.useState("");
+  const [selectedChatChannel, setSelectedChatChannel] = React.useState<"patient_chat" | "customer_service">("patient_chat");
+  const [patientImageDrafts, setPatientImageDrafts] = React.useState<Record<string, { mime: "image/jpeg"; data: string; fileName: string } | null>>({});
+  const [preferenceDraftsByMaster, setPreferenceDraftsByMaster] = React.useState<Record<string, BelugaPreferenceDraft[]>>({});
+  const [preferenceSavingByMaster, setPreferenceSavingByMaster] = React.useState<Record<string, boolean>>({});
+  const [preferenceResultByMaster, setPreferenceResultByMaster] = React.useState<Record<string, string>>({});
+  const patientImageInputRef = React.useRef<HTMLInputElement | null>(null);
   const [nameFirst, setNameFirst] = React.useState("");
   const [nameLast, setNameLast] = React.useState("");
   const [accountResult, setAccountResult] = React.useState<string | null>(null);
@@ -182,6 +208,7 @@ function BelugaDashboardPage() {
       const visitList: BelugaVisit[] = Array.isArray((res.data as any)?.data) ? (res.data as any).data : [];
       setVisits(visitList);
       setSelectedMasterId(visitList[0]?.masterId || "");
+      setSelectedChatMasterId((prev) => prev || visitList[0]?.masterId || "");
       setNameFirst(user?.firstName || "");
       setNameLast(user?.lastName || "");
     } catch (err: any) {
@@ -221,21 +248,26 @@ function BelugaDashboardPage() {
 
   React.useEffect(() => {
     if (activeTab !== "messages" || visits.length === 0) return;
-    visits.forEach((visit) => {
-      if (!chatMessagesByMaster[visit.masterId]) {
-        loadChatMessages(visit.masterId);
-      }
-    });
-  }, [activeTab, visits, chatMessagesByMaster, loadChatMessages]);
+    if (!selectedChatMasterId || !visits.some((visit) => visit.masterId === selectedChatMasterId)) {
+      setSelectedChatMasterId(visits[0].masterId);
+      return;
+    }
+    if (!chatMessagesByMaster[selectedChatMasterId]) {
+      loadChatMessages(selectedChatMasterId);
+    }
+  }, [activeTab, visits, selectedChatMasterId, chatMessagesByMaster, loadChatMessages]);
 
   const handleSendMessage = async (masterId: string, customerService = false) => {
     const draft = customerService ? csDrafts[masterId] : messageDrafts[masterId];
-    if (!masterId || !draft?.trim()) return;
+    const patientImageDraft = customerService ? null : patientImageDrafts[masterId];
+    if (!masterId || (!draft?.trim() && !patientImageDraft?.data)) return;
     setMessageResults((prev) => ({ ...prev, [masterId]: "" }));
     const endpoint = customerService ? "/beluga/messages/customer-service" : "/beluga/messages/patient";
     const payload = customerService
       ? { masterId, content: draft.trim() }
-      : { masterId, content: draft.trim(), isMedia: false };
+      : patientImageDraft?.data
+        ? { masterId, content: patientImageDraft.data, isMedia: true }
+        : { masterId, content: draft.trim(), isMedia: false };
 
     const response = await apiCall(endpoint, {
       method: "POST",
@@ -252,6 +284,7 @@ function BelugaDashboardPage() {
       setCsDrafts((prev) => ({ ...prev, [masterId]: "" }));
     } else {
       setMessageDrafts((prev) => ({ ...prev, [masterId]: "" }));
+      setPatientImageDrafts((prev) => ({ ...prev, [masterId]: null }));
     }
 
     await loadChatMessages(masterId);
@@ -277,9 +310,180 @@ function BelugaDashboardPage() {
     setAccountResult("Patient name update sent to Beluga.");
   };
 
+  const toDraftPreference = (pref?: Partial<BelugaPreferenceDraft> | null): BelugaPreferenceDraft => ({
+    name: pref?.name || "",
+    strength: pref?.strength || "",
+    quantity: pref?.quantity || "",
+    refills: pref?.refills || "",
+    daysSupply: pref?.daysSupply || "",
+    medId: pref?.medId || "",
+  });
+
+  const handleStartPreferenceEdit = (visit: BelugaVisit) => {
+    const existing = Array.isArray(visit.formObj?.patientPreference) ? visit.formObj!.patientPreference! : [];
+    const normalized = existing.length > 0 ? existing.map((item) => toDraftPreference(item)) : [toDraftPreference()];
+    setPreferenceDraftsByMaster((prev) => ({ ...prev, [visit.masterId]: normalized }));
+    setPreferenceResultByMaster((prev) => ({ ...prev, [visit.masterId]: "" }));
+  };
+
+  const handleCancelPreferenceEdit = (masterId: string) => {
+    setPreferenceDraftsByMaster((prev) => {
+      const next = { ...prev };
+      delete next[masterId];
+      return next;
+    });
+    setPreferenceResultByMaster((prev) => ({ ...prev, [masterId]: "" }));
+  };
+
+  const handlePreferenceFieldChange = (
+    masterId: string,
+    index: number,
+    field: keyof BelugaPreferenceDraft,
+    value: string
+  ) => {
+    setPreferenceDraftsByMaster((prev) => {
+      const current = prev[masterId] || [];
+      const next = current.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, [field]: value } : item
+      );
+      return { ...prev, [masterId]: next };
+    });
+  };
+
+  const handleSavePreferences = async (visit: BelugaVisit) => {
+    const masterId = visit.masterId;
+    const draftRows = preferenceDraftsByMaster[masterId] || [];
+    const payloadRows = draftRows
+      .map((row) => ({
+        name: row.name.trim(),
+        strength: row.strength.trim(),
+        quantity: row.quantity.trim(),
+        refills: row.refills.trim(),
+        daysSupply: row.daysSupply.trim(),
+        medId: row.medId.trim(),
+      }))
+      .filter((row) => row.name && row.strength && row.quantity && row.refills && row.daysSupply && row.medId);
+
+    if (payloadRows.length === 0) {
+      setPreferenceResultByMaster((prev) => ({
+        ...prev,
+        [masterId]: "Complete all required preference fields before saving.",
+      }));
+      return;
+    }
+
+    setPreferenceSavingByMaster((prev) => ({ ...prev, [masterId]: true }));
+    setPreferenceResultByMaster((prev) => ({ ...prev, [masterId]: "" }));
+
+    const response = await apiCall(`/beluga/visits/${encodeURIComponent(masterId)}/preferences`, {
+      method: "POST",
+      body: JSON.stringify({
+        patientPreference: payloadRows,
+      }),
+    });
+
+    if (!response.success) {
+      setPreferenceResultByMaster((prev) => ({
+        ...prev,
+        [masterId]: response.error || "Failed to update treatment preferences in Beluga.",
+      }));
+      setPreferenceSavingByMaster((prev) => ({ ...prev, [masterId]: false }));
+      return;
+    }
+
+    setVisits((prev) =>
+      prev.map((item) =>
+        item.masterId !== masterId
+          ? item
+          : {
+              ...item,
+              formObj: {
+                ...(item.formObj || {}),
+                patientPreference: payloadRows,
+              },
+            }
+      )
+    );
+    setPreferenceResultByMaster((prev) => ({
+      ...prev,
+      [masterId]: "Treatment preferences updated successfully.",
+    }));
+    setPreferenceSavingByMaster((prev) => ({ ...prev, [masterId]: false }));
+    await loadBelugaData();
+  };
+
   const totalRx = visits.reduce((acc, item) => acc + item.rxHistory.length, 0);
   const activeVisits = visits.filter((v) => v.visitStatus && ["active", "pending", "holding", "admin"].includes(v.visitStatus.toLowerCase())).length;
   const resolvedVisits = visits.filter((v) => (v.resolvedStatus || "").toLowerCase() === "closed").length;
+  const selectedChatVisit = visits.find((visit) => visit.masterId === selectedChatMasterId) || null;
+  const selectedChatMessages = selectedChatMasterId ? (chatMessagesByMaster[selectedChatMasterId] || []) : [];
+  const selectedChannelMessages = selectedChatMessages.filter((message) => message.channel === selectedChatChannel);
+  const isOutboundMessage = (message: BelugaChatMessage) => message.source === "outbound";
+  const isLikelyBase64Image = (value?: string) =>
+    Boolean(value && value.length > 180 && /^[A-Za-z0-9+/=\r\n]+$/.test(value));
+  const getSenderLabel = (message: BelugaChatMessage) => {
+    if (isOutboundMessage(message)) return "You";
+    if (message.channel === "customer_service") return "Customer Service";
+    if (message.senderRole === "doctor") return "Provider";
+    if (message.senderRole === "beluga_admin") return "Beluga Admin";
+    return "System";
+  };
+  const convertImageToJpegBase64 = async (file: File): Promise<string> => {
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
+      reader.onerror = () => reject(new Error("Failed to read image file"));
+      reader.readAsDataURL(file);
+    });
+
+    const jpegDataUrl = await new Promise<string>((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => {
+        const maxWidth = 1000;
+        const scale = image.width > maxWidth ? maxWidth / image.width : 1;
+        const width = Math.max(1, Math.round(image.width * scale));
+        const height = Math.max(1, Math.round(image.height * scale));
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const context = canvas.getContext("2d");
+        if (!context) {
+          reject(new Error("Could not create canvas context"));
+          return;
+        }
+        context.drawImage(image, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", 0.85));
+      };
+      image.onerror = () => reject(new Error("Failed to decode image"));
+      image.src = dataUrl;
+    });
+
+    return jpegDataUrl.split(",")[1] || "";
+  };
+  const handlePatientImageSelection = async (masterId: string, file: File | null) => {
+    if (!file) {
+      setPatientImageDrafts((prev) => ({ ...prev, [masterId]: null }));
+      return;
+    }
+    if (!file.type.startsWith("image/")) {
+      setMessageResults((prev) => ({ ...prev, [masterId]: "Only image files are allowed." }));
+      return;
+    }
+    try {
+      const encoded = await convertImageToJpegBase64(file);
+      setPatientImageDrafts((prev) => ({
+        ...prev,
+        [masterId]: {
+          mime: "image/jpeg",
+          data: encoded,
+          fileName: file.name.replace(/\.[^.]+$/, ".jpg"),
+        },
+      }));
+      setMessageResults((prev) => ({ ...prev, [masterId]: "" }));
+    } catch {
+      setMessageResults((prev) => ({ ...prev, [masterId]: "Could not process image. Please try another file." }));
+    }
+  };
 
   return (
     <ProtectedRoute>
@@ -434,6 +638,88 @@ function BelugaDashboardPage() {
                           </div>
                         </div>
                       )}
+                      {!Array.isArray(visit.formObj?.patientPreference) || visit.formObj!.patientPreference!.length === 0 ? (
+                        <div>
+                          <p className="text-xs font-medium text-foreground-500 mb-1.5 uppercase tracking-wide">Requested Treatment</p>
+                          <p className="text-sm text-foreground-400">No preference recorded yet for this visit.</p>
+                        </div>
+                      ) : null}
+
+                      <div className="space-y-3 p-3 rounded-lg border border-default-200 bg-content1">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <p className="text-xs font-medium text-foreground-500 uppercase tracking-wide">Update Preference</p>
+                          {!preferenceDraftsByMaster[visit.masterId] ? (
+                            <Button size="sm" variant="flat" onPress={() => handleStartPreferenceEdit(visit)}>
+                              Edit Preferences
+                            </Button>
+                          ) : (
+                            <Button size="sm" variant="light" onPress={() => handleCancelPreferenceEdit(visit.masterId)}>
+                              Cancel
+                            </Button>
+                          )}
+                        </div>
+
+                        {preferenceDraftsByMaster[visit.masterId] && (
+                          <div className="space-y-3">
+                            {preferenceDraftsByMaster[visit.masterId].map((pref, idx) => (
+                              <div key={`${visit.masterId}-pref-${idx}`} className="p-3 rounded-lg bg-content2 space-y-2">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                  <Input
+                                    size="sm"
+                                    label="Medication Name"
+                                    value={pref.name}
+                                    onValueChange={(value) => handlePreferenceFieldChange(visit.masterId, idx, "name", value)}
+                                  />
+                                  <Input
+                                    size="sm"
+                                    label="Med ID"
+                                    value={pref.medId}
+                                    isReadOnly
+                                    description="Med ID is fixed and cannot be edited."
+                                  />
+                                  <Input
+                                    size="sm"
+                                    label="Strength"
+                                    value={pref.strength}
+                                    onValueChange={(value) => handlePreferenceFieldChange(visit.masterId, idx, "strength", value)}
+                                  />
+                                  <Input
+                                    size="sm"
+                                    label="Quantity"
+                                    value={pref.quantity}
+                                    onValueChange={(value) => handlePreferenceFieldChange(visit.masterId, idx, "quantity", value)}
+                                  />
+                                  <Input
+                                    size="sm"
+                                    label="Refills"
+                                    value={pref.refills}
+                                    onValueChange={(value) => handlePreferenceFieldChange(visit.masterId, idx, "refills", value)}
+                                  />
+                                  <Input
+                                    size="sm"
+                                    label="Days Supply"
+                                    value={pref.daysSupply}
+                                    onValueChange={(value) => handlePreferenceFieldChange(visit.masterId, idx, "daysSupply", value)}
+                                  />
+                                </div>
+                              </div>
+                            ))}
+                            <div className="flex items-center gap-2">
+                              <Button
+                                size="sm"
+                                className="bg-teal-600 text-white"
+                                isLoading={Boolean(preferenceSavingByMaster[visit.masterId])}
+                                onPress={() => handleSavePreferences(visit)}
+                              >
+                                Save Preferences
+                              </Button>
+                              {preferenceResultByMaster[visit.masterId] && (
+                                <p className="text-xs text-foreground-500">{preferenceResultByMaster[visit.masterId]}</p>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
 
                       {/* Prescription History */}
                       <div>
@@ -459,6 +745,32 @@ function BelugaDashboardPage() {
                         )}
                       </div>
 
+                      {/* Lab Results */}
+                      <div>
+                        <p className="text-xs font-medium text-foreground-500 mb-1.5 uppercase tracking-wide">Lab Results</p>
+                        {visit.labResults.length === 0 ? (
+                          <p className="text-sm text-foreground-400">No lab results available for this visit.</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {visit.labResults.map((lab, idx) => (
+                              <div key={`${visit.masterId}-lab-${idx}`} className="p-3 rounded-lg bg-content2 text-sm">
+                                <p className="font-medium">{lab.testName || "Lab Test"}</p>
+                                <p className="text-foreground-500 text-xs mt-0.5">
+                                  {[
+                                    lab.testResult && `Result: ${lab.testResult}${lab.testResultUnits ? ` ${lab.testResultUnits}` : ""}`,
+                                    lab.refRange && `Ref Range: ${lab.refRange}`,
+                                    lab.statusIndicator && `Status: ${lab.statusIndicator}`,
+                                    lab.reportDate && `Reported: ${new Date(lab.reportDate).toLocaleDateString()}`,
+                                    lab.screeningDate && `Screened: ${new Date(lab.screeningDate).toLocaleDateString()}`,
+                                    lab.deviceType && `Device: ${lab.deviceType}`,
+                                  ].filter(Boolean).join(" · ")}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
                       <p className="text-xs text-foreground-400">
                         Last updated: {visit.updateTimestamp ? new Date(visit.updateTimestamp).toLocaleString() : "—"}
                         &nbsp;·&nbsp; Visit ID: {visit.belugaVisitId || visit.masterId}
@@ -470,7 +782,7 @@ function BelugaDashboardPage() {
             )}
 
             {activeTab === "messages" && (
-              <div className="max-w-4xl mx-auto space-y-4">
+              <div className="max-w-[1400px] mx-auto h-[calc(100vh-9.5rem)] md:h-[calc(100vh-8.5rem)]">
                 {loading && (
                   <Card>
                     <CardBody className="p-6 text-sm text-foreground-500">
@@ -485,81 +797,270 @@ function BelugaDashboardPage() {
                     </CardBody>
                   </Card>
                 )}
-                {visits.map((visit) => (
-                  <Card key={`chat-${visit.masterId}`}>
-                    <CardBody className="p-6 space-y-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <h3 className="font-semibold">
-                            {visit.formObj?.patientPreference?.map(p => p.name).filter(Boolean).join(", ") || "Beluga Visit"}
-                          </h3>
-                          <p className="text-xs text-foreground-400 mt-0.5">masterId: {visit.masterId}</p>
+                {visits.length > 0 && (
+                  <Card className="h-full">
+                    <CardBody className="p-0 md:p-0 h-full">
+                      <div className="grid grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)] h-full">
+                        <div className="border-b lg:border-b-0 lg:border-r border-content3 bg-content1 h-full flex flex-col min-h-[220px]">
+                          <div className="px-4 py-3 border-b border-content3">
+                            <h3 className="text-sm font-semibold text-foreground-700">Conversations</h3>
+                            <p className="text-xs text-foreground-500">{visits.length} master IDs</p>
+                          </div>
+                          <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                            {visits.map((visit) => {
+                              const isSelected = visit.masterId === selectedChatMasterId;
+                              const visitMessages = chatMessagesByMaster[visit.masterId] || [];
+                              const lastMessage = visitMessages[visitMessages.length - 1];
+                              return (
+                                <button
+                                  key={`chat-nav-${visit.masterId}`}
+                                  type="button"
+                                  className={`w-full text-left rounded-lg p-3 border transition ${
+                                    isSelected
+                                      ? "bg-teal-500/10 border-teal-500/30"
+                                      : "bg-content1 border-content3 hover:bg-content2"
+                                  }`}
+                                  onClick={() => {
+                                    setSelectedChatMasterId(visit.masterId);
+                                    if (!chatMessagesByMaster[visit.masterId]) {
+                                      loadChatMessages(visit.masterId);
+                                    }
+                                  }}
+                                >
+                                  <p className="text-xs text-foreground-400 truncate">masterId</p>
+                                  <p className="text-sm font-medium text-foreground-700 truncate">{visit.masterId}</p>
+                                  <p className="text-xs text-foreground-500 mt-1 truncate">
+                                    {visit.formObj?.patientPreference?.map((p) => p.name).filter(Boolean).join(", ") || "Beluga Visit"}
+                                  </p>
+                                  <p className="text-[11px] text-foreground-400 mt-1 truncate">
+                                    {lastMessage?.message || "No messages yet"}
+                                  </p>
+                                </button>
+                              );
+                            })}
+                          </div>
                         </div>
-                        <span className="text-xs px-2 py-1 rounded bg-content2">
-                          {(visit.visitStatus || "pending").toUpperCase()}
-                        </span>
-                      </div>
-                      {chatLoadingByMaster[visit.masterId] ? (
-                        <p className="text-xs text-foreground-400">Loading conversation...</p>
-                      ) : (chatMessagesByMaster[visit.masterId]?.length || 0) > 0 ? (
-                        <div className="max-h-56 overflow-y-auto space-y-2 p-2 rounded-lg bg-content2">
-                          {(chatMessagesByMaster[visit.masterId] || []).map((message) => (
-                            <div key={message.id} className="rounded-md bg-content1 p-2">
-                              <p className="text-xs font-medium text-foreground-600">
-                                {message.senderRole === "patient"
-                                  ? "You"
-                                  : message.senderRole === "doctor"
-                                    ? "Doctor"
-                                    : message.senderRole === "beluga_admin"
-                                      ? "Beluga Admin"
-                                      : "System"}
-                              </p>
-                              <p className="text-sm text-foreground-700">{message.message || "(no text)"}</p>
-                              <p className="text-[11px] text-foreground-400 mt-1">
-                                {new Date(message.createdAt).toLocaleString()}
-                              </p>
+
+                        <div className="p-4 md:p-6 h-full min-h-0">
+                          {selectedChatVisit ? (
+                            <div className="h-full flex flex-col gap-4">
+                              <div className="flex items-center justify-between gap-3">
+                                <div>
+                                  <h2 className="text-2xl font-semibold">
+                                    {selectedChatChannel === "patient_chat" ? "Chat with your Doctor" : "Customer Service Chat"}
+                                  </h2>
+                                  <p className="text-sm text-foreground-500 mt-1">
+                                    {selectedChatVisit.formObj?.patientPreference?.map((p) => p.name).filter(Boolean).join(", ") || "Beluga Visit"}
+                                  </p>
+                                  <p className="text-xs text-foreground-400 mt-1">masterId: {selectedChatVisit.masterId}</p>
+                                </div>
+                                <span className="text-xs px-2 py-1 rounded bg-content2">
+                                  {(selectedChatVisit.visitStatus || "pending").toUpperCase()}
+                                </span>
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  size="sm"
+                                  variant={selectedChatChannel === "patient_chat" ? "flat" : "light"}
+                                  className={selectedChatChannel === "patient_chat" ? "bg-teal-600 text-white" : ""}
+                                  onPress={() => setSelectedChatChannel("patient_chat")}
+                                >
+                                  Patient Chat
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant={selectedChatChannel === "customer_service" ? "flat" : "light"}
+                                  className={selectedChatChannel === "customer_service" ? "bg-teal-600 text-white" : ""}
+                                  onPress={() => setSelectedChatChannel("customer_service")}
+                                >
+                                  CS Chat
+                                </Button>
+                              </div>
+
+                              <Card className="flex-1 border border-content3 overflow-hidden">
+                                <CardBody className="p-0 flex flex-col h-full">
+                                  <div className="flex items-center gap-3 p-4 border-b border-content3">
+                                    <Avatar
+                                      name={selectedChatChannel === "patient_chat" ? "Provider" : "Customer Service"}
+                                      size="md"
+                                      fallback={
+                                        <span className="text-xl">
+                                          {selectedChatChannel === "patient_chat" ? "👨‍⚕️" : "🛟"}
+                                        </span>
+                                      }
+                                    />
+                                    <div className="flex-1">
+                                      <h3 className="font-medium">
+                                        {selectedChatChannel === "patient_chat" ? "Beluga Provider" : "Beluga Customer Service"}
+                                      </h3>
+                                      <p className="text-sm text-foreground-500">
+                                        {selectedChatChannel === "patient_chat" ? "Doctor" : "Support"}
+                                      </p>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-content1">
+                                    {chatLoadingByMaster[selectedChatVisit.masterId] ? (
+                                      <div className="flex justify-center items-center h-full">
+                                        <p className="text-xs text-foreground-400">
+                                          {selectedChatChannel === "patient_chat"
+                                            ? "Loading provider conversation..."
+                                            : "Loading customer service conversation..."}
+                                        </p>
+                                      </div>
+                                    ) : selectedChannelMessages.length > 0 ? (
+                                      selectedChannelMessages.map((message) => {
+                                        const outbound = isOutboundMessage(message);
+                                        return (
+                                          <div key={message.id} className={`flex ${outbound ? "justify-end" : "justify-start"}`}>
+                                            <div className={`max-w-[80%] ${outbound ? "" : "flex gap-3"}`}>
+                                              {!outbound && (
+                                                <Avatar
+                                                  name={getSenderLabel(message)}
+                                                  size="sm"
+                                                  className="mt-1"
+                                                  fallback={
+                                                    <span className="text-sm">
+                                                      {selectedChatChannel === "patient_chat" ? "👨‍⚕️" : "🛟"}
+                                                    </span>
+                                                  }
+                                                />
+                                              )}
+                                              <div>
+                                                {!outbound && (
+                                                  <div className="flex items-center gap-2 mb-1">
+                                                    <span className="font-medium text-sm">{getSenderLabel(message)}</span>
+                                                  </div>
+                                                )}
+                                                <div
+                                                  className={`p-3 rounded-lg ${outbound
+                                                    ? "bg-teal-600 text-white"
+                                                    : "bg-content2 text-foreground"
+                                                    }`}
+                                                >
+                                                  {isLikelyBase64Image(message.message) ? (
+                                                    <a href={`data:image/jpeg;base64,${message.message}`} target="_blank" rel="noopener noreferrer">
+                                                      <img
+                                                        src={`data:image/jpeg;base64,${message.message}`}
+                                                        alt="Patient image message"
+                                                        className="max-w-full max-h-[220px] rounded-md cursor-pointer hover:opacity-90"
+                                                      />
+                                                    </a>
+                                                  ) : (
+                                                    <p>{message.message || "(no text)"}</p>
+                                                  )}
+                                                </div>
+                                                <div className="text-xs text-foreground-400 mt-1">
+                                                  {new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                                </div>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        );
+                                      })
+                                    ) : (
+                                      <div className="flex justify-center items-center h-full text-sm text-foreground-400">
+                                        {selectedChatChannel === "patient_chat"
+                                          ? "No provider messages yet. Write the first one!"
+                                          : "No customer service messages yet. Write the first one!"}
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  <div className="p-3 border-t border-content3">
+                                    {selectedChatChannel === "patient_chat" && patientImageDrafts[selectedChatVisit.masterId]?.data && (
+                                      <div className="mb-2 flex items-center gap-2 bg-content2 rounded-md px-3 py-2">
+                                        <Icon icon="lucide:image" className="text-foreground-500" />
+                                        <span className="text-sm text-foreground-700 truncate flex-1">
+                                          {patientImageDrafts[selectedChatVisit.masterId]?.fileName || "image.jpg"}
+                                        </span>
+                                        <button
+                                          type="button"
+                                          className="text-danger-500 hover:text-danger-700"
+                                          onClick={() =>
+                                            setPatientImageDrafts((prev) => ({ ...prev, [selectedChatVisit.masterId]: null }))
+                                          }
+                                        >
+                                          <Icon icon="lucide:x" width={16} />
+                                        </button>
+                                      </div>
+                                    )}
+                                    <div className="flex gap-2 items-center">
+                                      {selectedChatChannel === "patient_chat" && (
+                                        <>
+                                          <input
+                                            ref={patientImageInputRef}
+                                            type="file"
+                                            accept="image/*"
+                                            className="hidden"
+                                            onChange={(e) => {
+                                              const file = e.target.files?.[0] || null;
+                                              void handlePatientImageSelection(selectedChatVisit.masterId, file);
+                                              if (patientImageInputRef.current) {
+                                                patientImageInputRef.current.value = "";
+                                              }
+                                            }}
+                                          />
+                                          <Button
+                                            isIconOnly
+                                            variant="light"
+                                            aria-label="Attach image"
+                                            onPress={() => patientImageInputRef.current?.click()}
+                                          >
+                                            <Icon icon="lucide:paperclip" className="text-foreground-500" />
+                                          </Button>
+                                        </>
+                                      )}
+                                      <Input
+                                        placeholder={selectedChatChannel === "patient_chat"
+                                          ? "Type a message to provider..."
+                                          : "Type a message to customer service..."}
+                                        value={selectedChatChannel === "patient_chat"
+                                          ? (messageDrafts[selectedChatVisit.masterId] || "")
+                                          : (csDrafts[selectedChatVisit.masterId] || "")}
+                                        onValueChange={(value) => {
+                                          if (selectedChatChannel === "patient_chat") {
+                                            setMessageDrafts((prev) => ({ ...prev, [selectedChatVisit.masterId]: value }));
+                                          } else {
+                                            setCsDrafts((prev) => ({ ...prev, [selectedChatVisit.masterId]: value }));
+                                          }
+                                        }}
+                                        onKeyDown={(e) => {
+                                          if (e.key === "Enter" && !e.shiftKey) {
+                                            e.preventDefault();
+                                            handleSendMessage(selectedChatVisit.masterId, selectedChatChannel === "customer_service");
+                                          }
+                                        }}
+                                        className="w-full"
+                                      />
+                                      <Button
+                                        isIconOnly
+                                        className="bg-teal-600 text-white"
+                                        onPress={() => handleSendMessage(selectedChatVisit.masterId, selectedChatChannel === "customer_service")}
+                                        isDisabled={selectedChatChannel === "patient_chat"
+                                          ? (!messageDrafts[selectedChatVisit.masterId]?.trim() && !patientImageDrafts[selectedChatVisit.masterId]?.data)
+                                          : !csDrafts[selectedChatVisit.masterId]?.trim()}
+                                      >
+                                        <Icon icon="lucide:send" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </CardBody>
+                              </Card>
+
+                              {messageResults[selectedChatVisit.masterId] && (
+                                <p className="text-sm text-foreground-500">{messageResults[selectedChatVisit.masterId]}</p>
+                              )}
                             </div>
-                          ))}
+                          ) : (
+                            <p className="text-sm text-foreground-500">Select a conversation to view messages.</p>
+                          )}
                         </div>
-                      ) : (
-                        <p className="text-xs text-foreground-400">No messages for this visit yet.</p>
-                      )}
-                      <Textarea
-                        label="Message to Provider"
-                        value={messageDrafts[visit.masterId] || ""}
-                        onValueChange={(value) =>
-                          setMessageDrafts((prev) => ({ ...prev, [visit.masterId]: value }))
-                        }
-                        placeholder="Type message for Beluga doctor..."
-                      />
-                      <Button
-                        className="bg-teal-600 text-white"
-                        onPress={() => handleSendMessage(visit.masterId, false)}
-                        isDisabled={!messageDrafts[visit.masterId]?.trim()}
-                      >
-                        Send Patient Message
-                      </Button>
-                      <Textarea
-                        label="Message to Customer Service"
-                        value={csDrafts[visit.masterId] || ""}
-                        onValueChange={(value) =>
-                          setCsDrafts((prev) => ({ ...prev, [visit.masterId]: value }))
-                        }
-                        placeholder="Type message for Beluga admin..."
-                      />
-                      <Button
-                        variant="flat"
-                        onPress={() => handleSendMessage(visit.masterId, true)}
-                        isDisabled={!csDrafts[visit.masterId]?.trim()}
-                      >
-                        Send CS Message
-                      </Button>
-                      {messageResults[visit.masterId] && (
-                        <p className="text-sm text-foreground-500">{messageResults[visit.masterId]}</p>
-                      )}
+                      </div>
                     </CardBody>
                   </Card>
-                ))}
+                )}
               </div>
             )}
 

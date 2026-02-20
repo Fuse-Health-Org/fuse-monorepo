@@ -2009,4 +2009,38 @@ export function registerAuthEndpoints(
             });
         }
     });
+
+    // ── Token Refresh ────────────────────────────────────────────────────────
+    // Accepts a valid (or recently expired) Bearer token and issues a fresh one.
+    // Used by management portals (tenant, admin) to silently extend sessions.
+    app.post("/auth/refresh", authenticateJWT, async (req, res) => {
+        try {
+            const currentUser = getCurrentUser(req);
+            if (!currentUser) {
+                return res.status(401).json({ success: false, message: "Authentication required" });
+            }
+
+            const user = await User.findByPk(currentUser.id);
+            if (!user || user.deletedAt) {
+                return res.status(401).json({ success: false, message: "User not found or deactivated" });
+            }
+
+            const newToken = createJWTToken(user);
+            console.log(`🔄 [Auth Refresh] Token refreshed for user ${user.id} (role: ${user.role})`);
+
+            return res.status(200).json({
+                success: true,
+                token: newToken,
+                user: {
+                    id: user.id,
+                    email: user.email,
+                    name: `${user.firstName} ${user.lastName}`.trim(),
+                    role: user.role,
+                },
+            });
+        } catch (error) {
+            console.error("❌ [Auth Refresh] Error:", error);
+            return res.status(500).json({ success: false, message: "Token refresh failed" });
+        }
+    });
 }

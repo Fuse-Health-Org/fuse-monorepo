@@ -27,6 +27,7 @@ import {
 import { RegularQuestionsView } from "./components/RegularQuestionsView";
 import { InformationalStepView } from "./components/InformationalStepView";
 import { BelugaConsentStep } from "./components/BelugaConsentStep";
+import { BelugaPhotoStep } from "./components/BelugaPhotoStep";
 import { StepNavigationButtons } from "./components/StepNavigationButtons";
 import { OrderSuccessModal } from "./components/OrderSuccessModal";
 
@@ -78,13 +79,27 @@ export const QuestionnaireModal: React.FC<QuestionnaireModalProps> = (props) => 
   }
 
   // Handle case when no visible steps remain
-  if (!currentStep && !modal.isProductSelectionStep() && !modal.isCheckoutStep() && !modal.isBelugaConsentStep) {
+  if (!currentStep && !modal.isProductSelectionStep() && !modal.isCheckoutStep() && !modal.isBelugaConsentStep && !modal.isBelugaPhotoStep) {
     if (modal.questionnaire) {
       const checkoutPos = modal.questionnaire.checkoutStepPosition;
-      const belugaOffset = modal.questionnaire.medicalCompanySource === MedicalCompanySlug.BELUGA ? 1 : 0;
+      const belugaOffset = modal.questionnaire.medicalCompanySource === MedicalCompanySlug.BELUGA ? 2 : 0;
       const checkoutStepIndex = (checkoutPos === -1 ? modal.questionnaire.steps.length : checkoutPos) + belugaOffset;
-      console.log('⏭️ No more visible questionnaire steps, advancing to checkout at index:', checkoutStepIndex);
-      modal.setCurrentStepIndex(checkoutStepIndex);
+      const productSelectionPos = modal.questionnaire.productSelectionStepPosition;
+      const productSelectionStepIndex =
+        productSelectionPos !== undefined && productSelectionPos !== -1
+          ? productSelectionPos + belugaOffset
+          : -1;
+
+      if (
+        productSelectionStepIndex !== -1 &&
+        modal.currentStepIndex < productSelectionStepIndex
+      ) {
+        console.log('⏭️ No visible questionnaire step; advancing to product selection at index:', productSelectionStepIndex);
+        modal.setCurrentStepIndex(productSelectionStepIndex);
+      } else {
+        console.log('⏭️ No more visible questionnaire steps, advancing to checkout at index:', checkoutStepIndex);
+        modal.setCurrentStepIndex(checkoutStepIndex);
+      }
     }
     return null;
   }
@@ -97,9 +112,15 @@ export const QuestionnaireModal: React.FC<QuestionnaireModalProps> = (props) => 
         <BelugaConsentStep
           consentGiven={modal.belugaConsentGiven}
           onConsentChange={modal.setBelugaConsentGiven}
+          consentError={modal.errors?.belugaConsent}
+        />
+      );
+    }
+    if (modal.isBelugaPhotoStep) {
+      return (
+        <BelugaPhotoStep
           onPhotoChange={modal.setBelugaPhoto}
           selectedPhotoName={modal.belugaPhoto?.fileName}
-          consentError={modal.errors?.belugaConsent}
           photoError={modal.errors?.belugaPhoto}
         />
       );

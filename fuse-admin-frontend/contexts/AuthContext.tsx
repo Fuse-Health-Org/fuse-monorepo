@@ -35,6 +35,9 @@ interface Subscription {
     hasCustomPortal?: boolean
     hasPrograms?: boolean
     canCustomizeFormStructure?: boolean
+    fuseFeePercent?: number | null
+    nonMedicalProfitPercent?: number | null
+    merchantServiceFeePercent?: number | null
   } | null
   customFeatures?: {
     canAddCustomProducts?: boolean

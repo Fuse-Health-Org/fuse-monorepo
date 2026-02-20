@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react'
 import { useRouter } from 'next/router'
 
 interface User {
@@ -24,6 +24,7 @@ interface AuthContextType {
   cancelMfa: () => void
   mfa: MfaState
   logout: () => void
+  handleUnauthorized: () => void
   isLoading: boolean
   error: string | null
 }
@@ -31,6 +32,19 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+
+const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000   // 30 min of no activity → log out
+const REFRESH_THRESHOLD_MS  = 5  * 60 * 1000   // refresh token when < 5 min remain
+const ACTIVITY_CHECK_MS     = 60 * 1000         // check every 60 seconds
+
+// Decode JWT payload without a library
+function parseJWT(token: string): { exp?: number } | null {
+  try {
+    return JSON.parse(atob(token.split('.')[1]))
+  } catch {
+    return null
+  }
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
@@ -40,23 +54,121 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [mfa, setMfa] = useState<MfaState>({ required: false, token: null, resendsRemaining: 3 })
   const router = useRouter()
 
+  // Refs so closures always see latest values without re-registering effects
+  const tokenRef      = useRef<string | null>(null)
+  const lastActivityRef = useRef<number>(Date.now())
+  const activityCheckRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // Keep tokenRef in sync with state
+  useEffect(() => { tokenRef.current = token }, [token])
+
+  // ── Activity tracking ──────────────────────────────────────────────────────
+  const recordActivity = () => { lastActivityRef.current = Date.now() }
+
+  const startActivityTracking = () => {
+    const events = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click']
+    events.forEach(e => window.addEventListener(e, recordActivity, { passive: true }))
+
+    if (activityCheckRef.current) clearInterval(activityCheckRef.current)
+
+    activityCheckRef.current = setInterval(async () => {
+      const currentToken = tokenRef.current
+      if (!currentToken) return
+
+      const inactiveFor = Date.now() - lastActivityRef.current
+
+      // Inactivity timeout — log the user out
+      if (inactiveFor >= INACTIVITY_TIMEOUT_MS) {
+        console.warn('⏱️ [Auth] Inactivity timeout reached, logging out')
+        stopActivityTracking()
+        handleUnauthorized()
+        return
+      }
+
+      // Proactive refresh — only when user is active and token is near expiry
+      const payload = parseJWT(currentToken)
+      if (!payload?.exp) return
+      const expiresIn = payload.exp * 1000 - Date.now()
+      if (expiresIn < REFRESH_THRESHOLD_MS) {
+        await silentRefresh(currentToken)
+      }
+    }, ACTIVITY_CHECK_MS)
+
+    return () => {
+      events.forEach(e => window.removeEventListener(e, recordActivity))
+      if (activityCheckRef.current) clearInterval(activityCheckRef.current)
+    }
+  }
+
+  const stopActivityTracking = () => {
+    const events = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click']
+    events.forEach(e => window.removeEventListener(e, recordActivity))
+    if (activityCheckRef.current) {
+      clearInterval(activityCheckRef.current)
+      activityCheckRef.current = null
+    }
+  }
+
+  const silentRefresh = async (currentToken: string) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${currentToken}` },
+      })
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success && data.token) {
+          localStorage.setItem('tenant_token', data.token)
+          if (data.user) localStorage.setItem('tenant_user', JSON.stringify(data.user))
+          setToken(data.token)
+          if (data.user) setUser(data.user)
+          console.log('🔄 [Auth] Token refreshed (user active)')
+        }
+      } else {
+        console.warn('⚠️ [Auth] Silent refresh failed, logging out')
+        stopActivityTracking()
+        handleUnauthorized()
+      }
+    } catch {
+      // Network error — will retry on next interval
+    }
+  }
+
+  const handleUnauthorized = () => {
+    localStorage.removeItem('tenant_token')
+    localStorage.removeItem('tenant_user')
+    setToken(null)
+    setUser(null)
+    stopActivityTracking()
+    router.push('/signin')
+  }
+
   // Check for existing token on mount
   useEffect(() => {
     const storedToken = localStorage.getItem('tenant_token')
-    const storedUser = localStorage.getItem('tenant_user')
+    const storedUser  = localStorage.getItem('tenant_user')
 
     if (storedToken && storedUser) {
       try {
-        const userData = JSON.parse(storedUser)
-        setToken(storedToken)
-        setUser(userData)
-      } catch (error) {
-        // Clear invalid stored data
+        const payload = parseJWT(storedToken)
+        const expired = payload?.exp && payload.exp * 1000 < Date.now()
+        if (expired) {
+          localStorage.removeItem('tenant_token')
+          localStorage.removeItem('tenant_user')
+        } else {
+          const userData = JSON.parse(storedUser)
+          setToken(storedToken)
+          setUser(userData)
+          startActivityTracking()
+        }
+      } catch {
         localStorage.removeItem('tenant_token')
         localStorage.removeItem('tenant_user')
       }
     }
     setIsLoading(false)
+
+    return () => stopActivityTracking()
   }, [])
 
   const login = async (email: string, password: string): Promise<boolean | 'mfa_required'> => {
@@ -92,6 +204,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Update state
         setToken(authToken)
         setUser(userData)
+        lastActivityRef.current = Date.now()
+        startActivityTracking()
 
         setIsLoading(false)
         return true
@@ -137,6 +251,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setToken(authToken)
         setUser(userData)
         setMfa({ required: false, token: null, resendsRemaining: 3 })
+        lastActivityRef.current = Date.now()
+        startActivityTracking()
 
         setIsLoading(false)
         return true
@@ -207,16 +323,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const logout = () => {
-    // Clear localStorage
     localStorage.removeItem('tenant_token')
     localStorage.removeItem('tenant_user')
-
-    // Clear state
     setToken(null)
     setUser(null)
     setError(null)
-
-    // Redirect to signin
+    stopActivityTracking()
     router.push('/signin')
   }
 
@@ -230,6 +342,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       cancelMfa,
       mfa,
       logout,
+      handleUnauthorized,
       isLoading,
       error
     }}>

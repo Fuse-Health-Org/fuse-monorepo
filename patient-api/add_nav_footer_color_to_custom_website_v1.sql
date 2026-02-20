@@ -1,0 +1,2 @@
+ALTER TABLE public."CustomWebsite"
+  ADD COLUMN IF NOT EXISTS "navFooterColor" VARCHAR(255) DEFAULT '#000000';

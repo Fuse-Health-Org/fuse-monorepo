@@ -35,6 +35,7 @@ import {
   deleteFromS3,
   isValidImageFile,
   isValidFileSize,
+  getFileFromS3,
 } from "./config/s3";
 import {
   authLimiter,
@@ -1463,6 +1464,7 @@ app.get("/clinic/:id", authenticateJWT, async (req, res) => {
         customDomain: (clinic as any).customDomain,
         isCustomDomain: (clinic as any).isCustomDomain,
         patientPortalDashboardFormat: normalizedFormat,
+        defaultFormColor: (clinic as any).defaultFormColor || null,
       },
     });
   } catch (error) {
@@ -1777,6 +1779,10 @@ app.post("/custom-website", authenticateJWT, async (req, res) => {
       portalTitle,
       portalDescription,
       primaryColor,
+      backgroundColor,
+      navFooterColor,
+      navDisplayMode,
+      navBrandName,
       fontFamily,
       logo,
       heroImageUrl,
@@ -1805,6 +1811,10 @@ app.post("/custom-website", authenticateJWT, async (req, res) => {
         portalTitle,
         portalDescription,
         primaryColor,
+        backgroundColor,
+        navFooterColor,
+        navDisplayMode,
+        navBrandName,
         fontFamily,
         logo,
         heroImageUrl,
@@ -1829,6 +1839,10 @@ app.post("/custom-website", authenticateJWT, async (req, res) => {
         portalTitle,
         portalDescription,
         primaryColor,
+        backgroundColor,
+        navFooterColor,
+        navDisplayMode,
+        navBrandName,
         fontFamily,
         logo,
         heroImageUrl,
@@ -2058,6 +2072,29 @@ app.post("/custom-website/reset-social-media", authenticateJWT, async (req, res)
 });
 
 // Upload portal logo to S3
+// Proxy the current clinic's saved logo from S3 to avoid browser CORS issues in the crop editor
+app.get("/custom-website/logo-proxy", authenticateJWT, async (req, res) => {
+  try {
+    const currentUser = getCurrentUser(req);
+    if (!currentUser) return res.status(401).json({ success: false, message: "Not authenticated" });
+
+    const user = await User.findByPk(currentUser.id);
+    if (!user?.clinicId) return res.status(404).json({ success: false, message: "User or clinic not found" });
+
+    const customWebsite = await CustomWebsite.findOne({ where: { clinicId: user.clinicId } });
+    if (!customWebsite?.logo) return res.status(404).json({ success: false, message: "No logo found" });
+
+    const { body, contentType } = await getFileFromS3(customWebsite.logo);
+
+    res.setHeader("Content-Type", contentType);
+    res.setHeader("Cache-Control", "private, max-age=3600");
+
+    (body as any).pipe(res);
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Failed to fetch logo" });
+  }
+});
+
 app.post("/custom-website/upload-logo", authenticateJWT, upload.single('logo'), async (req, res) => {
   try {
     const currentUser = getCurrentUser(req);
@@ -3543,11 +3580,14 @@ app.post(
         }
       }
 
-      // Upload new image to S3
+      // Upload new image to S3 under the brand's isolated folder
+      // Path: brands/{brandUserId}/products/{productId}/ — images are scoped per org
+      const brandFolder = `brands/${user.id}/products/${id}`;
       const imageUrl = await uploadToS3(
         req.file.buffer,
         req.file.originalname,
-        req.file.mimetype
+        req.file.mimetype,
+        brandFolder
       );
 
       // Update product with new image URL
@@ -12213,12 +12253,12 @@ const PORT = process.env.PORT || 3001;
 
 // Initialize database connection and start server
 async function startServer() {
-  const dbConnected = await initializeDatabase();
+  // const dbConnected = await initializeDatabase();
 
-  if (!dbConnected) {
-    console.error("❌ Failed to connect to database. Exiting...");
-    process.exit(1);
-  }
+  // if (!dbConnected) {
+  //   console.error("❌ Failed to connect to database. Exiting...");
+  //   process.exit(1);
+  // }
 
   // Import WebSocket service early so route handlers can reference it
   const WebSocketService = (await import("./services/websocket.service"))
@@ -13502,6 +13542,14 @@ async function startServer() {
     console.log("✅ BelugaProduct table synced");
   } catch (syncErr) {
     console.log("⚠️  BelugaProduct sync:", syncErr instanceof Error ? syncErr.message : syncErr);
+  }
+
+  try {
+    const BelugaEvent = (await import('./models/BelugaEvent')).default;
+    await BelugaEvent.sync({ alter: true });
+    console.log("✅ BelugaEvent table synced");
+  } catch (syncErr) {
+    console.log("⚠️  BelugaEvent sync:", syncErr instanceof Error ? syncErr.message : syncErr);
   }
 
   // ============================================

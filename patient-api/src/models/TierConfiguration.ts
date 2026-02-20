@@ -93,6 +93,16 @@ export default class TierConfiguration extends Entity {
   })
   declare nonMedicalProfitPercent: number | null;
 
+  /** Merchant service fee charged per transaction on this tier (e.g. 2.0 = 2%).
+   *  Shown separately from fuseFeePercent. Defaults to 2% system-wide; can be overridden per tier or per brand. */
+  @Column({
+    type: DataType.DECIMAL(5, 2),
+    allowNull: true,
+    defaultValue: 2,
+    comment: 'Per-transaction merchant service fee percent for this tier (e.g. 2.0 = 2%). Separate from profit-share fuseFeePercent. Defaults to 2.',
+  })
+  declare merchantServiceFeePercent: number | null;
+
   @BelongsTo(() => BrandSubscriptionPlans)
   declare plan?: BrandSubscriptionPlans;
 
@@ -109,6 +119,7 @@ export default class TierConfiguration extends Entity {
       isCustomTierCardTextActive: this.isCustomTierCardTextActive,
       fuseFeePercent: this.fuseFeePercent,
       nonMedicalProfitPercent: this.nonMedicalProfitPercent,
+      merchantServiceFeePercent: this.merchantServiceFeePercent,
     };
   }
 }
