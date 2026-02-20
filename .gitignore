@@ -53,4 +53,4 @@ MdIntegrationsAPIDocs.txt
 caddy.tar.gz
 
 # Claude Code local settings
-.claude/settings.local.json
+.claude/settings.local.json.playwright-mcp/

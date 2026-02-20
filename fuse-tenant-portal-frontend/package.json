@@ -13,7 +13,9 @@
     "pm2:reload-no-build": "pnpm with-env pm2 reload tenant-portal-frontend --update-env",
     "pm2:stop": "pm2 stop tenant-portal-frontend",
     "clean": "git clean -xdf .cache .turbo dist .next node_modules",
-    "with-env": "dotenv -e ../.env.local --"
+    "with-env": "dotenv -e ../.env.local --",
+    "test:e2e": "pnpm with-env playwright test",
+    "test:e2e:ui": "pnpm with-env playwright test --ui"
   },
   "dependencies": {
     "@fuse/enums": "workspace:*",
@@ -73,6 +75,8 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@fuse/e2e": "workspace:^",
+    "@playwright/test": "^1.54.2",
     "@types/node": "catalog:",
     "@types/react": "catalog:react18",
     "@types/react-dom": "catalog:react18",
