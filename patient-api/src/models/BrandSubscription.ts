@@ -67,6 +67,15 @@ export default class BrandSubscription extends Entity {
   })
   declare customMaxProducts?: number;
 
+  /** Per-brand negotiated merchant service fee override (e.g. 1.5 = 1.5%). Overrides tier default when set. */
+  @Column({
+    type: DataType.DECIMAL(5, 2),
+    allowNull: true,
+    defaultValue: null,
+    comment: 'Per-brand negotiated merchant service fee percent override (e.g. 1.5 = 1.5%). Overrides tier-level merchantServiceFeePercent when set.',
+  })
+  declare customMerchantServiceFeePercent?: number | null;
+
   @Column({
     type: DataType.STRING,
     allowNull: false,

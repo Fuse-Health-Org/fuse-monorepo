@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "pnpm with-env next dev -p 3002",
+    "dev": "wait-on tcp:localhost:3001 && pnpm with-env next dev -p 3002",
     "build": "NODE_ENV=production pnpm with-env next build",
     "build:windows": "cross-env NODE_ENV=production pnpm with-env next build",
     "start": "next start -p 3020",
@@ -62,7 +62,9 @@
     "react": "catalog:react18",
     "react-day-picker": "catalog:",
     "react-dom": "catalog:react18",
+    "react-easy-crop": "^5.5.6",
     "react-hook-form": "catalog:",
+    "react-image-crop": "^11.0.10",
     "react-resizable-panels": "catalog:",
     "recharts": "catalog:",
     "tailwind-merge": "catalog:",

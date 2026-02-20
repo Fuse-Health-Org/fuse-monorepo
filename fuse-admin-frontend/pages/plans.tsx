@@ -483,7 +483,12 @@ export default function Plans() {
                             <span className="text-muted-foreground"> / month</span>
                           </>
                         )}
-                        <div className="text-xs text-muted-foreground mt-1">+ {plan.tierConfig?.fuseFeePercent != null ? `${plan.tierConfig.fuseFeePercent}%` : '1%'} transaction fee</div>
+                        <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
+                          {(plan.tierConfig?.fuseFeePercent ?? 0) > 0 && (
+                            <div>+ {plan.tierConfig!.fuseFeePercent}% profit share</div>
+                          )}
+                          <div>+ 2% merchant service fee</div>
+                        </div>
                       </div>
                     </CardHeader>
 
@@ -598,7 +603,7 @@ export default function Plans() {
                     </div>
                     <h3 className="text-lg font-bold mb-2 text-foreground">Transparent Pricing</h3>
                     <p className="text-sm text-muted-foreground leading-relaxed mb-4 flex-grow">
-                      Simple monthly fee + 1% transaction rate. No hidden costs or surprises
+                      Simple monthly fee + profit share + 2% merchant service fee. No hidden costs or surprises
                     </p>
                     <div className="flex items-center justify-center text-xs font-medium text-blue-600 mt-auto">
                       <span>Industry standard rates</span>

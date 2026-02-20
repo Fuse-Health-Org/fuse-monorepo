@@ -99,7 +99,15 @@ export function registerSubscriptionEndpoints(app: Express, authenticateJWT: any
 
       console.log('🎯 [Subscription] Effective maxProducts:', effectiveMaxProducts);
 
-    const responseData = {
+      // Resolve merchant service fee: per-brand override > tier default > 2 (system default)
+      const resolvedMerchantServiceFeePercent =
+        subscription.customMerchantServiceFeePercent != null
+          ? Number(subscription.customMerchantServiceFeePercent)
+          : tierConfig?.merchantServiceFeePercent != null
+          ? Number(tierConfig.merchantServiceFeePercent)
+          : 2;
+
+      const responseData = {
       id: subscription.id,
       planId: plan?.id || null,
       status: subscription.status,
@@ -122,6 +130,8 @@ export function registerSubscriptionEndpoints(app: Express, authenticateJWT: any
       productsChangedAmountOnCurrentCycle: subscription.productsChangedAmountOnCurrentCycle || 0,
       retriedProductSelectionForCurrentCycle: !!(subscription as any).retriedProductSelectionForCurrentCycle,
       customMaxProducts: subscription.customMaxProducts,
+      customMerchantServiceFeePercent: subscription.customMerchantServiceFeePercent ?? null,
+      merchantServiceFeePercent: resolvedMerchantServiceFeePercent,
       customFeatures: customFeatures ? customFeatures.toJSON() : null,
       tierConfig: tierConfig ? tierConfig.toJSON() : null
     };

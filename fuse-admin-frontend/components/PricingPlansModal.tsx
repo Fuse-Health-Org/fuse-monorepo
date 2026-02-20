@@ -172,12 +172,10 @@ export default function PricingPlansModal({
     return features;
   };
 
-  const getTransactionFee = (plan: Plan) => {
-    if (
-      plan.tierConfig?.fuseFeePercent !== null &&
-      plan.tierConfig?.fuseFeePercent !== undefined
-    ) {
-      return `${plan.tierConfig.fuseFeePercent}% transaction fee`;
+  const getProfitShare = (plan: Plan): string | null => {
+    const fee = plan.tierConfig?.fuseFeePercent;
+    if (fee !== null && fee !== undefined && fee > 0) {
+      return `${fee}% profit share`;
     }
     return null;
   };
@@ -236,7 +234,7 @@ export default function PricingPlansModal({
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {plans.map((plan) => {
                 const features = getPlanFeatures(plan);
-                const transactionFee = getTransactionFee(plan);
+                const profitShare = getProfitShare(plan);
                 const isPopular =
                   plan.planType === "standard" || plan.sortOrder === 2; // Growth should stay highlighted
 
@@ -313,12 +311,11 @@ export default function PricingPlansModal({
                           );
                         })()}
 
-                        {/* Transaction Fee */}
-                        {transactionFee && (
-                          <p className="text-sm text-muted-foreground mt-1.5">
-                            {transactionFee}
-                          </p>
-                        )}
+                        {/* Fees */}
+                        <div className="text-sm text-muted-foreground mt-1.5 space-y-0.5">
+                          {profitShare && <p>{profitShare}</p>}
+                          <p>2% merchant service fee</p>
+                        </div>
                       </div>
 
                       {/* Features - flex-grow pushes button down */}

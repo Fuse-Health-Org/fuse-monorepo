@@ -262,27 +262,7 @@ export default function Products() {
             clearTimeout(timeoutId)
             console.log('✅ Loaded products (combined):', combined.length)
 
-            // Fetch pharmacy coverages for each product
-            const productsWithCoverages = await Promise.all(
-                combined.map(async (product) => {
-                    try {
-                        const coverageRes = await fetch(`${baseUrl}/public/products/${product.id}/pharmacy-coverages`)
-                        if (coverageRes.ok) {
-                            const coverageData = await coverageRes.json()
-                            const coverages = coverageData.data || []
-                            return {
-                                ...product,
-                                pharmacyCoverages: coverages
-                            }
-                        }
-                    } catch (error) {
-                        console.error(`❌ Error fetching coverages for product ${product.id}:`, error)
-                    }
-                    return product
-                })
-            )
-
-            setAllProducts(productsWithCoverages)
+            setAllProducts(combined)
         } catch (err: any) {
             console.error('❌ Failed to load products:', err)
             setError(err?.message || 'Failed to load products')

@@ -9,6 +9,9 @@ import { getUser } from "./db/user";
 import type { ProductCreateInput, ProductUpdateInput } from "@fuse/validators";
 import User from "../models/User";
 import Clinic from "../models/Clinic";
+import PharmacyCoverage from "../models/PharmacyCoverage";
+import Pharmacy from "../models/Pharmacy";
+import PharmacyProduct from "../models/PharmacyProduct";
 
 /**
 
@@ -21,6 +24,13 @@ type SerializedProduct = ReturnType<Product["toJSON"]> & {
   suggestedRetailPrice?: number;
   price: number;
   brandName?: string;
+  pharmacyCoverages: Array<{
+    id: string;
+    customName: string;
+    customSig: string;
+    pharmacy: { id: string; name: string; slug: string } | null;
+    pharmacyProduct: { pharmacyProductName: string } | null;
+  }>;
 };
 
 function serializeProduct(product: Product): SerializedProduct {
@@ -32,6 +42,21 @@ function serializeProduct(product: Product): SerializedProduct {
   // Extract brand name from the clinic if available
   const brandData = (plain as any).brand;
   const brandName = brandData?.clinic?.name || null;
+
+  const pharmacyCoverages = ((plain as any).pharmacyCoverages ?? [])
+    .map((c: any) => ({
+      id: c.id,
+      customName: c.customName,
+      customSig: c.customSig,
+      pharmacy: c.pharmacy
+        ? { id: c.pharmacy.id, name: c.pharmacy.name, slug: c.pharmacy.slug }
+        : null,
+      pharmacyProduct:
+        Array.isArray(c.assignments) && c.assignments.length > 0
+          ? { pharmacyProductName: c.assignments[0].pharmacyProductName }
+          : null,
+    }))
+    .sort((a: any, b: any) => (a.customName ?? "").localeCompare(b.customName ?? ""));
 
   return {
     ...plain,
@@ -45,6 +70,7 @@ function serializeProduct(product: Product): SerializedProduct {
       : undefined,
     price: plain.price ? parseFloat(plain.price as any) : plain.price,
     brandName,
+    pharmacyCoverages,
   };
 }
 
@@ -152,6 +178,15 @@ class ProductService {
               required: false,
               attributes: ["id", "name"],
             },
+          ],
+        },
+        {
+          model: PharmacyCoverage,
+          as: "pharmacyCoverages",
+          required: false,
+          include: [
+            { model: Pharmacy, as: "pharmacy", attributes: ["id", "name", "slug"] },
+            { model: PharmacyProduct, as: "assignments", attributes: ["id", "pharmacyProductName"] },
           ],
         },
       ],

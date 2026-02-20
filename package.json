@@ -31,7 +31,8 @@
     "prettier": "catalog:",
     "turbo": "catalog:",
     "typescript": "catalog:",
-    "pm2": "^6.0.13"
+    "pm2": "^6.0.13",
+    "wait-on": "^8.0.3"
   },
   "private": true
 }

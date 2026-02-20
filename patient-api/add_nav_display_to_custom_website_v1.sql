@@ -1,0 +1,3 @@
+ALTER TABLE public."CustomWebsite"
+  ADD COLUMN IF NOT EXISTS "navDisplayMode" VARCHAR(50) DEFAULT 'brandName',
+  ADD COLUMN IF NOT EXISTS "navBrandName" VARCHAR(255) DEFAULT NULL;
