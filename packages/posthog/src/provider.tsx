@@ -9,10 +9,10 @@ interface PostHogAnalyticsProviderProps {
   children: React.ReactNode;
 }
 
-export function PostHogAnalyticsProvider({
+export const PostHogAnalyticsProvider = ({
   config,
   children,
-}: PostHogAnalyticsProviderProps) {
+}: PostHogAnalyticsProviderProps) => {
   const router = useRouter();
   const initializedRef = useRef(false);
 
@@ -77,4 +77,4 @@ export function PostHogAnalyticsProvider({
   }
 
   return <PostHogProvider client={posthog}>{children}</PostHogProvider>;
-}
+};

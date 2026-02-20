@@ -7,7 +7,7 @@ import { IdentifyUserParams } from "./types";
  * Identifies the current user with PostHog when params are provided,
  * and calls posthog.reset() when params become null (logout).
  */
-export function useIdentifyUser(params: IdentifyUserParams | null): void {
+export const useIdentifyUser = (params: IdentifyUserParams | null): void => {
   const prevUserIdRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -25,6 +25,6 @@ export function useIdentifyUser(params: IdentifyUserParams | null): void {
       prevUserIdRef.current = newUserId;
     }
   }, [params]);
-}
+};
 
 export { usePostHog };
