@@ -15,11 +15,11 @@ interface AmplitudeProviderProps {
   children: React.ReactNode;
 }
 
-export function AmplitudeProvider({
+export const AmplitudeProvider = ({
   config,
   user,
   children,
-}: AmplitudeProviderProps) {
+}: AmplitudeProviderProps) => {
   const router = useRouter();
   const prevUserIdRef = useRef<string | null>(null);
 
@@ -62,4 +62,4 @@ export function AmplitudeProvider({
   }, [router]);
 
   return <>{children}</>;
-}
+};

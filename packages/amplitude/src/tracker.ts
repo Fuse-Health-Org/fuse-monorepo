@@ -4,7 +4,7 @@ import { AmplitudeConfig, AmplitudeEvent, AmplitudeUser } from "./types";
 let initialized = false;
 let currentAppName = "";
 
-export function initAmplitude(config: AmplitudeConfig): void {
+export const initAmplitude = (config: AmplitudeConfig): void => {
   if (!config.apiKey) {
     return;
   }
@@ -22,16 +22,16 @@ export function initAmplitude(config: AmplitudeConfig): void {
   if (config.debug) {
     console.log(`[Amplitude] Initialized for ${config.appName}`);
   }
-}
+};
 
-export function shutdownAmplitude(): void {
+export const shutdownAmplitude = (): void => {
   if (!initialized) return;
   amplitude.flush();
   amplitude.reset();
   initialized = false;
-}
+};
 
-export function identifyUser(user: AmplitudeUser, appName: string): void {
+export const identifyUser = (user: AmplitudeUser, appName: string): void => {
   if (!initialized) return;
 
   amplitude.setUserId(user.id);
@@ -43,26 +43,26 @@ export function identifyUser(user: AmplitudeUser, appName: string): void {
     identifyEvent.set("clinic_id", user.clinicId);
   }
   amplitude.identify(identifyEvent);
-}
+};
 
-export function resetUser(): void {
+export const resetUser = (): void => {
   if (!initialized) return;
   amplitude.reset();
-}
+};
 
-export function trackEvent(
+export const trackEvent = (
   eventName: AmplitudeEvent | string,
   properties?: Record<string, unknown>
-): void {
+): void => {
   if (!initialized) return;
   amplitude.track(eventName, {
     ...properties,
     app_name: currentAppName,
   });
-}
+};
 
 /** HIPAA: Strip potential PHI from query parameters before tracking */
-function sanitizeUrl(url: string): string {
+const sanitizeUrl = (url: string): string => {
   try {
     const parsed = new URL(url, "http://placeholder");
     for (const param of ["email", "name", "patientId", "dob", "phone", "address"]) {
@@ -73,9 +73,9 @@ function sanitizeUrl(url: string): string {
   } catch {
     return url;
   }
-}
+};
 
-export function trackPageView(url: string): void {
+export const trackPageView = (url: string): void => {
   if (!initialized) return;
   trackEvent(AmplitudeEvent.PAGE_VIEW, { page_path: sanitizeUrl(url) });
-}
+};

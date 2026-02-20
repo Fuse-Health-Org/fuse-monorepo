@@ -2,7 +2,7 @@ import { useCallback } from "react";
 import { AmplitudeEvent } from "./types";
 import { trackEvent } from "./tracker";
 
-export function useAmplitude() {
+export const useAmplitude = () => {
   const track = useCallback(
     (eventName: AmplitudeEvent | string, properties?: Record<string, unknown>) => {
       trackEvent(eventName, properties);
@@ -11,4 +11,4 @@ export function useAmplitude() {
   );
 
   return { track };
-}
+};
