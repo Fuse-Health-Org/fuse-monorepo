@@ -1,7 +1,9 @@
 import '../styles/globals.css'
 import type { AppProps } from 'next/app'
 import { HeroUIProvider, ToastProvider } from '@heroui/react'
-import { AuthProvider } from '../contexts/AuthContext'
+import { AuthProvider, useAuth } from '../contexts/AuthContext'
+import { AmplitudeProvider } from '@fuse/amplitude'
+import { PostHogAnalyticsProvider } from '@fuse/posthog'
 import { ProtectedRouteProvider } from '../providers/ProtectedRouteProvider'
 import { useEffect } from 'react'
 import { useRouter } from 'next/router'
@@ -97,15 +99,42 @@ function AffiliateRedirectHandler() {
   return null
 }
 
+function AmplitudeWrapper({ children }: { children: React.ReactNode }) {
+    const { user } = useAuth()
+    return (
+        <AmplitudeProvider
+            config={{
+                apiKey: process.env.NEXT_PUBLIC_AMPLITUDE_API_KEY || '',
+                appName: 'patient',
+                debug: process.env.NODE_ENV === 'development',
+                sessionReplay: { sampleRate: 0.01 },
+            }}
+            user={user ? { id: user.id, role: user.role, clinicId: user.clinicId } : null}
+        >
+            {children}
+        </AmplitudeProvider>
+    )
+}
+
 function MyApp({ Component, pageProps }: AppProps) {
     return (
         <HeroUIProvider>
             <ToastProvider />
             <AuthProvider>
-                <ProtectedRouteProvider>
-                    <AffiliateRedirectHandler />
-                    <Component {...pageProps} />
-                </ProtectedRouteProvider>
+                <PostHogAnalyticsProvider
+                    config={{
+                        apiKey: process.env.NEXT_PUBLIC_POSTHOG_KEY || '',
+                        host: process.env.NEXT_PUBLIC_POSTHOG_HOST,
+                        enabled: process.env.NEXT_PUBLIC_POSTHOG_ENABLED !== 'false',
+                    }}
+                >
+                    <AmplitudeWrapper>
+                        <ProtectedRouteProvider>
+                            <AffiliateRedirectHandler />
+                            <Component {...pageProps} />
+                        </ProtectedRouteProvider>
+                    </AmplitudeWrapper>
+                </PostHogAnalyticsProvider>
             </AuthProvider>
         </HeroUIProvider>
     )

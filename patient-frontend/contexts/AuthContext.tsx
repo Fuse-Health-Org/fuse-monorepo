@@ -4,6 +4,7 @@ import { useRouter } from 'next/router';
 import { SessionTimeoutManager } from '../lib/sessionTimeout';
 import { SessionWarning } from '../components/SessionWarning';
 import { PUBLIC_PATH_PATTERNS } from '@fuse/enums';
+import { useIdentifyUser } from '@fuse/posthog';
 
 interface AuthContextType {
   user: User | null;
@@ -67,6 +68,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [countdown, setCountdown] = useState(300); // 5 minutes countdown
   const router = useRouter();
   const sessionManager = React.useRef<SessionTimeoutManager | null>(null);
+
+  // PostHog: identify user when authenticated, reset on logout
+  useIdentifyUser(user ? { userId: user.id, role: user.role, clinicId: user.clinicId } : null);
 
   const refreshUser = async () => {
     try {

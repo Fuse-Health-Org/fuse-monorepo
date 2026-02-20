@@ -83,7 +83,10 @@ catalog:
   recharts: 2.15.4
 
   # Analytics
+  "@amplitude/analytics-browser": ^2.11.0
+  "@amplitude/plugin-session-replay-browser": ^1.12.0
   "@vercel/analytics": 1.3.1
+  posthog-js: ^1.236.0
 
   # Authentication & Security
   "@types/jsonwebtoken": ^9.0.10
