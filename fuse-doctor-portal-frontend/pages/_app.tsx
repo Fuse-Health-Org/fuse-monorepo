@@ -5,6 +5,7 @@ import { Analytics } from "@vercel/analytics/next"
 import { useState, useCallback } from 'react'
 import { AuthProvider, useAuth } from '@/contexts/AuthContext'
 import { AmplitudeProvider } from '@fuse/amplitude'
+import { PostHogAnalyticsProvider } from '@fuse/posthog'
 import { ThemeProvider } from '@/contexts/ThemeContext'
 import { WebSocketProvider } from '@/contexts/WebSocketContext'
 import ProtectedRoute from '@/components/ProtectedRoute'
@@ -71,13 +72,21 @@ export default function App({ Component, pageProps }: AppProps & { showToast?: (
             </Head>
             <ThemeProvider>
                 <AuthProvider>
-                    <AmplitudeWrapper>
-                        <WebSocketProvider>
-                            {content}
-                            <ToastManager toasts={toasts} onDismiss={dismissToast} />
-                            <Toaster position="top-right" richColors />
-                        </WebSocketProvider>
-                    </AmplitudeWrapper>
+                    <WebSocketProvider>
+                        <PostHogAnalyticsProvider
+                            config={{
+                                apiKey: process.env.NEXT_PUBLIC_POSTHOG_KEY || '',
+                                host: process.env.NEXT_PUBLIC_POSTHOG_HOST,
+                                enabled: process.env.NEXT_PUBLIC_POSTHOG_ENABLED !== 'false',
+                            }}
+                        >
+                            <AmplitudeWrapper>
+                                {content}
+                                <ToastManager toasts={toasts} onDismiss={dismissToast} />
+                                <Toaster position="top-right" richColors />
+                            </AmplitudeWrapper>
+                        </PostHogAnalyticsProvider>
+                    </WebSocketProvider>
                 </AuthProvider>
             </ThemeProvider>
         </>

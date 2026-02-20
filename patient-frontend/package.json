@@ -20,6 +20,7 @@
   "dependencies": {
     "@fuse/amplitude": "workspace:*",
     "@fuse/enums": "workspace:*",
+    "@fuse/posthog": "workspace:*",
     "@heroui/react": "^2.8.3",
     "@iconify/react": "^6.0.1",
     "@react-oauth/google": "^0.12.2",

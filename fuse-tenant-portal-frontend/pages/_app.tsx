@@ -4,6 +4,7 @@ import { Analytics } from "@vercel/analytics/next"
 import { useRouter } from 'next/router'
 import { AuthProvider, useAuth } from '@/contexts/AuthContext'
 import { AmplitudeProvider } from '@fuse/amplitude'
+import { PostHogAnalyticsProvider } from '@fuse/posthog'
 import { TenantProvider } from '@/contexts/TenantContext'
 import { ThemeProvider } from '@/contexts/ThemeContext'
 import ProtectedRoute from '@/components/ProtectedRoute'
@@ -41,9 +42,16 @@ export default function App({ Component, pageProps }: AppProps) {
       </Head>
       <ThemeProvider>
         <AuthProvider>
-          <AmplitudeWrapper>
-            <TenantProvider>
-              <div className="font-sans">
+          <TenantProvider>
+            <PostHogAnalyticsProvider
+              config={{
+                apiKey: process.env.NEXT_PUBLIC_POSTHOG_KEY || '',
+                host: process.env.NEXT_PUBLIC_POSTHOG_HOST,
+                enabled: process.env.NEXT_PUBLIC_POSTHOG_ENABLED === 'true',
+              }}
+            >
+              <AmplitudeWrapper>
+                <div className="font-sans">
               {isPublicPage ? (
                 <Component {...pageProps} />
               ) : (
@@ -51,11 +59,12 @@ export default function App({ Component, pageProps }: AppProps) {
                   <Component {...pageProps} />
                 </ProtectedRoute>
               )}
-              <Toaster richColors position="top-right" />
-              {process.env.NEXT_PUBLIC_ENABLE_VERCEL_ANALYTICS === 'true' && <Analytics />}
-              </div>
-            </TenantProvider>
-          </AmplitudeWrapper>
+                <Toaster richColors position="top-right" />
+                {process.env.NEXT_PUBLIC_ENABLE_VERCEL_ANALYTICS === 'true' && <Analytics />}
+                </div>
+              </AmplitudeWrapper>
+            </PostHogAnalyticsProvider>
+          </TenantProvider>
         </AuthProvider>
       </ThemeProvider>
     </>

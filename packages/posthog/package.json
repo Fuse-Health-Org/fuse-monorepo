@@ -1,0 +1,26 @@
+{
+  "name": "@fuse/posthog",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Shared PostHog analytics for Fuse Health frontend apps",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "type:check": "tsc --noEmit",
+    "clean": "git clean -xdf .cache .turbo dist node_modules"
+  },
+  "dependencies": {
+    "posthog-js": "catalog:",
+    "@fuse/tsconfig": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0",
+    "next": "^14.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "catalog:react18",
+    "dotenv": "catalog:",
+    "typescript": "catalog:"
+  }
+}

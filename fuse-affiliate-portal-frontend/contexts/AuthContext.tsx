@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, checkAuth, signOut } from '../lib/auth';
 import { useRouter } from 'next/router';
+import { useIdentifyUser } from '@fuse/posthog';
 
 interface AuthContextType {
   user: User | null;
@@ -21,6 +22,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+
+  // PostHog: identify user when authenticated, reset on logout
+  useIdentifyUser(user ? { userId: user.id, role: user.role, clinicId: user.clinicId } : null);
 
   const refreshUser = async () => {
     try {

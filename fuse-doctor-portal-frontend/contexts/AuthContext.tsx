@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode, useMemo } from 'react'
 import { useRouter } from 'next/router'
 import { ApiClient } from '@/lib/api'
+import { useIdentifyUser } from '@fuse/posthog'
 
 interface User {
     id: string
@@ -51,6 +52,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [error, setError] = useState<string | null>(null)
     const [mfa, setMfa] = useState<MfaState>({ required: false, token: null, resendsRemaining: 3 })
     const router = useRouter()
+
+    // PostHog: identify user when authenticated, reset on logout
+    useIdentifyUser(user ? { userId: user.id, role: user.role } : null)
 
     // Helper reused across unauthorized paths
     const handleUnauthorized = (message?: string) => {

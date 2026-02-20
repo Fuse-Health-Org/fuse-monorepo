@@ -3,6 +3,7 @@ import type { AppProps } from 'next/app'
 import { HeroUIProvider, ToastProvider } from '@heroui/react'
 import { AuthProvider, useAuth } from '../contexts/AuthContext'
 import { AmplitudeProvider } from '@fuse/amplitude'
+import { PostHogAnalyticsProvider } from '@fuse/posthog'
 import { ThemeProvider } from '../contexts/ThemeContext'
 
 function AmplitudeWrapper({ children }: { children: React.ReactNode }) {
@@ -27,9 +28,17 @@ function MyApp({ Component, pageProps }: AppProps) {
             <HeroUIProvider>
                 <ToastProvider />
                 <AuthProvider>
-                    <AmplitudeWrapper>
-                        <Component {...pageProps} />
-                    </AmplitudeWrapper>
+                    <PostHogAnalyticsProvider
+                        config={{
+                            apiKey: process.env.NEXT_PUBLIC_POSTHOG_KEY || '',
+                            host: process.env.NEXT_PUBLIC_POSTHOG_HOST,
+                            enabled: process.env.NEXT_PUBLIC_POSTHOG_ENABLED !== 'false',
+                        }}
+                    >
+                        <AmplitudeWrapper>
+                            <Component {...pageProps} />
+                        </AmplitudeWrapper>
+                    </PostHogAnalyticsProvider>
                 </AuthProvider>
             </HeroUIProvider>
         </ThemeProvider>
