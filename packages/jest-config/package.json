@@ -1,0 +1,29 @@
+{
+  "name": "@fuse/jest-config",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Shared Jest configuration and testing utilities for Fuse Health applications",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "type:check": "tsc --noEmit",
+    "clean": "git clean -xdf .cache .turbo dist node_modules"
+  },
+  "dependencies": {
+    "@fuse/tsconfig": "workspace:*",
+    "@fuse/enums": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/jest": "catalog:",
+    "@types/node": "catalog:",
+    "jest": "catalog:",
+    "jest-mock-extended": "catalog:",
+    "ts-jest": "catalog:",
+    "typescript": "catalog:"
+  },
+  "peerDependencies": {
+    "jest": "^29.0.0"
+  }
+}
