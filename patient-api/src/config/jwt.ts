@@ -37,7 +37,7 @@ export const createDebugShortLivedJWTToken = (payload: JWTPayload): string => {
   delete rest.aud;
   delete rest.iss;
   return jwt.sign(rest, JWT_SECRET, {
-    expiresIn: '1m',
+    expiresIn: '2m',
     issuer: 'patient-portal-api',
     audience: 'patient-portal-frontend',
   });
