@@ -330,19 +330,6 @@ export default function SignIn() {
                 </div>
 
                 <button
-                  type="button"
-                  onClick={() => setShortSession(v => !v)}
-                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-medium transition-colors ${
-                    shortSession
-                      ? 'bg-purple-500/10 border-purple-500/30 text-purple-600'
-                      : 'border-border text-muted-foreground hover:text-foreground hover:bg-muted/50'
-                  }`}
-                >
-                  <FlaskConical className="h-3.5 w-3.5 shrink-0" />
-                  {shortSession ? 'Short session active — token expires in 2 min' : 'Short session (debug)'}
-                </button>
-
-                <button
                   type="submit"
                   disabled={isLoading || !email || !password}
                   className="w-full px-6 py-3 rounded-full bg-[#4FA59C] hover:bg-[#478F87] text-white shadow-sm hover:shadow-md transition-all text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
@@ -360,6 +347,16 @@ export default function SignIn() {
           </div>
         </div>
       </div>
+
+      <button
+        type="button"
+        onClick={() => setShortSession(v => !v)}
+        className="fixed bottom-4 left-4 flex items-center gap-1.5 text-xs transition-colors"
+        style={{ color: shortSession ? '#a78bfa' : '#d1d5db' }}
+      >
+        <FlaskConical className="h-3 w-3 shrink-0" />
+        {shortSession ? 'Short session active (2 min)' : 'Short session (debug)'}
+      </button>
     </>
   )
 }

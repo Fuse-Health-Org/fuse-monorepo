@@ -460,19 +460,6 @@ export default function SignIn() {
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => setShortSession(v => !v)}
-                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-medium transition-colors ${
-                    shortSession
-                      ? 'bg-secondary-100 border-secondary-300 text-secondary-700'
-                      : 'border-default-300 text-default-500 hover:text-default-700 hover:bg-default-100'
-                  }`}
-                >
-                  <Icon icon="lucide:flask-conical" className="h-3.5 w-3.5 shrink-0" />
-                  {shortSession ? 'Short session active — token expires in 2 min' : 'Short session (debug)'}
-                </button>
-
                 <Button
                   type="submit"
                   color="primary"
@@ -488,6 +475,16 @@ export default function SignIn() {
           </Card>
         </motion.div>
       </div>
+
+      <button
+        type="button"
+        onClick={() => setShortSession(v => !v)}
+        className="fixed bottom-4 left-4 flex items-center gap-1.5 text-xs transition-colors"
+        style={{ color: shortSession ? '#a78bfa' : '#d1d5db' }}
+      >
+        <Icon icon="lucide:flask-conical" className="h-3 w-3 shrink-0" />
+        {shortSession ? 'Short session active (2 min)' : 'Short session (debug)'}
+      </button>
     </>
   );
 }
