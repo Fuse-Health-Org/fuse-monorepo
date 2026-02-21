@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import { useAuth } from "../contexts/AuthContext";
 import { useTheme } from "../contexts/ThemeContext";
@@ -13,10 +13,40 @@ const navigation = [
     { name: "Settings", icon: "lucide:settings", href: "/settings" },
 ];
 
+function getTokenExpiry(token: string): number | null {
+    try {
+        const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))
+        return typeof payload.exp === 'number' ? payload.exp : null
+    } catch { return null }
+}
+
+function formatCountdown(s: number): string {
+    if (s <= 0) return 'Expired'
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60
+    if (h > 0) return `${h}h ${String(m).padStart(2,'0')}m ${String(sec).padStart(2,'0')}s`
+    return `${String(m).padStart(2,'0')}m ${String(sec).padStart(2,'0')}s`
+}
+
 export function Sidebar() {
     const { user, signOut } = useAuth();
     const { theme, toggleTheme } = useTheme();
     const router = useRouter();
+    const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
+
+    useEffect(() => {
+        const token = localStorage.getItem('auth-token');
+        if (!token) { setSecondsLeft(null); return; }
+        const expiry = getTokenExpiry(token);
+        if (!expiry) { setSecondsLeft(null); return; }
+        const update = () => {
+            const remaining = Math.max(0, expiry - Math.floor(Date.now() / 1000));
+            setSecondsLeft(remaining);
+            if (remaining === 0) signOut();
+        };
+        update();
+        const id = setInterval(update, 1000);
+        return () => clearInterval(id);
+    }, []);
 
     const handleLogout = async () => {
         await signOut();
@@ -71,6 +101,20 @@ export function Sidebar() {
                     })}
                 </div>
             </nav>
+
+            {/* Session Timer */}
+            {secondsLeft !== null && (
+                <div className="px-4 pb-2">
+                    <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-mono font-medium tabular-nums border ${
+                        secondsLeft === 0 ? 'bg-danger-100 border-danger-300 text-danger'
+                        : secondsLeft <= 300 ? 'bg-warning-100 border-warning-300 text-warning-700'
+                        : 'bg-default-100 border-default-300 text-default-600'}`}
+                        title="Time until your session expires">
+                        <Icon icon="lucide:timer" className="h-3 w-3 shrink-0" />
+                        {formatCountdown(secondsLeft)}
+                    </div>
+                </div>
+            )}
 
             {/* User Profile */}
             <div className="p-4 border-t border-divider">

@@ -1,16 +1,67 @@
-import { Search, MoreHorizontal, ChevronDown, LogOut, Sun, Moon, AlertTriangle, ArrowRight } from "lucide-react"
+import { Search, Sun, Moon, AlertTriangle, ArrowRight, Timer } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useAuth } from "@/contexts/AuthContext"
 import { useTheme } from "@/contexts/ThemeContext"
 import Link from "next/link"
+import { useState, useEffect } from "react"
+
+function getTokenExpiry(token: string): number | null {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))
+    return typeof payload.exp === 'number' ? payload.exp : null
+  } catch {
+    return null
+  }
+}
+
+function formatCountdown(seconds: number): string {
+  if (seconds <= 0) return 'Expired'
+  const h = Math.floor(seconds / 3600)
+  const m = Math.floor((seconds % 3600) / 60)
+  const s = seconds % 60
+  if (h > 0) return `${h}h ${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`
+  return `${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`
+}
 
 export function Header() {
-  const { user, logout, hasActiveSubscription, isLoading, isSubscriptionLoading } = useAuth()
+  const { user, token, logout, hasActiveSubscription, isLoading, isSubscriptionLoading } = useAuth()
   const { theme, toggleTheme } = useTheme()
+  const [secondsLeft, setSecondsLeft] = useState<number | null>(null)
+
+  useEffect(() => {
+    // Always read directly from localStorage so we catch overrideToken writes
+    // even if React hasn't flushed the state update yet on first render
+    const activeToken = localStorage.getItem('admin_token') || token
+    if (!activeToken) {
+      setSecondsLeft(null)
+      return
+    }
+
+    const expiry = getTokenExpiry(activeToken)
+    if (!expiry) {
+      setSecondsLeft(null)
+      return
+    }
+
+    const update = () => {
+      const remaining = Math.max(0, expiry - Math.floor(Date.now() / 1000))
+      setSecondsLeft(remaining)
+      if (remaining === 0) {
+        logout({ message: 'Your session has expired. Please sign in again.' })
+      }
+    }
+
+    update()
+    const id = setInterval(update, 1000)
+    return () => clearInterval(id)
+  }, [token])
 
   // Only show banner when both auth AND subscription checks are complete
   const showSubscriptionBanner = !isLoading && !isSubscriptionLoading && !hasActiveSubscription
+
+  const isExpiringSoon = secondsLeft !== null && secondsLeft > 0 && secondsLeft <= 300
+
 
   return (
     <header className="border-b border-border bg-card/50 backdrop-blur-sm">
@@ -51,7 +102,24 @@ export function Header() {
         </div>
 
         {/* Right side */}
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-3">
+          {/* Session Timer */}
+          {secondsLeft !== null && (
+            <div
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono font-medium tabular-nums border transition-colors ${
+                secondsLeft === 0
+                  ? 'bg-red-500/10 border-red-500/30 text-red-500'
+                  : isExpiringSoon
+                  ? 'bg-amber-500/10 border-amber-500/30 text-amber-500'
+                  : 'bg-muted/40 border-border/50 text-muted-foreground'
+              }`}
+              title="Time until your session expires"
+            >
+              <Timer className="h-3 w-3 shrink-0" />
+              {formatCountdown(secondsLeft)}
+            </div>
+          )}
+
           {/* Theme Toggle */}
           <Button
             variant="ghost"

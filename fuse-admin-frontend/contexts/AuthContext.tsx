@@ -71,6 +71,8 @@ interface AuthContextType {
   isLoading: boolean
   isSubscriptionLoading: boolean
   error: string | null
+  /** Dev helper: replace the active token in both state and localStorage */
+  overrideToken: (newToken: string) => void
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -518,6 +520,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const hasActiveSubscription = subscription?.status === 'active'
 
+  const overrideToken = (newToken: string) => {
+    localStorage.setItem('admin_token', newToken)
+    setToken(newToken)
+  }
+
   return (
     <AuthContext.Provider
       value={{
@@ -537,6 +544,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         isSubscriptionLoading,
         error,
+        overrideToken,
       }}
     >
       {children}

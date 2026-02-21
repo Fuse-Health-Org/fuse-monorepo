@@ -23,8 +23,9 @@ interface AuthContextType {
   resendMfaCode: () => Promise<boolean>
   cancelMfa: () => void
   mfa: MfaState
-  logout: () => void
+  logout: (opts?: { message?: string }) => void
   handleUnauthorized: () => void
+  overrideToken: (newToken: string) => void
   isLoading: boolean
   error: string | null
 }
@@ -322,14 +323,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError(null)
   }
 
-  const logout = () => {
+  const logout = (opts?: { message?: string }) => {
     localStorage.removeItem('tenant_token')
     localStorage.removeItem('tenant_user')
     setToken(null)
     setUser(null)
     setError(null)
     stopActivityTracking()
-    router.push('/signin')
+    const destination = opts?.message
+      ? `/signin?message=${encodeURIComponent(opts.message)}`
+      : '/signin'
+    router.push(destination)
   }
 
   return (
@@ -343,6 +347,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       mfa,
       logout,
       handleUnauthorized,
+      overrideToken: (newToken: string) => {
+        localStorage.setItem('tenant_token', newToken)
+        setToken(newToken)
+      },
       isLoading,
       error
     }}>

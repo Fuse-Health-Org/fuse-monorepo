@@ -10,6 +10,7 @@ interface AuthContextType {
   loading: boolean;
   signOut: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  overrideToken: (newToken: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -195,6 +196,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loading,
     signOut: handleSignOut,
     refreshUser,
+    overrideToken: (newToken: string) => {
+      localStorage.setItem('auth-token', newToken)
+    },
   };
 
   return (
