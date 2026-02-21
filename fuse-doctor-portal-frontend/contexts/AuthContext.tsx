@@ -1,6 +1,15 @@
-import { createContext, useContext, useState, useEffect, ReactNode, useMemo } from 'react'
+import { createContext, useContext, useState, useEffect, useRef, ReactNode, useMemo } from 'react'
 import { useRouter } from 'next/router'
 import { ApiClient } from '@/lib/api'
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000
+const REFRESH_THRESHOLD_MS  =  5 * 60 * 1000
+const ACTIVITY_CHECK_MS     = 60 * 1000
+
+function parseJWT(token: string): { exp?: number } | null {
+  try { return JSON.parse(atob(token.split('.')[1])) } catch { return null }
+}
 
 interface User {
     id: string
@@ -53,6 +62,59 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [mfa, setMfa] = useState<MfaState>({ required: false, token: null, resendsRemaining: 3 })
     const router = useRouter()
 
+    const tokenRef         = useRef<string | null>(null)
+    const lastActivityRef  = useRef<number>(Date.now())
+    const activityCheckRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+    useEffect(() => { tokenRef.current = token }, [token])
+
+    const recordActivity = () => { lastActivityRef.current = Date.now() }
+
+    const stopActivityTracking = () => {
+        const events = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click']
+        events.forEach(e => window.removeEventListener(e, recordActivity))
+        if (activityCheckRef.current) { clearInterval(activityCheckRef.current); activityCheckRef.current = null }
+    }
+
+    const silentRefresh = async (currentToken: string) => {
+        try {
+            const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${currentToken}` },
+            })
+            if (res.ok) {
+                const data = await res.json()
+                if (data.success && data.token) {
+                    localStorage.setItem('doctor_token', data.token)
+                    if (data.user) localStorage.setItem('doctor_user', JSON.stringify(data.user))
+                    setToken(data.token)
+                    if (data.user) setUser(data.user)
+                    console.log('🔄 [Auth] Doctor token refreshed (user active)')
+                }
+            } else {
+                stopActivityTracking()
+                handleUnauthorized()
+            }
+        } catch { /* network error — retry next tick */ }
+    }
+
+    const startActivityTracking = () => {
+        lastActivityRef.current = Date.now()
+        const events = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click']
+        events.forEach(e => window.addEventListener(e, recordActivity, { passive: true }))
+        if (activityCheckRef.current) clearInterval(activityCheckRef.current)
+        activityCheckRef.current = setInterval(async () => {
+            const t = tokenRef.current
+            if (!t) return
+            if (Date.now() - lastActivityRef.current >= INACTIVITY_TIMEOUT_MS) {
+                stopActivityTracking(); handleUnauthorized(); return
+            }
+            const payload = parseJWT(t)
+            if (!payload?.exp) return
+            if (payload.exp * 1000 - Date.now() < REFRESH_THRESHOLD_MS) await silentRefresh(t)
+        }, ACTIVITY_CHECK_MS)
+    }
+
     // Helper reused across unauthorized paths
     const handleUnauthorized = (message?: string) => {
         const logoutMessage = message || 'Your session has expired. Please sign in again.'
@@ -63,6 +125,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setToken(null)
         setUser(null)
         setError(logoutMessage)
+        stopActivityTracking()
 
         if (router.pathname !== '/signin') {
             router.push(`/signin?message=${encodeURIComponent(logoutMessage)}`)
@@ -76,6 +139,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setToken(null)
         setUser(null)
         setError(message ?? null)
+        stopActivityTracking()
 
         if (router.pathname !== '/signin') {
             router.push(message ? `/signin?message=${encodeURIComponent(message)}` : '/signin')
@@ -117,6 +181,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 const userData = JSON.parse(storedUser)
                 setToken(storedToken)
                 setUser(userData)
+                startActivityTracking()
             } catch (error) {
                 localStorage.removeItem('doctor_token')
                 localStorage.removeItem('doctor_user')
@@ -124,6 +189,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         setIsLoading(false)
+        return () => stopActivityTracking()
     }, [])
 
     const login = async (email: string, password: string): Promise<boolean | 'mfa_required'> => {
@@ -158,6 +224,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
                 setToken(authToken)
                 setUser(userData)
+                startActivityTracking()
 
                 setIsLoading(false)
                 return true
@@ -209,6 +276,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 setToken(authToken)
                 setUser(userData)
                 setMfa({ required: false, token: null, resendsRemaining: 3 })
+                startActivityTracking()
 
                 setIsLoading(false)
                 return true

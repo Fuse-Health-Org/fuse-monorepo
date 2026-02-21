@@ -12278,12 +12278,12 @@ const PORT = process.env.PORT || 3001;
 
 // Initialize database connection and start server
 async function startServer() {
-  // const dbConnected = await initializeDatabase();
+  const dbConnected = await initializeDatabase();
 
-  // if (!dbConnected) {
-  //   console.error("❌ Failed to connect to database. Exiting...");
-  //   process.exit(1);
-  // }
+  if (!dbConnected) {
+    console.error("❌ Failed to connect to database. Exiting...");
+    process.exit(1);
+  }
 
   // Import WebSocket service early so route handlers can reference it
   const WebSocketService = (await import("./services/websocket.service"))

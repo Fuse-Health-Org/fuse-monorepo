@@ -1,6 +1,15 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { User, checkAuth, signOut } from '../lib/auth';
 import { useRouter } from 'next/router';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000
+const REFRESH_THRESHOLD_MS  =  5 * 60 * 1000
+const ACTIVITY_CHECK_MS     = 60 * 1000
+
+function parseJWT(token: string): { exp?: number } | null {
+  try { return JSON.parse(atob(token.split('.')[1])) } catch { return null }
+}
 
 interface AuthContextType {
   user: User | null;
@@ -23,6 +32,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
+  const lastActivityRef  = useRef<number>(Date.now());
+  const activityCheckRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const recordActivity = () => { lastActivityRef.current = Date.now(); };
+
+  const stopTokenRefresh = () => {
+    const events = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click'];
+    events.forEach(e => window.removeEventListener(e, recordActivity));
+    if (activityCheckRef.current) { clearInterval(activityCheckRef.current); activityCheckRef.current = null; }
+  };
+
+  const startTokenRefresh = () => {
+    lastActivityRef.current = Date.now();
+    const events = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click'];
+    events.forEach(e => window.addEventListener(e, recordActivity, { passive: true }));
+    if (activityCheckRef.current) clearInterval(activityCheckRef.current);
+    activityCheckRef.current = setInterval(async () => {
+      const t = localStorage.getItem('auth-token');
+      if (!t) return;
+      if (Date.now() - lastActivityRef.current >= INACTIVITY_TIMEOUT_MS) { stopTokenRefresh(); return; }
+      const payload = parseJWT(t);
+      if (!payload?.exp) return;
+      if (payload.exp * 1000 - Date.now() < REFRESH_THRESHOLD_MS) {
+        try {
+          const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${t}` },
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.success && data.token) {
+              localStorage.setItem('auth-token', data.token);
+              console.log('🔄 [Auth] Affiliate token refreshed (user active)');
+            }
+          }
+        } catch { /* retry next tick */ }
+      }
+    }, ACTIVITY_CHECK_MS);
+  };
+
   const refreshUser = async () => {
     try {
       const userData = await checkAuth();
@@ -38,6 +87,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const handleSignOut = async () => {
     try {
+      stopTokenRefresh();
       localStorage.removeItem('auth-token');
       await signOut();
       setUser(null);
@@ -58,7 +108,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     initAuth();
+    return () => stopTokenRefresh();
   }, [router.pathname]);
+
+  // Start/stop token refresh alongside authentication state
+  useEffect(() => {
+    const publicRoute = isPublicRoute(router.pathname);
+    if (user && !publicRoute) {
+      startTokenRefresh();
+    } else {
+      stopTokenRefresh();
+    }
+  }, [user, router.pathname]);
 
   // Redirect to signin if user becomes unauthenticated
   useEffect(() => {

@@ -1,9 +1,18 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { User, checkAuth, signOut, hasPatientFrontendAccess } from '../lib/auth';
 import { useRouter } from 'next/router';
 import { SessionTimeoutManager } from '../lib/sessionTimeout';
 import { SessionWarning } from '../components/SessionWarning';
 import { PUBLIC_PATH_PATTERNS } from '@fuse/enums';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000
+const REFRESH_THRESHOLD_MS  =  5 * 60 * 1000
+const ACTIVITY_CHECK_MS     = 60 * 1000
+
+function parseJWT(token: string): { exp?: number } | null {
+  try { return JSON.parse(atob(token.split('.')[1])) } catch { return null }
+}
 
 interface AuthContextType {
   user: User | null;
@@ -67,7 +76,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [showSessionWarning, setShowSessionWarning] = useState(false);
   const [countdown, setCountdown] = useState(300); // 5 minutes countdown
   const router = useRouter();
-  const sessionManager = React.useRef<SessionTimeoutManager | null>(null);
+  const sessionManager    = React.useRef<SessionTimeoutManager | null>(null);
+  const lastActivityRef   = useRef<number>(Date.now());
+  const activityCheckRef  = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const recordActivity = () => { lastActivityRef.current = Date.now(); };
+
+  const stopTokenRefresh = () => {
+    const events = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click'];
+    events.forEach(e => window.removeEventListener(e, recordActivity));
+    if (activityCheckRef.current) { clearInterval(activityCheckRef.current); activityCheckRef.current = null; }
+  };
+
+  const startTokenRefresh = () => {
+    lastActivityRef.current = Date.now();
+    const events = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click'];
+    events.forEach(e => window.addEventListener(e, recordActivity, { passive: true }));
+    if (activityCheckRef.current) clearInterval(activityCheckRef.current);
+    activityCheckRef.current = setInterval(async () => {
+      const t = localStorage.getItem('auth-token');
+      if (!t) return;
+      if (Date.now() - lastActivityRef.current >= INACTIVITY_TIMEOUT_MS) { stopTokenRefresh(); return; }
+      const payload = parseJWT(t);
+      if (!payload?.exp) return;
+      if (payload.exp * 1000 - Date.now() < REFRESH_THRESHOLD_MS) {
+        try {
+          const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${t}` },
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.success && data.token) {
+              localStorage.setItem('auth-token', data.token);
+              console.log('🔄 [Auth] Patient token refreshed (user active)');
+            }
+          }
+        } catch { /* retry next tick */ }
+      }
+    }, ACTIVITY_CHECK_MS);
+  };
 
   const refreshUser = async () => {
     try {
@@ -101,6 +149,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         sessionManager.current.stop();
       }
       setShowSessionWarning(false);
+      stopTokenRefresh();
 
       // Remove JWT token from localStorage (using same key as api.ts)
       localStorage.removeItem('auth-token');
@@ -178,9 +227,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
       }
       sessionManager.current.start();
+      startTokenRefresh();
     } else if (sessionManager.current) {
       // Stop session manager when user is not authenticated or on public pages
       sessionManager.current.stop();
+      stopTokenRefresh();
     }
 
     // Cleanup on unmount
@@ -188,6 +239,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (sessionManager.current) {
         sessionManager.current.stop();
       }
+      stopTokenRefresh();
     };
   }, [user, router.pathname]);
 

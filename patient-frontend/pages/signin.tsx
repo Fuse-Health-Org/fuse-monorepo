@@ -646,7 +646,7 @@ export default function SignIn() {
                 }`}
               >
                 <Icon icon="lucide:flask-conical" className="h-3.5 w-3.5 shrink-0" />
-                {shortSession ? 'Short session active — token expires in 1 min' : 'Short session (debug)'}
+                {shortSession ? 'Short session active — token expires in 2 min' : 'Short session (debug)'}
               </button>
 
               <Button
