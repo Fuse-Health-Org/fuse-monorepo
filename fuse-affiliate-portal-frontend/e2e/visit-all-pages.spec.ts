@@ -1,14 +1,14 @@
 import { test, expect } from "@playwright/test";
 import { serviceUrls } from "@fuse/e2e";
 
-const BASE_URL = serviceUrls.adminApp;
-const EMAIL = process.env.E2E_ADMIN_EMAIL;
-const PASSWORD = process.env.E2E_ADMIN_PASSWORD;
+const BASE_URL = serviceUrls.affiliateApp;
+const EMAIL = process.env.E2E_AFFILIATE_EMAIL;
+const PASSWORD = process.env.E2E_AFFILIATE_PASSWORD;
 
 if (!EMAIL || !PASSWORD) {
   throw new Error(
-    "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD env vars are required. Example:\n" +
-    "  E2E_ADMIN_EMAIL=user@example.com E2E_ADMIN_PASSWORD=secret npx playwright test visit-all-pages"
+    "E2E_AFFILIATE_EMAIL and E2E_AFFILIATE_PASSWORD env vars are required. Example:\n" +
+    "  E2E_AFFILIATE_EMAIL=user@example.com E2E_AFFILIATE_PASSWORD=secret npx playwright test visit-all-pages"
   );
 }
 
@@ -27,7 +27,6 @@ test.describe("Visit all pages (deployed)", () => {
   test.setTimeout(300_000);
 
   let authToken: string;
-  let userData: string;
 
   test.beforeAll(async ({ browser }, testInfo) => {
     testInfo.setTimeout(120_000);
@@ -69,10 +68,7 @@ test.describe("Visit all pages (deployed)", () => {
 
     // Extract auth data from localStorage
     authToken = await page.evaluate(() =>
-      localStorage.getItem("admin_token") || ""
-    );
-    userData = await page.evaluate(() =>
-      localStorage.getItem("admin_user") || ""
+      localStorage.getItem("auth-token") || ""
     );
 
     expect(authToken).toBeTruthy();
@@ -84,45 +80,28 @@ test.describe("Visit all pages (deployed)", () => {
   // Seed localStorage before each test
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(
-      ({ token, user }) => {
-        localStorage.setItem("admin_token", token);
-        localStorage.setItem("admin_user", user);
+      ({ token }) => {
+        localStorage.setItem("auth-token", token);
       },
-      { token: authToken, user: userData }
+      { token: authToken }
     );
   });
 
   const publicPages = [
     { path: "/signin", name: "Sign In" },
-    { path: "/signup", name: "Sign Up" },
     { path: "/forgot-password", name: "Forgot Password" },
-    { path: "/terms", name: "Terms" },
-    { path: "/privacy", name: "Privacy" },
-    { path: "/privacy-notice", name: "Privacy Notice" },
   ];
 
   const protectedPages = [
-    { path: "/", name: "Dashboard" },
-    { path: "/settings", name: "Settings" },
-    { path: "/customers", name: "Customers" },
-    { path: "/contacts", name: "Contacts" },
-    { path: "/orders", name: "Orders" },
-    { path: "/affiliates", name: "Affiliates" },
+    { path: "/", name: "Home" },
+    { path: "/dashboard", name: "Dashboard" },
+    { path: "/analytics", name: "Analytics" },
+    { path: "/branding", name: "Branding" },
+    { path: "/onboarding", name: "Onboarding" },
     { path: "/payouts", name: "Payouts" },
     { path: "/products", name: "Products" },
-    { path: "/products/new", name: "New Product" },
-    { path: "/treatments", name: "Treatments" },
-    { path: "/treatments/new", name: "New Treatment" },
-    { path: "/analytics", name: "Analytics" },
-    { path: "/offerings", name: "Offerings" },
-    { path: "/portal", name: "Portal" },
-    { path: "/programs", name: "Programs" },
-    { path: "/sequences", name: "Sequences" },
-    { path: "/templates", name: "Templates" },
-    { path: "/tags", name: "Tags" },
-    { path: "/plans", name: "Plans" },
-    { path: "/checkout", name: "Checkout" },
-    { path: "/brand-signup", name: "Brand Signup" },
+    { path: "/revenue", name: "Revenue" },
+    { path: "/settings", name: "Settings" },
   ];
 
   for (const pg of publicPages) {
@@ -130,13 +109,14 @@ test.describe("Visit all pages (deployed)", () => {
       await page.goto(pg.path, { waitUntil: "load", timeout: 30_000 });
       await delay(DELAY_MS);
 
-      const title = await page.title();
-      expect(title.length).toBeGreaterThan(0);
-
+      // Affiliate frontend doesn't consistently use <title> tags
       const errorOverlay = page.locator("#__next-build-error");
       await expect(errorOverlay).toHaveCount(0);
 
-      console.log(`  ✓ ${pg.name} loaded — title: "${title}"`);
+      const body = page.locator("body");
+      await expect(body).not.toBeEmpty();
+
+      console.log(`  ✓ ${pg.name} loaded`);
     });
   }
 
@@ -149,16 +129,14 @@ test.describe("Visit all pages (deployed)", () => {
       const url = page.url();
       expect(url).not.toContain("/signin");
 
-      const title = await page.title();
-      expect(title.length).toBeGreaterThan(0);
-
+      // Affiliate frontend doesn't consistently use <title> tags
       const errorOverlay = page.locator("#__next-build-error");
       await expect(errorOverlay).toHaveCount(0);
 
       const body = page.locator("body");
       await expect(body).not.toBeEmpty();
 
-      console.log(`  ✓ ${pg.name} loaded — title: "${title}"`);
+      console.log(`  ✓ ${pg.name} loaded`);
     });
   }
 });

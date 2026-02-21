@@ -1,14 +1,14 @@
 import { test, expect } from "@playwright/test";
 import { serviceUrls } from "@fuse/e2e";
 
-const BASE_URL = serviceUrls.adminApp;
-const EMAIL = process.env.E2E_ADMIN_EMAIL;
-const PASSWORD = process.env.E2E_ADMIN_PASSWORD;
+const BASE_URL = serviceUrls.tenantApp;
+const EMAIL = process.env.E2E_TENANT_EMAIL;
+const PASSWORD = process.env.E2E_TENANT_PASSWORD;
 
 if (!EMAIL || !PASSWORD) {
   throw new Error(
-    "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD env vars are required. Example:\n" +
-    "  E2E_ADMIN_EMAIL=user@example.com E2E_ADMIN_PASSWORD=secret npx playwright test visit-all-pages"
+    "E2E_TENANT_EMAIL and E2E_TENANT_PASSWORD env vars are required. Example:\n" +
+    "  E2E_TENANT_EMAIL=user@example.com E2E_TENANT_PASSWORD=secret npx playwright test visit-all-pages"
   );
 }
 
@@ -27,7 +27,6 @@ test.describe("Visit all pages (deployed)", () => {
   test.setTimeout(300_000);
 
   let authToken: string;
-  let userData: string;
 
   test.beforeAll(async ({ browser }, testInfo) => {
     testInfo.setTimeout(120_000);
@@ -69,10 +68,7 @@ test.describe("Visit all pages (deployed)", () => {
 
     // Extract auth data from localStorage
     authToken = await page.evaluate(() =>
-      localStorage.getItem("admin_token") || ""
-    );
-    userData = await page.evaluate(() =>
-      localStorage.getItem("admin_user") || ""
+      localStorage.getItem("tenant_token") || ""
     );
 
     expect(authToken).toBeTruthy();
@@ -84,45 +80,36 @@ test.describe("Visit all pages (deployed)", () => {
   // Seed localStorage before each test
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(
-      ({ token, user }) => {
-        localStorage.setItem("admin_token", token);
-        localStorage.setItem("admin_user", user);
+      ({ token }) => {
+        localStorage.setItem("tenant_token", token);
       },
-      { token: authToken, user: userData }
+      { token: authToken }
     );
   });
 
   const publicPages = [
     { path: "/signin", name: "Sign In" },
-    { path: "/signup", name: "Sign Up" },
     { path: "/forgot-password", name: "Forgot Password" },
-    { path: "/terms", name: "Terms" },
-    { path: "/privacy", name: "Privacy" },
-    { path: "/privacy-notice", name: "Privacy Notice" },
   ];
 
   const protectedPages = [
     { path: "/", name: "Dashboard" },
-    { path: "/settings", name: "Settings" },
-    { path: "/customers", name: "Customers" },
-    { path: "/contacts", name: "Contacts" },
-    { path: "/orders", name: "Orders" },
-    { path: "/affiliates", name: "Affiliates" },
-    { path: "/payouts", name: "Payouts" },
+    { path: "/client-management", name: "Client Management" },
+    { path: "/doctor-applications", name: "Doctor Applications" },
+    { path: "/audit-logs", name: "Audit Logs" },
+    { path: "/support", name: "Support" },
     { path: "/products", name: "Products" },
-    { path: "/products/new", name: "New Product" },
-    { path: "/treatments", name: "Treatments" },
-    { path: "/treatments/new", name: "New Treatment" },
-    { path: "/analytics", name: "Analytics" },
-    { path: "/offerings", name: "Offerings" },
-    { path: "/portal", name: "Portal" },
+    { path: "/global-fees", name: "Global Fees" },
+    { path: "/payouts", name: "Payouts" },
     { path: "/programs", name: "Programs" },
-    { path: "/sequences", name: "Sequences" },
-    { path: "/templates", name: "Templates" },
-    { path: "/tags", name: "Tags" },
-    { path: "/plans", name: "Plans" },
-    { path: "/checkout", name: "Checkout" },
-    { path: "/brand-signup", name: "Brand Signup" },
+    { path: "/tier-management", name: "Tier Management" },
+    { path: "/website-builder", name: "Website Builder" },
+    { path: "/forms", name: "Forms" },
+    { path: "/teleforms", name: "Teleforms" },
+    { path: "/beluga-admin", name: "Beluga Admin" },
+    { path: "/ironsail-admin", name: "Ironsail Admin" },
+    { path: "/mdi-admin", name: "MDI Admin" },
+    { path: "/olympia-admin", name: "Olympia Admin" },
   ];
 
   for (const pg of publicPages) {
