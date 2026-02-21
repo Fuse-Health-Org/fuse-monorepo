@@ -382,11 +382,11 @@ export default function SignIn() {
             <button
                 type="button"
                 onClick={() => setShortSession(v => !v)}
-                className="fixed bottom-4 left-4 flex items-center gap-1.5 text-xs transition-colors"
+                className="fixed bottom-4 left-4 transition-colors"
                 style={{ color: shortSession ? '#a78bfa' : '#d1d5db' }}
+                title={shortSession ? 'Short session active (2 min)' : 'Short session (debug)'}
             >
-                <FlaskConical className="h-3 w-3 shrink-0" />
-                {shortSession ? 'Short session active (2 min)' : 'Short session (debug)'}
+                <FlaskConical className="h-3.5 w-3.5" />
             </button>
         </>
     )
